@@ -215,7 +215,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
 
       {/* Main Content Container (Exact max-w-7xl matching Home & Practice page) */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
         
         {/* 1. BREADCRUMB */}
         <div className="flex items-center gap-2 text-xs font-medium text-slate-400 dark:text-slate-500 mb-4 select-none">
@@ -225,49 +225,23 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           <span className="text-slate-700 dark:text-slate-300 font-semibold">Aptitude</span>
         </div>
 
-        {/* 2. HERO HEADER SECTION WITH AUTHENTIC EASEL ARTWORK */}
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-slate-100 dark:border-slate-800/80">
-          <div className="flex flex-col items-start max-w-2xl z-10 select-none">
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-3">
-              Aptitude{' '}
-              <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 dark:from-blue-400 dark:via-indigo-400 dark:to-purple-400 bg-clip-text text-transparent">
-                Practice
-              </span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300/90 leading-relaxed max-w-xl">
-              Choose a section and practice aptitude questions with real exam patterns to sharpen your speed, accuracy and problem solving skills.
-            </p>
-          </div>
-
-          {/* Right Hero Artwork with floating badges */}
-          <div className="relative shrink-0 flex items-center justify-center select-none pointer-events-none min-w-[280px] sm:min-w-[340px] md:min-w-[380px] h-32 sm:h-36 md:h-40">
-            {/* 1. Calculator Badge */}
-            <div className="absolute top-1 left-4 sm:left-8 z-20 w-8 h-8 rounded-xl bg-blue-500/90 dark:bg-blue-500/20 dark:border dark:border-blue-400/60 text-white dark:text-blue-300 flex items-center justify-center shadow-md dark:shadow-[0_0_15px_rgba(59,130,246,0.6)] transform -rotate-6 animate-pulse">
-              <i className="fa-solid fa-calculator text-xs"></i>
-            </div>
-
-            {/* 2. Bar Chart Badge */}
-            <div className="absolute -top-1 left-28 sm:left-36 z-20 w-8 h-8 rounded-xl bg-purple-600/90 dark:bg-purple-500/20 dark:border dark:border-purple-400/60 text-white dark:text-purple-300 flex items-center justify-center shadow-md dark:shadow-[0_0_15px_rgba(168,85,247,0.6)] transform rotate-3">
-              <i className="fa-solid fa-chart-simple text-xs"></i>
-            </div>
-
-            {/* 3. Lightbulb Badge */}
-            <div className="absolute top-0 right-16 sm:right-24 z-20 w-8 h-8 rounded-xl bg-amber-400/90 dark:bg-amber-500/20 dark:border dark:border-amber-400/60 text-slate-900 dark:text-amber-300 flex items-center justify-center shadow-md dark:shadow-[0_0_15px_rgba(245,158,11,0.6)] transform rotate-6">
-              <i className="fa-solid fa-lightbulb text-xs"></i>
-            </div>
-
-            {/* 4. Target Badge */}
-            <div className="absolute top-3 right-4 sm:right-8 z-20 w-8 h-8 rounded-xl bg-rose-500/90 dark:bg-rose-500/20 dark:border dark:border-rose-400/60 text-white dark:text-rose-300 flex items-center justify-center shadow-md dark:shadow-[0_0_15px_rgba(244,63,94,0.6)] transform -rotate-3">
-              <i className="fa-solid fa-bullseye text-xs"></i>
-            </div>
-
+        {/* 2. HERO BANNER SECTION (Using exact Light and Dark theme banners provided by user) */}
+        <section className="w-full pb-6">
+          <div className="w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80">
+            {/* Light Theme Banner */}
             <img
-              src="/aptitude_hero_illustration.png"
-              alt="Aptitude Practice Notes"
-              className="h-28 sm:h-32 md:h-36 w-auto object-contain drop-shadow-md z-10"
+              src="/aptitude_banner_light.png"
+              alt="Aptitude Practice Banner"
+              className="w-full h-auto block dark:hidden object-cover select-none pointer-events-none"
+            />
+            {/* Dark Theme Banner */}
+            <img
+              src="/aptitude_banner_dark.png"
+              alt="Aptitude Practice Banner"
+              className="w-full h-auto hidden dark:block object-cover select-none pointer-events-none"
             />
           </div>
-        </div>
+        </section>
 
         {/* 3. THREE CATEGORY SWITCHER CARDS (Quantitative, Reasoning, Verbal) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 py-8">
