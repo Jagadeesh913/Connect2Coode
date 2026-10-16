@@ -37,10 +37,10 @@ export function AdminTable<T>({
   }
 
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-[#14202C]/75 backdrop-blur-xl shadow-2xl font-sans">
+    <div className="w-full overflow-x-auto rounded-2xl border border-white/10 bg-neutral-900 backdrop-blur-xl shadow-2xl font-sans">
       <table className="w-full text-left border-collapse text-xs">
         <thead>
-          <tr className="border-b border-white/10 bg-[#090A0C]/90">
+          <tr className="border-b border-white/10 bg-neutral-950">
             {columns.map((col, i) => (
               <th key={i} className={`py-3.5 px-4 text-xs font-bold text-gray-400 uppercase tracking-wider ${col.className || ''}`}>
                 {col.header}

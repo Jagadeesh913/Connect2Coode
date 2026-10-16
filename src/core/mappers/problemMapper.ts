@@ -23,12 +23,62 @@ const readCompanies = (value: unknown, fallbackCompany?: string): string[] => {
   return fallbackCompany ? [fallbackCompany] : [];
 };
 
+export const KNOWN_QUESTION_PLATFORMS: Record<string, { refCode: string; refName: string }> = {
+  '1': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '2': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '3': { refCode: 'GFG', refName: 'GeeksforGeeks' },
+  '4': { refCode: 'AON', refName: 'AON Assessment Platform' },
+  '5': { refCode: 'TCSION', refName: 'TCS iON Digital Exam Platform' },
+  '6': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '7': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '8': { refCode: 'GFG', refName: 'GeeksforGeeks' },
+  '9': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '10': { refCode: 'AON', refName: 'AON Assessment Platform' },
+  '11': { refCode: 'TCSION', refName: 'TCS iON Digital Exam Platform' },
+  '12': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '13': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '14': { refCode: 'GFG', refName: 'GeeksforGeeks' },
+  '15': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '16': { refCode: 'TCSION', refName: 'TCS iON Digital Exam Platform' },
+  '17': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '18': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '19': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '20': { refCode: 'GFG', refName: 'GeeksforGeeks' },
+  '21': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '22': { refCode: 'METTL', refName: 'Mettl Online Assessment Platform' },
+  '23': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '24': { refCode: 'LEETCODE', refName: 'LeetCode' },
+  '26': { refCode: 'HACKERRANK', refName: 'HackerRank' },
+  '28': { refCode: 'LEETCODE', refName: 'LeetCode' },
+};
+
 export const mapProblemDto = (
   value: ProblemDto,
   context: ProblemMappingContext = {}
 ): Problem => {
   const rawValue = value as Record<string, unknown>;
   const rawId = rawValue.id ?? rawValue._id ?? '';
+  const knownPlatform = KNOWN_QUESTION_PLATFORMS[String(rawId)] || {
+    refCode: 'CONNECT2CODE',
+    refName: 'Connect 2 Code',
+  };
+
+  const qpfRefName = rawValue.qpfRefName
+    ? String(rawValue.qpfRefName)
+    : rawValue.examPlatform
+    ? String(rawValue.examPlatform)
+    : rawValue.platformName
+    ? String(rawValue.platformName)
+    : rawValue.platform
+    ? String(rawValue.platform)
+    : knownPlatform.refName;
+
+  const qpfRefCode = rawValue.qpfRefCode
+    ? String(rawValue.qpfRefCode)
+    : rawValue.platformCode
+    ? String(rawValue.platformCode)
+    : knownPlatform.refCode;
+
   const topic =
     rawValue.topicName ||
     rawValue.topicRefName ||
@@ -75,10 +125,10 @@ export const mapProblemDto = (
     difficultyRefCode: rawValue.difficultyRefCode ? String(rawValue.difficultyRefCode) : undefined,
     topicRefName: rawValue.topicRefName ? String(rawValue.topicRefName) : undefined,
     topicRefCode: rawValue.topicRefCode ? String(rawValue.topicRefCode) : undefined,
-    qpfRefGroupCode: rawValue.qpfRefGroupCode ? String(rawValue.qpfRefGroupCode) : undefined,
-    qpfRefCode: rawValue.qpfRefCode ? String(rawValue.qpfRefCode) : undefined,
-    qpfRefName: rawValue.qpfRefName ? String(rawValue.qpfRefName) : undefined,
-    examPlatform: rawValue.examPlatform ? String(rawValue.examPlatform) : undefined,
+    qpfRefGroupCode: rawValue.qpfRefGroupCode ? String(rawValue.qpfRefGroupCode) : 'QPF',
+    qpfRefCode: qpfRefCode,
+    qpfRefName: qpfRefName,
+    examPlatform: rawValue.examPlatform ? String(rawValue.examPlatform) : qpfRefName,
     questionHints: Array.isArray(rawValue.questionHints) ? rawValue.questionHints : undefined,
     hints: Array.isArray(rawValue.hints) ? rawValue.hints.map(String) : undefined,
     testCases: Array.isArray(rawValue.testCases) ? rawValue.testCases : undefined,

@@ -36,6 +36,10 @@ export class AppErrorBoundary extends React.Component<
     window.location.reload();
   };
 
+  handleGoHome = (): void => {
+    window.location.href = '/';
+  };
+
   render(): React.ReactNode {
     if (!this.state.hasError) {
       return this.props.children;
@@ -44,30 +48,64 @@ export class AppErrorBoundary extends React.Component<
     return (
       <main
         role="alert"
-        className="min-h-screen bg-[#090A0C] text-white flex items-center justify-center px-6"
+        className="min-h-screen w-full bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans transition-colors duration-200"
       >
-        <section className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#181A20] p-8 text-center shadow-xl">
+        {/* Ambient background glows */}
+        <div className="fixed top-12 -left-48 w-96 h-[400px] bg-rose-500/10 dark:bg-rose-600/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+        <div className="fixed bottom-12 -right-48 w-96 h-[400px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none -z-10" />
+
+        <section className="w-full max-w-lg rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-md p-8 sm:p-10 text-center shadow-xl relative z-10">
+          
+          {/* Brand Logo Header */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <img src="/logo-mark.png" alt="Connect to Code" className="w-8 h-8 rounded-lg" />
+            <span className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white">
+              connect<span className="text-blue-600">2</span>code
+            </span>
+          </div>
+
+          {/* Alert Icon Badge */}
           <div
             aria-hidden="true"
-            className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400"
+            className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200/80 dark:border-rose-900/60 text-rose-500 dark:text-rose-400 shadow-2xs"
           >
-            <i className="fa-solid fa-triangle-exclamation" />
+            <i className="fa-solid fa-triangle-exclamation text-xl" />
           </div>
-          <h1 className="text-xl font-bold">Something went wrong</h1>
-          <p className="mt-2 text-sm leading-6 text-gray-400">
-            The page could not be rendered safely. Reload to restart the application.
+
+          <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
+            Something went wrong
+          </h1>
+          <p className="text-sm leading-6 text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+            The page encountered an unexpected issue and could not be rendered safely. Please reload to resume your session.
           </p>
-          <button
-            type="button"
-            onClick={this.handleReload}
-            className="mt-6 inline-flex min-h-11 items-center justify-center rounded-lg bg-[#A3E635] px-5 text-sm font-bold text-black hover:bg-[#84CC16]"
-          >
-            Reload application
-          </button>
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={this.handleReload}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+            >
+              <i className="fa-solid fa-rotate-right text-xs"></i>
+              <span>Reload application</span>
+            </button>
+            <button
+              type="button"
+              onClick={this.handleGoHome}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
+            >
+              <span>Return Home</span>
+            </button>
+          </div>
+
           {import.meta.env.DEV && this.state.message ? (
-            <p className="mt-4 break-words text-left text-xs text-gray-500" data-testid="error-boundary-message">
-              {this.state.message}
-            </p>
+            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-rose-500 block mb-1">
+                Developer Diagnostics:
+              </span>
+              <p className="break-words text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800" data-testid="error-boundary-message">
+                {this.state.message}
+              </p>
+            </div>
           ) : null}
         </section>
       </main>

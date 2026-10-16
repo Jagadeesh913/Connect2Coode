@@ -38,6 +38,7 @@ export const API_ENDPOINTS = {
     ATTEMPTED_QUESTIONS: (userId: string | number) => `/${userId}/getAPttemptedQuestionIds`,
     QUESTION_SUBMISSIONS: (userId: string | number, questionId: string | number) =>
       `/${userId}/question/${questionId}/getSubmissions`,
+    USER_INFO: (userId: string | number) => `/userInfo/${userId}`,
     SOLVED_QUESTIONS: (userId: string | number) => `/${userId}/getSubmiteedQuestionIds`,
   },
   LANGUAGE: {
@@ -50,5 +51,17 @@ export const API_ENDPOINTS = {
     USER_SUBMIT: '/submitCode',
     ADMIN_RUN: '/admin/testCode',
     ADMIN_SUBMIT: '/admin/submitCode',
+  },
+  INSTITUTION: {
+    ADMIN: {
+      BASE: '/admin/institutions',
+      DETAILS: (id: string | number) => `/admin/institutions/${id}`,
+      STATUS: (id: string | number) => `/admin/institutions/${id}/status`,
+    },
+    PUBLIC: {
+      BASE: '/institutions',
+      SEARCH: '/institutions/search',
+      DETAILS: (id: string | number) => `/institutions/${id}`,
+    },
   },
 } as const;

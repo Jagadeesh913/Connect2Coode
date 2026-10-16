@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const root = process.cwd();
-const scanRoots = ['src', 'index.html', 'vite.config.js', '.github'];
+const scanRoots = ['src', 'index.html', 'vite.config.ts', '.github'];
 const bannedPatterns = [
   { label: 'Vercel reference', pattern: /vercel\.app|vercel\.com|Vercel/i },
   { label: 'client-side mock mode', pattern: /VITE_USE_MOCK/ },

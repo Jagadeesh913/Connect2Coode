@@ -18,7 +18,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   icon,
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-gray-800 rounded-xl bg-[#111827]/40 my-4">
+    <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-gray-800 rounded-xl bg-neutral-900 my-4">
       <div className="p-3 bg-gray-800/50 text-gray-400 rounded-full mb-4">
         {icon || <Inbox className="w-8 h-8" />}
       </div>

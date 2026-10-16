@@ -18,7 +18,7 @@ export const AdminBreadcrumb: React.FC = () => {
 
   return (
     <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-gray-400 font-sans">
-      <Link to="/admin/dashboard" className="hover:text-[#A3E635] transition-colors">
+      <Link to="/admin/dashboard" className="hover:text-white transition-colors">
         Admin
       </Link>
       {breadcrumbs.length > 1 &&
@@ -28,7 +28,7 @@ export const AdminBreadcrumb: React.FC = () => {
             {idx === breadcrumbs.length - 2 ? (
               <span className="font-semibold text-white truncate">{item.label}</span>
             ) : (
-              <Link to={item.path} className="hover:text-[#A3E635] transition-colors truncate">
+              <Link to={item.path} className="hover:text-white transition-colors truncate">
                 {item.label}
               </Link>
             )}

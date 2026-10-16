@@ -1,26 +1,105 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
+import { tokenStorage } from '../core/security/tokenStorage';
 import type { ApiResponse } from '../core/types/api';
-import type { UserProfile } from '../core/types/domain';
+import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../core/types/domain';
 
 export type UserProfileData = UserProfile;
 
 export const profileService = {
+  /**
+   * Fetches baseline user profile from session and userInfo endpoint
+   */
   async getProfile(): Promise<ApiResponse<UserProfileData>> {
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.PROFILE);
+    const storedUser = tokenStorage.getUser();
+    if (storedUser) {
+      const fallbackProfile: UserProfileData = {
+        id: storedUser.id,
+        email: storedUser.email,
+        firstName: storedUser.firstName,
+        lastName: storedUser.lastName,
+        fullName: storedUser.fullName || `${storedUser.firstName || ''} ${storedUser.lastName || ''}`.trim(),
+        role: storedUser.role,
+        avatarUrl: storedUser.avatarUrl,
+      };
+
+      if (storedUser.id) {
+        try {
+          const infoRes = await this.getUserInfo(storedUser.id);
+          if (infoRes?.data) {
+            fallbackProfile.regNumber = infoRes.data.regNumber;
+            fallbackProfile.collegeName = infoRes.data.college;
+            fallbackProfile.bio = infoRes.data.bio;
+            fallbackProfile.joinedYear = infoRes.data.joinedYear;
+            fallbackProfile.passedOutYear = infoRes.data.passedOutYear;
+          }
+        } catch {}
+      }
+
+      return {
+        statusCode: 200,
+        message: 'Profile loaded from session',
+        data: fallbackProfile,
+      };
+    }
+
     return {
       statusCode: 200,
-      message: 'Profile fetched',
-      data: res?.data || res || null,
+      message: 'No profile found',
+      data: null as any,
     };
   },
 
+  /**
+   * Updates base profile and synchronizes with tokenStorage
+   */
   async updateProfile(payload: Partial<UserProfileData>): Promise<ApiResponse<UserProfileData>> {
-    const res: any = await apiClient.put(API_ENDPOINTS.USER.UPDATE, payload);
+    const current = tokenStorage.getUser() || ({} as any);
+    const updated = {
+      ...current,
+      ...payload,
+      fullName: payload.fullName || `${payload.firstName || current.firstName || ''} ${payload.lastName || current.lastName || ''}`.trim() || current.fullName,
+    };
+    tokenStorage.setUser(updated);
+
     return {
       statusCode: 200,
       message: 'Profile updated successfully',
-      data: res?.data || res || null,
+      data: updated as UserProfileData,
+    };
+  },
+
+  /**
+   * GET /api/v1/userInfo/{userId}
+   * Fetches academic/user registration details by userId
+   */
+  async getUserInfo(
+    userId: string | number,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<UserInfoData | null>> {
+    const res: any = await apiClient.get(API_ENDPOINTS.USER.USER_INFO(userId), { signal });
+    return {
+      statusCode: res?.statusCode || 200,
+      message: res?.message || 'User profile fetched successfully',
+      data: res?.data ?? null,
+      errors: res?.errors ?? null,
+    };
+  },
+
+  /**
+   * POST /api/v1/userInfo/{userId}
+   * Creates or updates academic user profile info
+   */
+  async saveUserInfo(
+    userId: string | number,
+    payload: SaveUserInfoPayload
+  ): Promise<ApiResponse<UserInfoData>> {
+    const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payload);
+    return {
+      statusCode: res?.statusCode || 200,
+      message: res?.message || 'User profile saved successfully',
+      data: res?.data ?? res,
+      errors: res?.errors ?? null,
     };
   },
 };

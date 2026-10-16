@@ -57,11 +57,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
       {/* Container */}
       <div
-        className={`relative w-full bg-[#121316]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[90vh] z-10 text-left font-sans ${widthClasses[maxWidth]}`}
+        className={`relative w-full bg-neutral-900 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col max-h-[90vh] z-10 text-left font-sans ${widthClasses[maxWidth]}`}
       >
         {/* Header */}
         {(title || subtitle) && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#090A0C]/90">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-neutral-950">
             <div>
               <h3 className="text-lg font-bold text-white font-heading">{title}</h3>
               {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
@@ -81,7 +81,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-[#090A0C]/90 border-t border-white/10">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-neutral-950 border-t border-white/10">
             {footer}
           </div>
         )}

@@ -1,4 +1,3 @@
-// import { GfgLogoIcon, LeetCodeLogoIcon, HackerRankLogoIcon } from '../../../shared/components/ui/PlatformIcons';
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
@@ -44,7 +43,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
       title: 'Data Structures & Algorithms',
       subtitle: 'Step by step guide to mastering DSA for interviews and real-world coding',
       phases: [
-        { title: 'Basics', color: '#A3E635', topics: ['Arrays & Strings', 'Linked Lists', 'Stacks & Queues', 'Hash Maps', 'Big-O Analysis'] },
+        { title: 'Basics', color: '#a3a3a3', topics: ['Arrays & Strings', 'Linked Lists', 'Stacks & Queues', 'Hash Maps', 'Big-O Analysis'] },
         { title: 'Trees & Graphs', color: '#38BDF8', topics: ['Binary Trees', 'BST & Traversals', 'Heaps', 'Graphs (BFS/DFS)', 'Priority Queues'] },
         { title: 'Sorting & Searching', color: '#818CF8', topics: ['Merge Sort', 'Quick Sort', 'Binary Search', 'Two Pointers', 'Sliding Window'] },
         { title: 'Advanced Patterns', color: '#C084FC', topics: ['Recursion', 'Backtracking', 'Dynamic Programming', 'Greedy Algorithms', 'Tries'] },
@@ -54,7 +53,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
         {
           id: 'dsa-1',
           title: 'Arrays & Strings',
-          color: '#A3E635',
+          color: '#a3a3a3',
           icon: 'fa-solid fa-code',
           tags: ['traversal', 'two pointers', 'sliding window', 'prefix sum'],
           description: 'Master linear data structures, contiguous memory allocation, two pointers, and sliding window optimization.',
@@ -71,7 +70,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
         {
           id: 'dsa-2',
           title: 'Linked Lists',
-          color: '#A3E635',
+          color: '#a3a3a3',
           icon: 'fa-solid fa-layer-group',
           tags: ['singly', 'doubly', 'fast/slow pointers', 'reversal'],
           description: 'Understand non-contiguous node references, pointer manipulation, and cycle detection.',
@@ -213,7 +212,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
       title: 'Java Backend Developer',
       subtitle: 'Step by step guide to mastering Core Java, Spring Boot, Microservices, and Enterprise Architecture',
       phases: [
-        { title: 'Java Core & JVM', color: '#A3E635', topics: ['Syntax & Primitives', 'OOP & Interfaces', 'JVM Architecture', 'Garbage Collection', 'Exception Handling'] },
+        { title: 'Java Core & JVM', color: '#a3a3a3', topics: ['Syntax & Primitives', 'OOP & Interfaces', 'JVM Architecture', 'Garbage Collection', 'Exception Handling'] },
         { title: 'Collections & Streams', color: '#38BDF8', topics: ['ArrayList & HashMap', 'ConcurrentHashMap', 'Streams API', 'Generics & Wildcards', 'Lambdas'] },
         { title: 'Multithreading', color: '#818CF8', topics: ['Thread Lifecycle', 'Executors & Pools', 'CompletableFuture', 'Volatile & Locks', 'Atomic Types'] },
         { title: 'Spring Boot', color: '#C084FC', topics: ['Spring IoC & DI', 'REST Controllers', 'Spring Data JPA', 'Spring Security', 'Maven & Gradle'] },
@@ -223,7 +222,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
         {
           id: 'java-1',
           title: 'Java Core & JVM Memory Architecture',
-          color: '#A3E635',
+          color: '#a3a3a3',
           icon: 'fa-brands fa-java',
           tags: ['JDK JRE JVM', 'Bytecode', 'Heap vs Stack', 'Garbage Collection'],
           description: 'Master Java syntax, bytecode compilation, class loader delegation, and memory tuning.',
@@ -276,7 +275,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
       title: 'System Design',
       subtitle: 'Step by step guide to designing scalable, reliable, and fault-tolerant distributed systems',
       phases: [
-        { title: 'Fundamentals', color: '#A3E635', topics: ['Scalability (Vertical vs Horizontal)', 'Load Balancing', 'Caching Strategies', 'Database Sharding', 'CAP Theorem'] },
+        { title: 'Fundamentals', color: '#a3a3a3', topics: ['Scalability (Vertical vs Horizontal)', 'Load Balancing', 'Caching Strategies', 'Database Sharding', 'CAP Theorem'] },
         { title: 'Networking & APIs', color: '#38BDF8', topics: ['HTTP / HTTPS / gRPC', 'WebSockets vs Polling', 'API Gateways', 'Rate Limiting', 'CDN Setup'] },
         { title: 'Databases & Storage', color: '#818CF8', topics: ['SQL vs NoSQL', 'Replication & Master-Slave', 'Consistent Hashing', 'Object Storage (S3)', 'WAL & Indexing'] },
         { title: 'Distributed Systems', color: '#C084FC', topics: ['Message Queues (Kafka)', 'Event-Driven Architecture', 'Distributed Locking', 'Idempotency', 'Consensus (Raft)'] },
@@ -286,7 +285,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
         {
           id: 'sd-1',
           title: 'Scalability & Load Balancing',
-          color: '#A3E635',
+          color: '#a3a3a3',
           icon: 'fa-solid fa-network-wired',
           tags: ['Load Balancers', 'Nginx', 'Round Robin', 'Least Connections'],
           description: 'Master horizontal scaling, reverse proxies, and traffic distribution algorithms.'
@@ -333,7 +332,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
     title: formattedTitle,
     subtitle: `Step by step guide to mastering ${formattedTitle} for software engineering careers`,
     phases: [
-      { title: 'Foundations', color: '#A3E635', topics: [`${formattedTitle} Core`, 'Syntax & Concepts', 'Development Environment', 'Version Control', 'Basic Tooling'] },
+      { title: 'Foundations', color: '#a3a3a3', topics: [`${formattedTitle} Core`, 'Syntax & Concepts', 'Development Environment', 'Version Control', 'Basic Tooling'] },
       { title: 'Core Skills', color: '#38BDF8', topics: ['Data Handling', 'APIs & Services', 'Framework Mechanics', 'Testing Basics', 'Debugging'] },
       { title: 'Advanced Concepts', color: '#818CF8', topics: ['Architecture Patterns', 'Performance Tuning', 'Security Practices', 'Optimization', 'Async Processing'] },
       { title: 'Ecosystem & Tools', color: '#C084FC', topics: ['CI/CD Pipelines', 'Containerization', 'Deployment', 'Monitoring', 'Cloud Hosting'] },
@@ -343,7 +342,7 @@ const getRoadmapData = (slug: string | undefined): RoadmapData => {
       {
         id: 'node-1',
         title: `${formattedTitle} Core Fundamentals`,
-        color: '#A3E635',
+        color: '#a3a3a3',
         icon: 'fa-solid fa-code',
         tags: ['syntax', 'primitives', 'core mechanics', 'basics'],
         description: `Master the foundational syntax, runtime execution, and primary building blocks of ${formattedTitle}.`
@@ -394,9 +393,9 @@ export const RoadmapDetails: React.FC = () => {
       <div className="pt-2 sm:pt-4 mb-6">
         <Link
           to="/roadmaps"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-[#A3E635] transition-all bg-[#202225] border border-white/10 hover:border-[#A3E635]/40 px-4 py-2 rounded-xl shadow-md group"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white transition-all bg-neutral-800 border border-white/10 hover:border-neutral-700 px-4 py-2 rounded-xl shadow-md group"
         >
-          <i className="fa-solid fa-arrow-left text-xs text-[#A3E635] group-hover:-translate-x-0.5 transition-transform"></i>
+          <i className="fa-solid fa-arrow-left text-xs text-neutral-300 group-hover:-translate-x-0.5 transition-transform"></i>
           <span>Back to Roadmaps</span>
         </Link>
       </div>
@@ -404,7 +403,7 @@ export const RoadmapDetails: React.FC = () => {
       {/* 2. HERO HEADER SECTION - DSA Sheet Theme */}
       <section className="mb-10 text-center flex flex-col items-center">
         <h1 className="font-heading font-bold text-center text-3xl sm:text-4xl md:text-5xl tracking-tight text-white mb-2.5 leading-tight">
-          {roadmapData.title} <span className="text-[#A3E635]">Roadmap</span>
+          {roadmapData.title} <span className="text-neutral-300">Roadmap</span>
         </h1>
         <p className="text-center text-xs sm:text-sm font-sans mb-6 text-gray-400 max-w-2xl leading-relaxed">
           {roadmapData.subtitle}
@@ -412,7 +411,7 @@ export const RoadmapDetails: React.FC = () => {
 
         {/* DSA Sheet Gradient Line */}
         <div className="flex justify-center mb-9">
-          <div className="shrink-0 h-0.5 rounded-full w-60 bg-gradient-to-r from-[#A3E635] via-[#38BDF8] to-[#C084FC]"></div>
+          <div className="shrink-0 h-0.5 rounded-full w-60 bg-gradient-to-r from-neutral-700 via-[#38BDF8] to-[#C084FC]"></div>
         </div>
 
         {/* HERO DIAGRAM CONTAINER */}
@@ -420,13 +419,13 @@ export const RoadmapDetails: React.FC = () => {
           
           {/* Top Banner Pill - LIME ACCENT */}
           <div
-            className="flex items-center justify-center text-center font-heading font-bold text-black bg-[#A3E635] border border-[#A3E635] px-8 py-3 rounded-2xl text-sm sm:text-base shadow-[0_0_24px_rgba(163,230,53,0.3)] tracking-tight"
+            className="flex items-center justify-center text-center font-heading font-bold text-black bg-neutral-100 text-neutral-900 border border-neutral-600 px-8 py-3 rounded-2xl text-sm sm:text-base  tracking-tight"
           >
             {roadmapData.title}
           </div>
 
           <div
-            className="w-0.5 h-8 bg-gradient-to-b from-[#A3E635]/60 to-[#A3E635]/10"
+            className="w-0.5 h-8 bg-gradient-to-b from-neutral-700/60 to-neutral-700/10"
           ></div>
 
           {/* Grid of Columns for Phases - DSA SHEET STYLING */}
@@ -435,21 +434,21 @@ export const RoadmapDetails: React.FC = () => {
               
               {/* Multi-Color Gradient Connection Line */}
               <div
-                className="hidden sm:block absolute rounded-full top-0 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-[#A3E635] via-[#38BDF8] via-[#818CF8] via-[#C084FC] to-[#F97316] shadow-[0_0_12px_rgba(163,230,53,0.2)]"
+                className="hidden sm:block absolute rounded-full top-0 left-[10%] right-[10%] h-0.5 bg-gradient-to-r from-neutral-700 via-[#38BDF8] via-[#818CF8] via-[#C084FC] to-[#F97316] shadow-[0_0_12px_rgba(163,230,53,0.2)]"
               ></div>
 
               {/* Watermark Tag */}
               <div
-                className="hidden sm:flex absolute items-center justify-center gap-1 font-mono text-[10px] select-none -top-2.5 left-1/2 -translate-x-1/2 bg-[#121113] border border-white/10 px-2.5 py-0.5 rounded-full text-gray-300 z-10"
+                className="hidden sm:flex absolute items-center justify-center gap-1 font-mono text-[10px] select-none -top-2.5 left-1/2 -translate-x-1/2 bg-neutral-900 border border-white/10 px-2.5 py-0.5 rounded-full text-gray-300 z-10"
               >
-                <span className="text-[#A3E635]">✦</span>
+                <span className="text-neutral-300">✦</span>
                 <span className="text-gray-300 font-bold">techroadmaps.in</span>
               </div>
 
               {/* 5 Column Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
                 {roadmapData.phases.map((phase, pIdx) => {
-                  const phaseColors = ['#A3E635', '#38BDF8', '#818CF8', '#C084FC', '#F97316'];
+                  const phaseColors = ['#a3a3a3', '#38BDF8', '#818CF8', '#C084FC', '#F97316'];
                   const curColor = phase.color || phaseColors[pIdx % phaseColors.length];
 
                   return (
@@ -464,7 +463,7 @@ export const RoadmapDetails: React.FC = () => {
                       ></div>
 
                       <div
-                        className="w-full rounded-xl p-3.5 bg-[#202225] hover:bg-[#2f3136] border border-white/10 hover:border-white/30 transition-all duration-300 hover:-translate-y-1 shadow-md flex flex-col justify-between"
+                        className="w-full rounded-xl p-3.5 bg-neutral-800 hover:bg-neutral-800 border border-white/10 hover:border-white/30 transition-all duration-300 hover:-translate-y-1 shadow-md flex flex-col justify-between"
                       >
                         <div>
                           <div
@@ -482,7 +481,7 @@ export const RoadmapDetails: React.FC = () => {
                             {phase.topics.map((topItem, tIdx) => (
                               <div
                                 key={tIdx}
-                                className="text-[11px] font-sans text-center rounded-lg bg-[#121113] border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition-all py-1.5 px-2.5 shadow-xs"
+                                className="text-[11px] font-sans text-center rounded-lg bg-neutral-900 border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition-all py-1.5 px-2.5 shadow-xs"
                               >
                                 {topItem}
                               </div>
@@ -497,11 +496,11 @@ export const RoadmapDetails: React.FC = () => {
             </div>
 
             {/* Bottom CTA Pill - LIME ACCENT */}
-            <div className="w-0.5 h-7 mx-auto mt-2 bg-gradient-to-b from-[#F97316]/30 to-[#A3E635]/60"></div>
+            <div className="w-0.5 h-7 mx-auto mt-2 bg-gradient-to-b from-[#F97316]/30 to-neutral-700/60"></div>
 
             <div className="flex flex-col items-center">
               <div
-                className="inline-flex items-center justify-center text-center font-bold text-xs sm:text-sm text-black bg-[#A3E635] hover:bg-[#84CC16] border border-[#A3E635] px-6 py-2.5 rounded-xl shadow-[0_0_16px_rgba(163,230,53,0.2)] transition-all cursor-pointer"
+                className="inline-flex items-center justify-center text-center font-bold text-xs sm:text-sm text-black bg-neutral-100 text-neutral-900 hover:bg-neutral-200 border border-neutral-600 px-6 py-2.5 rounded-xl shadow-[0_0_16px_rgba(163,230,53,0.2)] transition-all cursor-pointer"
               >
                 <span>Access Full {roadmapData.title} Roadmap — Free</span>
                 <i className="fa-solid fa-chevron-down ml-2 text-xs text-black"></i>
@@ -515,42 +514,42 @@ export const RoadmapDetails: React.FC = () => {
       <div id="roadmap-journey">
         <section className="mb-14">
           <h2 className="text-2xl sm:text-3xl font-heading font-bold text-white mb-2">
-            {roadmapData.title} <span className="text-[#A3E635]">Learning Journey</span>
+            {roadmapData.title} <span className="text-neutral-300">Learning Journey</span>
           </h2>
           <p className="text-xs text-gray-400 font-sans mb-3">
             Click any section to explore learning resources
           </p>
-          <div className="w-12 h-1 bg-[#A3E635] rounded-full mb-8 opacity-90"></div>
+          <div className="w-12 h-1 bg-neutral-100 text-neutral-900 rounded-full mb-8 opacity-90"></div>
 
           {/* Accordion Node List */}
           <div className="flex flex-col items-center w-full">
             {roadmapData.journeyNodes.map((node, nIdx) => {
-              const curColor = node.color || '#A3E635';
+              const curColor = node.color || '#a3a3a3';
 
               return (
                 <React.Fragment key={node.id}>
                   {nIdx > 0 && (
-                    <div className="w-0.5 h-8 bg-[#A3E635]/30"></div>
+                    <div className="w-0.5 h-8 bg-neutral-800"></div>
                   )}
                   <div className="flex flex-col items-center w-full max-w-lg">
                     <button
                       onClick={() => setExpandedNodeId(expandedNodeId === node.id ? null : node.id)}
-                      className="w-full rounded-2xl p-5 flex items-start gap-4 text-left transition-all duration-200 bg-[#202225] hover:bg-[#2f3136] border border-white/10 hover:border-[#A3E635]/40 shadow-md cursor-pointer group"
+                      className="w-full rounded-2xl p-5 flex items-start gap-4 text-left transition-all duration-200 bg-neutral-800 hover:bg-neutral-800 border border-white/10 hover:border-neutral-700 shadow-md cursor-pointer group"
                     >
                       {/* Icon Container */}
                       <div
-                        className="w-11 h-11 rounded-xl bg-[#121113] border border-white/10 flex items-center justify-center shrink-0 group-hover:border-[#A3E635]/40 transition-colors shadow-sm"
+                        className="w-11 h-11 rounded-xl bg-neutral-900 border border-white/10 flex items-center justify-center shrink-0 group-hover:border-neutral-700 transition-colors shadow-sm"
                       >
                         <i className={`${node.icon || 'fa-solid fa-code'} text-base`} style={{ color: curColor }}></i>
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-sm sm:text-base font-semibold font-heading text-white group-hover:text-[#A3E635] transition-colors">
+                          <h3 className="text-sm sm:text-base font-semibold font-heading text-white group-hover:text-white transition-colors">
                             {node.title}
                           </h3>
                           <i
-                            className={`fa-solid fa-chevron-right text-xs text-[#A3E635] transition-transform duration-200 ${
+                            className={`fa-solid fa-chevron-right text-xs text-neutral-300 transition-transform duration-200 ${
                               expandedNodeId === node.id ? 'rotate-90' : ''
                             }`}
                           ></i>
@@ -561,7 +560,7 @@ export const RoadmapDetails: React.FC = () => {
                           {node.tags.map((tag, tIdx) => (
                             <span
                               key={tIdx}
-                              className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-[#121113] border border-white/10 text-gray-300"
+                              className="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-neutral-900 border border-white/10 text-gray-300"
                             >
                               {tag}
                             </span>
@@ -593,7 +592,7 @@ export const RoadmapDetails: React.FC = () => {
                                     return (
                                       <div
                                         key={pIdx}
-                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-[#121113] border border-white/10 text-gray-200 gap-2"
+                                        className="flex flex-col sm:flex-row sm:items-center justify-between p-2.5 rounded-xl bg-neutral-900 border border-white/10 text-gray-200 gap-2"
                                       >
                                         <div className="flex items-center gap-2 min-w-0">
                                           <span className="font-medium font-sans text-xs sm:text-sm text-white truncate">{p.title}</span>
@@ -605,7 +604,7 @@ export const RoadmapDetails: React.FC = () => {
                                         {isOwn ? (
                                           <Link
                                             to={`/problems/${p.slug}`}
-                                            className="px-3 py-1 bg-[#A3E635] hover:bg-[#84CC16] text-black font-bold rounded-lg text-xs transition-all font-mono self-start sm:self-auto"
+                                            className="px-3 py-1 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-bold rounded-lg text-xs transition-all font-mono self-start sm:self-auto"
                                           >
                                             Solve
                                           </Link>
@@ -634,29 +633,29 @@ export const RoadmapDetails: React.FC = () => {
       {/* 4. FAQS ACCORDION SECTION - DSA Sheet Aesthetics */}
       <section className="mb-14">
         <h2 className="text-2xl sm:text-3xl font-heading font-bold text-white mb-2">
-          Frequently Asked <span className="text-[#A3E635]">Questions</span>
+          Frequently Asked <span className="text-neutral-300">Questions</span>
         </h2>
-        <div className="w-12 h-1 bg-[#A3E635] rounded-full mb-6 opacity-90"></div>
+        <div className="w-12 h-1 bg-neutral-100 text-neutral-900 rounded-full mb-6 opacity-90"></div>
 
         <div className="space-y-3">
           {roadmapData.faqs.map((faq, fIdx) => (
             <div
               key={fIdx}
-              className="rounded-2xl overflow-hidden bg-[#202225] border border-white/10 hover:border-white/20 transition-all shadow-md"
+              className="rounded-2xl overflow-hidden bg-neutral-800 border border-white/10 hover:border-white/20 transition-all shadow-md"
             >
               <button
                 onClick={() => setExpandedFaqIdx(expandedFaqIdx === fIdx ? null : fIdx)}
-                className="flex w-full items-center justify-between transition-all px-5 py-4 text-sm font-semibold font-heading text-white hover:text-[#A3E635] text-left cursor-pointer"
+                className="flex w-full items-center justify-between transition-all px-5 py-4 text-sm font-semibold font-heading text-white hover:text-white text-left cursor-pointer"
               >
                 <span>{faq.q}</span>
                 <i
-                  className={`fa-solid fa-chevron-down text-xs text-[#A3E635] transition-transform duration-200 ${
+                  className={`fa-solid fa-chevron-down text-xs text-neutral-300 transition-transform duration-200 ${
                     expandedFaqIdx === fIdx ? 'rotate-180' : ''
                   }`}
                 ></i>
               </button>
               {expandedFaqIdx === fIdx && (
-                <div className="px-5 pb-4 text-xs font-sans text-gray-300 leading-relaxed border-t border-white/10 pt-3 bg-[#121113]">
+                <div className="px-5 pb-4 text-xs font-sans text-gray-300 leading-relaxed border-t border-white/10 pt-3 bg-neutral-900">
                   {faq.a}
                 </div>
               )}
@@ -666,7 +665,7 @@ export const RoadmapDetails: React.FC = () => {
 
         <p className="text-center text-xs font-sans mt-8 text-gray-400">
           Still have questions?{' '}
-          <span className="text-[#A3E635]">Explore the roadmap above and start learning step-by-step.</span>
+          <span className="text-neutral-300">Explore the roadmap above and start learning step-by-step.</span>
         </p>
       </section>
 

@@ -4,6 +4,8 @@ import { QuestionTestCase } from '../../../../services/questionService';
 import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
+import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { getActionableErrorMessage } from '../../../../core/validation';
 
 interface TestCaseModalProps {
   isOpen: boolean;
@@ -32,6 +34,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     },
   ]);
 
+  const [fieldErrors, setFieldErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
   const [testCaseTypes, setTestCaseTypes] = useState<ReferenceItem[]>([]);
   const [typesLoading, setTypesLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -167,25 +170,51 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       updated[index] = target;
       return updated;
     });
+
+    if (fieldErrors[index]) {
+      setFieldErrors((prev) => {
+        const current = { ...prev[index] };
+        if (field === 'input' && value.trim()) delete current.input;
+        if (field === 'expectedOutput' && value.trim()) delete current.expectedOutput;
+        if (Object.keys(current).length === 0) {
+          const next = { ...prev };
+          delete next[index];
+          return next;
+        }
+        return { ...prev, [index]: current };
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!questionId) {
-      toast.error('Question ID is missing');
+      toast.error('Question ID is missing.');
       return;
     }
 
-    // Validate inputs
+    // Validate inputs with inline errors
+    const newErrors: Record<number, { input?: string; expectedOutput?: string }> = {};
+    let hasError = false;
     for (let i = 0; i < testCases.length; i++) {
+      const tcErrors: { input?: string; expectedOutput?: string } = {};
       if (!testCases[i].input.trim()) {
-        toast.error(`Input is required for Test Case #${i + 1}`);
-        return;
+        tcErrors.input = 'Input raw string is required.';
+        hasError = true;
       }
       if (!testCases[i].expectedOutput.trim()) {
-        toast.error(`Expected Output is required for Test Case #${i + 1}`);
-        return;
+        tcErrors.expectedOutput = 'Expected output raw string is required.';
+        hasError = true;
       }
+      if (tcErrors.input || tcErrors.expectedOutput) {
+        newErrors[i] = tcErrors;
+      }
+    }
+
+    if (hasError) {
+      setFieldErrors(newErrors);
+      toast.error('Please enter required inputs and outputs for all test cases.');
+      return;
     }
 
     setSubmitting(true);
@@ -204,7 +233,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
       const res = await adminQuestionService.addTestCases(questionId, payload);
       if (res && (res.statusCode === 200 || res.statusCode === 201 || res.data)) {
-        toast.success(`Test cases attached to Question #${questionId} successfully!`);
+        toast.success(`Test cases attached successfully!`);
         if (onSuccess) onSuccess();
         onClose();
       } else {
@@ -213,9 +242,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
         toast.error(msg);
       }
     } catch (err: any) {
-      const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : '';
-      const msg = detail ? `${err?.message || 'Error'}: ${detail}` : (err?.message || 'Error attaching test cases to backend');
-      toast.error(msg);
+      toast.error(getActionableErrorMessage(err, 'Error attaching test cases to question.'));
     } finally {
       setSubmitting(false);
     }
@@ -237,7 +264,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           <button
             type="button"
             onClick={handleAddRow}
-            className="px-3 py-1.5 bg-[#A3E635]/10 hover:bg-[#A3E635]/20 text-[#A3E635] border border-[#A3E635]/30 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 font-sans"
+            className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 font-sans"
           >
             <i className="fa-solid fa-plus text-[10px]"></i> Add Case
           </button>
@@ -245,9 +272,9 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
         <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
           {testCases.map((tc, index) => (
-            <div key={index} className="p-4 bg-[#121317] border border-white/10 rounded-2xl space-y-3 relative">
+            <div key={index} className="p-4 bg-neutral-900 border border-white/10 rounded-2xl space-y-3 relative">
               <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <span className="font-bold text-[#A3E635] font-mono text-xs">
+                <span className="font-bold text-neutral-300 font-mono text-xs">
                   Test Case #{index + 1}
                 </span>
                 <button
@@ -263,26 +290,38 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Input */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-gray-300">Input Raw String *</label>
+                  <label htmlFor={`testcase-input-${index}`} className="block text-xs font-semibold text-gray-300">Input Raw String *</label>
                   <textarea
+                    id={`testcase-input-${index}`}
                     rows={2}
                     placeholder="e.g. 5\n1 2 3 4 5"
                     value={tc.input}
+                    aria-invalid={fieldErrors[index]?.input ? 'true' : 'false'}
+                    aria-describedby={fieldErrors[index]?.input ? `testcase-input-error-${index}` : undefined}
                     onChange={(e) => handleChange(index, 'input', e.target.value)}
-                    className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635] font-mono"
+                    className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border font-mono transition-colors focus:outline-none ${
+                      fieldErrors[index]?.input ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
+                    }`}
                   />
+                  <FormFieldError error={fieldErrors[index]?.input} id={`testcase-input-error-${index}`} />
                 </div>
 
                 {/* Expected Output */}
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-gray-300">Expected Output *</label>
+                  <label htmlFor={`testcase-output-${index}`} className="block text-xs font-semibold text-gray-300">Expected Output *</label>
                   <textarea
+                    id={`testcase-output-${index}`}
                     rows={2}
                     placeholder="e.g. 15"
                     value={tc.expectedOutput}
+                    aria-invalid={fieldErrors[index]?.expectedOutput ? 'true' : 'false'}
+                    aria-describedby={fieldErrors[index]?.expectedOutput ? `testcase-output-error-${index}` : undefined}
                     onChange={(e) => handleChange(index, 'expectedOutput', e.target.value)}
-                    className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635] font-mono"
+                    className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border font-mono transition-colors focus:outline-none ${
+                      fieldErrors[index]?.expectedOutput ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
+                    }`}
                   />
+                  <FormFieldError error={fieldErrors[index]?.expectedOutput} id={`testcase-output-error-${index}`} />
                 </div>
               </div>
 
@@ -290,24 +329,27 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                 {/* Test Case Type Dropdown */}
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold text-gray-300">Case Type (TESTCASETYPE)</label>
-                  <select
-                    disabled={typesLoading || testCaseTypes.length === 0}
-                    value={tc.typeRefCode}
-                    onChange={(e) => handleChange(index, 'typeRefCode', e.target.value)}
-                    className="w-full bg-[#181A20] text-gray-100 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635] cursor-pointer disabled:opacity-50"
-                  >
-                    {typesLoading ? (
-                      <option value="">Loading types...</option>
-                    ) : testCaseTypes.length === 0 ? (
-                      <option value="NECESSARY">Standard / Necessary</option>
-                    ) : (
-                      testCaseTypes.map((t) => (
-                        <option key={t.id || t.refCode} value={t.refCode}>
-                          {t.refName} ({t.refCode})
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <div className="relative">
+                    <select
+                      disabled={typesLoading || testCaseTypes.length === 0}
+                      value={tc.typeRefCode}
+                      onChange={(e) => handleChange(index, 'typeRefCode', e.target.value)}
+                      className="w-full appearance-none bg-neutral-900 text-gray-100 rounded-xl px-3 pr-8 py-2 text-xs border border-white/10 hover:border-white/20 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                    >
+                      {typesLoading ? (
+                        <option value="">Loading types...</option>
+                      ) : testCaseTypes.length === 0 ? (
+                        <option value="NECESSARY">Standard / Necessary</option>
+                      ) : (
+                        testCaseTypes.map((t) => (
+                          <option key={t.id || t.refCode} value={t.refCode}>
+                            {t.refName} ({t.refCode})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                  </div>
                 </div>
 
                 {/* Explanation */}
@@ -318,7 +360,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                     placeholder="e.g. Corner case for single element array"
                     value={tc.explanation || ''}
                     onChange={(e) => handleChange(index, 'explanation', e.target.value)}
-                    className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635]"
+                    className="w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
                   />
                 </div>
               </div>
@@ -330,7 +372,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                   id={`hidden-${index}`}
                   checked={tc.isHidden}
                   onChange={(e) => handleChange(index, 'isHidden', e.target.checked)}
-                  className="w-3.5 h-3.5 rounded bg-[#181A20] border-white/10 text-[#A3E635] focus:ring-[#A3E635] cursor-pointer"
+                  className="w-3.5 h-3.5 rounded bg-neutral-900 border-white/10 text-neutral-300 focus:ring-neutral-500 cursor-pointer"
                 />
                 <label htmlFor={`hidden-${index}`} className="text-gray-400 text-xs cursor-pointer select-none">
                   Hidden Case (Used for evaluation only, invisible to users during practice)
@@ -345,14 +387,14 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
+            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="px-5 py-2 bg-[#A3E635] hover:bg-[#b4f043] text-black font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#A3E635]/10 disabled:opacity-50 font-sans"
+            className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-[#b4f043] text-black font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md  disabled:opacity-50 font-sans"
           >
             {submitting ? (
               <>

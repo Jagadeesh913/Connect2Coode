@@ -285,12 +285,12 @@ export const DashboardCodeRunner: React.FC = () => {
     >
       <div className="flex flex-col gap-5 font-sans text-xs">
         {/* API Pipeline Architecture Notice */}
-        <div className="flex items-center justify-between p-3.5 bg-[#14202C]/90 border border-white/10 rounded-xl flex-wrap gap-2">
+        <div className="flex items-center justify-between p-3.5 bg-neutral-900 border border-white/10 rounded-xl flex-wrap gap-2">
           <div className="flex items-center gap-2.5 text-gray-200">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#A3E635] animate-pulse"></span>
+            <span className="w-2.5 h-2.5 rounded-full bg-neutral-100 text-neutral-900 animate-pulse"></span>
             <span className="font-bold text-xs font-heading">Admin Execution Pipeline:</span>
             <span className="text-[11px] text-gray-400">
-              Sends <code className="text-[#A3E635] font-mono">languageId</code> from Table and executes without creating permanent submission records.
+              Sends <code className="text-neutral-300 font-mono">languageId</code> from Table and executes without creating permanent submission records.
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export const DashboardCodeRunner: React.FC = () => {
         </div>
 
         {/* Control Bar: Question Picker, ID Input, Language Selector & Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-[#090A0C]/80 p-3 rounded-xl border border-white/10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-neutral-950 p-3 rounded-xl border border-white/10">
           {/* Question Selector (Select or Type ID) */}
           <div className="md:col-span-5 flex items-center gap-2">
             <div className="flex-1">
@@ -308,17 +308,20 @@ export const DashboardCodeRunner: React.FC = () => {
                 Select Question:
               </label>
               {questions.length > 0 ? (
-                <select
-                  value={selectedQuestionId ?? ''}
-                  onChange={handleQuestionSelectChange}
-                  className="w-full bg-[#121316] text-gray-200 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#A3E635] cursor-pointer"
-                >
-                  {questions.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      #{q.id} {q.title} ({q.difficulty})
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={selectedQuestionId ?? ''}
+                    onChange={handleQuestionSelectChange}
+                    className="w-full appearance-none bg-neutral-900 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-2 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    {questions.map((q) => (
+                      <option key={q.id} value={q.id} className="bg-neutral-900 text-white">
+                        #{q.id} {q.title} ({q.difficulty})
+                      </option>
+                    ))}
+                  </select>
+                  <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
               ) : (
                 <span className="text-gray-500 text-xs">No questions available from the backend.</span>
               )}
@@ -333,7 +336,7 @@ export const DashboardCodeRunner: React.FC = () => {
                 value={manualQuestionId}
                 onChange={handleManualQuestionIdChange}
                 placeholder="ID"
-                className="w-full bg-[#121316] text-gray-200 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-[#A3E635] font-mono text-center"
+                className="w-full bg-neutral-900 text-gray-200 border border-white/10 rounded-xl px-2.5 py-2 text-xs outline-none focus:border-neutral-500 font-mono text-center transition-colors shadow-2xs"
               />
             </div>
           </div>
@@ -343,17 +346,20 @@ export const DashboardCodeRunner: React.FC = () => {
             <label className="block text-[11px] font-semibold text-gray-400 mb-1">
               Active Language (/api/v1/language/dropdown):
             </label>
-            <select
-              value={selectedLanguageId ?? ''}
-              onChange={handleLanguageChange}
-              className="w-full bg-[#121316] text-gray-200 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#A3E635] cursor-pointer"
-            >
-              {languages.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name} (Execution ID: {l.id})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedLanguageId ?? ''}
+                onChange={handleLanguageChange}
+                className="w-full appearance-none bg-neutral-900 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-2 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
+              >
+                {languages.map((l) => (
+                  <option key={l.id} value={l.id} className="bg-neutral-900 text-white">
+                    {l.name} (Execution ID: {l.id})
+                  </option>
+                ))}
+              </select>
+              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
 
           {/* Action Execution Buttons */}
@@ -362,13 +368,13 @@ export const DashboardCodeRunner: React.FC = () => {
             <button
               onClick={handleRunSampleCases}
               disabled={isRunning || isSubmitting || selectedQuestionId === null || selectedLanguageId === null}
-              className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-200 border border-white/15 hover:border-[#A3E635]/50 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-200 border border-white/15 hover:border-neutral-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
               title="Runs visible sample test cases only (POST /api/v1/admin/testCode)"
             >
               {isRunning ? (
-                <i className="fa-solid fa-spinner animate-spin text-[#A3E635]"></i>
+                <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
               ) : (
-                <i className="fa-solid fa-play text-[#A3E635] text-xs"></i>
+                <i className="fa-solid fa-play text-neutral-300 text-xs"></i>
               )}
               <span>Run Code</span>
             </button>
@@ -377,7 +383,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <button
               onClick={handleSubmitAllCases}
               disabled={isRunning || isSubmitting || selectedQuestionId === null || selectedLanguageId === null}
-              className="px-4 py-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-[#A3E635]/20 disabled:opacity-50"
+              className="px-4 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md  disabled:opacity-50"
               title="Runs full suite including corner & hidden cases (POST /api/v1/admin/submitCode)"
             >
               {isSubmitting ? (
@@ -392,9 +398,9 @@ export const DashboardCodeRunner: React.FC = () => {
 
         {/* Code Editor Container */}
         <div className="border border-white/10 rounded-xl overflow-hidden bg-[#1E1E1E] shadow-xl">
-          <div className="px-4 py-2 bg-[#121316] border-b border-white/10 flex items-center justify-between">
+          <div className="px-4 py-2 bg-neutral-900 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-2 text-gray-300 font-mono text-[11px]">
-              <i className="fa-solid fa-file-code text-[#A3E635]"></i>
+              <i className="fa-solid fa-file-code text-neutral-300"></i>
               <span>Question #{manualQuestionId || selectedQuestionId} Solution Code</span>
             </div>
             <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">
@@ -420,7 +426,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
         {/* Execution Output Panel */}
         {result && (
-          <div className="bg-[#14202C]/90 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
+          <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
             {/* Header Result Summary */}
             <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-wrap gap-2">
               <div className="flex items-center gap-3">

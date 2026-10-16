@@ -2,8 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems } from '../redux/problemSlice';
-import { toggleSolvedProblem } from '../../progress/redux/progressSlice';
-import { toggleBookmarkItem, fetchBookmarks } from '../../bookmarks/redux/bookmarkSlice';
+import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -24,7 +23,7 @@ export const ProblemList: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const pageSize = 50;
+  const pageSize = 20;
 
   // Sanitize invalid page query parameters (F-031)
   useEffect(() => {
@@ -75,12 +74,6 @@ export const ProblemList: React.FC = () => {
     return () => request.abort();
   }, [dispatch, debouncedSearch, currentPage]);
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(fetchBookmarks());
-    }
-  }, [dispatch, isAuthenticated]);
-
   const groupedProblems = useMemo(() => {
     const groups = new Map<string, typeof problems>();
     problems.forEach((problem) => {
@@ -96,19 +89,6 @@ export const ProblemList: React.FC = () => {
       questions: items,
     }));
   }, [problems]);
-
-  const handleSolveToggle = (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!isAuthenticated) {
-      toast.error('Please log in to track your solved problems');
-      dispatch(openAuthModal({ mode: 'login' }));
-      return;
-    }
-
-    dispatch(toggleSolvedProblem({ id }));
-  };
 
   const handleBookmarkToggle = (problem: (typeof problems)[number], e: React.MouseEvent) => {
     e.preventDefault();
@@ -149,68 +129,95 @@ export const ProblemList: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex flex-col items-center pb-16 font-sans">
-      <section className="relative mx-auto mt-16 max-w-7xl px-6 text-center md:px-8 flex flex-col items-center">
-        <h1 className="animate-fade-in -translate-y-4 text-balance whitespace-nowrap bg-gradient-to-br from-white from-30% to-white/40 bg-clip-text py-6 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-medium leading-none tracking-tighter text-transparent font-heading">
-          DSA Sheet
-        </h1>
-        <p className="animate-fade-in mb-6 -translate-y-4 text-lg tracking-tight text-gray-400 md:text-xl max-w-2xl">
-          Practice coding problems served by the Connect 2 Code backend.
-        </p>
-        <div className="flex justify-center">
-          <div className="shrink-0 h-0.5 rounded-lg w-60 bg-gradient-to-r from-purple-600 via-violet-500 to-pink-600" />
+    <div className="w-full flex flex-col items-center pb-20 font-sans bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 overflow-x-hidden">
+      {/* Ambient background glows matching Practice and Companies page */}
+      <div className="fixed top-24 -left-48 w-96 h-[400px] bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+
+      {/* Hero Header Section */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-6 flex flex-col items-center text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-700/60 text-blue-600 dark:text-sky-300 text-xs font-bold uppercase tracking-wider mb-4 shadow-2xs">
+          <i className="fa-solid fa-layer-group text-[10px]"></i>
+          <span>CURATED DSA SHEET</span>
         </div>
+
+        {/* Headline */}
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight leading-[1.1] mb-3">
+          Master Coding with{' '}
+          <span className="text-blue-600 dark:text-[#38BDF8]">
+            DSA Sheet
+          </span>
+        </h1>
+
+        <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-2xl leading-relaxed mb-6">
+          Structured collection of coding problems organized by core topics to boost your interview readiness.
+        </p>
       </section>
 
-      <div className="w-full max-w-3xl px-4 mt-8">
-        <input
-          type="search"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search problems..."
-          className="w-full bg-[#121316] border border-white/10 text-sm text-gray-200 placeholder-gray-500 rounded-xl px-4 py-3 outline-none focus:border-[#A3E635] transition-colors"
-          aria-label="Search problems"
-        />
+      {/* Search Input */}
+      <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 mb-8">
+        <div className="relative w-full">
+          <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm absolute left-5 top-1/2 -translate-y-1/2"></i>
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search problems by title or keywords..."
+            className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 rounded-2xl pl-12 pr-4 py-3.5 outline-none focus:border-blue-500 dark:focus:border-blue-400 shadow-sm transition-colors"
+            aria-label="Search problems"
+          />
+        </div>
       </div>
 
       {loading && problems.length === 0 ? (
-        <div className="w-full max-w-5xl mt-10 px-4 space-y-4">
-          <Skeleton className="h-16 w-full rounded-xl" count={6} />
+        <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4">
+          <Skeleton className="h-16 w-full rounded-2xl" count={6} />
+        </div>
+      ) : !isAuthenticated && problems.length === 0 ? (
+        <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+          <EmptyState
+            title="Sign in to access DSA Sheet"
+            description="Log in with your Connect 2 Code account to browse problems, track solved status, and save bookmarks."
+            actionText="Sign In"
+            onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+            icon={<i className="fa-solid fa-lock text-3xl text-blue-500" />}
+          />
         </div>
       ) : error && problems.length === 0 ? (
-        <div className="mt-10">
+        <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <EmptyState
             title="Unable to load problems"
             description={error}
             actionText="Retry"
             onAction={() => dispatch(fetchProblems({ page: currentPage, limit: pageSize }))}
-            icon={<i className="fa-solid fa-triangle-exclamation text-2xl text-gray-500" />}
+            icon={<i className="fa-solid fa-triangle-exclamation text-2xl text-slate-400" />}
           />
         </div>
       ) : problems.length === 0 ? (
-        <div className="mt-10">
+        <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <EmptyState
             title="No problems found"
             description="The backend returned no problems for this search."
             actionText="Clear Search"
             onAction={() => setSearchInput('')}
-            icon={<i className="fa-solid fa-code text-2xl text-gray-500" />}
+            icon={<i className="fa-solid fa-code text-2xl text-slate-400" />}
           />
         </div>
       ) : (
-        <div className="w-full max-w-5xl mt-10 px-4 space-y-8">
+        <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-8">
           {groupedProblems.map((group) => (
             <section key={group.topic} className="space-y-3">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono font-bold text-[#A3E635] bg-[#A3E635]/10 border border-[#A3E635]/20 px-2.5 py-1 rounded-lg">
+                <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/60 px-2.5 py-1 rounded-lg">
                   {group.num}
                 </span>
-                <h2 className="text-lg sm:text-xl font-heading font-bold text-white">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
                   {group.topic}
                 </h2>
               </div>
 
-              <div className="bg-[#202225] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+              <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
                 {group.questions.map((problem) => {
                   const solved = solvedByProblemId[problem.id] ?? problem.isSolved;
                   const bookmarked = problem.isBookmarked || bookmarks.some((b) => b.itemId === problem.id);
@@ -219,22 +226,24 @@ export const ProblemList: React.FC = () => {
                   return (
                     <div
                       key={problem.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-white/5 last:border-b-0 hover:bg-white/[0.03]"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border-b border-slate-100 dark:border-slate-800/80 last:border-b-0 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <button
-                          type="button"
-                          onClick={(e) => handleSolveToggle(problem.id, e)}
-                          className={`text-xl shrink-0 ${solved ? 'text-[#A3E635]' : 'text-gray-600 hover:text-gray-400'}`}
-                          title={solved ? 'Mark as unsolved' : 'Mark as solved'}
+                        <div
+                          className={`text-xl shrink-0 select-none ${solved ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`}
+                          title={solved ? 'Solved via code submission' : 'Not yet solved'}
                         >
                           <i className={`fa-solid ${solved ? 'fa-circle-check' : 'fa-circle'}`} />
-                        </button>
+                        </div>
 
                         <button
                           type="button"
                           onClick={(e) => handleBookmarkToggle(problem, e)}
-                          className={`p-2 rounded-lg border text-xs shrink-0 ${bookmarked ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' : 'bg-[#121113] border-white/10 text-gray-500 hover:text-amber-400'}`}
+                          className={`p-2 rounded-xl border text-xs shrink-0 cursor-pointer transition-colors ${
+                            bookmarked
+                              ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60 text-amber-500 dark:text-amber-400'
+                              : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 text-slate-400 hover:text-amber-500'
+                          }`}
                           title={bookmarked ? 'Remove bookmark' : 'Add bookmark'}
                         >
                           <i className={`fa-${bookmarked ? 'solid' : 'regular'} fa-star`} />
@@ -243,23 +252,23 @@ export const ProblemList: React.FC = () => {
                         <div className="min-w-0">
                           <Link
                             to={`/problems/${targetSlug}`}
-                            className="text-sm sm:text-base font-semibold text-white hover:text-[#A3E635] truncate block"
+                            className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block transition-colors"
                           >
                             {problem.title}
                           </Link>
-                          <div className="text-[11px] text-gray-500 mt-1 font-mono">
+                          <div className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono">
                             {problem.slug ? problem.slug : (problem.topic || problem.category || '')}
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                        <span className="text-xs font-mono font-bold px-3 py-1 rounded-full border text-gray-300 border-white/10">
+                        <span className="text-xs font-mono font-bold px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300">
                           {problem.difficulty || '—'}
                         </span>
                         <Link
                           to={`/problems/${targetSlug}`}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#A3E635] hover:bg-[#84CC16] text-xs font-bold text-black"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-2xs no-underline"
                         >
                           Solve
                           <i className="fa-solid fa-chevron-right text-[10px]" />
@@ -273,11 +282,15 @@ export const ProblemList: React.FC = () => {
           ))}
 
           {pagination.totalPages > 1 && (
-            <Pagination
-              currentPage={pagination.page}
-              totalPages={pagination.totalPages}
-              onPageChange={handlePageChange}
-            />
+            <div className="pt-2">
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.totalPages}
+                totalElements={pagination.total}
+                pageSize={pageSize}
+                onPageChange={handlePageChange}
+              />
+            </div>
           )}
         </div>
       )}

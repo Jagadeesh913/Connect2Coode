@@ -122,6 +122,41 @@ while (left < right) {
     };
   }
 
+  if (title.includes('longest substring') || title.includes('distinct characters')) {
+    return {
+      intuition:
+        'To find the length of the longest substring without repeating characters, maintain a sliding window of unique characters with two pointers.',
+      bruteForce: {
+        title: 'Check All Substrings',
+        description: 'Generate all possible substrings O(N^2) and check if each substring contains only unique characters using a Set O(N).',
+        timeComplexity: 'O(N³)',
+        spaceComplexity: 'O(min(N, M))',
+      },
+      optimal: {
+        title: 'Sliding Window with Hash Map / Index Array',
+        description:
+          'Maintain a sliding window [left, right] and a map storing the last seen index of each character. When a duplicate character is encountered, jump the left pointer to max(left, lastSeen[char] + 1). Update max length at each step.',
+        timeComplexity: 'O(N)',
+        spaceComplexity: 'O(min(N, M))',
+        pseudocode: `Map<Character, Integer> charMap = new HashMap<>();
+int maxLen = 0, left = 0;
+for (int right = 0; right < s.length(); right++) {
+    char c = s.charAt(right);
+    if (charMap.containsKey(c)) {
+        left = Math.max(left, charMap.get(c) + 1);
+    }
+    charMap.put(c, right);
+    maxLen = Math.max(maxLen, right - left + 1);
+}
+return maxLen;`,
+      },
+      tips: [
+        'The left pointer should never move backwards when updating: left = Math.max(left, charMap.get(c) + 1).',
+        'String may contain symbols, spaces, and digits in addition to English letters.',
+      ],
+    };
+  }
+
   if (title.includes('two sum') || title.includes('sum')) {
     return {
       intuition:

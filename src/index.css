@@ -1,240 +1,221 @@
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Centralized Design System Design Tokens */
 :root {
-  --font-sans: "Inter", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-heading: "Outfit", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "Roboto Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  
-  --background: #121113;
-  --theme-color: #121113;
-  --foreground: #f4f4f4;
-  --foreground-secondary: #d4d4d4;
-  --card: #202225;
-  --card-background: #202225;
-  --card-background-hover: #2f3136;
-  --card-border-color: rgba(255, 255, 255, 0.08);
-  --muted: #2f3136;
-  --muted-foreground: #9ca3af;
-  --primary: #627eff;
-  --primary-color: #627eff;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --input: #2f3136;
-  --success-color: #4ade80;
-  
-  --difficulty-easy: rgba(72, 199, 142, 0.8);
-  --difficulty-medium: rgba(245, 166, 35, 0.8);
-  --difficulty-hard: rgba(248, 113, 113, 0.8);
-  --difficulty-label-easy: #48c78e;
-  --difficulty-label-medium: #f5a623;
-  --difficulty-label-hard: #f87171;
+  /* Fonts */
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Surfaces & Backgrounds */
+  --bg-page: #FFFFFF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-subtle: #F8FAFC;
+  --bg-surface-elevated: #FFFFFF;
+  --bg-surface-muted: #F1F5F9;
+
+  /* Text Colors */
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-subtle: #94A3B8;
+
+  /* Borders */
+  --border-primary: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --border-strong: #CBD5E1;
+
+  /* Brand Accents */
+  --brand-blue: #2563EB;
+  --brand-blue-hover: #1D4ED8;
+  --brand-blue-subtle: #EFF6FF;
+  --brand-violet: #8B5CF6;
+  --brand-pink: #EC4899;
+  --brand-emerald: #10B981;
+  --brand-amber: #F59E0B;
+  --brand-rose: #F43F5E;
+
+  /* Shadows */
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-elevated: 0 10px 15px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-glow-blue: 0 0 25px rgba(37, 99, 235, 0.15);
+  --shadow-glow-violet: 0 0 25px rgba(139, 92, 246, 0.15);
+
+  /* Radius */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Theme color-scheme for browser native dropdowns & controls */
+  color-scheme: light;
+
+  /* Toast Notification Design System */
+  --toast-bg: rgba(255, 255, 255, 0.96);
+  --toast-color: #0F172A;
+  --toast-border: rgba(226, 232, 240, 0.95);
+  --toast-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+}
+
+html.dark {
+  /* Theme color-scheme for browser native dropdowns & controls */
+  color-scheme: dark;
+
+  /* Surfaces & Backgrounds */
+  --bg-page: #070A13;
+  --bg-surface: #0D1322;
+  --bg-surface-subtle: #111A2E;
+  --bg-surface-elevated: #111A2E;
+  --bg-surface-muted: #1E293B;
+
+  /* Text Colors */
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  --text-muted: #64748B;
+  --text-subtle: #475569;
+
+  /* Borders */
+  --border-primary: #1E293B;
+  --border-subtle: #151E32;
+  --border-strong: #334155;
+
+  /* Brand Accents */
+  --brand-blue: #2563EB;
+  --brand-blue-hover: #3B82F6;
+  --brand-blue-subtle: rgba(37, 99, 235, 0.12);
+
+  /* Shadows */
+  --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-elevated: 0 12px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glow-blue: 0 0 30px rgba(59, 130, 246, 0.2);
+  --shadow-glow-violet: 0 0 30px rgba(139, 92, 246, 0.25);
+
+  /* Toast Notification Design System */
+  --toast-bg: rgba(13, 19, 34, 0.96);
+  --toast-color: #F8FAFC;
+  --toast-border: rgba(51, 65, 85, 0.8);
+  --toast-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 20px rgba(59, 130, 246, 0.15);
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   margin: 0;
   padding: 0;
+  font-family: var(--font-sans);
+  background-color: var(--bg-page);
+  color: var(--text-primary);
   line-height: 1.5;
-  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-h1, h2, h3, h4, h5, h6, .font-heading {
-  font-family: var(--font-heading);
-  letter-spacing: -0.02em;
-}
-
-code, pre, .font-mono {
-  font-family: var(--font-mono);
-}
-
-/* Custom Scrollbar */
+/* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #121113;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #2f3136;
-  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #43474d;
+  background: rgba(148, 163, 184, 0.5);
 }
 
-/* Surface Card Class */
-.app-surface-card {
+/* Reusable Design System Helper Classes */
+.c2c-logo-gradient {
+  background: linear-gradient(135deg, #8B5CF6 0%, #EC4899 100%);
+}
+
+.c2c-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-card);
+  border-radius: var(--radius-xl);
+}
+
+.c2c-pill {
+  border-radius: var(--radius-full);
+}
+
+/* Subtle Ambient Glows */
+.ambient-glow-light {
+  background: radial-gradient(circle at 50% 0%, rgba(224, 242, 254, 0.6) 0%, rgba(243, 232, 255, 0.4) 50%, transparent 80%);
+}
+
+.ambient-glow-dark {
+  background: radial-gradient(circle at 50% 0%, rgba(37, 99, 235, 0.12) 0%, rgba(139, 92, 246, 0.08) 50%, transparent 80%);
+}
+
+/* Shimmer / Skeleton Wave Animation */
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-wave {
   position: relative;
   overflow: hidden;
-  border: 1px solid var(--border-color);
-  border-radius: 0.875rem;
-  background: var(--card-background);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  color: var(--foreground);
+  background-color: #E2E8F0; /* slate-200 base */
 }
 
-/* Hero Title Typography */
-.landing-hero-prefix {
-  display: block;
-  font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  color: var(--foreground);
+html.dark .shimmer-wave {
+  background-color: #1E293B; /* slate-800 base */
 }
 
-@media (min-width: 640px) {
-  .landing-hero-prefix {
-    font-size: 2.5rem;
-  }
-}
-@media (min-width: 1024px) {
-  .landing-hero-prefix {
-    font-size: 3rem;
-    letter-spacing: -0.04em;
-  }
-}
-
-.landing-hero-heading {
-  font-family: var(--font-heading);
-  font-size: 3.25rem;
-  font-weight: 800;
-  line-height: 0.92;
-  letter-spacing: -0.035em;
+.shimmer-wave::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmerSweep 1.6s infinite ease-in-out;
+  pointer-events: none;
 }
 
-@media (min-width: 640px) {
-  .landing-hero-heading {
-    font-size: 4.5rem;
-  }
-}
-@media (min-width: 768px) {
-  .landing-hero-heading {
-    font-size: 5.5rem;
-  }
-}
-@media (min-width: 1024px) {
-  .landing-hero-heading {
-    font-size: 6.5rem;
-    letter-spacing: -0.045em;
-  }
+html.dark .shimmer-wave::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
 }
 
-.landing-hero-prepare {
-  color: var(--foreground);
+/* Hide scrollbar utility for clean mobile carousels */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
-.landing-hero-dot {
-  color: var(--primary);
+/* Handwriting Font for Authentic Hand-drawn Doodles */
+.font-handwriting {
+  font-family: 'Caveat', cursive, sans-serif;
 }
 
-.landing-hero-copy {
-  color: var(--muted-foreground);
-  font-size: 1rem;
-  line-height: 1.6;
-  font-family: var(--font-sans);
-  letter-spacing: -0.01em;
-}
-
-.landing-hero-cta {
-  color: var(--foreground);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-color: var(--primary);
-  font-size: 0.875rem;
-  font-weight: 600;
-  font-family: var(--font-sans);
-  transition: all 0.2s ease;
-}
-
-.landing-hero-cta:hover {
-  text-decoration-color: rgba(98, 126, 255, 0.6);
-}
-
-/* Buttons */
-.btn-neetcode-primary {
-  background-color: var(--primary);
-  color: #ffffff;
-  font-weight: 600;
-  font-family: var(--font-sans);
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.625rem;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-.btn-neetcode-primary:hover {
-  background-color: #4f6cf1;
-  box-shadow: 0 4px 20px rgba(98, 126, 255, 0.35);
-}
-
-.btn-neetcode-secondary {
-  background-color: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-color);
-  color: var(--foreground);
-  font-weight: 500;
-  font-family: var(--font-sans);
-  padding: 0.5rem 1.25rem;
-  border-radius: 0.625rem;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  font-size: 0.875rem;
-}
-
-.btn-neetcode-secondary:hover {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-}
-
-/* Difficulty Badges */
-.badge-easy {
-  color: #48c78e;
-  background-color: rgba(72, 199, 142, 0.1);
-  border: 1px solid rgba(72, 199, 142, 0.2);
-}
-
-.badge-medium {
-  color: #f5a623;
-  background-color: rgba(245, 166, 35, 0.1);
-  border: 1px solid rgba(245, 166, 35, 0.2);
-}
-
-.badge-hard {
-  color: #f87171;
-  background-color: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.2);
-}
-
-/* Card Hover Effects */
-.testimonial-card {
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.testimonial-card:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-}
-
-/* MyJo Infinite Continuous Company Marquee Animation */
-@keyframes myjo-marquee-left {
+/* Automated Infinite Marquee Moving from Right to Left */
+@keyframes marqueeRtl {
   0% {
     transform: translateX(0%);
   }
@@ -243,611 +224,29 @@ code, pre, .font-mono {
   }
 }
 
-.myjo-company-chip-marquee {
-  animation: myjo-marquee-left 35s linear infinite;
+.animate-marquee-rtl {
+  display: flex;
+  width: max-content;
+  animation: marqueeRtl 26s linear infinite;
+  will-change: transform;
 }
 
-.myjo-company-chip-marquee:hover {
+.animate-marquee-rtl:hover {
   animation-play-state: paused;
 }
 
-/* MyJo Infinite Continuous Testimonial Marquee Animation */
-@keyframes myjo-testimonial-marquee-left {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-50%);
-  }
+.animate-marquee-rtl-slow {
+  display: flex;
+  width: max-content;
+  animation: marqueeRtl 38s linear infinite;
+  will-change: transform;
 }
 
-.myjo-testimonial-marquee {
-  animation: myjo-testimonial-marquee-left 40s linear infinite;
-}
-
-.myjo-testimonial-marquee:hover {
+.animate-marquee-rtl-slow:hover {
   animation-play-state: paused;
 }
 
-/* LIGHT MODE COMPREHENSIVE OVERRIDES */
-html.light {
-  --background: #f8fafc;
-  --theme-color: #f8fafc;
-  --foreground: #0f172a;
-  --foreground-secondary: #334155;
-  --card: #ffffff;
-  --card-background: #ffffff;
-  --card-background-hover: #f1f5f9;
-  --card-border-color: #e2e8f0;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --border: #e2e8f0;
-  --border-color: #e2e8f0;
-  --input: #ffffff;
-  color-scheme: light;
-}
-
-html.light body,
-html.light #root {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-
-/* 1. MAIN CONTAINERS & CARDS OVERRIDES */
-html.light .bg-\[\#090A0C\],
-html.light .bg-\[\#0d0e10\],
-html.light .bg-\[\#121113\],
-html.light .bg-\[\#121316\] {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* 2. INLINE TABLES, EXPANDED MODULE CONTAINERS & CARDS */
-html.light .bg-\[\#17191c\],
-html.light .bg-\[\#18191c\],
-html.light .bg-\[\#1a1c20\] {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* 3. INNER ITEM CARDS, ROWS & PROBLEM CARDS */
-html.light .bg-\[\#202225\],
-html.light .bg-\[\#2f3136\] {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light .bg-\[\#202225\]:hover,
-html.light .bg-\[\#2f3136\]:hover {
-  background-color: #f1f5f9 !important;
-}
-
-/* 4. CHIPS, BADGES, SMALL BOXES & PILLS */
-html.light .bg-white\/5,
-html.light .bg-white\/10 {
-  background-color: #f1f5f9 !important;
-  color: #1e293b !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* 5. BORDER OVERRIDES */
-html.light .border-white\/5,
-html.light .border-white\/10,
-html.light .border-white\/15,
-html.light .border-white\/20,
-html.light .border-white\/30,
-html.light .border-white\/40 {
-  border-color: #e2e8f0 !important;
-}
-
-/* 6. TEXT COLOR OVERRIDES */
-html.light .text-white,
-html.light .text-gray-100,
-html.light .text-gray-200,
-html.light .text-gray-300 {
-  color: #0f172a !important;
-}
-
-html.light .text-gray-400,
-html.light .text-gray-500 {
-  color: #475569 !important;
-}
-
-/* 7. LIME BRAND TEXT CONTRAST IN LIGHT MODE */
-html.light .text-\[\#A3E635\] {
-  color: #A3E635 !important;
-}
-
-/* 8. HEADER & NAVIGATION OVERRIDES */
-html.light header {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light nav a:hover {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
-}
-
-/* ==========================================================================
-   ADMIN CONSOLE COMPREHENSIVE THEME OVERRIDES (LIGHT MODE)
-   ========================================================================== */
-
-/* 1. Admin Layout & Main Shell */
-html.light .admin-layout-container,
-html.light .min-h-screen.bg-\[\#090A0C\],
-html.light main.bg-\[\#090A0C\],
-html.light .bg-\[\#090A0C\] {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-
-/* 2. Admin Sidebar */
-html.light aside {
-  background-color: rgba(255, 255, 255, 0.98) !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.04) !important;
-}
-
-html.light aside .border-b,
-html.light aside .border-t,
-html.light aside .border-r,
-html.light aside .border-white\/10 {
-  border-color: #e2e8f0 !important;
-}
-
-html.light aside h1.text-white,
-html.light aside .text-white {
-  color: #0f172a !important;
-}
-
-html.light aside a:not(.bg-\[\#A3E635\]) {
-  color: #475569 !important;
-}
-
-html.light aside a:not(.bg-\[\#A3E635\]):hover {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
-}
-
-html.light aside .bg-\[\#090A0C\]\/80 {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-/* 3. Admin Header */
-html.light header.h-16 {
-  background-color: rgba(255, 255, 255, 0.96) !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
-}
-
-html.light header.h-16 .text-white {
-  color: #0f172a !important;
-}
-
-html.light header.h-16 .text-gray-300,
-html.light header.h-16 .text-gray-400 {
-  color: #475569 !important;
-}
-
-html.light header.h-16 button.bg-\[\#090A0C\]\/80 {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-  color: #334155 !important;
-}
-
-html.light header.h-16 button.bg-\[\#090A0C\]\/80:hover {
-  background-color: #e2e8f0 !important;
-  border-color: #94a3b8 !important;
-  color: #0f172a !important;
-}
-
-/* 4. Admin Header Profile Dropdown */
-html.light header .bg-\[\#121316\]\/95 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-}
-
-html.light header .bg-\[\#121316\]\/95 .bg-\[\#090A0C\]\/80 {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.light header .bg-\[\#121316\]\/95 .text-white {
-  color: #0f172a !important;
-}
-
-/* 5. Admin Cards & Containers */
-html.light [class*="bg-[#14202C]"],
-html.light [class*="bg-[#181A20]"],
-html.light [class*="bg-[#1a1c22]"],
-html.light [class*="bg-[#22252D]"],
-html.light [class*="bg-[#121317]"] {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light [class*="bg-[#14202C]"] h3,
-html.light [class*="bg-[#14202C]"] h2,
-html.light [class*="bg-[#14202C]"] .text-white {
-  color: #0f172a !important;
-}
-
-html.light [class*="bg-[#14202C]"] .border-b {
-  border-color: #e2e8f0 !important;
-}
-
-html.light [class*="bg-[#14202C]"] .text-gray-400 {
-  color: #64748b !important;
-}
-
-/* 6. Dashboard Metrics Grid & Overview */
-html.light [class*="bg-[#181A20]"] .text-white {
-  color: #0f172a !important;
-}
-
-html.light [class*="bg-[#181A20]"] .text-gray-400 {
-  color: #64748b !important;
-}
-
-html.light [class*="bg-[#181A20]"] .text-gray-500 {
-  color: #94a3b8 !important;
-}
-
-html.light .from-\[\#121316\].via-\[\#161920\].to-\[\#121316\] {
-  background: linear-gradient(to right, #f8fafc, #ffffff, #f8fafc) !important;
-  border-color: rgba(163, 230, 53, 0.4) !important;
-}
-
-html.light .p-3\.5.bg-\[\#090A0C\]\/80,
-html.light a.bg-\[\#090A0C\]\/80,
-html.light div.bg-\[\#090A0C\]\/80 {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-html.light a.bg-\[\#090A0C\]\/80:hover {
-  background-color: #f1f5f9 !important;
-  border-color: #A3E635 !important;
-}
-
-html.light a.bg-\[\#090A0C\]\/80 .text-white {
-  color: #0f172a !important;
-}
-
-html.light a.bg-\[\#090A0C\]\/80 .text-gray-500 {
-  color: #64748b !important;
-}
-
-/* 7. Admin Tables */
-html.light .overflow-x-auto[class*="bg-[#14202C]"] {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
-}
-
-html.light table tr[class*="bg-[#090A0C]"],
-html.light table thead tr {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-}
-
-html.light table th {
-  color: #475569 !important;
-  border-color: #e2e8f0 !important;
-  background-color: #f8fafc !important;
-}
-
-html.light table tbody {
-  border-color: #e2e8f0 !important;
-}
-
-html.light table tbody tr {
-  border-color: #f1f5f9 !important;
-  color: #1e293b !important;
-}
-
-html.light table tbody tr:hover {
-  background-color: #f8fafc !important;
-}
-
-html.light table td {
-  border-color: #f1f5f9 !important;
-  color: #1e293b !important;
-}
-
-html.light table td .text-white {
-  color: #0f172a !important;
-}
-
-html.light table td .text-gray-200,
-html.light table td .text-gray-300 {
-  color: #334155 !important;
-}
-
-html.light table td .text-gray-400,
-html.light table td .text-gray-500 {
-  color: #64748b !important;
-}
-
-/* 8. Filter Bars, Selects, Inputs */
-html.light select,
-html.light input[type="text"],
-html.light input[type="password"],
-html.light input[type="email"],
-html.light textarea {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-
-html.light select option {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-html.light label.text-gray-300 {
-  color: #334155 !important;
-}
-
-html.light .placeholder-gray-500::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* 9. Modals (AdminModal, QuestionFormModal, TestCaseModal, etc.) */
-html.light .bg-\[\#121316\]\/95 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.15) !important;
-  color: #0f172a !important;
-}
-
-html.light .bg-\[\#121316\]\/95 .bg-\[\#090A0C\]\/90,
-html.light .bg-\[\#121316\]\/95 .bg-\[\#090A0C\]\/80,
-html.light .bg-\[\#121316\]\/95 .bg-\[\#121317\],
-html.light .bg-\[\#121316\]\/95 .bg-\[\#1a1c22\],
-html.light .bg-\[\#121316\]\/95 .bg-\[\#22252D\] {
-  background-color: #f8fafc !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-html.light .bg-\[\#121316\]\/95 .text-white {
-  color: #0f172a !important;
-}
-
-html.light .bg-\[\#121316\]\/95 .text-gray-200,
-html.light .bg-\[\#121316\]\/95 .text-gray-300 {
-  color: #334155 !important;
-}
-
-html.light .bg-\[\#121316\]\/95 .text-gray-400 {
-  color: #64748b !important;
-}
-
-/* 10. Pagination Bar */
-html.light .bg-\[\#14202C\]\/75.backdrop-blur-xl {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  color: #475569 !important;
-}
-
-html.light .bg-\[\#14202C\]\/75 button.bg-\[\#090A0C\]\/80 {
-  background-color: #f1f5f9 !important;
-  border-color: #cbd5e1 !important;
-  color: #1e293b !important;
-}
-
-html.light .bg-\[\#14202C\]\/75 button.bg-\[\#090A0C\]\/80:hover:not(:disabled) {
-  background-color: #e2e8f0 !important;
-}
-
-/* 11. Page Header & Breadcrumbs */
-html.light .text-2xl.text-white {
-  color: #0f172a !important;
-}
-
-html.light nav[aria-label="Breadcrumb"] {
-  color: #64748b !important;
-}
-
-html.light nav[aria-label="Breadcrumb"] .text-white {
-  color: #0f172a !important;
-}
-
-html.light nav[aria-label="Breadcrumb"] .text-gray-600 {
-  color: #cbd5e1 !important;
-}
-
-/* 12. Empty States & Error States */
-html.light .bg-\[\#121316\] {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-html.light .bg-\[\#121316\] h4.text-white {
-  color: #0f172a !important;
-}
-
-html.light .bg-\[\#121316\] p.text-gray-400 {
-  color: #64748b !important;
-}
-
-/* 9. FORM INPUTS & SELECTS */
-html.light input,
-html.light select,
-html.light textarea {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-
-html.light input::placeholder {
-  color: #94a3b8 !important;
-}
-
-/* 10. CODE BLOCKS & PRE CONTAINERS */
-html.light pre,
-html.light code,
-html.light .codeblock-container {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-}
-
-/* 11. BUTTONS IN LIGHT MODE */
-html.light .bg-\[\#A3E635\] {
-  background-color: #A3E635 !important;
-  color: #000000 !important;
-}
-
-html.light .bg-\[\#A3E635\]:hover {
-  background-color: #A3E635 !important;
-  color: #ffffff !important;
-}
-
-/* 12. SCROLLBARS IN LIGHT MODE */
-html.light ::-webkit-scrollbar-track {
-  background: #f8fafc;
-}
-
-html.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-html.light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* 13. FIX GRADIENT TEXT & TRANSPARENT HEADINGS IN LIGHT MODE */
-html.light .text-transparent,
-html.light [class*="bg-clip-text"] {
-  background-image: none !important;
-  -webkit-background-clip: initial !important;
-  background-clip: initial !important;
-  color: #0f172a !important;
-  -webkit-text-fill-color: #0f172a !important;
-}
-
-html.light .text-transparent .text-\[\#A3E635\],
-html.light [class*="bg-clip-text"] .text-\[\#A3E635\],
-html.light .text-\[\#A3E635\] {
-  color: #70B615 !important;
-  -webkit-text-fill-color: #70B615 !important;
-}
-
-/* 11. BUTTONS & LIME HIGHLIGHTS IN LIGHT MODE - EXACT USER SPEC */
-html.light .bg-\[\#A3E635\] {
-  background-color: #A3E635 !important;
-  color: #000000 !important;
-}
-
-html.light .bg-\[\#A3E635\]:hover {
-  background-color: #A3E635 !important;
-  color: #000000 !important;
-}
-
-html.light .shadow-\[0_7px_0_\#65A30D\],
-html.light .shadow-\[0_5px_0_\#65A30D\] {
-  box-shadow: 0 5px 0 #65A30D !important;
-}
-
-html.light .text-\[\#A3E635\] {
-  color: #70B615 !important;
-  -webkit-text-fill-color: #70B615 !important;
-}
-
-/* 14. MOBILE SPECIFIC LIGHT MODE OVERRIDES */
-html.light .lg\:hidden.bg-\[\#090A0C\]\/98,
-html.light .lg\:hidden.border-t {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  color: #0f172a !important;
-}
-
-html.light .hero-font span.block:not(.text-\[\#A3E635\]) {
-  color: #000000 !important;
-}
-
-html.light .hero-font p {
-  color: #334155 !important;
-}
-
-/* 15. EXPLICIT ALL BLACK FOR 'your campus placement.' IN LIGHT MODE */
-html.light .hero-campus-placement-text,
-html.light .hero-campus-placement-text *,
-html.light .hero-campus-placement-text span,
-html.light .hero-campus-placement-text .text-\[\#A3E635\] {
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000 !important;
-}
-
-/* STRICT BRAND LIME #A3E635 ONLY IN LIGHT MODE */
-html.light .text-\[\#A3E635\],
-html.light span.text-\[\#A3E635\],
-html.light .hero-font .text-\[\#A3E635\] {
-  color: #A3E635 !important;
-  -webkit-text-fill-color: #A3E635 !important;
-}
-
-html.light .bg-\[\#A3E635\] {
-  background-color: #A3E635 !important;
-}
-
-/* FORCE BOTH 'your campus' AND 'placement.' TO SOLID BLACK (#000000) IN LIGHT MODE */
-html.light .hero-campus-placement-text,
-html.light .hero-placement-word,
-html.light span.hero-placement-word {
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000 !important;
-}
-
-/* HERO PLACEMENT WORD COLOR RULES FOR DARK VS LIGHT MODE */
-.hero-placement-word {
-  color: #A3E635;
-}
-
-html.light .hero-placement-word,
-html.light .hero-campus-placement-text {
-  color: #000000 !important;
-  -webkit-text-fill-color: #000000 !important;
-}
-
-/* LIGHT MODE STYLING FOR PAGINATION CONTROLS */
-html.light .bg-\[\#111827\]\/90,
-html.light .bg-\[\#14202C\]\/75 {
-  background-color: #ffffff !important;
-  border-color: #e2e8f0 !important;
-  color: #334155 !important;
-}
-
-html.light .bg-\[\#090A0C\]\/80 {
-  background-color: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-html.light select.bg-\[\#090A0C\]\/80,
-html.light input.bg-\[\#090A0C\]\/80 {
-  background-color: #ffffff !important;
-  border-color: #cbd5e1 !important;
-  color: #0f172a !important;
-}
-
-
-
-/* Respect user motion preferences across the SPA. */
+/* Accessibility: respect user motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -858,3 +257,98 @@ html.light input.bg-\[\#090A0C\]\/80 {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ==========================================================================
+   DROPDOWN & SELECT THEME STYLES (Clean Light/Dark Conversion)
+   ========================================================================== */
+select {
+  color-scheme: light;
+}
+
+html.dark select {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  padding: 8px 12px;
+}
+
+html.dark select option {
+  background-color: #0D1322 !important;
+  color: #F8FAFC !important;
+  padding: 8px 12px;
+}
+
+.c2c-select-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.c2c-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #F8FAFC;
+  color: #0F172A;
+  border: 1px solid #E2E8F0;
+  border-radius: 0.75rem;
+  padding: 0.625rem 2.5rem 0.625rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.25rem;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease-in-out;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.c2c-select:hover {
+  border-color: #93C5FD;
+  background-color: #FFFFFF;
+}
+
+.c2c-select:focus {
+  border-color: #2563EB;
+  background-color: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+html.dark .c2c-select {
+  background-color: #111A2E;
+  color: #F8FAFC;
+  border-color: rgba(51, 65, 85, 0.8);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .c2c-select:hover {
+  border-color: #3B82F6;
+  background-color: #141F36;
+}
+
+html.dark .c2c-select:focus {
+  border-color: #3B82F6;
+  background-color: #141F36;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+}
+
+/* ==========================================================================
+   TOAST POPUP MESSAGES DESIGN SYSTEM
+   ========================================================================== */
+.c2c-toast {
+  font-family: var(--font-sans) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+html.dark .c2c-toast {
+  background: rgba(13, 19, 34, 0.96) !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(51, 65, 85, 0.8) !important;
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 25px rgba(59, 130, 246, 0.15) !important;
+}
+
+

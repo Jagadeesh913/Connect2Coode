@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { closeAuthModal, openAuthModal, logoutUser } from '../../auth/redux/authSlice';
+import { closeAuthModal, logoutUser } from '../../auth/redux/authSlice';
 import { Login } from '../../auth/pages/Login';
-import { NeetCodeNavbar } from '../../../shared/components/ui/NeetCodeNavbar';
+import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
 import { toast } from 'react-hot-toast';
 
 export const Landing: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { isAuthModalOpen, user } = useAppSelector((state) => state.auth);
 
   const handleLogout = async () => {
@@ -17,523 +17,1195 @@ export const Landing: React.FC = () => {
     toast.success('Logged out successfully');
   };
 
-  // 1. Hero Word Flipping State ('Clear', 'Crack', 'Master', 'Ace')
-  const heroWords = ['Clear', 'Crack', 'Master', 'Ace'];
-  const [heroWordIndex, setHeroWordIndex] = useState<number>(0);
+  // Interactive FAQ State (first item open by default matching reference)
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
+  // Interactive Mini Code Runner Demo State
+  const [demoSelectedLang, setDemoSelectedLang] = useState('Java');
+  const [demoActiveTab, setDemoActiveTab] = useState<'custom' | 'testcases'>('testcases');
+  const [demoRunning, setDemoRunning] = useState(false);
+  const [demoOutput, setDemoOutput] = useState<string | null>(null);
+
+  // Company Marquee Horizontal Scroll Ref for manual arrows
+  const companiesScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollCompanies = (direction: 'left' | 'right') => {
+    if (companiesScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -280 : 280;
+      companiesScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  // Automated Feedback Carousel State (Auto-advances from Right to Left)
+  const [activeFeedbackSlide, setActiveFeedbackSlide] = useState(0);
+  const [isFeedbackHovered, setIsFeedbackHovered] = useState(false);
+
+  const feedbackSlides = [
+    // Slide 1 (Matching reference image)
+    [
+      {
+        quote:
+          'The platform is very clean and easy to use. I love the variety of problems and the detailed solutions.',
+        name: 'Sravanthi',
+        role: '3rd Year, CSE',
+        avatar: '/avatar_sravanthi.png',
+      },
+      {
+        quote:
+          'Company-wise questions and mock tests are really helpful. My preparation became much more focused.',
+        name: 'Akhil',
+        role: 'Final Year, IT',
+        avatar: '/avatar_akhil.png',
+      },
+      {
+        quote:
+          'The coding environment is smooth and supports multiple languages. Perfect for consistent practice.',
+        name: 'Meghana',
+        role: '3rd Year, ECE',
+        avatar: '/avatar_meghana.png',
+      },
+    ],
+    // Slide 2
+    [
+      {
+        quote:
+          'The structured DSA roadmap took me from knowing basics to cracking tier-1 tech interviews with confidence.',
+        name: 'Rahul Sharma',
+        role: 'Final Year, CSE',
+        avatar: '/avatar_student1.png',
+      },
+      {
+        quote:
+          'Mock company-specific tests matched the exact pattern of my interview. It felt like real placement prep!',
+        name: 'Sneha Patel',
+        role: 'Placed at Accenture',
+        avatar: '/avatar_student2.png',
+      },
+      {
+        quote:
+          'The fast compiler and clean topic-wise questions made daily problem solving an effortless habit.',
+        name: 'Ankit Verma',
+        role: '3rd Year, IT',
+        avatar: '/avatar_student3.png',
+      },
+    ],
+    // Slide 3
+    [
+      {
+        quote:
+          'Aptitude and coding practice together on one platform is a game changer for campus placement prep.',
+        name: 'Kavya Rao',
+        role: 'Final Year, ECE',
+        avatar: '/avatar_student4.png',
+      },
+      {
+        quote:
+          'Detailed explanations and multiple approaches for each problem saved me hundreds of hours of prep time.',
+        name: 'Vikram Seth',
+        role: 'Software Engineer Intern',
+        avatar: '/avatar_akhil.png',
+      },
+      {
+        quote:
+          'Clean UI, no clutter, and instant test case execution. By far the best student coding platform.',
+        name: 'Pooja Nair',
+        role: '3rd Year, CSE',
+        avatar: '/avatar_sravanthi.png',
+      },
+    ],
+  ];
+
+  // Automatic right-to-left slide transition every 3.5 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setHeroWordIndex((prev) => (prev + 1) % heroWords.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, []);
+    if (isFeedbackHovered) return;
+    const timer = setInterval(() => {
+      setActiveFeedbackSlide((prev) => (prev + 1) % feedbackSlides.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [isFeedbackHovered, feedbackSlides.length]);
 
-  const placementPaths = [
+  const handleNextFeedback = () => {
+    setActiveFeedbackSlide((prev) => (prev + 1) % feedbackSlides.length);
+  };
+
+  const handlePrevFeedback = () => {
+    setActiveFeedbackSlide((prev) => (prev === 0 ? feedbackSlides.length - 1 : prev - 1));
+  };
+
+  const handleRunDemoCode = () => {
+    setDemoRunning(true);
+    setDemoOutput(null);
+    setTimeout(() => {
+      setDemoRunning(false);
+      setDemoOutput('[0, 1] — All 3 Test Cases Passed! (Runtime: 1ms)');
+      toast.success('Sample Code Executed Successfully!');
+    }, 800);
+  };
+
+  const faqs = [
     {
-      id: 'aptitude',
-      title: 'Aptitude & Verbal Mastery',
-      subtitle: 'Build speed and accuracy',
-      duration: '4–6 weeks',
-      iconClass: 'fa-solid fa-chart-simple text-[#A3E635]',
-      badgeBg: 'bg-[#A3E635]/15 text-[#A3E635] border border-[#A3E635]/30',
-      checkColor: 'text-[#A3E635]',
-      btnHover: 'hover:border-[#A3E635] hover:text-[#A3E635]',
-      description: 'Master quantitative math, logical reasoning, data interpretation, and verbal comprehension with bite-sized lessons and shortcut tricks.',
-      features: [
-        'Speed math shortcuts & formulas',
-        'Logical reasoning puzzle patterns',
-        'Reading comprehension & grammar',
-      ],
-      link: '/aptitude',
+      q: 'Is connect2code free to use?',
+      a: 'Yes, connect2code is completely free for students. You can practice problems, attempt company-wise questions, and track your progress without any cost.',
     },
     {
-      id: 'coding',
-      title: 'DSA & Coding Practice',
-      subtitle: 'From basics to interview level',
-      duration: '6–8 weeks',
-      iconClass: 'fa-solid fa-code text-[#38BDF8]',
-      badgeBg: 'bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30',
-      checkColor: 'text-[#38BDF8]',
-      btnHover: 'hover:border-[#38BDF8] hover:text-[#38BDF8]',
-      description: 'Solve curated Data Structures & Algorithms problems with visual solution breakdowns, time complexity analysis, and multi-language support.',
-      features: [
-        'Curated Striver DSA Sheet',
-        'Real-time browser code compiler',
-        'Topic-wise problem categorization',
-      ],
-      link: '/dsa-sheet',
+      q: 'Can I practice company-wise questions?',
+      a: 'Yes! We provide curated previous year and pattern-based questions for top product and service-based companies including TCS, Infosys, Accenture, Cognizant, Amazon, Microsoft, Google, and more.',
     },
     {
-      id: 'company',
-      title: 'Company Pattern Mocks',
-      subtitle: 'Real exam environment',
-      duration: '2–3 weeks',
-      iconClass: 'fa-solid fa-bookmark text-[#EC4899]',
-      badgeBg: 'bg-[#EC4899]/15 text-[#EC4899] border border-[#EC4899]/30',
-      checkColor: 'text-[#EC4899]',
-      btnHover: 'hover:border-[#EC4899] hover:text-[#EC4899]',
-      description: 'Practise full-length mock tests designed to match the exact section timing, question types, and cutoffs of TCS NQT, Infosys, Accenture, Wipro, and Cognizant.',
-      features: [
-        'Exact section timing & structure',
-        'Automated scoring & sectional cutoffs',
-        'Detailed weak-area analysis report',
-      ],
-      link: '/company-patterns',
+      q: 'Which programming languages are supported?',
+      a: 'Our platform supports all popular programming languages including Java, C++, Python, JavaScript, and C with fast real-time online compilation and test execution.',
     },
     {
-      id: 'roadmaps',
-      title: 'Structured Tech Roadmaps',
-      subtitle: 'Clear step-by-step guidance',
-      duration: 'Ongoing',
-      iconClass: 'fa-solid fa-book-open text-[#EAB308]',
-      badgeBg: 'bg-[#EAB308]/15 text-[#EAB308] border border-[#EAB308]/30',
-      checkColor: 'text-[#EAB308]',
-      btnHover: 'hover:border-[#EAB308] hover:text-[#EAB308]',
-      description: 'Follow structured career roadmaps for Software Engineering, Full Stack Development, Data Science, and DevOps with recommended resources.',
-      features: [
-        'Curated learning milestones',
-        'Core CS fundamentals coverage',
-        'Project ideas & interview prep tips',
-      ],
-      link: '/roadmaps',
+      q: 'How is my progress tracked?',
+      a: 'Your profile tracks solved problems, difficulty distribution (Easy, Medium, Hard), topic proficiency, submission history, and test accuracy in real-time.',
     },
   ];
 
-  const companyLogos = [
-    { name: 'Accenture', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/accnture.webp' },
-    { name: 'Infosys', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/infosys.webp' },
-    { name: 'Google', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/google.webp' },
-    { name: 'Zoho', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/zoho.webp' },
-    { name: 'Bosch', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/bosch.webp' },
-    { name: 'KPMG', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/kpmg.webp' },
-    { name: 'Mindtree', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/mindtree.webp' },
-    { name: 'Persistent', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/persistent.webp' },
-    { name: 'Simplilearn', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/simlilearn.webp' },
-    { name: 'Texas Instruments', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/texas.webp' },
-    { name: 'UpGrad', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/upgrad.webp' },
-    { name: 'Whatfix', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/whatfix.webp' },
-    { name: 'GaragePlug', src: 'https://files.prepinsta.com/wp-content/uploads/2024/06/garageplug.webp' },
+  const topicChips = [
+    { name: 'Arrays', icon: 'fa-solid fa-table-cells-large', color: 'text-rose-500 bg-rose-500/10 border-rose-500/20' },
+    { name: 'Strings', icon: 'fa-solid fa-font', color: 'text-blue-500 bg-blue-500/10 border-blue-500/20' },
+    { name: 'Linked List', icon: 'fa-solid fa-link', color: 'text-purple-500 bg-purple-500/10 border-purple-500/20' },
+    { name: 'Trees', icon: 'fa-solid fa-network-wired', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20' },
+    { name: 'Graphs', icon: 'fa-solid fa-diagram-project', color: 'text-teal-400 bg-teal-500/10 border-teal-500/20' },
+    { name: 'Dynamic Programming', icon: 'fa-solid fa-cubes', color: 'text-pink-400 bg-pink-500/10 border-pink-500/20' },
+  ];
+
+  const companiesList = [
+    {
+      name: 'TCS',
+      brand: 'tcs',
+      badgeColor: 'text-rose-600 dark:text-rose-400',
+      logo: (
+        <span className="text-base font-black text-rose-600 dark:text-rose-400 tracking-tighter lowercase leading-none">
+          tcs
+        </span>
+      ),
+    },
+    {
+      name: 'Infosys',
+      brand: 'Infosys',
+      badgeColor: 'text-blue-600 dark:text-blue-400',
+      logo: (
+        <span className="text-sm font-black text-blue-600 dark:text-blue-400 tracking-tight leading-none">
+          Infosys
+        </span>
+      ),
+    },
+    {
+      name: 'Accenture',
+      brand: 'Accenture',
+      badgeColor: 'text-purple-600 dark:text-purple-400',
+      logo: (
+        <span className="flex items-center gap-0.5 text-xs font-black text-purple-600 dark:text-purple-400 lowercase leading-none">
+          <span className="text-purple-500 font-bold text-sm">&gt;</span>accenture
+        </span>
+      ),
+    },
+    {
+      name: 'Cognizant',
+      brand: 'Cognizant',
+      badgeColor: 'text-cyan-600 dark:text-cyan-400',
+      logo: (
+        <div className="flex items-center gap-1 leading-none">
+          <span className="w-3.5 h-3.5 rounded-full border-2 border-cyan-500 flex items-center justify-center text-[9px] font-black text-cyan-600 dark:text-cyan-400">
+            C
+          </span>
+          <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400">Cognizant</span>
+        </div>
+      ),
+    },
+    {
+      name: 'Microsoft',
+      brand: 'Microsoft',
+      badgeColor: 'text-slate-800 dark:text-slate-200',
+      logo: (
+        <div className="flex items-center gap-1.5 leading-none">
+          <span className="grid grid-cols-2 gap-0.5 w-3 h-3 shrink-0">
+            <span className="bg-red-500 rounded-[1px]"></span>
+            <span className="bg-green-500 rounded-[1px]"></span>
+            <span className="bg-blue-500 rounded-[1px]"></span>
+            <span className="bg-amber-500 rounded-[1px]"></span>
+          </span>
+          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Microsoft</span>
+        </div>
+      ),
+    },
+    {
+      name: 'Amazon',
+      brand: 'Amazon',
+      badgeColor: 'text-amber-500',
+      logo: (
+        <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight leading-none">
+          amazon<span className="text-amber-500">⌣</span>
+        </span>
+      ),
+    },
+    {
+      name: 'Google',
+      brand: 'Google',
+      badgeColor: 'text-slate-900 dark:text-white',
+      logo: (
+        <span className="text-sm font-bold tracking-tight leading-none">
+          <span className="text-blue-500">G</span>
+          <span className="text-red-500">o</span>
+          <span className="text-amber-500">o</span>
+          <span className="text-blue-500">g</span>
+          <span className="text-green-500">l</span>
+          <span className="text-red-500">e</span>
+        </span>
+      ),
+    },
   ];
 
   return (
-    <div className="w-full flex flex-col items-center bg-[#090A0C] text-[#f4f4f4] font-sans selection:bg-[#A3E635]/30 selection:text-white overflow-x-hidden min-h-screen">
-      {/* 1. Header Navbar */}
-      <NeetCodeNavbar user={user} onLogout={handleLogout} />
+    <div className="relative w-full flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen">
       
-      {/* 2. HERO FOLD WRAPPER - Restored Previous Centered Design */}
-      <div className="w-full flex flex-col justify-between min-h-[calc(100vh-90px)] pb-6 pt-2">
-        
-        {/* CENTERED HERO CONTENT */}
-        <section id="companiesshero" className="w-full relative my-auto py-4 sm:py-6">
-          <div className="mx-auto max-w-3xl px-5 text-center flex flex-col items-center">
-            
-            <h1 className="hero-font mx-auto max-w-[15ch] text-[34px] font-extrabold leading-[1.02] tracking-[-.02em] text-white sm:text-[58px] sm:leading-[1] lg:text-[68px] font-heading">
-              <span className="block min-h-[1.12em] text-[#A3E635] font-black overflow-hidden">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={heroWords[heroWordIndex]}
-                    initial={{ y: 32, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -32, opacity: 0 }}
-                    transition={{ duration: 0.35, ease: 'easeInOut' }}
-                    className="inline-block min-w-[5ch]"
-                  >
-                    {heroWords[heroWordIndex]}
-                  </motion.span>
-                </AnimatePresence>
+      {/* Ambient Glowing Blobs on Left & Right Edges (Subtle in Dark Mode) */}
+      <div className="hidden dark:block fixed top-20 -left-48 w-96 h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+      {/* 1. HEADER NAVBAR */}
+      <Navbar user={user} onLogout={handleLogout} />
+
+      {/* 2. HERO FOLD SECTION */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-2 sm:pb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 items-end">
+          
+          {/* Left Column: Heading, Subheading, CTAs & Social Proof */}
+          <div className="lg:col-span-6 xl:col-span-5 flex flex-col items-start text-left z-10 pb-4">
+            {/* Top Partner Badge */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#EEF2F6] dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 text-xs font-bold tracking-wider uppercase mb-6 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span>YOUR PLACEMENT PREP PARTNER</span>
+            </div>
+
+            {/* Main Headline with Burst Doodle */}
+            <h1 className="text-4xl sm:text-6xl lg:text-[62px] font-extrabold tracking-tight text-slate-900 dark:text-white leading-[1.08] mb-5">
+              Code{' '}
+              <span className="relative inline-block text-blue-600 dark:text-[#38BDF8]">
+                Today
+                {/* 4-point Sparkle Doodle on top-right of Today */}
+                <svg
+                  className="absolute -top-7 -right-8 w-8 h-8 text-slate-800 dark:text-slate-200 select-none pointer-events-none hidden sm:block"
+                  viewBox="0 0 36 36"
+                  fill="none"
+                >
+                  <path
+                    d="M18 10 C18 14 14 18 10 18 C14 18 18 22 18 26 C18 22 22 18 26 18 C22 18 18 14 18 10 Z"
+                    fill="currentColor"
+                  />
+                  <path
+                    d="M18 14 C18 16 16 18 14 18 C16 18 18 20 18 22 C18 20 20 18 22 18 C20 18 18 16 18 14 Z"
+                    fill="#FFFFFF"
+                    className="dark:fill-slate-900"
+                  />
+                  <path d="M12 9 L8 3" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <path d="M26 8 L32 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <path d="M28 17 L35 17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <path d="M25 24 L31 29" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                </svg>
               </span>
-              <span className="block hero-campus-placement-text text-white">your campus <span className="hero-placement-word">placement.</span></span>
+              <br />
+              For A Brighter{' '}
+              <span className="relative inline-block text-emerald-500 dark:text-emerald-400">
+                Tomorrow.
+                {/* Hand-drawn Green Underline Brush Stroke under Tomorrow. */}
+                <svg
+                  className="absolute -bottom-1.5 sm:-bottom-2 left-0 w-full h-2 text-emerald-500 dark:text-emerald-400 select-none pointer-events-none"
+                  viewBox="0 0 160 8"
+                  fill="currentColor"
+                  preserveAspectRatio="none"
+                >
+                  <path d="M2 4 C 35 1.5, 95 1.5, 158 3.5 C 115 6.5, 55 6.5, 2 4 Z" />
+                </svg>
+              </span>
             </h1>
 
-            <p className="hero-font mx-auto mt-4 max-w-[48ch] text-[14px] font-normal leading-[1.55] text-gray-400 sm:text-[18px] sm:leading-[1.7] font-sans">
-              Prepare for campus drives and walk-in drives with topic-wise lessons, coding practice, company-pattern mocks, and a clear weak-area fix plan.
-            </p>
+            {/* Subtitle */}
+            <div className="text-base sm:text-lg text-slate-600 dark:text-slate-300 leading-relaxed max-w-xl mb-8 space-y-1">
+              <p className="font-medium text-slate-700 dark:text-slate-200">
+                Practice. Prepare. Grow. All in one place.
+              </p>
+              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400">
+                Build your skills with structured practice, real company questions and track your progress towards your goals.
+              </p>
+            </div>
 
             {/* CTA Buttons */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 sm:mt-7 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-3.5 sm:gap-4 mb-9 w-full sm:w-auto">
               <Link
-                to="/company-patterns"
-                className="inline-flex min-h-[56px] w-full sm:w-auto items-center justify-center gap-2 rounded-[14px] bg-[#A3E635] hover:bg-[#84CC16] px-8 text-[16px] font-black text-black shadow-[0_7px_0_#65A30D] active:translate-y-1 transition-all cursor-pointer font-sans"
+                to="/practice"
+                className="inline-flex items-center justify-center gap-2.5 px-7 py-3 rounded-full bg-[#0B0F19] hover:bg-slate-800 text-white text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all active:translate-y-0.5 cursor-pointer no-underline"
               >
-                <span>Explore company patterns</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-right" aria-hidden="true">
-                  <path d="M5 12h14"></path>
-                  <path d="m12 5 7 7-7 7"></path>
-                </svg>
+                <span>Start Practicing</span>
+                <i className="fa-solid fa-arrow-right text-xs"></i>
               </Link>
+
+              <a
+                href="#features"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-slate-800 dark:text-slate-200 text-sm sm:text-base font-semibold shadow-2xs transition-all cursor-pointer no-underline"
+              >
+                <span>Explore Features</span>
+              </a>
+            </div>
+
+            {/* Social Proof Avatars */}
+            <div className="flex items-center gap-3.5 pt-1">
+              <img
+                src="/avatars_group.png"
+                alt="Students on their placement journey"
+                className="h-9 w-auto object-contain shrink-0"
+              />
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium leading-snug">
+                Join thousands of students <br className="hidden sm:inline" />
+                on their placement journey.
+              </p>
+            </div>
+          </div>
+
+          {/* Right Column: High-Res Illustration from Reference Images */}
+          <div className="lg:col-span-6 xl:col-span-7 relative flex items-end justify-center lg:justify-end self-end w-full">
+            {/* Dark Theme Hero Illustration */}
+            <img
+              src="/hero_illustration_dark.png"
+              alt="Connect2Code Student Preparation Ecosystem"
+              className="hidden dark:block w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none drop-shadow-2xl"
+            />
+
+            {/* Light Theme Authentic Hero Illustration */}
+            <img
+              src="/hero_illustration_light_v2.png"
+              alt="Connect2Code Student Preparation Ecosystem"
+              className="block dark:hidden w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none mix-blend-multiply"
+            />
+          </div>
+
+        </div>
+      </section>
+
+      {/* 3. UNIFIED FLOATING STATS BAR */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16 sm:mb-20">
+        <div className="bg-white dark:bg-[#0D1322] border border-slate-100 dark:border-slate-800/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] p-4 sm:p-5 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800/80">
+          
+          {/* Stat 1: 10K+ Aspiring Developers */}
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-blue-100/70 dark:bg-blue-600/15 text-blue-600 dark:text-sky-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+              <i className="fa-solid fa-users"></i>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">10K+</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aspiring Developers</div>
+            </div>
+          </div>
+
+          {/* Stat 2: 5K+ Practice Problems */}
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+              <i className="fa-solid fa-file-lines"></i>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">5K+</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Practice Problems</div>
+            </div>
+          </div>
+
+          {/* Stat 3: 100+ Company Questions */}
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-600/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+              <i className="fa-solid fa-city"></i>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">100+</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Company Questions</div>
+            </div>
+          </div>
+
+          {/* Stat 4: Track Your Progress */}
+          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100/70 dark:bg-rose-600/15 text-rose-500 dark:text-rose-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+              <i className="fa-solid fa-chart-simple"></i>
+            </div>
+            <div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">Track</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Your Progress</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 4. SECTION: "One Platform. Four Ways to Grow." */}
+      <section id="features" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+        
+        {/* Section Header: Title & Badge on Left, Handwritten Doodle on Right */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div className="flex flex-col items-start max-w-xl">
+            {/* Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#EEF2F6] dark:bg-[#0F1D38] border border-slate-200/70 dark:border-blue-800/60 text-slate-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
+              <span className="w-1.5 h-1.5 rounded-full bg-teal-500 dark:bg-sky-400"></span>
+              <span>EVERYTHING YOU NEED</span>
+            </div>
+
+            {/* Title with Doodle Burst */}
+            <h2 className="text-3xl sm:text-4xl lg:text-[44px] font-black text-slate-900 dark:text-white tracking-tight leading-[1.12]">
+              One Platform. <br />
+              Four Ways to{' '}
+              <span className="relative inline-flex items-center gap-2 text-blue-600 dark:text-[#38BDF8]">
+                <span>Grow.</span>
+                {/* 3 Green Burst Lines Doodle \ | / */}
+                <svg
+                  className="w-6 h-6 text-emerald-500 select-none pointer-events-none -mt-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <path d="M12 2v6" />
+                  <path d="M4 6l4.5 4.5" />
+                  <path d="M20 6l-4.5 4.5" />
+                </svg>
+              </span>
+            </h2>
+
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+              A complete preparation ecosystem designed for students to learn, practice, and get placement ready.
+            </p>
+          </div>
+
+          {/* Right: Authentic Hand-Drawn Annotation with Curly Loop Underline */}
+          <div className="hidden lg:flex flex-col items-center select-none pointer-events-none text-slate-800 dark:text-slate-200 font-handwriting text-xl sm:text-2xl leading-none rotate-[-4deg] self-end -mb-2">
+            <span>Structured Learning</span>
+            <span>Real Practice</span>
+            <span>Better Opportunities</span>
+            <svg className="w-24 h-7 text-slate-800 dark:text-slate-200 mt-1" viewBox="0 0 100 28" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M5 12 C 30 18, 60 4, 85 14 C 95 18, 92 26, 78 24 C 65 22, 60 12, 72 8" />
+            </svg>
+          </div>
+        </div>
+
+        {/* 4 Full Vertical Feature Cards Grid matching Reference Image */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          {/* Card 1: DSA */}
+          <div className="rounded-3xl p-6 bg-[#EEF6FF] dark:bg-blue-950/20 border border-[#D6E6FE] dark:border-blue-900/40 hover:shadow-lg transition-all flex flex-col justify-between group text-inherit">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#D6E6FE] dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 font-mono font-bold flex items-center justify-center text-base mb-5 shadow-2xs group-hover:scale-105 transition-transform">
+                &lt;/&gt;
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">DSA</h3>
+              <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                Master core concepts with curated problems, multiple difficulty levels and detailed solutions.
+              </p>
+
+              {/* Checklist */}
+              <ul className="space-y-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-blue-500 text-xs"></i>
+                  <span>Topic-wise problems</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-blue-500 text-xs"></i>
+                  <span>Multiple difficulty levels</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-blue-500 text-xs"></i>
+                  <span>Detailed explanations</span>
+                </li>
+              </ul>
+            </div>
+
+            <Link
+              to="/practice"
+              className="w-full py-2.5 px-4 rounded-full bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm border border-blue-100 dark:border-blue-900/40 flex items-center justify-center gap-2 transition-all hover:bg-blue-50 dark:hover:bg-slate-700/60 no-underline cursor-pointer"
+            >
+              <span>Explore DSA</span>
+              <i className="fa-solid fa-arrow-right text-[11px]"></i>
+            </Link>
+          </div>
+
+          {/* Card 2: Coding Practice */}
+          <div className="rounded-3xl p-6 bg-[#F0FDF4] dark:bg-emerald-950/20 border border-[#DCFCE7] dark:border-emerald-900/40 hover:shadow-lg transition-all flex flex-col justify-between group text-inherit">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#DCFCE7] dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-base mb-5 shadow-2xs group-hover:scale-105 transition-transform">
+                <i className="fa-solid fa-layer-group"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Coding Practice</h3>
+              <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                Write, run, and improve your code with an online compiler.
+              </p>
+
+              {/* Checklist */}
+              <ul className="space-y-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-emerald-500 text-xs"></i>
+                  <span>Multiple languages</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-emerald-500 text-xs"></i>
+                  <span>Real-time execution</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-emerald-500 text-xs"></i>
+                  <span>Custom test cases</span>
+                </li>
+              </ul>
+            </div>
+
+            <Link
+              to="/practice"
+              className="w-full py-2.5 px-4 rounded-full bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm border border-emerald-100 dark:border-emerald-900/40 flex items-center justify-center gap-2 transition-all hover:bg-emerald-50 dark:hover:bg-slate-700/60 no-underline cursor-pointer"
+            >
+              <span>Start Coding</span>
+              <i className="fa-solid fa-arrow-right text-[11px]"></i>
+            </Link>
+          </div>
+
+          {/* Card 3: Company Prep */}
+          <div className="rounded-3xl p-6 bg-[#FFFDF0] dark:bg-amber-950/20 border border-[#FEF3C7] dark:border-amber-900/40 hover:shadow-lg transition-all flex flex-col justify-between group text-inherit">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FEF3C7] dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center text-base mb-5 shadow-2xs group-hover:scale-105 transition-transform">
+                <i className="fa-solid fa-landmark"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Company Prep</h3>
+              <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                Get ready with real company questions, mock tests and patterns.
+              </p>
+
+              {/* Checklist */}
+              <ul className="space-y-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-amber-500 text-xs"></i>
+                  <span>Previous year questions</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-amber-500 text-xs"></i>
+                  <span>Company-wise practice</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-amber-500 text-xs"></i>
+                  <span>Mock tests & analysis</span>
+                </li>
+              </ul>
+            </div>
+
+            <Link
+              to="/companies"
+              className="w-full py-2.5 px-4 rounded-full bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm border border-amber-100 dark:border-amber-900/40 flex items-center justify-center gap-2 transition-all hover:bg-amber-50 dark:hover:bg-slate-700/60 no-underline cursor-pointer"
+            >
+              <span>Explore Prep</span>
+              <i className="fa-solid fa-arrow-right text-[11px]"></i>
+            </Link>
+          </div>
+
+          {/* Card 4: Aptitude */}
+          <div className="rounded-3xl p-6 bg-[#FFF1F2] dark:bg-rose-950/20 border border-[#FFE4E6] dark:border-rose-900/40 hover:shadow-lg transition-all flex flex-col justify-between group text-inherit">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-[#FFE4E6] dark:bg-rose-900/50 text-rose-500 dark:text-rose-400 flex items-center justify-center text-base mb-5 shadow-2xs group-hover:scale-105 transition-transform">
+                <i className="fa-solid fa-brain"></i>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Aptitude</h3>
+              <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
+                Sharpen your logical and quantitative skills.
+              </p>
+
+              {/* Checklist */}
+              <ul className="space-y-2.5 text-xs font-medium text-slate-700 dark:text-slate-300 mb-6">
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-rose-500 text-xs"></i>
+                  <span>Topic-wise questions</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-rose-500 text-xs"></i>
+                  <span>Timed tests</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fa-solid fa-check text-rose-500 text-xs"></i>
+                  <span>Detailed explanations</span>
+                </li>
+              </ul>
+            </div>
+
+            <Link
+              to="/aptitude"
+              className="w-full py-2.5 px-4 rounded-full bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 text-xs sm:text-sm font-bold shadow-xs hover:shadow-sm border border-rose-100 dark:border-rose-900/40 flex items-center justify-center gap-2 transition-all hover:bg-rose-50 dark:hover:bg-slate-700/60 no-underline cursor-pointer"
+            >
+              <span>Practice Aptitude</span>
+              <i className="fa-solid fa-arrow-right text-[11px]"></i>
+            </Link>
+          </div>
+
+        </div>
+      </section>
+
+      {/* 5. SECTION: "Company-wise Questions" (AUTOMATICALLY MOVES RIGHT TO LEFT) */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
+          <span>PRACTICE FOR TOP COMPANIES</span>
+        </div>
+
+        {/* Title with Radiating Bursts on Both Sides */}
+        <div className="flex items-center justify-center gap-4 mb-2">
+          <svg className="w-6 h-6 text-blue-500 hidden sm:block rotate-[-30deg]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 2v6" /><path d="M4 6l4.5 4.5" /><path d="M20 6l-4.5 4.5" />
+          </svg>
+          <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Company-wise Questions
+          </h2>
+          <svg className="w-6 h-6 text-blue-500 hidden sm:block rotate-[30deg]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 2v6" /><path d="M4 6l4.5 4.5" /><path d="M20 6l-4.5 4.5" />
+          </svg>
+        </div>
+
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl mx-auto mb-8">
+          Access curated questions from top product and service based companies and get familiar with real interview patterns.
+        </p>
+
+        {/* Marquee Row with navigation arrows on left and right */}
+        <div className="relative flex items-center justify-center gap-3 sm:gap-4 max-w-6xl mx-auto">
+          {/* Left Arrow Button */}
+          <button
+            type="button"
+            onClick={() => handleScrollCompanies('left')}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            aria-label="Previous companies"
+          >
+            <i className="fa-solid fa-chevron-left text-xs"></i>
+          </button>
+
+          {/* Infinite Marquee Track Moving Automatically from Right to Left */}
+          <div
+            ref={companiesScrollRef}
+            className="w-full overflow-hidden relative rounded-2xl py-2"
+          >
+            {/* Fade masks on left & right edges for seamless visuals */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#FBFBFD] dark:from-[#070A13] to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#FBFBFD] dark:from-[#070A13] to-transparent z-10 pointer-events-none" />
+
+            <div className="animate-marquee-rtl flex items-center gap-3.5 sm:gap-4 hover:[animation-play-state:paused]">
+              {/* Loop list twice for seamless infinite movement */}
+              {[...companiesList, ...companiesList].map((company, index) => (
+                <Link
+                  key={`${company.name}-${index}`}
+                  to={`/practice?company=${encodeURIComponent(company.name)}`}
+                  className="min-w-[130px] sm:min-w-[145px] h-[78px] px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center transition-all cursor-pointer group shrink-0 no-underline"
+                >
+                  <div className="h-6 flex items-center justify-center">
+                    {company.logo}
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">
+                    {company.name}
+                  </span>
+                </Link>
+              ))}
+
+              {/* View All Card */}
+              <Link
+                to="/companies"
+                className="min-w-[130px] sm:min-w-[145px] h-[78px] px-4 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 text-blue-600 dark:text-sky-400 text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-2 no-underline shadow-2xs hover:shadow-sm"
+              >
+                <span>View All</span>
+                <i className="fa-solid fa-arrow-right text-[11px]"></i>
+              </Link>
+            </div>
+          </div>
+
+          {/* Right Arrow Button */}
+          <button
+            type="button"
+            onClick={() => handleScrollCompanies('right')}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            aria-label="Next companies"
+          >
+            <i className="fa-solid fa-chevron-right text-xs"></i>
+          </button>
+        </div>
+      </section>
+
+      {/* 6. SECTION: "Practice Problems Across Different Topics." WITH MINI CODE RUNNER */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
+          <span>POPULAR PROBLEM TYPES</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center mt-2">
+          
+          {/* Left Column: Topics and Filters */}
+          <div className="lg:col-span-5 flex flex-col items-start relative">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-3">
+              Practice Problems Across Different Topics.
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+              Explore a wide range of problems to strengthen your problem solving skills.
+            </p>
+
+            {/* Topic Chips Carousel Row with Left and Right Arrows */}
+            <div className="relative flex items-center gap-2 w-full mb-5">
+              <button
+                type="button"
+                onClick={() => navigate('/practice')}
+                className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs"
+                aria-label="Previous topics"
+              >
+                <i className="fa-solid fa-chevron-left text-[10px]"></i>
+              </button>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 w-full">
+                {topicChips.map((chip) => (
+                  <Link
+                    key={chip.name}
+                    to={`/practice?topic=${encodeURIComponent(chip.name)}`}
+                    className={`flex flex-col items-center justify-center p-2.5 rounded-2xl border text-center transition-all hover:scale-105 cursor-pointer ${chip.color} shadow-2xs no-underline`}
+                  >
+                    <i className={`${chip.icon} text-base mb-1`}></i>
+                    <span className="text-[10px] font-bold text-slate-800 dark:text-slate-200 leading-tight truncate w-full text-center">
+                      {chip.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
 
               <button
                 type="button"
-                onClick={() => dispatch(openAuthModal({ mode: 'signup' }))}
-                className="inline-flex min-h-[56px] w-full sm:w-auto items-center justify-center gap-2 rounded-[14px] bg-[#121316] border border-white/15 hover:border-white/30 px-8 text-[16px] font-black text-white shadow-[0_7px_0_#000] active:translate-y-1 transition-all cursor-pointer font-sans"
+                onClick={() => navigate('/practice')}
+                className="w-7 h-7 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs"
+                aria-label="Next topics"
               >
-                <span>Sign up</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-right" aria-hidden="true">
-                  <path d="M5 12h14"></path>
-                  <path d="m12 5 7 7-7 7"></path>
-                </svg>
+                <i className="fa-solid fa-chevron-right text-[10px]"></i>
               </button>
             </div>
 
-          </div>
-        </section>
-
-        {/* Continuous Company Logo Marquee Scroller */}
-        <div className="w-full max-w-5xl px-4 pt-2 pb-2 mx-auto flex items-center justify-center">
-          <div className="relative w-full max-w-full overflow-hidden rounded-xl border border-white/10 bg-[#121316] py-3.5 shadow-md [mask-image:linear-gradient(90deg,transparent,black_10%,black_90%,transparent)]">
-            <div className="myjo-company-chip-marquee flex w-max items-center justify-center gap-5 px-4">
-              {/* Set 1 */}
-              {companyLogos.map((logo, idx) => (
-                <div
-                  key={`logo-set1-${idx}`}
-                  className="inline-flex h-12 min-w-[120px] items-center justify-center rounded-xl bg-white border border-white/20 px-4 py-2 hover:border-[#A3E635] hover:shadow-[0_0_14px_rgba(163,230,53,0.4)] transition-all shrink-0 shadow-sm"
-                >
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-6 sm:h-7 w-auto max-w-[95px] object-contain transition-transform hover:scale-105"
-                  />
-                </div>
-              ))}
-
-              {/* Set 2 Duplicate for continuous infinite marquee */}
-              {companyLogos.map((logo, idx) => (
-                <div
-                  key={`logo-set2-${idx}`}
-                  className="inline-flex h-12 min-w-[120px] items-center justify-center rounded-xl bg-white border border-white/20 px-4 py-2 hover:border-[#A3E635] hover:shadow-[0_0_14px_rgba(163,230,53,0.4)] transition-all shrink-0 shadow-sm"
-                >
-                  <img
-                    src={logo.src}
-                    alt={logo.name}
-                    className="h-6 sm:h-7 w-auto max-w-[95px] object-contain transition-transform hover:scale-105"
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* 3. SECTION 2: "Pick your placement path." (id="paths") */}
-      <section id="paths" className="scroll-mt-24 bg-[#090A0C] w-full pt-20 sm:pt-32 pb-12">
-        <div className="mx-auto max-w-6xl px-4">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight font-heading">
-              Pick your <span className="text-[#A3E635]">placement path</span>.
-            </h2>
-            <p className="mt-2 text-sm sm:text-base text-gray-400 font-sans">
-              Start wherever you feel weakest — we'll guide the rest.
-            </p>
-          </div>
-
-          {/* Mobile Snap Carousel */}
-          <div className="-mx-4 lg:hidden">
-            <div className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 pb-3">
-              {placementPaths.map((path) => (
-                <div key={path.id} className="w-[min(84vw,320px)] shrink-0 snap-center">
-                  <div className="flex flex-col overflow-hidden rounded-xl border border-white/10 hover:border-white/30 bg-[#121316] shadow-md p-5">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                        <i className={`${path.iconClass} text-base`}></i>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${path.badgeBg}`}>
-                          {path.duration}
-                        </span>
-                        <h3 className="mt-0.5 text-base font-bold text-white font-sans truncate">{path.title}</h3>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-gray-400 font-sans leading-relaxed min-h-[48px]">
-                      {path.description}
-                    </p>
-
-                    <ul className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 text-xs text-gray-300 font-sans">
-                      {path.features.map((feat, i) => (
-                        <li key={i} className="flex items-center gap-2">
-                          <i className={`fa-solid fa-circle-check ${path.checkColor} text-[11px]`}></i>
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-
-                    <Link
-                      to={path.link}
-                      className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 ${path.btnHover} text-xs font-bold text-white transition-all cursor-pointer`}
-                    >
-                      <span>Start path</span>
-                      <i className="fa-solid fa-arrow-right text-[10px]"></i>
-                    </Link>
-                  </div>
-                </div>
-              ))}
+            {/* Sub-row pills: Searching & Sorting, Stacks & Queues */}
+            <div className="flex flex-wrap items-center gap-2.5 mb-2">
+              <Link
+                to="/practice?topic=Searching"
+                className="px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-blue-400 no-underline shadow-2xs"
+              >
+                Searching & Sorting
+              </Link>
+              <Link
+                to="/practice?topic=Stack"
+                className="px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-blue-400 no-underline shadow-2xs"
+              >
+                Stacks & Queues
+              </Link>
             </div>
           </div>
 
-          {/* Desktop Grid Layout */}
-          <div className="hidden gap-4 lg:grid lg:grid-cols-4">
-            {placementPaths.map((path) => (
-              <div key={path.id} className="flex flex-col justify-between rounded-xl border border-white/10 hover:border-white/30 bg-[#121316] hover:bg-[#1a1c21] p-5 shadow-md transition-all group">
-                <div>
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                      <i className={`${path.iconClass} text-base group-hover:scale-110 transition-transform`}></i>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9.5px] font-bold ${path.badgeBg}`}>
-                        {path.duration}
-                      </span>
-                      <h3 className="mt-0.5 text-base font-bold text-white font-sans leading-tight">{path.title}</h3>
-                    </div>
-                  </div>
+          {/* Right Column: Two Sum Demo Card with "Solve / Run / Learn" Hand-drawn Note */}
+          <div className="lg:col-span-7 w-full relative">
+            {/* Doodle "Solve Run Learn" note pointing to card */}
+            <div className="absolute -top-7 right-6 hidden md:flex items-center gap-1 select-none pointer-events-none text-slate-600 dark:text-slate-300 font-handwriting text-base font-bold">
+              <div className="flex flex-col text-right leading-none">
+                <span>Solve</span>
+                <span>Run</span>
+                <span>Learn</span>
+              </div>
+              <svg className="w-8 h-8 text-sky-400" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M4 6 C 14 18, 22 18, 26 24" />
+                <path d="M20 24 L 26 24 L 25 18" />
+              </svg>
+            </div>
 
-                  <p className="text-xs text-gray-400 font-sans leading-relaxed mt-2 min-h-[48px]">
-                    {path.description}
-                  </p>
-
-                  <ul className="mt-4 flex flex-col gap-2 border-t border-white/10 pt-3 text-xs text-gray-300 font-sans">
-                    {path.features.map((feat, i) => (
-                      <li key={i} className="flex items-center gap-2">
-                        <i className={`fa-solid fa-circle-check ${path.checkColor} text-[11px]`}></i>
-                        <span>{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
+            <div className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl">
+              {/* Header: Two Sum | Easy | Language dropdown */}
+              <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">Two Sum</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold text-emerald-700 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/60">
+                    Easy
+                  </span>
                 </div>
 
-                <Link
-                  to={path.link}
-                  className={`mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 ${path.btnHover} text-xs font-bold text-white transition-all cursor-pointer`}
-                >
-                  <span>Start path</span>
-                  <i className="fa-solid fa-arrow-right text-[10px]"></i>
-                </Link>
+                {/* Language Selector */}
+                <div className="relative inline-flex items-center">
+                  <select
+                    value={demoSelectedLang}
+                    onChange={(e) => setDemoSelectedLang(e.target.value)}
+                    className="appearance-none text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-1.5 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs transition-colors"
+                  >
+                    <option value="Java" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">Java</option>
+                    <option value="Python" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">Python</option>
+                    <option value="C++" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">C++</option>
+                    <option value="JavaScript" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">JavaScript</option>
+                  </select>
+                  <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-2.5 pointer-events-none" />
+                </div>
               </div>
-            ))}
+
+              {/* Prompt description */}
+              <p className="text-xs text-slate-600 dark:text-slate-400 mt-4 leading-relaxed font-sans">
+                Given an array of integers <code className="text-violet-600 dark:text-violet-400 font-mono font-bold bg-violet-50 dark:bg-violet-950/50 px-1 py-0.5 rounded">nums</code> and an integer <code className="text-violet-600 dark:text-violet-400 font-mono font-bold bg-violet-50 dark:bg-violet-950/50 px-1 py-0.5 rounded">target</code>, return indices of the two numbers such that they add up to target.
+              </p>
+
+              {/* Example Box */}
+              <div className="mt-3.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-xs font-mono text-slate-700 dark:text-slate-300">
+                <span className="text-slate-400 text-[10px] uppercase font-bold block mb-1">Example 1:</span>
+                <div>Input: nums = [2, 7, 11, 15], target = 9</div>
+                <div>Output: [0, 1]</div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].</div>
+              </div>
+
+              {/* Tab Runner bar */}
+              <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDemoActiveTab('custom')}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                      demoActiveTab === 'custom'
+                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    Custom Input
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDemoActiveTab('testcases')}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors cursor-pointer ${
+                      demoActiveTab === 'testcases'
+                        ? 'bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white'
+                        : 'text-slate-500 hover:text-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    Test Cases
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRunDemoCode}
+                    disabled={demoRunning}
+                    className="px-4 py-1.5 rounded-full bg-[#0B0F19] dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-2xs active:translate-y-0.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {demoRunning ? 'Running...' : 'Run Code'}
+                  </button>
+                  <Link
+                    to="/practice/two-sum"
+                    className="px-5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs active:translate-y-0.5 cursor-pointer no-underline"
+                  >
+                    Submit
+                  </Link>
+                </div>
+              </div>
+
+              {/* Live output preview */}
+              {demoOutput && (
+                <div className="mt-3.5 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs font-mono text-emerald-800 dark:text-emerald-300 animate-fade-in flex items-center gap-2">
+                  <i className="fa-solid fa-circle-check text-emerald-600"></i>
+                  <span>{demoOutput}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Bottom 4 Feature Value Props Grid */}
-          <div className="mt-8 grid gap-3.5 rounded-xl border border-white/10 bg-[#121316] p-5 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="flex items-center gap-3 p-2">
-              <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-compass text-[#A3E635] text-sm"></i>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white font-sans">Choose your target</p>
-                <p className="text-xs text-gray-400 font-sans">Service &amp; product roles.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-2">
-              <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-bullseye text-[#38BDF8] text-sm"></i>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white font-sans">Know your gaps</p>
-                <p className="text-xs text-gray-400 font-sans">See what to fix first.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-2">
-              <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-users text-[#A855F7] text-sm"></i>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white font-sans">Real guidance</p>
-                <p className="text-xs text-gray-400 font-sans">Expert placement mentors.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 p-2">
-              <div className="w-10 h-10 rounded-lg bg-[#090A0C] border border-white/10 flex items-center justify-center shrink-0">
-                <i className="fa-solid fa-award text-[#EAB308] text-sm"></i>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-white font-sans">Stay motivated</p>
-                <p className="text-xs text-gray-400 font-sans">Daily progress tracking.</p>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* 4. SECTION 3: "WHY Connect 2 Code IS DIFFERENT?" BENTO GRID SECTION (Exact Requested Alignment & Spacing) */}
-      <section className="bg-[#090A0C] w-full pt-10 pb-16 border-t border-white/10">
-        <div className="relative max-w-7xl px-6 pt-5 pb-10 mx-auto md:px-12 lg:px-24">
-          <div className="flex flex-col w-full items-center justify-center text-center">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#A3E635] mb-2 font-mono">
-              Real Skills, Real Outcomes
-            </h2>
-            <div>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight font-heading mb-3 text-center">
-                Why <span className="text-[#A3E635]">Connect 2 Code</span> <span className="block sm:inline">is different?</span>
-              </h2>
-              <p className="mt-2 text-gray-400 text-base sm:text-lg font-medium font-sans max-w-2xl mx-auto">
-                From topic-wise practice to company-pattern mocks — we teach what actually gets you hired in campus drives.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid h-full w-full rounded-lg mt-12 grid-cols-1 md:grid-cols-3 grid-rows-none md:grid-rows-4 gap-4">
-            {/* Card 1 - Action-Oriented Placement Prep (Spans 2 cols, 2 rows) */}
-            <div className="md:col-span-2 md:row-span-2 rounded-3xl bg-[#121316] border border-white/10 hover:border-white/30 p-6 sm:p-8 flex flex-col justify-between shadow-md transition-all group">
-              <div className="flex items-center mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-circle-check-big text-[#A3E635] w-10 mr-2 shrink-0 group-hover:scale-110 transition-transform">
-                  <path d="M21.801 10A10 10 0 1 1 17 3.335"></path>
-                  <path d="m9 11 3 3L22 4"></path>
-                </svg>
-                <h3 className="text-xl font-bold text-white font-sans">Action-Oriented Placement Prep</h3>
-              </div>
-              <p className="text-gray-400 font-sans leading-relaxed text-sm sm:text-base">
-                We emphasize doing, not just knowing. Practice full-length company mock tests matching exact section timings and question patterns for TCS NQT, Infosys, Accenture, Wipro, and Cognizant.
-              </p>
-            </div>
-
-            {/* Card 2 - Curated DSA & Company Sheets (Spans 1 col, 2 rows) */}
-            <div className="md:row-span-2 rounded-3xl bg-[#121316] border border-white/10 hover:border-white/30 p-6 sm:p-8 flex flex-col justify-between shadow-md transition-all group">
-              <div className="flex items-center mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-file-text text-[#38BDF8] w-10 mr-2 shrink-0 group-hover:scale-110 transition-transform">
-                  <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
-                  <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-                  <path d="M10 9H8"></path>
-                  <path d="M16 13H8"></path>
-                  <path d="M16 17H8"></path>
-                </svg>
-                <h3 className="text-xl font-bold text-white font-sans">Curated DSA &amp; Company Sheets</h3>
-              </div>
-              <p className="text-gray-400 font-sans leading-relaxed text-sm">
-                Access topic-wise problem sets, speed math shortcuts, and company-wise previous year question archives curated for engineering campus drives.
-              </p>
-            </div>
-
-            {/* Card 3 - Weak-Area Fix & Analytics (Spans 1 col, 2 rows) */}
-            <div className="md:row-span-2 rounded-3xl bg-[#121316] border border-white/10 hover:border-white/30 p-6 sm:p-8 flex flex-col justify-between shadow-md transition-all group">
-              <div className="flex items-center mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-compass text-[#A855F7] w-10 mr-2 shrink-0 group-hover:scale-110 transition-transform">
-                  <path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z"></path>
-                  <circle cx="12" cy="12" r="10"></circle>
-                </svg>
-                <h3 className="text-xl font-bold text-white font-sans">Weak-Area Fix &amp; Analytics</h3>
-              </div>
-              <p className="text-gray-400 font-sans leading-relaxed text-sm">
-                Our performance analytics identifies your weak section immediately — whether Aptitude, Logical, Verbal, or Coding — and gives you a clear repair plan.
-              </p>
-            </div>
-
-            {/* Card 4 - Real-Time Code Execution & Analytics (Spans 1 col, 2 rows) */}
-            <div className="md:row-span-2 rounded-3xl bg-[#121316] border border-white/10 hover:border-white/30 p-6 sm:p-8 flex flex-col justify-between shadow-md transition-all group">
-              <div className="flex items-center mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-trending-up text-[#EAB308] w-10 mr-2 shrink-0 group-hover:scale-110 transition-transform">
-                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline>
-                  <polyline points="16 7 22 7 22 13"></polyline>
-                </svg>
-                <h3 className="text-xl font-bold text-white font-sans">Real-Time Code Compiler</h3>
-              </div>
-              <p className="text-gray-400 font-sans leading-relaxed text-sm">
-                Run code directly in your browser with instant test-case feedback, solution breakdowns, and score tracking across all campus modules.
-              </p>
-            </div>
-
-            {/* Card 5 - Structured Roadmaps & Strategies (Spans 1 col, 2 rows) */}
-            <div className="md:row-span-2 rounded-3xl bg-[#121316] border border-white/10 hover:border-white/30 p-6 sm:p-8 flex flex-col justify-between shadow-md transition-all group">
-              <div className="flex items-center mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-users text-[#3B82F6] w-10 mr-2 shrink-0 group-hover:scale-110 transition-transform">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
-                  <circle cx="9" cy="7" r="4"></circle>
-                  <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                <h3 className="text-xl font-bold text-white font-sans">Structured Roadmaps &amp; Strategies</h3>
-              </div>
-              <p className="text-gray-400 font-sans leading-relaxed text-sm">
-                Learn step-by-step from beginner to placement ready. Our structured guidance ensures you focus on what actually gets asked on drive day.
-              </p>
-            </div>
-          </div>
+      {/* 7. SECTION: "Get Started in 3 Simple Steps" */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
+          <span>HOW IT WORKS</span>
         </div>
-      </section>
 
-      {/* 5. SECTION 4: "Students understand what to fix next." TESTIMONIALS (id="stories") */}
-      <section className="scroll-mt-24 bg-[#090A0C] w-full py-12 md:py-16 border-t border-white/10" id="stories">
-        <div className="mx-auto max-w-6xl px-4 text-center">
-          <h2 className="text-2xl sm:text-4xl font-bold text-white tracking-tight font-heading mb-2">
-            Students understand <span className="text-[#A3E635]">what to fix next.</span>
+        {/* Title with Airplane & Bursts */}
+        <div className="relative inline-block mb-2">
+          {/* Green Burst on Left */}
+          <svg className="absolute -top-5 -left-10 w-7 h-7 text-emerald-500 hidden sm:block rotate-[-20deg]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 2v6" /><path d="M4 6l4.5 4.5" /><path d="M20 6l-4.5 4.5" />
+          </svg>
+
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+            Get Started in 3 Simple Steps
           </h2>
-          <p className="mx-auto mt-2 max-w-[38ch] text-sm text-gray-400 font-sans mb-10">
-            No big claims. Just clearer prep after every attempt.
-          </p>
 
-          {/* Continuous Infinite Testimonials Marquee */}
-          <div className="relative overflow-hidden rounded-2xl py-2 [mask-image:linear-gradient(90deg,transparent,black_8%,black_92%,transparent)]">
-            <div className="myjo-testimonial-marquee flex w-max items-stretch gap-4 px-1">
-              <div className="w-[268px] shrink-0 rounded-xl border border-white/10 bg-[#121316] p-4 text-left shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <span className="relative grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-black" style={{ width: '48px', height: '48px', backgroundColor: '#A3E635' }}>
-                      <span className="text-base">R</span>
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white font-sans">Riya S.</p>
-                    <p className="truncate text-xs text-gray-400 font-sans">TCS NQT</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs font-medium italic leading-relaxed text-gray-300 font-sans">“Finding out my aptitude section score gap early helped me focus on what actually mattered for TCS NQT.”</p>
-              </div>
+          {/* Purple Paper Airplane on Right */}
+          <svg className="absolute -top-7 -right-12 w-8 h-8 text-purple-500 hidden sm:block rotate-12" viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 16 L28 4 L18 28 L14 18 L4 16 Z" />
+            <path d="M28 4 L14 18" />
+          </svg>
+        </div>
 
-              <div className="w-[268px] shrink-0 rounded-xl border border-white/10 bg-[#121316] p-4 text-left shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <span className="relative grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-black" style={{ width: '48px', height: '48px', backgroundColor: '#38BDF8' }}>
-                      <span className="text-base">A</span>
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white font-sans">Ananya S.</p>
-                    <p className="truncate text-xs text-gray-400 font-sans">Infosys</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs font-medium italic leading-relaxed text-gray-300 font-sans">“The Infosys technical &amp; coding pattern questions were spot on. The step-by-step solution breakdowns helped immensely.”</p>
-              </div>
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-14">
+          Start your preparation journey in minutes.
+        </p>
 
-              <div className="w-[268px] shrink-0 rounded-xl border border-white/10 bg-[#121316] p-4 text-left shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <span className="relative grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-white" style={{ width: '48px', height: '48px', backgroundColor: '#EC4899' }}>
-                      <span className="text-base">R</span>
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white font-sans">Rahul V.</p>
-                    <p className="truncate text-xs text-gray-400 font-sans">Accenture &amp; Cognizant</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs font-medium italic leading-relaxed text-gray-300 font-sans">“Practiced Aptitude shortcuts and DSA Sheet daily. Cracked Accenture ASE and Cognizant GenC back to back.”</p>
-              </div>
+        {/* Steps Grid with Connected Curved Dotted Wave Track */}
+        <div className="relative max-w-5xl mx-auto">
+          {/* Subtle curved connecting dashed wave line behind step badges on desktop */}
+          <svg
+            className="hidden md:block absolute top-5 left-1/2 -translate-x-1/2 w-4/5 h-16 pointer-events-none select-none z-0"
+            viewBox="0 0 800 60"
+            fill="none"
+          >
+            <path
+              d="M 100 20 C 230 55, 300 0, 400 20 C 500 40, 600 5, 700 20"
+              stroke="#93C5FD"
+              strokeWidth="2.5"
+              strokeDasharray="6 6"
+              strokeLinecap="round"
+              className="dark:stroke-blue-800/80"
+            />
+          </svg>
 
-              <div className="w-[268px] shrink-0 rounded-xl border border-white/10 bg-[#121316] p-4 text-left shadow-md">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <span className="relative grid shrink-0 place-items-center overflow-hidden rounded-full font-bold text-black" style={{ width: '48px', height: '48px', backgroundColor: '#EAB308' }}>
-                      <span className="text-base">K</span>
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white font-sans">Karan P.</p>
-                    <p className="truncate text-xs text-gray-400 font-sans">Wipro</p>
-                  </div>
-                </div>
-                <p className="mt-3 text-xs font-medium italic leading-relaxed text-gray-300 font-sans">“Short lessons plus practice felt easier than watching long videos.”</p>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+            {/* Step 1 */}
+            <div className="flex-1 w-full flex flex-col items-center text-center p-6 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black text-base flex items-center justify-center mb-4 shadow-sm">
+                1
               </div>
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base mb-3">
+                <i className="fa-regular fa-user"></i>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Create Your Account</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+                Sign up and set up your profile.
+              </p>
+            </div>
+
+            {/* Connecting Arrow 1 -> 2 */}
+            <div className="hidden md:flex items-center justify-center text-slate-300 dark:text-slate-600 shrink-0">
+              <i className="fa-solid fa-arrow-right text-sm"></i>
+            </div>
+
+            {/* Step 2 */}
+            <div className="flex-1 w-full flex flex-col items-center text-center p-6 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-blue-600 text-white font-black text-base flex items-center justify-center mb-4 shadow-sm">
+                2
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-base mb-3">
+                <i className="fa-solid fa-bullseye"></i>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Choose Your Path</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+                Practice DSA, coding, company questions or aptitude.
+              </p>
+            </div>
+
+            {/* Connecting Arrow 2 -> 3 */}
+            <div className="hidden md:flex items-center justify-center text-slate-300 dark:text-slate-600 shrink-0">
+              <i className="fa-solid fa-arrow-right text-sm"></i>
+            </div>
+
+            {/* Step 3 */}
+            <div className="flex-1 w-full flex flex-col items-center text-center p-6 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl shadow-xs hover:shadow-md transition-all">
+              <div className="w-10 h-10 rounded-full bg-emerald-500 text-white font-black text-base flex items-center justify-center mb-4 shadow-sm">
+                3
+              </div>
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-base mb-3">
+                <i className="fa-solid fa-chart-column"></i>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Track Your Progress</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs">
+                Solve, learn and see your improvement.
+              </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 6. FOOTER */}
+      {/* 8. SECTION: "Loved by Aspiring Developers" (FEEDBACK - AUTOMATICALLY MOVES RIGHT TO LEFT) */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Badge */}
+        <div className="flex justify-center mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
+            <span>WHAT LEARNERS SAY</span>
+          </div>
+        </div>
+
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
+            Loved by Aspiring Developers
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            Students are already improving their skills and getting placement ready with connect2code.
+          </p>
+        </div>
+
+        {/* Automated Slider with Navigation Arrows matching Reference Image */}
+        <div
+          className="relative flex items-center justify-center gap-3 sm:gap-4 max-w-6xl mx-auto"
+          onMouseEnter={() => setIsFeedbackHovered(true)}
+          onMouseLeave={() => setIsFeedbackHovered(false)}
+        >
+          {/* Left Arrow Button */}
+          <button
+            type="button"
+            onClick={handlePrevFeedback}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            aria-label="Previous testimonials"
+          >
+            <i className="fa-solid fa-chevron-left text-xs"></i>
+          </button>
+
+          {/* Carousel Viewport: Smooth Right-to-Left Slide Transition */}
+          <div className="w-full overflow-hidden">
+            <div
+              className="flex transition-transform duration-700 ease-in-out"
+              style={{ transform: `translateX(-${activeFeedbackSlide * 100}%)` }}
+            >
+              {feedbackSlides.map((slide, slideIdx) => (
+                <div
+                  key={slideIdx}
+                  className="w-full shrink-0 grid grid-cols-1 md:grid-cols-3 gap-6 px-1"
+                >
+                  {slide.map((item, itemIdx) => (
+                    <div
+                      key={itemIdx}
+                      className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6 shadow-xs flex flex-col justify-between hover:shadow-md transition-all"
+                    >
+                      <div>
+                        <span className="text-purple-600 dark:text-purple-400 text-3xl font-serif font-black leading-none block mb-3">
+                          ““
+                        </span>
+                        <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic mb-6">
+                          {item.quote}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
+                        <img
+                          src={item.avatar}
+                          alt={item.name}
+                          className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700"
+                        />
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">{item.name}</span>
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">{item.role}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Arrow Button */}
+          <button
+            type="button"
+            onClick={handleNextFeedback}
+            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            aria-label="Next testimonials"
+          >
+            <i className="fa-solid fa-chevron-right text-xs"></i>
+          </button>
+        </div>
+
+        {/* Carousel Pagination Dots (Center Dot Active Matching Reference Mockup) */}
+        <div className="flex items-center justify-center gap-2 mt-8">
+          {feedbackSlides.map((_, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => setActiveFeedbackSlide(idx)}
+              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                activeFeedbackSlide === idx
+                  ? 'w-6 bg-blue-600 dark:bg-sky-400'
+                  : 'w-2 bg-slate-300 dark:bg-slate-700 hover:bg-slate-400'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* 9. SECTION: "Have Questions?" (FAQ ACCORDION) */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
+          <span>FREQUENTLY ASKED QUESTIONS</span>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start mt-2">
+          
+          {/* Left Column: Heading, Subheading & playful Q/A Badges + Dotted ? */}
+          <div className="lg:col-span-5 flex flex-col items-start relative">
+            <h2 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-tight mb-3">
+              Have <br />
+              <span className="text-blue-600 dark:text-[#38BDF8]">Questions?</span>
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed mb-8">
+              Find answers to common questions about connect2code.
+            </p>
+
+            {/* Q and A chat badges + dotted question mark doodle */}
+            <div className="flex items-center gap-3 relative">
+              <div className="w-12 h-12 rounded-2xl bg-purple-600 text-white font-black text-xl flex items-center justify-center shadow-md">
+                Q
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white font-black text-xl flex items-center justify-center shadow-md">
+                A
+              </div>
+
+              {/* Hand-drawn Dotted Pink Question Mark Doodle */}
+              <svg className="w-9 h-11 text-pink-500 absolute -top-8 left-24 select-none pointer-events-none" viewBox="0 0 30 40" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="3 3" strokeLinecap="round">
+                <path d="M6 12 C6 5 22 4 22 14 C22 22 14 20 14 28" />
+                <circle cx="14" cy="35" r="1.5" fill="currentColor" />
+              </svg>
+            </div>
+          </div>
+
+          {/* Right Column: Interactive Accordion */}
+          <div className="lg:col-span-7 flex flex-col gap-3.5">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index;
+              return (
+                <div
+                  key={index}
+                  className={`border rounded-2xl overflow-hidden transition-all shadow-2xs ${
+                    isOpen
+                      ? 'bg-blue-50/40 dark:bg-[#0D182E] border-blue-200 dark:border-blue-700/60'
+                      : 'bg-white dark:bg-[#0D1322] border-slate-200/80 dark:border-slate-800'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaqIndex(isOpen ? null : index)}
+                    className="w-full px-5 py-4 flex items-center justify-between text-left gap-4 cursor-pointer focus:outline-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isOpen && (
+                        <span className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-sky-300 flex items-center justify-center text-xs">
+                          <i className="fa-regular fa-user"></i>
+                        </span>
+                      )}
+                      <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                        {faq.q}
+                      </span>
+                    </div>
+                    <i
+                      className={`fa-solid ${
+                        isOpen ? 'fa-minus text-blue-600 dark:text-sky-400' : 'fa-plus text-slate-400'
+                      } text-xs transition-transform`}
+                    ></i>
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-5 pb-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-3 animate-fade-in pl-14">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+        </div>
+      </section>
+
+      {/* 10. FOOTER */}
       <Footer />
 
       {/* Floating Auth Modal Overlay */}

@@ -9,7 +9,7 @@ export function useGoogleOAuthLogin() {
   const initiateGoogleLogin = useCallback(() => {
     // Preserve current internal route for post-auth navigation if safe
     try {
-      const currentPath = window.location.pathname;
+      const currentPath = window.location.pathname + window.location.search;
       if (
         currentPath &&
         currentPath !== '/login' &&

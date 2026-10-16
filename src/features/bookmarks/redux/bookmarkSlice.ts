@@ -20,6 +20,7 @@ export interface BookmarkState {
   error: string | null;
   currentRequestId: string | null;
   activeUserId: string | number | null;
+  lastFetchedAt: number | null;
 }
 
 const LOCAL_STORAGE_KEY = 'myjo_bookmarks';
@@ -59,9 +60,13 @@ const initialState: BookmarkState = {
   error: null,
   currentRequestId: null,
   activeUserId: getInitialActiveUserId(),
+  lastFetchedAt: null,
 };
 
-export const fetchBookmarks = createAsyncThunk(
+export const fetchBookmarks = createAsyncThunk<
+  { userId: string | number | null; bookmarks: BookmarkItem[] },
+  { force?: boolean } | boolean | void
+>(
   'bookmarks/fetchList',
   async (_, { getState }) => {
     const local = loadBookmarksFromStorage();
@@ -102,9 +107,21 @@ export const fetchBookmarks = createAsyncThunk(
     };
   },
   {
-    condition: (_, { getState }) => {
+    condition: (arg, { getState }) => {
       const state = getState() as RootState;
       if (state.bookmarks?.loading) {
+        return false;
+      }
+      const force = typeof arg === 'boolean' ? arg : Boolean(arg?.force);
+      if (force) {
+        return true;
+      }
+      const userId = state.auth?.user?.id;
+      const isSameUser = String(state.bookmarks?.activeUserId ?? '') === String(userId ?? '');
+      const isFresh =
+        state.bookmarks?.lastFetchedAt &&
+        Date.now() - state.bookmarks.lastFetchedAt < 60_000;
+      if (isSameUser && isFresh && state.bookmarks?.bookmarks !== undefined) {
         return false;
       }
       return true;
@@ -221,6 +238,7 @@ const bookmarkSlice = createSlice({
         state.loading = false;
         state.currentRequestId = null;
         state.bookmarks = bookmarks;
+        state.lastFetchedAt = Date.now();
         saveBookmarksToStorage(bookmarks);
       })
       .addCase(fetchBookmarks.rejected, (state, action) => {

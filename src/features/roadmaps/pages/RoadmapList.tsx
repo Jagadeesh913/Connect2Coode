@@ -120,10 +120,10 @@ export const RoadmapList: React.FC = () => {
                 <Link
                   key={item.slug}
                   to={`/roadmaps/${item.slug}`}
-                  className="group flex items-center gap-4 p-4 min-h-[72px] bg-[#202225] hover:bg-[#2f3136] border border-white/10 hover:border-white/30 rounded-lg shadow-md transition-all active:scale-[0.98]"
+                  className="group flex items-center gap-4 p-4 min-h-[72px] bg-neutral-800 hover:bg-neutral-800 border border-white/10 hover:border-white/30 rounded-lg shadow-md transition-all active:scale-[0.98]"
                 >
                   {/* Transparent Icon Container */}
-                  <div className="w-11 h-11 rounded-lg bg-[#121113] border border-white/10 flex items-center justify-center shrink-0 group-hover:border-white/30 transition-colors">
+                  <div className="w-11 h-11 rounded-lg bg-neutral-900 border border-white/10 flex items-center justify-center shrink-0 group-hover:border-white/30 transition-colors">
                     <i className={`${item.icon} text-lg text-white group-hover:scale-110 transition-transform`}></i>
                   </div>
 

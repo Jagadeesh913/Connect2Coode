@@ -67,7 +67,7 @@ export const executionService = {
           return list;
         }
       } catch (err) {
-        console.warn('Language dropdown fetch fallback to defaults:', err);
+        console.warn('Language dropdown fetch failed:', err);
       }
 
       throw new Error('Supported languages could not be loaded from the backend');

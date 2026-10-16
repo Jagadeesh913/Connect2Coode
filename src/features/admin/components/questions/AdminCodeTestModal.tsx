@@ -234,20 +234,20 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           </div>
 
           {/* Collapsible Problem Statement & Configured Sample Test Cases Panel */}
-          <div className="bg-[#14202C]/60 border border-white/10 rounded-xl overflow-hidden transition-all">
+          <div className="bg-neutral-900 border border-white/10 rounded-xl overflow-hidden transition-all">
             <div
               onClick={() => setIsStatementOpen((prev) => !prev)}
               className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors select-none"
             >
               <div className="flex items-center gap-2">
-                <i className="fa-solid fa-file-lines text-[#A3E635]"></i>
+                <i className="fa-solid fa-file-lines text-neutral-300"></i>
                 <span className="font-bold text-white text-xs">Problem Statement &amp; Configured Sample Test Cases</span>
                 {loadingDetails ? (
                   <span className="text-[10px] text-gray-400 flex items-center gap-1 font-mono">
                     <i className="fa-solid fa-spinner animate-spin"></i> Loading...
                   </span>
                 ) : (
-                  <span className="text-[10px] bg-[#A3E635]/15 text-[#A3E635] px-2 py-0.5 rounded-full font-mono font-semibold">
+                  <span className="text-[10px] bg-neutral-800 text-neutral-300 px-2 py-0.5 rounded-full font-mono font-semibold">
                     {sampleTestCases.length} Sample Case{sampleTestCases.length !== 1 ? 's' : ''} (of {allTestCasesCount || sampleTestCases.length} total)
                   </span>
                 )}
@@ -259,14 +259,14 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             </div>
 
             {isStatementOpen && (
-              <div className="p-4 pt-1 border-t border-white/5 flex flex-col gap-3 text-xs bg-[#090A0C]/50">
+              <div className="p-4 pt-1 border-t border-white/5 flex flex-col gap-3 text-xs bg-neutral-950">
                 {/* Problem Description */}
                 {questionDetails?.description && (
                   <div>
                     <span className="text-gray-400 font-semibold block text-[11px] mb-1 uppercase tracking-wider">
                       Description:
                     </span>
-                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap bg-[#121316] p-3 rounded-lg border border-white/5 font-sans">
+                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap bg-neutral-900 p-3 rounded-lg border border-white/5 font-sans">
                       {questionDetails.description}
                     </p>
                   </div>
@@ -278,7 +278,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                     <span className="text-gray-400 font-semibold block text-[11px] mb-1 uppercase tracking-wider">
                       Constraints:
                     </span>
-                    <div className="font-mono text-gray-300 bg-[#121316] p-2.5 rounded-lg border border-white/5">
+                    <div className="font-mono text-gray-300 bg-neutral-900 p-2.5 rounded-lg border border-white/5">
                       {questionDetails.constraints}
                     </div>
                   </div>
@@ -300,25 +300,25 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                       {sampleTestCases.map((stc: any, sIdx: number) => (
                         <div
                           key={stc.id || sIdx}
-                          className="bg-[#121316] p-2.5 rounded-lg border border-white/10 flex flex-col gap-1.5"
+                          className="bg-neutral-900 p-2.5 rounded-lg border border-white/10 flex flex-col gap-1.5"
                         >
                           <div className="flex items-center justify-between text-[11px]">
                             <span className="font-bold text-gray-200">
                               Sample #{sIdx + 1}
                             </span>
-                            <span className="text-[10px] text-[#A3E635] bg-[#A3E635]/10 px-1.5 py-0.5 rounded font-mono">
+                            <span className="text-[10px] text-neutral-300 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">
                               {stc.typeRefName || 'Sample'}
                             </span>
                           </div>
                           <div className="font-mono text-[11px]">
                             <span className="text-gray-500 text-[10px] block">Input:</span>
-                            <div className="bg-[#090A0C] p-1.5 rounded border border-white/5 text-gray-300 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
+                            <div className="bg-neutral-950 p-1.5 rounded border border-white/5 text-gray-300 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
                               {stc.input || '(empty)'}
                             </div>
                           </div>
                           <div className="font-mono text-[11px]">
                             <span className="text-gray-500 text-[10px] block">Expected Output:</span>
-                            <div className="bg-[#090A0C] p-1.5 rounded border border-white/5 text-emerald-400 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
+                            <div className="bg-neutral-950 p-1.5 rounded border border-white/5 text-emerald-400 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
                               {stc.expectedOutput || '(empty)'}
                             </div>
                           </div>
@@ -331,7 +331,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500 italic text-[11px] p-2 bg-[#121316] rounded-lg">
+                    <p className="text-gray-500 italic text-[11px] p-2 bg-neutral-900 rounded-lg">
                       {loadingDetails ? 'Fetching sample test cases...' : 'No visible sample test cases found.'}
                     </p>
                   )}
@@ -341,23 +341,26 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           </div>
 
         {/* Top Control Bar: Language Dropdown + Action Buttons */}
-        <div className="flex items-center justify-between gap-3 flex-wrap bg-[#14202C]/60 p-2.5 rounded-xl border border-white/10">
+        <div className="flex items-center justify-between gap-3 flex-wrap bg-neutral-900 p-2.5 rounded-xl border border-white/10">
           <div className="flex items-center gap-2">
             <label className="text-gray-300 font-semibold text-xs flex items-center gap-1.5">
-              <i className="fa-solid fa-code text-[#A3E635]"></i>
+              <i className="fa-solid fa-code text-neutral-300"></i>
               <span>Language:</span>
             </label>
-            <select
-              value={selectedLanguageId ?? ''}
-              onChange={handleLanguageChange}
-              className="bg-[#090A0C] text-gray-200 border border-white/10 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-[#A3E635] cursor-pointer"
-            >
-              {languages.map((lang) => (
-                <option key={lang.id} value={lang.id}>
-                  {lang.name} (Table ID: {lang.id})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedLanguageId ?? ''}
+                onChange={handleLanguageChange}
+                className="appearance-none bg-neutral-950 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-1.5 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
+              >
+                {languages.map((lang) => (
+                  <option key={lang.id} value={lang.id} className="bg-neutral-900 text-white">
+                    {lang.name} (Table ID: {lang.id})
+                  </option>
+                ))}
+              </select>
+              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -365,13 +368,13 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             <button
               onClick={handleAdminRun}
               disabled={isRunning || isSubmitting || selectedLanguageId === null || languages.length === 0}
-              className="px-3.5 py-1.5 bg-[#181A20] hover:bg-[#22252D] text-gray-200 border border-white/10 hover:border-[#A3E635]/50 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-gray-200 border border-white/10 hover:border-neutral-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               title="Executes visible sample test cases only (POST /api/v1/admin/testCode)"
             >
               {isRunning ? (
-                <i className="fa-solid fa-spinner animate-spin text-[#A3E635]"></i>
+                <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
               ) : (
-                <i className="fa-solid fa-play text-[#A3E635] text-[10px]"></i>
+                <i className="fa-solid fa-play text-neutral-300 text-[10px]"></i>
               )}
               <span>Run Code (Sample)</span>
             </button>
@@ -380,7 +383,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             <button
               onClick={handleAdminSubmit}
               disabled={isRunning || isSubmitting}
-              className="px-4 py-1.5 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md shadow-[#A3E635]/20 disabled:opacity-50"
+              className="px-4 py-1.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md  disabled:opacity-50"
               title="Executes all test cases including hidden (POST /api/v1/admin/submitCode)"
             >
               {isSubmitting ? (
@@ -415,7 +418,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
 
         {/* Execution Results Section */}
         {result && (
-          <div className="bg-[#14202C]/80 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
+          <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
             {/* Header Summary */}
             <div className="flex items-center justify-between pb-2 border-b border-white/10 flex-wrap gap-2">
               <div className="flex items-center gap-3">
@@ -496,19 +499,19 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                         {!isHidden && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-[11px] font-mono">
                             {tc.input && (
-                              <div className="bg-[#090A0C] p-2 rounded border border-white/5">
+                              <div className="bg-neutral-950 p-2 rounded border border-white/5">
                                 <span className="text-gray-500 block text-[10px]">Input:</span>
                                 <span className="text-gray-300">{tc.input}</span>
                               </div>
                             )}
                             {tc.expectedOutput && (
-                              <div className="bg-[#090A0C] p-2 rounded border border-white/5">
+                              <div className="bg-neutral-950 p-2 rounded border border-white/5">
                                 <span className="text-gray-500 block text-[10px]">Expected:</span>
                                 <span className="text-emerald-400">{tc.expectedOutput}</span>
                               </div>
                             )}
                             {tc.actualOutput && (
-                              <div className="bg-[#090A0C] p-2 rounded border border-white/5 sm:col-span-2">
+                              <div className="bg-neutral-950 p-2 rounded border border-white/5 sm:col-span-2">
                                 <span className="text-gray-500 block text-[10px]">Actual Output:</span>
                                 <span className={isPassed ? 'text-gray-300' : 'text-rose-400'}>
                                   {tc.actualOutput}

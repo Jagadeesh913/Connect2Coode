@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
@@ -13,6 +13,7 @@ import { adminQuestionService } from '../../../services/admin/adminQuestionServi
 import { adminCompanyService } from '../../../services/admin/adminCompanyService';
 import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { toast } from 'react-hot-toast';
+import { getActionableErrorMessage } from '../../../core/validation';
 
 export const AdminQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionPayload[]>([]);
@@ -49,6 +50,16 @@ export const AdminQuestions: React.FC = () => {
 
   // State to track if question was saved but test cases failed during retry flow
   const [createdQuestionIdForRetry, setCreatedQuestionIdForRetry] = useState<number | string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>('');
+  const searchAbortRef = useRef<AbortController | null>(null);
+
+  // Debounce search input by 300ms to eliminate redundant per-keystroke API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Load Filter References and Companies from Backend API
   useEffect(() => {
@@ -77,6 +88,10 @@ export const AdminQuestions: React.FC = () => {
    * Fetches paginated questions from Java Spring Boot Backend.
    */
   const fetchQuestions = useCallback(async () => {
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+
     setLoading(true);
     setError(null);
     try {
@@ -84,18 +99,23 @@ export const AdminQuestions: React.FC = () => {
       const topicArr: number[] | null = selectedTopic && !isNaN(Number(selectedTopic)) ? [Number(selectedTopic)] : null;
       const compArr: number[] | null = selectedCompany && !isNaN(Number(selectedCompany)) ? [Number(selectedCompany)] : null;
 
-      const res = await adminQuestionService.getQuestions({
-        level: levelArr,
-        companies: compArr,
-        topic: topicArr,
-        searchText: searchTerm.trim() ? searchTerm.trim() : null,
-        pageRequest: {
-          pageNumber,
-          pageSize,
-          sortBy: 'id',
-          sortDirection: 'ASC',
+      const res = await adminQuestionService.getQuestions(
+        {
+          level: levelArr,
+          companies: compArr,
+          topic: topicArr,
+          searchText: debouncedSearch.trim() ? debouncedSearch.trim() : null,
+          pageRequest: {
+            pageNumber,
+            pageSize,
+            sortBy: 'id',
+            sortDirection: 'ASC',
+          },
         },
-      });
+        controller.signal
+      );
+
+      if (controller.signal.aborted) return;
 
       const rawData: any = (res?.data as any)?.data || res?.data || res;
       const contentList = Array.isArray(rawData?.content)
@@ -120,16 +140,24 @@ export const AdminQuestions: React.FC = () => {
       setTotalPages(computedPages);
       setTotalElements(total);
     } catch (err: any) {
+      if (controller.signal.aborted || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+        return;
+      }
       const msg = err?.message || (err?.errors && err?.errors[0]) || 'Failed to fetch questions list from backend API';
       setError(msg);
       setQuestions([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, [pageNumber, pageSize, selectedDifficulty, selectedTopic, selectedCompany, searchTerm]);
+  }, [pageNumber, pageSize, selectedDifficulty, selectedTopic, selectedCompany, debouncedSearch]);
 
   useEffect(() => {
     fetchQuestions();
+    return () => {
+      searchAbortRef.current?.abort();
+    };
   }, [fetchQuestions]);
 
   const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -256,7 +284,7 @@ export const AdminQuestions: React.FC = () => {
         if (res && (res.statusCode === 200 || res.statusCode === 201 || savedId)) {
           questionSavedSuccessfully = true;
         } else {
-          toast.error(res?.message || 'Failed to save question to Java backend');
+          toast.error(res?.message || 'Failed to save question.');
           return;
         }
       }
@@ -278,7 +306,7 @@ export const AdminQuestions: React.FC = () => {
         try {
           const tcRes = await adminQuestionService.addTestCases(savedId, testCasePayload);
           if (tcRes && (tcRes.statusCode === 200 || tcRes.statusCode === 201 || tcRes.data)) {
-            toast.success(isNewQuestion ? `Question #${savedId} & Test Cases Created Successfully!` : `Question #${savedId} & Test Cases Updated Successfully!`);
+            toast.success(isNewQuestion ? `Problem #${savedId} & test cases created successfully.` : `Problem #${savedId} & test cases updated successfully.`);
             setCreatedQuestionIdForRetry(null);
             setIsFormOpen(false);
             fetchQuestions();
@@ -286,27 +314,27 @@ export const AdminQuestions: React.FC = () => {
             const detail = Array.isArray((tcRes as any)?.errors) && (tcRes as any).errors.length > 0 ? (tcRes as any).errors.join('; ') : '';
             const msg = detail ? `${tcRes?.message || 'Failed'}: ${detail}` : (tcRes?.message || 'Failed to attach test cases');
             setCreatedQuestionIdForRetry(savedId);
-            toast.error(`Question #${savedId} saved, but test cases failed: ${msg}`);
+            toast.error(`Problem #${savedId} saved, but attaching test cases failed: ${msg}`);
           }
         } catch (tcErr: any) {
           const detail = Array.isArray(tcErr?.errors) && tcErr.errors.length > 0 ? tcErr.errors.join('; ') : '';
           const msg = detail ? `${tcErr?.message || 'Failed'}: ${detail}` : (tcErr?.message || 'Failed to attach test cases');
           setCreatedQuestionIdForRetry(savedId);
-          toast.error(`Question #${savedId} saved, but test cases failed: ${msg}`);
+          toast.error(`Problem #${savedId} saved, but attaching test cases failed: ${msg}`);
         }
       } else {
         // External problem or edit flow
         toast.success(
           isNewQuestion
-            ? 'External Question Created Successfully!'
-            : 'Question Updated Successfully in Java Database!'
+            ? 'Problem created successfully.'
+            : 'Problem updated successfully.'
         );
         setCreatedQuestionIdForRetry(null);
         setIsFormOpen(false);
         fetchQuestions();
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to save question to Java backend');
+      toast.error(getActionableErrorMessage(err, 'Failed to save question.'));
     } finally {
       setSubmitting(false);
     }
@@ -360,13 +388,13 @@ export const AdminQuestions: React.FC = () => {
       header: 'Question Title',
       cell: (row: any) => (
         <div className="flex flex-col gap-1">
-          <span className="font-bold text-white hover:text-[#A3E635] transition-colors font-heading text-sm">{row.title}</span>
+          <span className="font-bold text-white hover:text-white transition-colors font-heading text-sm">{row.title}</span>
           <div className="flex items-center gap-2 text-xs text-gray-400">
             <span className="font-mono text-[11px] text-gray-500">
               QPF: {row.qpfRefName || row.qpfRefCode || row.qpfName || 'Platform'}
             </span>
             {row.isOwnProblem && (
-              <span className="text-[11px] text-[#A3E635] font-semibold">
+              <span className="text-[11px] text-neutral-300 font-semibold">
                 &bull; Original Problem
               </span>
             )}
@@ -412,7 +440,7 @@ export const AdminQuestions: React.FC = () => {
           {row.isOwnProblem && (
             <button
               onClick={() => handleOpenTestCasesForQuestion(row)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-[#A3E635]/20 text-gray-400 hover:text-[#A3E635] transition-colors cursor-pointer"
+              className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
               title="Manage Test Cases"
             >
               <i className="fa-solid fa-vial text-xs"></i>
@@ -427,7 +455,7 @@ export const AdminQuestions: React.FC = () => {
               });
               setIsTestCodeOpen(true);
             }}
-            className="px-2.5 py-1.5 rounded-xl bg-[#A3E635]/10 hover:bg-[#A3E635]/25 text-[#A3E635] border border-[#A3E635]/30 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
             title="Admin Code Runner & Tester: POST /api/v1/admin/testCode & /admin/submitCode"
           >
             <i className="fa-solid fa-play text-[10px]"></i>
@@ -442,7 +470,7 @@ export const AdminQuestions: React.FC = () => {
           </button>
           <button
             onClick={() => handleEditClick(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-[#A3E635]/20 text-gray-400 hover:text-[#A3E635] transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
             title="Edit Question"
           >
             <i className="fa-solid fa-pen-to-square text-xs"></i>
@@ -461,7 +489,7 @@ export const AdminQuestions: React.FC = () => {
         actions={
           <button
             onClick={handleCreateClick}
-            className="px-4 py-2.5 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-[#A3E635]/20 font-sans"
+            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
           >
             <i className="fa-solid fa-plus text-xs"></i>
             <span>Add New Question</span>
@@ -470,54 +498,63 @@ export const AdminQuestions: React.FC = () => {
       />
 
       {/* Filter Bar Controls with Glassmorphism */}
-      <AdminCard className="p-4 bg-[#14202C]/75 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
+      <AdminCard className="p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-sans text-xs">
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-300">Filter Difficulty</label>
-            <select
-              value={selectedDifficulty}
-              onChange={handleDifficultyChange}
-              className="w-full bg-[#090A0C]/80 text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] cursor-pointer"
-            >
-              <option value="">All Difficulties</option>
-              {difficulties.map((d) => (
-                <option key={d.id || d.refCode} value={String(d.id)}>
-                  {d.refName}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedDifficulty}
+                onChange={handleDifficultyChange}
+                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
+              >
+                <option value="">All Difficulties</option>
+                {difficulties.map((d) => (
+                  <option key={d.id || d.refCode} value={String(d.id)}>
+                    {d.refName}
+                  </option>
+                ))}
+              </select>
+              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
 
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-300">Filter Topic</label>
-            <select
-              value={selectedTopic}
-              onChange={handleTopicChange}
-              className="w-full bg-[#090A0C]/80 text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] cursor-pointer"
-            >
-              <option value="">All Topics</option>
-              {topics.map((t) => (
-                <option key={t.id || t.refCode} value={String(t.id)}>
-                  {t.refName}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedTopic}
+                onChange={handleTopicChange}
+                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
+              >
+                <option value="">All Topics</option>
+                {topics.map((t) => (
+                  <option key={t.id || t.refCode} value={String(t.id)}>
+                    {t.refName}
+                  </option>
+                ))}
+              </select>
+              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
 
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-300">Filter Company</label>
-            <select
-              value={selectedCompany}
-              onChange={handleCompanyChange}
-              className="w-full bg-[#090A0C]/80 text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] cursor-pointer"
-            >
-              <option value="">All Companies</option>
-              {companies.map((c) => (
-                <option key={c.id || c.name} value={String(c.id)}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={selectedCompany}
+                onChange={handleCompanyChange}
+                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
+              >
+                <option value="">All Companies</option>
+                {companies.map((c) => (
+                  <option key={c.id || c.name} value={String(c.id)}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
           </div>
 
           <div className="space-y-1">
@@ -529,7 +566,7 @@ export const AdminQuestions: React.FC = () => {
                 placeholder="Search practice problems..."
                 value={searchTerm}
                 onChange={handleSearchChange}
-                className="w-full bg-[#090A0C]/80 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-[#A3E635]"
+                className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
               />
             </div>
           </div>
@@ -555,7 +592,7 @@ export const AdminQuestions: React.FC = () => {
           />
 
           {/* Full-Featured Admin Pagination Footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-[#14202C]/75 backdrop-blur-xl border border-white/10 rounded-2xl text-xs font-sans text-gray-300 shadow-2xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl text-xs font-sans text-gray-300 shadow-2xl">
             <div className="flex items-center gap-3 flex-wrap">
               <span>
                 Showing{' '}
@@ -570,16 +607,19 @@ export const AdminQuestions: React.FC = () => {
               </span>
               <div className="flex items-center gap-1.5 ml-2">
                 <span className="text-gray-400">Per page:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                  className="bg-[#090A0C]/80 text-gray-100 rounded-lg px-2.5 py-1 border border-white/10 text-xs focus:outline-none focus:border-[#A3E635] cursor-pointer"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={pageSize}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="appearance-none bg-neutral-950 text-gray-100 rounded-lg pl-2.5 pr-6 py-1 border border-white/10 text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                  <i className="fa-solid fa-chevron-down text-[8px] text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </div>
               </div>
             </div>
 
@@ -588,7 +628,7 @@ export const AdminQuestions: React.FC = () => {
               <button
                 disabled={pageNumber === 0 || loading}
                 onClick={() => setPageNumber(0)}
-                className="p-1.5 px-2 rounded-xl bg-[#090A0C]/80 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
+                className="p-1.5 px-2 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
                 title="First Page"
               >
                 <i className="fa-solid fa-angles-left text-[10px]"></i>
@@ -598,7 +638,7 @@ export const AdminQuestions: React.FC = () => {
               <button
                 disabled={pageNumber === 0 || loading}
                 onClick={() => setPageNumber((p) => Math.max(0, p - 1))}
-                className="px-3 py-1.5 rounded-xl bg-[#090A0C]/80 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
               >
                 <i className="fa-solid fa-angle-left text-[10px]"></i>
                 <span className="hidden sm:inline">Prev</span>
@@ -622,8 +662,8 @@ export const AdminQuestions: React.FC = () => {
                       disabled={loading}
                       className={`min-w-8 h-8 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
                         isActive
-                          ? 'bg-[#A3E635] text-black shadow-md shadow-[#A3E635]/20 font-extrabold'
-                          : 'border border-white/10 bg-[#090A0C]/80 text-gray-300 hover:bg-white/10 hover:text-white'
+                          ? 'bg-neutral-100 text-neutral-900 text-black shadow-md  font-extrabold'
+                          : 'border border-white/10 bg-neutral-950 text-gray-300 hover:bg-white/10 hover:text-white'
                       }`}
                     >
                       {p}
@@ -636,7 +676,7 @@ export const AdminQuestions: React.FC = () => {
               <button
                 disabled={pageNumber >= totalPages - 1 || loading}
                 onClick={() => setPageNumber((p) => p + 1)}
-                className="px-3 py-1.5 rounded-xl bg-[#090A0C]/80 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
               >
                 <span className="hidden sm:inline">Next</span>
                 <i className="fa-solid fa-angle-right text-[10px]"></i>
@@ -646,7 +686,7 @@ export const AdminQuestions: React.FC = () => {
               <button
                 disabled={pageNumber >= totalPages - 1 || loading}
                 onClick={() => setPageNumber(Math.max(0, totalPages - 1))}
-                className="p-1.5 px-2 rounded-xl bg-[#090A0C]/80 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
+                className="p-1.5 px-2 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
                 title="Last Page"
               >
                 <i className="fa-solid fa-angles-right text-[10px]"></i>

@@ -79,6 +79,9 @@ export interface ProblemFilter {
   searchText?: string | null;
   company?: number[] | string | number | null;
   companies?: number[] | string[] | null;
+  platform?: number[] | string | number | null;
+  platforms?: number[] | string[] | null;
+  qpf?: number[] | string | number | null;
   page?: number;
   limit?: number;
 }
@@ -176,6 +179,24 @@ export interface AdminLanguage {
   isActive?: boolean;
 }
 
+export interface UserInfoData {
+  id?: number;
+  userId?: number | string;
+  regNumber?: string;
+  joinedYear?: number | string;
+  passedOutYear?: number | string;
+  college?: string;
+  bio?: string;
+}
+
+export interface SaveUserInfoPayload {
+  regNumber: string;
+  joinedYear: number;
+  passedOutYear: number;
+  college: string;
+  bio: string;
+}
+
 export interface UserProfile {
   id?: string | number;
   firstName?: string;
@@ -191,6 +212,18 @@ export interface UserProfile {
   leetcodeUrl?: string;
   bio?: string;
   avatarUrl?: string;
+  dob?: string;
+  gender?: string;
+  location?: string;
+  degree?: string;
+  branch?: string;
+  currentYear?: string;
+  joinedYear?: number | string;
+  passedOutYear?: number | string;
+  regNumber?: string;
+  institutionId?: number | null;
+  institution?: Institution | null;
+  userInfo?: UserInfoData | null;
 }
 
 export type User = UserProfile;
@@ -219,3 +252,77 @@ export interface ExecutionResult {
   memoryMb?: number | string;
   testCases: ExecutionTestCaseResult[];
 }
+
+/**
+ * Institution Management Domain Models
+ * Matches backend Spring Boot REST entities & C2CResponse DTOs
+ */
+export type InstitutionType = 'COLLEGE' | 'UNIVERSITY';
+
+export interface Institution {
+  id: number;
+  aisheCode: string;
+  name: string;
+  institutionType: InstitutionType;
+  universityId?: number | null;
+  universityName?: string | null;
+  university?: Institution | null;
+  state: string;
+  district: string;
+  website?: string | null;
+  yearOfEstablishment?: number | null;
+  isActive: boolean;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+}
+
+export interface InstitutionOptionDTO {
+  id: number;
+  name: string;
+  institutionType: InstitutionType;
+  state: string;
+  district: string;
+}
+
+export interface InstitutionFilterParams {
+  page?: number;
+  size?: number;
+  query?: string;
+  institutionType?: InstitutionType;
+  type?: InstitutionType;
+  state?: string;
+  district?: string;
+  isActive?: boolean;
+  activeOnly?: boolean;
+}
+
+export interface CreateInstitutionRequest {
+  aisheCode: string;
+  name: string;
+  institutionType: InstitutionType;
+  universityId?: number | null;
+  state: string;
+  district: string;
+  website?: string | null;
+  yearOfEstablishment?: number | null;
+  isActive?: boolean;
+}
+
+export interface UpdateInstitutionRequest {
+  aisheCode?: string;
+  name?: string;
+  institutionType?: InstitutionType;
+  universityId?: number | null;
+  state?: string;
+  district?: string;
+  website?: string | null;
+  yearOfEstablishment?: number | null;
+  isActive?: boolean;
+}
+
+export interface UpdateInstitutionStatusRequest {
+  isActive: boolean;
+}
+

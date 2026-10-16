@@ -1,174 +1,429 @@
-import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { fetchUserProfile, updateUserProfile } from '../redux/profileSlice';
-import { Input } from '../../../shared/components/ui/Input';
-import { Button } from '../../../shared/components/ui/Button';
+import {
+  fetchUserProfile,
+  updateUserProfile,
+  saveUserInfoThunk,
+} from '../redux/profileSlice';
+import { profileService } from '../../../services/profileService';
+import type {
+  UserInfoData,
+  Institution,
+  SaveUserInfoPayload,
+} from '../../../core/types/domain';
+import { getActionableErrorMessage } from '../../../core/validation';
+
+// Profile UI Components
+import { ProfileSidebarNav } from '../components/ProfileSidebarNav';
+import { ProfileHero } from '../components/ProfileHero';
+import { ProfileTabs, ProfileTabType } from '../components/ProfileTabs';
+import { PersonalInfoCard } from '../components/PersonalInfoCard';
+import { ProfilePhotoCard } from '../components/ProfilePhotoCard';
+import { InstitutionInfoCard } from '../components/InstitutionInfoCard';
+import { AcademicDetailsCard } from '../components/AcademicDetailsCard';
+import { ProfileCompletionCard } from '../components/ProfileCompletionCard';
+import { ProfileActivityCard } from '../components/ProfileActivityCard';
+
+// Modals
+import { EditPersonalInfoModal } from '../components/modals/EditPersonalInfoModal';
+import { EditInstitutionModal } from '../components/modals/EditInstitutionModal';
+import { EditAcademicModal, AcademicFormData } from '../components/modals/EditAcademicModal';
+import { UploadPhotoModal } from '../components/modals/UploadPhotoModal';
 import { toast } from 'react-hot-toast';
 
-const profileSchema = z.object({
-  fullName: z.string().min(2, 'Name is required'),
-  email: z.string().email('Invalid email'),
-  phone: z.string().min(10, 'Valid phone required'),
-  college: z.string().min(2, 'College required'),
-  targetRole: z.string().min(2, 'Target role required'),
-  githubUrl: z.string().url('Invalid GitHub URL').or(z.literal('')),
-  linkedinUrl: z.string().url('Invalid LinkedIn URL').or(z.literal('')),
-});
-
-type ProfileFormData = z.infer<typeof profileSchema>;
-
-export const ProfileSettings: React.FC = () => {
+export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
   const profile = useAppSelector((state) => state.profile.profile);
-  const profileLoading = useAppSelector((state) => state.profile.loading);
+  const reduxUserInfo = useAppSelector((state) => state.profile.userInfo);
   const authUser = useAppSelector((state) => state.auth.user);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    reset,
-  } = useForm<ProfileFormData>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      fullName: profile?.fullName || authUser?.fullName || '',
-      email: profile?.email || authUser?.email || '',
-      phone: profile?.phone || '',
-      college: profile?.collegeName || '',
-      targetRole: '',
-      githubUrl: profile?.githubUrl || '',
-      linkedinUrl: profile?.linkedinUrl || '',
-    },
-  });
+  // Active Tab
+  const [activeTab, setActiveTab] = useState<ProfileTabType>('overview');
 
+  // Modals state
+  const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
+  const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState<boolean>(false);
+  const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
+  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
+  const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Local state for userInfo and institution (strictly populated from backend API)
+  const [userInfo, setUserInfo] = useState<UserInfoData | null>(null);
+  const [institution, setInstitution] = useState<Institution | null>(null);
+
+  const bookmarks = useAppSelector((state) => state.bookmarks.bookmarks);
+  const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
+  const attemptedByProblemId = useAppSelector((state) => state.progress.attemptedByProblemId);
+
+  // Effective User ID from authenticated session
+  const effectiveUserId = useMemo(() => {
+    return authUser?.id || profile?.id;
+  }, [authUser?.id, profile?.id]);
+
+  // Refs to guarantee profile and user-info are only fetched once per user session
+  const hasFetchedProfileRef = React.useRef(false);
+  const fetchedUserIdRef = React.useRef<string | number | null>(null);
+
+  // Initial Data Fetching from real API
   useEffect(() => {
-    void dispatch(fetchUserProfile());
-  }, [dispatch]);
+    if (!hasFetchedProfileRef.current) {
+      hasFetchedProfileRef.current = true;
+      void dispatch(fetchUserProfile());
+    }
 
+    if (effectiveUserId && fetchedUserIdRef.current !== effectiveUserId) {
+      fetchedUserIdRef.current = effectiveUserId;
+      void (async () => {
+        try {
+          const res = await profileService.getUserInfo(effectiveUserId);
+          if (res?.data) {
+            setUserInfo(res.data);
+          }
+        } catch {
+          // Silently handle if unauthenticated or new profile
+        }
+      })();
+    }
+  }, [dispatch, effectiveUserId]);
+
+  // Synchronize Redux User Info when updated
   useEffect(() => {
-    if (!profile && !authUser) return;
-    reset({
-      fullName: profile?.fullName || authUser?.fullName || '',
-      email: profile?.email || authUser?.email || '',
-      phone: profile?.phone || '',
-      college: profile?.collegeName || '',
-      targetRole: '',
-      githubUrl: profile?.githubUrl || '',
-      linkedinUrl: profile?.linkedinUrl || '',
-    });
-  }, [profile, authUser, reset]);
+    if (reduxUserInfo) {
+      setUserInfo(reduxUserInfo);
+    }
+  }, [reduxUserInfo]);
 
-  const onSubmit = async (data: ProfileFormData) => {
+  // Synchronize institution from profile if available
+  useEffect(() => {
+    if (profile?.institution) {
+      setInstitution(profile.institution);
+    }
+  }, [profile?.institution]);
+
+  // Handle Personal Info Submit
+  const handleSavePersonalInfo = async (data: any) => {
+    setSubmitting(true);
     try {
-      const updated = await dispatch(updateUserProfile(data)).unwrap();
-      reset({
-        fullName: updated?.fullName || data.fullName,
-        email: updated?.email || data.email,
-        phone: updated?.phone || data.phone,
-        college: updated?.collegeName || data.college,
-        targetRole: data.targetRole,
-        githubUrl: updated?.githubUrl || data.githubUrl,
-        linkedinUrl: updated?.linkedinUrl || data.linkedinUrl,
-      });
-      toast.success('Profile details updated successfully!');
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to update profile');
+      await dispatch(
+        updateUserProfile({
+          fullName: data.fullName,
+          email: data.email,
+          bio: data.bio,
+        })
+      ).unwrap();
+
+      // If user provided a bio, update it on the backend via userInfo API as well
+      if (effectiveUserId) {
+        try {
+          const res = await dispatch(
+            saveUserInfoThunk({
+              userId: effectiveUserId,
+              payload: {
+                regNumber: userInfo?.regNumber || '',
+                joinedYear: Number(userInfo?.joinedYear) || new Date().getFullYear(),
+                passedOutYear: Number(userInfo?.passedOutYear) || new Date().getFullYear() + 2,
+                college: userInfo?.college || '',
+                bio: (data.bio !== undefined ? data.bio : userInfo?.bio) || '',
+              },
+            })
+          ).unwrap();
+          if (res) {
+            setUserInfo(res);
+          }
+        } catch {}
+      }
+
+      toast.success('Personal information updated successfully.');
+      setIsPersonalModalOpen(false);
+    } catch (err: any) {
+      const errorMsg = getActionableErrorMessage(err, 'Unable to save personal information. Please try again.');
+      toast.error(errorMsg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  // Handle Institution Info Submit
+  const handleSaveInstitution = async (instData: Partial<Institution>) => {
+    setSubmitting(true);
+    try {
+      await dispatch(
+        updateUserProfile({
+          collegeName: instData.name,
+        })
+      ).unwrap();
+
+      if (instData.name || instData.id) {
+        setInstitution((prev) => ({
+          id: instData.id ?? prev?.id ?? 0,
+          name: instData.name ?? prev?.name ?? '',
+          institutionType: instData.institutionType ?? prev?.institutionType ?? 'COLLEGE',
+          ...prev,
+          ...instData,
+        } as Institution));
+      }
+
+      // Sync college name to userInfo API if userId is available
+      if (effectiveUserId && instData.name) {
+        try {
+          await dispatch(
+            saveUserInfoThunk({
+              userId: effectiveUserId,
+              payload: {
+                regNumber: userInfo?.regNumber || '',
+                joinedYear: Number(userInfo?.joinedYear) || new Date().getFullYear(),
+                passedOutYear: Number(userInfo?.passedOutYear) || new Date().getFullYear() + 2,
+                college: instData.name.trim(),
+                bio: userInfo?.bio || '',
+              },
+            })
+          );
+        } catch {}
+      }
+
+      toast.success('Institution updated successfully.');
+      setIsInstitutionModalOpen(false);
+    } catch (err: any) {
+      const errorMsg = getActionableErrorMessage(err, 'Unable to update institution. Please try again.');
+      toast.error(errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Academic Info Submit -> POST /api/v1/userInfo/{userId}
+  const handleSaveAcademic = async (data: AcademicFormData) => {
+    if (!effectiveUserId) {
+      toast.error('Please log in to save academic details.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const payload: SaveUserInfoPayload = {
+        regNumber: data.regNumber.trim(),
+        joinedYear: Number(data.joinedYear),
+        passedOutYear: Number(data.passedOutYear),
+        college: data.college.trim(),
+        bio: data.bio.trim(),
+      };
+
+      const result = await dispatch(
+        saveUserInfoThunk({
+          userId: effectiveUserId,
+          payload,
+        })
+      ).unwrap();
+
+      if (result) {
+        setUserInfo(result);
+      } else {
+        setUserInfo((prev) => ({
+          ...prev,
+          ...payload,
+        }));
+      }
+
+      // Also sync degree/branch and college to base profile
+      await dispatch(
+        updateUserProfile({
+          degree: data.degree,
+          branch: data.branch,
+          collegeName: data.college,
+          bio: data.bio,
+        })
+      );
+
+      toast.success('Academic details saved successfully.');
+      setIsAcademicModalOpen(false);
+    } catch (err: any) {
+      const errorMsg = getActionableErrorMessage(err, 'Unable to save academic details. Please try again.');
+      toast.error(errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Handle Avatar Change
+  const handleSaveAvatar = async (url: string) => {
+    setSubmitting(true);
+    try {
+      await dispatch(
+        updateUserProfile({
+          avatarUrl: url,
+        })
+      ).unwrap();
+      toast.success('Profile photo updated successfully.');
+      setIsPhotoModalOpen(false);
+    } catch (err: any) {
+      const errorMsg = getActionableErrorMessage(err, 'Unable to update profile photo. Please try again.');
+      toast.error(errorMsg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const solvedCount = Object.values(solvedByProblemId).filter(Boolean).length;
+  const attemptedCount = Object.values(attemptedByProblemId).filter(Boolean).length;
+
   return (
-    <div className="w-full flex flex-col items-center pb-16">
-      {/* BeyondBasics Hero Header - Exactly Matching Companies Page */}
-      <section className="relative mx-auto mt-16 max-w-7xl px-6 text-center md:px-8 flex flex-col items-center">
-        <h1 className="animate-fade-in -translate-y-4 text-balance whitespace-nowrap bg-gradient-to-br from-white from-30% to-white/40 bg-clip-text py-6 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-medium leading-none tracking-tighter text-transparent opacity-100 font-heading">
-          User Profile
-        </h1>
-        <p className="animate-fade-in mb-6 -translate-y-4 text-balance text-lg tracking-tight text-gray-400 opacity-100 md:text-xl font-sans">
-          Manage your personal information, target company preferences, and portfolio links
-        </p>
-        <div className="flex justify-center mb-8">
-          <div className="shrink-0 bg-white/10 h-0.5 rounded-lg w-60 bg-gradient-to-r from-purple-600 via-violet-500 to-pink-600"></div>
-        </div>
-      </section>
+    <div className="w-full min-h-screen bg-[#FFFFFF] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
+      {/* Ambient background glows */}
+      <div className="fixed top-24 -left-48 w-96 h-[400px] bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
 
-      {/* Profile Form Container - Matching Companies Page Div Hover Design */}
-      <div className="w-full max-w-3xl px-4 mt-6">
-        {profileLoading && !profile ? (
-          <div className="p-6 bg-[#202225] border border-white/10 rounded-lg text-sm text-gray-400">
-            Loading profile…
-          </div>
-        ) : null}
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          className="p-6 bg-[#202225] hover:bg-[#202225] border border-white/10 rounded-lg flex flex-col gap-5 shadow-md transition-all"
-        >
-          <div className="flex items-center gap-4 pb-4 border-b border-white/10">
-            <img
-              src={profile?.avatarUrl || ''}
-              alt={profile?.fullName || authUser?.fullName || 'User'}
-              className="w-16 h-16 rounded-full border-2 border-[#A3E635]/60 object-cover shadow-sm"
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Breadcrumb Navigation */}
+        <nav className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
+          <Link
+            to="/practice"
+            className="hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors"
+          >
+            <i className="fa-solid fa-house text-[11px]"></i>
+            <span>Home</span>
+          </Link>
+          <span className="text-gray-300 dark:text-neutral-700">/</span>
+          <span className="text-gray-900 dark:text-gray-200 font-bold">User Profile</span>
+        </nav>
+
+        {/* Outer Flex Container: Left Navigation Sidebar + Main Content Area */}
+        <div className="flex flex-col lg:flex-row items-start gap-6">
+          {/* Left Navigation Sidebar */}
+          <ProfileSidebarNav
+            activeTab={activeTab}
+            onTabChange={(tab) => {
+              if (
+                tab === 'overview' ||
+                tab === 'personal' ||
+                tab === 'institution' ||
+                tab === 'academic' ||
+                tab === 'security'
+              ) {
+                setActiveTab(tab as ProfileTabType);
+              }
+            }}
+          />
+
+          {/* Main Content Area */}
+          <main className="flex-1 min-w-0 space-y-6 w-full">
+            {/* Hero Profile Banner */}
+            <ProfileHero
+              profile={profile}
+              userInfo={userInfo}
+              problemsSolved={solvedCount}
+              onEditName={() => setIsPersonalModalOpen(true)}
+              onUploadPhoto={() => setIsPhotoModalOpen(true)}
             />
-            <div>
-              <h3 className="text-xl font-bold text-white font-heading tracking-tight">{profile?.fullName || authUser?.fullName || 'Your Profile'}</h3>
-              <p className="text-xs font-mono text-gray-400 mt-0.5">{profile?.email || authUser?.email || ''}</p>
+
+            {/* Profile Navigation Tabs */}
+            <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
+
+            {/* Two-Column Responsive Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column (Cards) */}
+              <div className="lg:col-span-8 space-y-6">
+                {/* 1. Personal Information & Profile Photo Cards (Side-by-side on desktop) */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="md:col-span-2">
+                    <PersonalInfoCard
+                      profile={profile}
+                      userInfo={userInfo}
+                      onEdit={() => setIsPersonalModalOpen(true)}
+                    />
+                  </div>
+                  <div className="md:col-span-1">
+                    <ProfilePhotoCard
+                      profile={profile}
+                      onUpload={() => setIsPhotoModalOpen(true)}
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Institution Information Card */}
+                <InstitutionInfoCard
+                  profile={profile}
+                  institution={institution}
+                  onEdit={() => setIsInstitutionModalOpen(true)}
+                />
+
+                {/* 3. Academic Details Card (userInfo API) */}
+                <AcademicDetailsCard
+                  profile={profile}
+                  userInfo={userInfo}
+                  onEdit={() => setIsAcademicModalOpen(true)}
+                />
+              </div>
+
+              {/* Right Column (Sidebar Widgets) */}
+              <div className="lg:col-span-4 space-y-6">
+                {/* Profile Completion Donut Widget */}
+                <ProfileCompletionCard
+                  profile={profile}
+                  userInfo={userInfo}
+                  institution={institution}
+                  onEditSection={(section) => {
+                    if (section === 'personal') setIsPersonalModalOpen(true);
+                    else if (section === 'institution') setIsInstitutionModalOpen(true);
+                    else if (section === 'academic') setIsAcademicModalOpen(true);
+                    else if (section === 'photo') setIsPhotoModalOpen(true);
+                  }}
+                />
+
+                {/* Activity & Progress Statistics - Driven by real API */}
+                <ProfileActivityCard
+                  problemsSolved={solvedCount}
+                  problemsAttempted={attemptedCount}
+                  bookmarksCount={bookmarks.length}
+                  collegeName={userInfo?.college || institution?.name || profile?.collegeName}
+                />
+              </div>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label="Full Name"
-              leftIcon={<i className="fa-solid fa-user text-xs"></i>}
-              error={errors.fullName?.message}
-              {...register('fullName')}
-            />
-
-            <Input
-              label="Email Address"
-              type="email"
-              leftIcon={<i className="fa-solid fa-envelope text-xs"></i>}
-              error={errors.email?.message}
-              {...register('email')}
-            />
-
-            <Input
-              label="Phone Number"
-              leftIcon={<i className="fa-solid fa-phone text-xs"></i>}
-              error={errors.phone?.message}
-              {...register('phone')}
-            />
-
-            <Input
-              label="College / Institute"
-              leftIcon={<i className="fa-solid fa-graduation-cap text-xs"></i>}
-              error={errors.college?.message}
-              {...register('college')}
-            />
-
-            <Input
-              label="GitHub Profile URL"
-              leftIcon={<i className="fa-brands fa-github text-xs"></i>}
-              error={errors.githubUrl?.message}
-              {...register('githubUrl')}
-            />
-
-            <Input
-              label="LinkedIn Profile URL"
-              leftIcon={<i className="fa-brands fa-linkedin text-xs"></i>}
-              error={errors.linkedinUrl?.message}
-              {...register('linkedinUrl')}
-            />
-          </div>
-
-          <div className="pt-4 border-t border-white/10 flex justify-end">
-            <Button type="submit" variant="primary" size="md" isLoading={isSubmitting} leftIcon={<i className="fa-solid fa-floppy-disk text-xs"></i>}>
-              Save Changes
-            </Button>
-          </div>
-        </form>
+          </main>
+        </div>
       </div>
+
+      {/* Edit Personal Information Modal */}
+      <EditPersonalInfoModal
+        isOpen={isPersonalModalOpen}
+        onClose={() => setIsPersonalModalOpen(false)}
+        onSubmit={handleSavePersonalInfo}
+        initialData={profile ? { ...profile, bio: userInfo?.bio || profile?.bio || '' } : null}
+        submitting={submitting}
+      />
+
+      {/* Edit Institution Modal */}
+      <EditInstitutionModal
+        isOpen={isInstitutionModalOpen}
+        onClose={() => setIsInstitutionModalOpen(false)}
+        onSubmit={handleSaveInstitution}
+        initialData={institution}
+        submitting={submitting}
+      />
+
+      {/* Edit Academic Details Modal */}
+      <EditAcademicModal
+        isOpen={isAcademicModalOpen}
+        onClose={() => setIsAcademicModalOpen(false)}
+        onSubmit={handleSaveAcademic}
+        initialData={userInfo}
+        defaultCollege={institution?.name || ''}
+        defaultDegree={profile?.degree || ''}
+        defaultBranch={profile?.branch || ''}
+        submitting={submitting}
+      />
+
+      {/* Upload Photo Modal */}
+      <UploadPhotoModal
+        isOpen={isPhotoModalOpen}
+        onClose={() => setIsPhotoModalOpen(false)}
+        onSaveAvatar={handleSaveAvatar}
+        currentAvatar={profile?.avatarUrl}
+        submitting={submitting}
+      />
     </div>
   );
 };
+
+export { UserProfilePage as ProfileSettings, UserProfilePage as UserProfile };
+export default UserProfilePage;

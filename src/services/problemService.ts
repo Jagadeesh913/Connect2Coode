@@ -31,6 +31,7 @@ export const problemService = {
     const levelArr = parseToIdList(params.level ?? params.difficulty);
     const topicArr = parseToIdList(params.topic);
     const companiesArr = parseToIdList(params.companies ?? params.company);
+    const platformArr = parseToIdList(params.platform ?? params.platforms ?? params.qpf);
 
     const rawSearch = params.searchText?.trim()
       ? params.searchText.trim()
@@ -55,6 +56,9 @@ export const problemService = {
     }
     if (topicArr && topicArr.length > 0) {
       payload.topic = topicArr;
+    }
+    if (platformArr && platformArr.length > 0) {
+      payload.platform = platformArr;
     }
     if (rawSearch) {
       payload.searchText = rawSearch;
@@ -118,7 +122,7 @@ export const problemService = {
         message: 'Problem details fetched',
         data: mapProblemDto(data),
       };
-    } catch (err) {
+    } catch (err: any) {
       if (isRequestCanceled(err)) {
         throw err;
       }

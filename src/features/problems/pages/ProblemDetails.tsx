@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { toggleBookmarkItem, fetchBookmarks } from '../../bookmarks/redux/bookmarkSlice';
+import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { fetchProblemById } from '../redux/problemSlice';
-import { markSolvedProblem } from '../../progress/redux/progressSlice';
+import { markSolvedProblem, hydrateProgress } from '../../progress/redux/progressSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { fetchLanguages } from '../../languages/redux/languageSlice';
 import {
@@ -14,17 +14,17 @@ import {
 } from '../../../services/executionService';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { NotFound } from '../../../shared/components/errors/NotFound';
-import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import {
   resolveActiveQuestionId,
   canExecuteProblem,
 } from '../utils/problemExecution';
-import { getProblemEditorial } from '../utils/problemEditorial';
 import { toast } from 'react-hot-toast';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { isJwtAdmin } from '../../../core/security/jwt';
+import { useTheme } from '../../../shared/context/ThemeContext';
+import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 
 interface QuestionTestCase {
   id?: number;
@@ -101,10 +101,12 @@ solve();
 export const ProblemDetails: React.FC = () => {
   const { slug, id } = useParams<{ slug?: string; id?: string }>();
   const problemIdentifier = id || slug || '';
+  const navigate = useNavigate();
 
   const dispatch = useAppDispatch();
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
+  const { theme } = useTheme();
 
   const token = tokenStorage.getAccessToken();
   const userRole = String(user?.role || '').toUpperCase();
@@ -119,9 +121,65 @@ export const ProblemDetails: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageDropdownItem | null>(null);
 
   // Editor State
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
+
+  // Native Fullscreen Toggle with safe browser fallback
+  const toggleFullscreen = useCallback(async () => {
+    try {
+      if (!document.fullscreenElement) {
+        const elem = workspaceRef.current || document.documentElement;
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if ((elem as any).webkitRequestFullscreen) {
+          await (elem as any).webkitRequestFullscreen();
+        } else if ((elem as any).msRequestFullscreen) {
+          await (elem as any).msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+        setIsFullscreen(false);
+      }
+    } catch {
+      // Fallback to full-window CSS if browser policy prevents requestFullscreen
+      setIsFullscreen((prev) => !prev);
+    }
+  }, []);
+
+  // Sync isFullscreen with native browser fullscreen changes (e.g. Esc key)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isNativeFs = Boolean(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isNativeFs);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   // Execution State
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
@@ -135,8 +193,9 @@ export const ProblemDetails: React.FC = () => {
   const [consoleHeight, setConsoleHeight] = useState<'normal' | 'collapsed' | 'expanded'>('normal');
 
   // Active Tabs
-  const [leftTab, setLeftTab] = useState<'description' | 'editorial' | 'submissions' | 'companies' | 'hints'>('description');
-  const [bottomTab, setBottomTab] = useState<'testcases' | 'results'>('testcases');
+  const [leftTab, setLeftTab] = useState<'description' | 'submissions' | 'companies' | 'hints'>('description');
+  const [bottomTab, setBottomTab] = useState<'testcases' | 'custom' | 'results'>('testcases');
+  const [customInput, setCustomInput] = useState<string>('');
 
   // Check whether the currently loaded problem entity matches this route's identifier
   const isProblemLoadedForRoute = Boolean(
@@ -168,6 +227,9 @@ export const ProblemDetails: React.FC = () => {
   const [loadingSubmissions, setLoadingSubmissions] = useState<boolean>(false);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
 
+  const languagesRef = useRef(languages);
+  languagesRef.current = languages;
+
   useEffect(() => {
     let isMounted = true;
 
@@ -195,7 +257,7 @@ export const ProblemDetails: React.FC = () => {
           );
           if (isMounted && Array.isArray(serverSubs) && serverSubs.length > 0) {
             const mappedRecords: SubmissionRecord[] = serverSubs.map((sub) => {
-              const langObj = languages.find((l) => l.id === sub.languageId);
+              const langObj = languagesRef.current.find((l) => l.id === sub.languageId);
               const langName =
                 langObj?.name ||
                 (sub.languageId === 5
@@ -248,7 +310,7 @@ export const ProblemDetails: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeQuestionId, user?.id, languages]);
+  }, [activeQuestionId, user?.id]);
 
   // Map language name to Monaco language
   const monacoLang = useMemo(() => {
@@ -280,12 +342,6 @@ export const ProblemDetails: React.FC = () => {
       request.abort();
     };
   }, [dispatch, problemIdentifier]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      dispatch(fetchBookmarks());
-    }
-  }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
     if (serverLanguages.length > 0) {
@@ -350,10 +406,21 @@ export const ProblemDetails: React.FC = () => {
   const handleResetCode = () => {
     if (!selectedLanguage) return;
     const template = DEFAULT_STARTER_CODE[monacoLang] || DEFAULT_STARTER_CODE.java;
+    if (currentCode.trim() !== template.trim()) {
+      setIsResetConfirmOpen(true);
+    } else {
+      executeResetCode();
+    }
+  };
+
+  const executeResetCode = () => {
+    if (!selectedLanguage) return;
+    const template = DEFAULT_STARTER_CODE[monacoLang] || DEFAULT_STARTER_CODE.java;
     setCodeByLang((prev) => ({
       ...prev,
       [selectedLanguage.id]: template,
     }));
+    setIsResetConfirmOpen(false);
     toast.success('Code reset to default starter template');
   };
 
@@ -410,6 +477,11 @@ export const ProblemDetails: React.FC = () => {
       return;
     }
 
+    if (!currentCode || !currentCode.trim()) {
+      toast.error('Please enter your code solution before running tests.');
+      return;
+    }
+
     setIsExecuting(true);
     setExecutionType('run');
     setLastExecutionMode('run');
@@ -456,6 +528,11 @@ export const ProblemDetails: React.FC = () => {
       return;
     }
 
+    if (!currentCode || !currentCode.trim()) {
+      toast.error('Please enter your code solution before submitting.');
+      return;
+    }
+
     setIsExecuting(true);
     setExecutionType('submit');
     setLastExecutionMode('submit');
@@ -471,16 +548,21 @@ export const ProblemDetails: React.FC = () => {
 
     try {
       const result: ExecutionResultData = await executionService.submitCode(payload);
-      if (result.failedTestCases === 0 && result.passedTestCases > 0) {
+      const isAccepted =
+        (result.failedTestCases === 0 || !result.failedTestCases) &&
+        result.passedTestCases > 0 &&
+        (result.totalTestCases === undefined || result.passedTestCases >= result.totalTestCases);
+
+      if (isAccepted) {
         toast.success('Accepted! All test cases passed!');
         dispatch(markSolvedProblem({ id: String(activeQuestionId) }));
+        dispatch(hydrateProgress({ force: true }));
       } else {
-        toast.error(`Submission: ${result.failedTestCases} test case(s) failed`);
+        toast.error(`Submission: ${result.failedTestCases || 1} test case(s) failed`);
       }
       setExecutionResult(result);
 
       // Record in Session Submissions History
-      const isAccepted = result.failedTestCases === 0 && result.passedTestCases > 0;
       const newRecord: SubmissionRecord = {
         id: `sub_${Date.now()}`,
         status: isAccepted ? 'Accepted' : 'Wrong Answer',
@@ -556,11 +638,9 @@ export const ProblemDetails: React.FC = () => {
     return [];
   }, [problem]);
 
-  const editorial = useMemo(() => getProblemEditorial(problem), [problem]);
-
   if (loadingProblem || (!isProblemLoadedForRoute && !problemError)) {
     return (
-      <div className="w-full max-w-[1700px] mx-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 font-sans">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 font-sans">
         <Skeleton className="h-10 w-80 rounded-xl" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[740px]">
           <Skeleton className="lg:col-span-5 h-full rounded-2xl" />
@@ -570,171 +650,174 @@ export const ProblemDetails: React.FC = () => {
     );
   }
 
+  if (!isAuthenticated && (!problem || problemError)) {
+    return (
+      <div className="relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-16">
+        {/* Ambient glowing blobs matching Home page */}
+        <div className="hidden dark:block fixed top-20 -left-48 w-96 h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+        <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
+        <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center flex-1">
+          <div className="w-full max-w-md p-8 bg-white dark:bg-[#0F172A] border border-slate-200/90 dark:border-slate-800 rounded-3xl shadow-sm text-center flex flex-col items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-2xl shadow-xs">
+              <i className="fa-solid fa-lock"></i>
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Sign In to Solve Problem</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Sign in to your Connect 2 Code account to access problem specifications, compile and run code in the interactive editor, and submit solutions.
+            </p>
+            <button
+              type="button"
+              onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+              className="mt-2 w-full py-3 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+            >
+              Sign In
+            </button>
+            <Link
+              to="/practice"
+              className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-1"
+            >
+              ← Back to Practice Problems
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!isProblemLoadedForRoute || problemError) {
-    return <NotFound />;
+    return (
+      <div className="relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-16">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center flex-1">
+          <NotFound />
+        </div>
+      </div>
+    );
   }
 
   const activeSampleCase = sampleTestCases[selectedTestCaseIdx];
   const activeRunCase = executionResult?.testCases?.[selectedTestCaseIdx];
 
   return (
-    <div className={`w-full flex-1 flex flex-col px-3 sm:px-5 lg:px-6 py-3 max-w-[1750px] mx-auto font-sans text-gray-200 ${isFullscreen ? 'fixed inset-0 z-50 bg-[#0e0f11] p-3' : ''}`}>
-      
-      {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (LeetCode / CodeChef Style) */}
-      <header className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 mb-3 bg-[#18191c] border border-white/10 rounded-xl shadow-lg">
+    <div
+      ref={workspaceRef}
+      className={`relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 min-h-screen ${
+        isFullscreen
+          ? 'fixed inset-0 z-[999] w-screen h-screen overflow-y-auto bg-[#FBFBFD] dark:bg-[#070A13] p-3 sm:p-5'
+          : 'overflow-x-hidden pb-16'
+      }`}
+    >
+      {/* Ambient glowing blobs matching Home page */}
+      <div className="hidden dark:block fixed top-20 -left-48 w-96 h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
+
+      {/* Main Container constrained to Home page max-w-7xl width and padding */}
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 flex flex-col flex-1">
+        {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (Matching Reference Image 5) */}
+      <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
         
-        {/* Left: Breadcrumbs, Problem Title & Badges */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Left: Back button & Breadcrumbs */}
+        <div className="flex items-center gap-3 flex-wrap">
           <Link
             to="/practice"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-gray-300 hover:text-[#A3E635] bg-[#222428] border border-white/10 hover:border-[#A3E635]/40 px-3 py-1.5 rounded-lg transition-all shadow-xs"
-            title="Back to All Problems"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-3.5 py-1.5 rounded-full transition-colors shadow-2xs"
+            title="Back to Problems"
           >
-            <i className="fa-solid fa-chevron-left text-[11px] text-[#A3E635]"></i>
-            <span>Problems</span>
+            <i className="fa-solid fa-arrow-left text-[11px]"></i>
+            <span>Back to Problems</span>
           </Link>
 
-          <h1 className="text-sm sm:text-base font-heading font-bold text-white tracking-tight truncate max-w-xs sm:max-w-md">
-            {problem?.title || 'Problem'}
-          </h1>
+          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
 
-          {/* Difficulty Badge */}
-          <span className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md border shadow-xs ${difficultyBadgeStyle}`}>
-            {difficultyName}
-          </span>
-
-          {/* Topic Badge */}
-          {(problem?.topicRefName || problem?.topic) && (
-            <span className="text-[11px] font-sans font-medium px-2.5 py-0.5 rounded-md bg-[#222428] border border-white/10 text-gray-300 hidden md:inline">
-              {problem.topicRefName || problem.topic}
+          {/* Breadcrumb Hierarchy */}
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:flex">
+            {(problem?.topicRefName || problem?.topic) && (
+              <>
+                <span>{problem.topicRefName || problem.topic}</span>
+                <i className="fa-solid fa-chevron-right text-[9px] text-slate-400"></i>
+              </>
+            )}
+            <span className="font-bold text-slate-900 dark:text-white truncate max-w-xs">
+              {problem?.title || ''}
             </span>
-          )}
-
-          {/* ADMIN Indicator */}
-          {isAdmin && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/40 text-purple-300 font-bold">
-              <i className="fa-solid fa-shield-halved text-[10px]"></i>
-              <span>ADMIN</span>
-            </span>
-          )}
+          </div>
         </div>
 
-        {/* Right: Quick Actions & Primary Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          
-          {/* Bookmark Button */}
+        {/* Right: Previous / Next Problem Quick Buttons */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleBookmarkToggle}
-            className={`p-2 rounded-lg border transition-all cursor-pointer ${
-              isBookmarked
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                : 'bg-[#222428] border-white/10 text-gray-400 hover:text-amber-400'
-            }`}
-            title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
+            type="button"
+            onClick={() => {
+              const currentNum = Number(problem?.id);
+              if (currentNum > 1) {
+                navigate(`/problems/${currentNum - 1}`);
+              } else {
+                navigate('/practice');
+              }
+            }}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            <i className={`fa-${isBookmarked ? 'solid' : 'regular'} fa-star text-xs`}></i>
+            <i className="fa-solid fa-chevron-left text-[10px]"></i>
+            <span>Previous</span>
           </button>
 
-          {/* RUN CODE BUTTON */}
           <button
-            onClick={handleRunCode}
-            disabled={!isExecutionReady}
-            className="px-3.5 py-1.5 rounded-lg font-mono text-xs font-semibold bg-[#222428] hover:bg-white/10 text-white border border-white/15 transition-all flex items-center gap-2 cursor-pointer shadow-sm active:scale-95 disabled:opacity-50"
-            title="Run against Sample Test Cases (Ctrl + ')"
+            type="button"
+            onClick={() => {
+              const currentNum = Number(problem?.id);
+              if (currentNum) {
+                navigate(`/problems/${currentNum + 1}`);
+              } else {
+                navigate('/practice');
+              }
+            }}
+            className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
           >
-            {isExecuting && executionType === 'run' ? (
-              <>
-                <i className="fa-solid fa-circle-notch fa-spin text-[#A3E635]"></i>
-                <span>Running...</span>
-              </>
-            ) : (
-              <>
-                <i className="fa-solid fa-play text-[#A3E635] text-[11px]"></i>
-                <span>Run</span>
-                <span className="text-[10px] text-gray-500 hidden sm:inline font-sans">Ctrl + '</span>
-              </>
-            )}
-          </button>
-
-          {/* SUBMIT CODE BUTTON */}
-          <button
-            onClick={handleSubmitCode}
-            disabled={!isExecutionReady}
-            className="px-4 py-1.5 rounded-lg font-mono text-xs font-bold bg-[#A3E635] hover:bg-[#b0f53c] text-black transition-all flex items-center gap-2 cursor-pointer shadow-md active:scale-95 disabled:opacity-50"
-            title="Submit solution for grading (Ctrl + Enter)"
-          >
-            {isExecuting && executionType === 'submit' ? (
-              <>
-                <i className="fa-solid fa-circle-notch fa-spin"></i>
-                <span>Submitting...</span>
-              </>
-            ) : (
-              <>
-                <i className="fa-solid fa-cloud-arrow-up text-[11px]"></i>
-                <span>Submit</span>
-                <span className="text-[10px] text-black/70 hidden sm:inline font-sans">Ctrl + ↵</span>
-              </>
-            )}
-          </button>
-
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={() => setIsFullscreen((prev) => !prev)}
-            className="p-2 rounded-lg bg-[#222428] border border-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer hidden md:block"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Editor'}
-          >
-            <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'} text-xs`}></i>
+            <span>Next</span>
+            <i className="fa-solid fa-chevron-right text-[10px]"></i>
           </button>
         </div>
       </header>
 
       {/* 2. MAIN WORKSPACE (2-COLUMN SPLIT PANE) */}
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 flex-1 items-start">
+      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start">
         
         {/* ========================================================
             LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
            ======================================================== */}
-        <div className="lg:col-span-5 flex flex-col bg-[#18191c] border border-white/10 rounded-xl shadow-xl h-[780px] overflow-hidden">
+        {/* ========================================================
+            LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
+           ======================================================== */}
+        <div className="lg:col-span-5 flex flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs h-[780px] overflow-hidden">
           
-          {/* Tab Bar: Description | Editorial | Submissions | Companies | Hints */}
-          <div className="flex items-center border-b border-white/10 bg-[#141517] px-2 py-1.5 overflow-x-auto no-scrollbar gap-1">
+          {/* Tab Bar: Description | Submissions | Companies | Hints */}
+          <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-3 py-2 overflow-x-auto no-scrollbar gap-1.5 shrink-0">
             <button
               onClick={() => setLeftTab('description')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                 leftTab === 'description'
-                  ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                  : 'text-gray-400 hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-file-lines text-xs text-[#A3E635]"></i>
+              <i className="fa-solid fa-file-lines text-xs text-blue-600 dark:text-blue-400"></i>
               <span>Description</span>
             </button>
 
             <button
-              onClick={() => setLeftTab('editorial')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                leftTab === 'editorial'
-                  ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                  : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              <i className="fa-solid fa-lightbulb text-xs text-amber-400"></i>
-              <span>Editorial</span>
-              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-400 font-bold">Approach</span>
-            </button>
-
-            <button
               onClick={() => setLeftTab('submissions')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                 leftTab === 'submissions'
-                  ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                  : 'text-gray-400 hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-clock-rotate-left text-xs text-sky-400"></i>
+              <i className="fa-solid fa-clock-rotate-left text-xs text-sky-500"></i>
               <span>Submissions</span>
               {submissionsHistory.length > 0 && (
-                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/10 text-white font-bold">
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold">
                   {submissionsHistory.length}
                 </span>
               )}
@@ -742,98 +825,120 @@ export const ProblemDetails: React.FC = () => {
 
             <button
               onClick={() => setLeftTab('companies')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                 leftTab === 'companies'
-                  ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                  : 'text-gray-400 hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-building text-xs text-indigo-400"></i>
+              <i className="fa-solid fa-building text-xs text-indigo-500"></i>
               <span>Companies</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/10 text-gray-300">
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                 {problem?.companies?.length || 0}
               </span>
             </button>
 
             <button
               onClick={() => setLeftTab('hints')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                 leftTab === 'hints'
-                  ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                  : 'text-gray-400 hover:text-gray-200'
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 font-bold'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-key text-xs text-emerald-400"></i>
+              <i className="fa-solid fa-key text-xs text-emerald-500"></i>
               <span>Hints</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-white/10 text-gray-300">
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                 {problem?.questionHints?.length || problem?.hints?.length || 0}
               </span>
             </button>
           </div>
 
           {/* Left Panel Body */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5 text-sm leading-relaxed text-gray-300">
+          <div className="flex-1 overflow-y-auto p-5 space-y-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             
-            {/* 1. DESCRIPTION TAB */}
-            {leftTab === 'description' && (
-              <div className="space-y-5">
-                {/* Topic & Exam Platform Chips */}
-                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+            {/* Header: Title, Badges & Bookmark */}
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-col gap-2">
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                  {problem?.title || ''}
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Difficulty Badge */}
+                  <span className={`text-xs font-semibold px-3 py-1 rounded-full border shadow-2xs ${difficultyBadgeStyle}`}>
+                    {difficultyName}
+                  </span>
+
+                  {/* Topic Badge */}
                   {(problem?.topicRefName || problem?.topic) && (
-                    <span className="px-2.5 py-1 bg-[#121113] border border-white/10 rounded-lg text-gray-300">
-                      Topic: <strong className="text-white">{problem.topicRefName || problem.topic}</strong>
-                    </span>
-                  )}
-                  {problem?.qpfRefName && (
-                    <span className="px-2.5 py-1 bg-[#121113] border border-white/10 rounded-lg text-[#A3E635]">
-                      Platform: <strong>{problem.qpfRefName}</strong>
+                    <span className="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                      {problem.topicRefName || problem.topic}
                     </span>
                   )}
                 </div>
+              </div>
 
+              {/* Bookmark Button */}
+              <button
+                type="button"
+                onClick={handleBookmarkToggle}
+                className={`p-2 rounded-xl border transition-colors cursor-pointer ${
+                  isBookmarked
+                    ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400'
+                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600'
+                }`}
+                title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Problem'}
+              >
+                <i className={`fa-${isBookmarked ? 'solid' : 'regular'} fa-bookmark text-sm`}></i>
+              </button>
+            </div>
+
+            {/* 1. DESCRIPTION TAB */}
+            {leftTab === 'description' && (
+              <div className="space-y-6">
                 {/* Problem Statement Body */}
                 <div>
-                  <h3 className="text-xs uppercase font-mono font-bold text-gray-400 tracking-wider mb-2">
-                    Problem Statement
+                  <h3 className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-2 font-mono">
+                    Problem Description
                   </h3>
-                  <div className="p-4 bg-[#121113] border border-white/10 rounded-xl text-gray-200 whitespace-pre-line leading-relaxed font-sans text-sm">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-800 dark:text-slate-200 whitespace-pre-line leading-relaxed font-sans text-sm shadow-2xs">
                     {problem?.description || 'No problem description is available from the backend.'}
                   </div>
                 </div>
 
                 {/* Examples */}
                 <div>
-                  <h3 className="text-xs uppercase font-mono font-bold text-gray-400 tracking-wider mb-2">
+                  <h3 className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-2 font-mono">
                     Examples
                   </h3>
                   {sampleTestCases.length > 0 ? (
                     <div className="space-y-3">
                       {sampleTestCases.map((tc, idx) => (
-                        <div key={idx} className="p-3.5 bg-[#121113] border border-white/10 rounded-xl space-y-2 font-mono text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[#A3E635] font-bold">Example {idx + 1}</span>
+                        <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 font-mono text-xs shadow-2xs">
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
+                            <span className="text-slate-900 dark:text-white font-bold">Example {idx + 1}</span>
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(tc.input);
                                 toast.success('Input copied!');
                               }}
-                              className="text-gray-500 hover:text-white transition-colors text-[10px] cursor-pointer flex items-center gap-1"
+                              className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors text-[10px] cursor-pointer flex items-center gap-1"
                             >
                               <i className="fa-solid fa-copy"></i>
                               <span>Copy</span>
                             </button>
                           </div>
                           <div>
-                            <span className="text-gray-400">Input: </span>
-                            <span className="text-white whitespace-pre-wrap">{tc.input}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Input: </span>
+                            <span className="text-slate-900 dark:text-white whitespace-pre-wrap">{tc.input}</span>
                           </div>
                           <div>
-                            <span className="text-gray-400">Output: </span>
-                            <span className="text-[#A3E635] font-bold whitespace-pre-wrap">{tc.expectedOutput}</span>
+                            <span className="text-slate-500 dark:text-slate-400">Output: </span>
+                            <span className="text-emerald-600 dark:text-emerald-400 font-bold whitespace-pre-wrap">{tc.expectedOutput}</span>
                           </div>
                           {tc.explanation && (
-                            <div className="pt-1.5 border-t border-white/5 text-gray-400 text-[11px] font-sans">
-                              <span className="font-mono text-gray-500">Explanation: </span>
+                            <div className="pt-2 border-t border-slate-200/60 dark:border-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-sans">
+                              <span className="font-semibold text-slate-700 dark:text-slate-300">Explanation: </span>
                               {tc.explanation}
                             </div>
                           )}
@@ -841,7 +946,7 @@ export const ProblemDetails: React.FC = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="p-4 bg-[#121113] border border-white/10 rounded-xl text-xs text-gray-500">
+                    <p className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-400">
                       No visible examples were returned for this problem.
                     </p>
                   )}
@@ -850,126 +955,78 @@ export const ProblemDetails: React.FC = () => {
                 {/* Constraints */}
                 {problem?.constraints && (
                   <div>
-                    <h3 className="text-xs uppercase font-mono font-bold text-gray-400 tracking-wider mb-2">
+                    <h3 className="text-xs uppercase font-bold text-slate-400 tracking-wider mb-2 font-mono">
                       Constraints
                     </h3>
-                    <div className="p-3 bg-[#121113] border border-white/10 rounded-xl text-xs font-mono text-gray-300 whitespace-pre-line">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-mono text-slate-700 dark:text-slate-300 whitespace-pre-line shadow-2xs">
                       {problem.constraints}
                     </div>
+                  </div>
+                )}
+
+                {/* Exam Platform & Companies Footer Cards */}
+                {((problem?.qpfRefName || problem?.examPlatform) || (problem?.companies && problem.companies.length > 0)) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    {/* Exam Platform Card */}
+                    {(problem?.qpfRefName || problem?.examPlatform) && (
+                      <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <i className="fa-solid fa-graduation-cap text-blue-600 dark:text-blue-400"></i>
+                          <span>Exam Platform</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {Array.from(new Set([problem?.qpfRefName, problem?.examPlatform].filter(Boolean))).map((plat) => (
+                            <span key={String(plat)} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                              {String(plat)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Companies Card */}
+                    {problem?.companies && problem.companies.length > 0 && (
+                      <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                          <i className="fa-solid fa-building text-purple-600 dark:text-purple-400"></i>
+                          <span>Companies</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {problem.companies.slice(0, 5).map((comp, i) => (
+                            <span key={i} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+                              {String(comp)}
+                            </span>
+                          ))}
+                          {problem.companies.length > 5 && (
+                            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                              +{problem.companies.length - 5}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* 2. EDITORIAL TAB (takeUforward Style) */}
-            {leftTab === 'editorial' && (
-              editorial.isUnavailable ? (
-                <div className="py-6 animate-fade-in">
-                  <EmptyState
-                    title="Editorial Under Preparation"
-                    description="Our engineering team is currently preparing the official editorial, optimal algorithms, and complexity breakdown for this problem."
-                    icon={<i className="fa-solid fa-book-open text-2xl text-[#A3E635]"></i>}
-                  />
-                </div>
-              ) : (
-                <div className="space-y-5 animate-fade-in">
-                {/* Intuition Card */}
-                <div className="p-4 bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/30 rounded-xl space-y-2">
-                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider font-mono">
-                    <i className="fa-solid fa-lightbulb"></i>
-                    <span>Core Intuition</span>
-                  </div>
-                  <p className="text-xs text-gray-200 leading-relaxed font-sans">
-                    {editorial.intuition}
-                  </p>
-                </div>
-
-                {/* Approach 1: Brute Force */}
-                <div className="p-4 bg-[#121113] border border-white/10 rounded-xl space-y-3 font-mono text-xs">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="text-white font-bold">{editorial.bruteForce.title}</span>
-                    <span className="text-[10px] text-gray-400">Sub-optimal</span>
-                  </div>
-                  <p className="text-gray-300 font-sans leading-relaxed text-xs">
-                    {editorial.bruteForce.description}
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="p-2 bg-[#1a1b1e] rounded-lg">
-                      <span className="text-gray-500 text-[10px] block">Time Complexity</span>
-                      <span className="text-amber-400 font-bold">{editorial.bruteForce.timeComplexity}</span>
-                    </div>
-                    <div className="p-2 bg-[#1a1b1e] rounded-lg">
-                      <span className="text-gray-500 text-[10px] block">Space Complexity</span>
-                      <span className="text-emerald-400 font-bold">{editorial.bruteForce.spaceComplexity}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Approach 2: Optimal */}
-                <div className="p-4 bg-[#121113] border border-[#A3E635]/30 rounded-xl space-y-3 font-mono text-xs shadow-md">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                    <span className="text-[#A3E635] font-bold flex items-center gap-1.5">
-                      <i className="fa-solid fa-bolt"></i>
-                      <span>{editorial.optimal.title}</span>
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#A3E635]/20 text-[#A3E635] font-bold">
-                      Recommended
-                    </span>
-                  </div>
-                  <p className="text-gray-200 font-sans leading-relaxed text-xs">
-                    {editorial.optimal.description}
-                  </p>
-                  {editorial.optimal.pseudocode && (
-                    <pre className="p-3 bg-[#0a0a0c] border border-white/10 rounded-lg text-gray-300 overflow-x-auto text-[11px] leading-relaxed">
-                      {editorial.optimal.pseudocode}
-                    </pre>
-                  )}
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div className="p-2 bg-[#1a1b1e] rounded-lg">
-                      <span className="text-gray-500 text-[10px] block">Time Complexity</span>
-                      <span className="text-[#A3E635] font-bold">{editorial.optimal.timeComplexity}</span>
-                    </div>
-                    <div className="p-2 bg-[#1a1b1e] rounded-lg">
-                      <span className="text-gray-500 text-[10px] block">Space Complexity</span>
-                      <span className="text-emerald-400 font-bold">{editorial.optimal.spaceComplexity}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Practical Tips */}
-                {editorial.tips && editorial.tips.length > 0 && (
-                  <div className="p-4 bg-[#121113] border border-white/10 rounded-xl space-y-2 text-xs">
-                    <div className="text-gray-400 font-mono font-bold uppercase tracking-wider text-[11px]">
-                      Key Takeaways & Edge Cases
-                    </div>
-                    <ul className="list-disc list-inside space-y-1.5 text-gray-300 font-sans text-xs">
-                      {editorial.tips.map((tip, idx) => (
-                        <li key={idx}>{tip}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )
-          )}
-
-            {/* 3. SUBMISSIONS TAB (Backend + Session History) */}
+            {/* 2. SUBMISSIONS TAB */}
             {leftTab === 'submissions' && (
               <div className="space-y-3 animate-fade-in">
-                <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                  <span className="text-xs font-mono text-gray-400 font-bold uppercase tracking-wider">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                  <span className="text-xs font-mono text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                     Recent Submissions
                   </span>
-                  <span className="text-[11px] text-gray-500 font-mono">
+                  <span className="text-[11px] text-slate-400 font-mono">
                     {loadingSubmissions ? 'Loading...' : `${submissionsHistory.length} Record(s)`}
                   </span>
                 </div>
 
                 {submissionsHistory.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500 text-xs font-mono space-y-2 bg-[#121113] border border-white/10 rounded-xl">
-                    <i className="fa-solid fa-clock-rotate-left text-2xl text-gray-600 block mb-1"></i>
+                  <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs font-mono space-y-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl">
+                    <i className="fa-solid fa-clock-rotate-left text-2xl text-slate-400 block mb-1"></i>
                     <span>No submissions yet in this session.</span>
-                    <p className="text-[11px] text-gray-500 font-sans">
+                    <p className="text-[11px] text-slate-400 font-sans">
                       Write your solution in the editor and click "Submit" to test against the full test suite.
                     </p>
                   </div>
@@ -980,7 +1037,7 @@ export const ProblemDetails: React.FC = () => {
                     return (
                       <div
                         key={sub.id}
-                        className={`p-3.5 bg-[#121113] border rounded-xl flex flex-col font-mono text-xs transition-all ${
+                        className={`p-3.5 bg-slate-50 dark:bg-slate-900/60 border rounded-2xl flex flex-col font-mono text-xs transition-all shadow-2xs ${
                           isAccepted ? 'border-emerald-500/30' : 'border-rose-500/30'
                         }`}
                       >
@@ -992,31 +1049,31 @@ export const ProblemDetails: React.FC = () => {
                             <span
                               className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${
                                 isAccepted
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                               }`}
                             >
                               {isAccepted ? '✓ Accepted' : '✗ Wrong Answer'}
                             </span>
-                            <span className="text-gray-300 font-sans text-xs">
+                            <span className="text-slate-700 dark:text-slate-300 font-sans text-xs">
                               {sub.passedTestCases}/{sub.totalTestCases} Tests
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-4 text-gray-400 text-[11px]">
+                          <div className="flex items-center gap-4 text-slate-500 dark:text-slate-400 text-[11px]">
                             <span>{sub.language}</span>
                             {sub.runtimeMs !== undefined && sub.runtimeMs !== null && (
-                              <span className="text-white font-bold">{sub.runtimeMs} ms</span>
+                              <span className="text-slate-900 dark:text-white font-bold">{sub.runtimeMs} ms</span>
                             )}
-                            <span className="text-gray-500">{sub.timestamp}</span>
-                            <i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-gray-500`} />
+                            <span className="text-slate-400">{sub.timestamp}</span>
+                            <i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-slate-400`} />
                           </div>
                         </div>
 
                         {isExpanded && sub.sourceCode && (
-                          <div className="mt-3 pt-3 border-t border-white/10 space-y-2">
+                          <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
                             <div className="flex items-center justify-between text-[11px]">
-                              <span className="text-gray-400">Submitted Source Code ({sub.language}):</span>
+                              <span className="text-slate-500">Submitted Source Code ({sub.language}):</span>
                               <button
                                 type="button"
                                 onClick={() => {
@@ -1028,13 +1085,13 @@ export const ProblemDetails: React.FC = () => {
                                     toast.success('Loaded submission code into editor');
                                   }
                                 }}
-                                className="text-[#A3E635] hover:underline font-sans cursor-pointer flex items-center gap-1.5"
+                                className="text-blue-600 dark:text-blue-400 hover:underline font-sans cursor-pointer flex items-center gap-1.5"
                               >
                                 <i className="fa-solid fa-code text-[10px]"></i>
                                 <span>Load into Editor</span>
                               </button>
                             </div>
-                            <pre className="p-3 bg-[#090A0C] border border-white/10 rounded-lg text-gray-300 text-xs font-mono overflow-x-auto max-h-60 whitespace-pre">
+                            <pre className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 text-xs font-mono overflow-x-auto max-h-60 whitespace-pre">
                               {sub.sourceCode}
                             </pre>
                           </div>
@@ -1049,33 +1106,28 @@ export const ProblemDetails: React.FC = () => {
             {/* 4. COMPANIES TAB */}
             {leftTab === 'companies' && (
               <div className="space-y-4 animate-fade-in">
-                <div className="text-xs font-mono text-gray-400 uppercase tracking-wider font-bold">
+                <div className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                   Top Companies Asking This Question
                 </div>
                 {problem?.companies && problem.companies.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2.5">
                     {problem.companies.map((c, idx) => {
                       const name = String(c);
-                      const logo = null;
                       return (
                         <div
                           key={idx}
-                          className="p-3 bg-[#121113] border border-white/10 rounded-xl flex items-center gap-2.5 font-mono text-xs text-gray-200 shadow-sm"
+                          className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center gap-2.5 font-mono text-xs text-slate-800 dark:text-slate-200 shadow-2xs"
                         >
-                          {logo ? (
-                            <img src={logo} alt={name} className="w-5 h-5 rounded object-contain bg-white/5 p-0.5" />
-                          ) : (
-                            <div className="w-5 h-5 rounded bg-[#A3E635]/15 border border-[#A3E635]/30 flex items-center justify-center text-[#A3E635] text-[10px]">
-                              <i className="fa-solid fa-building"></i>
-                            </div>
-                          )}
+                          <div className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300 text-[10px]">
+                            <i className="fa-solid fa-building"></i>
+                          </div>
                           <span className="font-semibold">{name}</span>
                         </div>
                       );
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-gray-500 font-mono p-4 bg-[#121113] border border-white/10 rounded-xl">
+                  <p className="text-xs text-slate-400 font-mono p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl">
                     No company associations were returned for this problem.
                   </p>
                 )}
@@ -1085,21 +1137,31 @@ export const ProblemDetails: React.FC = () => {
             {/* 5. HINTS TAB */}
             {leftTab === 'hints' && (
               <div className="space-y-3 animate-fade-in">
-                <div className="text-xs font-mono text-gray-400 uppercase tracking-wider font-bold">
+                <div className="text-xs font-mono text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">
                   Progressive Solution Hints
                 </div>
                 {problem?.questionHints && problem.questionHints.length > 0 ? (
                   problem.questionHints.map((h, i) => (
-                    <div key={i} className="p-3.5 bg-[#121113] border border-white/10 rounded-xl text-xs text-gray-300 space-y-1">
-                      <div className="text-amber-400 font-mono font-bold flex items-center gap-1.5">
+                    <div key={i} className="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 space-y-1">
+                      <div className="text-amber-500 font-mono font-bold flex items-center gap-1.5">
                         <i className="fa-solid fa-key text-[10px]"></i>
                         <span>Hint {i + 1}</span>
                       </div>
-                      <p className="font-sans leading-relaxed text-gray-200">{h.hintText}</p>
+                      <p className="font-sans leading-relaxed text-slate-700 dark:text-slate-300">{h.hintText || String(h)}</p>
+                    </div>
+                  ))
+                ) : problem?.hints && problem.hints.length > 0 ? (
+                  problem.hints.map((h, i) => (
+                    <div key={i} className="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl text-xs text-slate-800 dark:text-slate-200 space-y-1">
+                      <div className="text-amber-500 font-mono font-bold flex items-center gap-1.5">
+                        <i className="fa-solid fa-key text-[10px]"></i>
+                        <span>Hint {i + 1}</span>
+                      </div>
+                      <p className="font-sans leading-relaxed text-slate-700 dark:text-slate-300">{String(h)}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-xs text-gray-500 font-mono p-4 bg-[#121113] border border-white/10 rounded-xl">
+                  <p className="text-xs text-slate-400 font-mono p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl">
                     No hints currently recorded for this question. Analyze time/space complexity and edge cases.
                   </p>
                 )}
@@ -1112,73 +1174,106 @@ export const ProblemDetails: React.FC = () => {
         {/* ========================================================
             RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
            ======================================================== */}
-        <div className="lg:col-span-7 flex flex-col gap-3">
+        {/* ========================================================
+            RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
+           ======================================================== */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
           
           {/* EDITOR CARD CONTAINER */}
-          <div className="bg-[#18191c] border border-white/10 rounded-xl shadow-xl overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden flex flex-col">
             
-            {/* Editor Action Bar (Language Selector, Reset, Copy) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 bg-[#141517] border-b border-white/10">
+            {/* Editor Action Bar (Matching Reference Image 5) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
               
-              {/* Language Selector */}
+              {/* Language Selector Pill */}
               <div className="flex items-center gap-2">
-                <select
-                  id="languageSelect"
-                  value={selectedLanguage?.id ?? ''}
-                  onChange={handleLanguageChange}
-                  disabled={loadingLanguages || isExecuting || languages.length === 0}
-                  className="bg-[#222428] border border-white/15 text-white font-mono text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#A3E635]/60 cursor-pointer shadow-xs"
-                >
-                  {languages.length === 0 ? (
-                    <option value="" disabled>
-                      {loadingLanguages ? 'Loading languages…' : 'No languages available'}
-                    </option>
-                  ) : (
-                    languages.map((l) => (
-                    <option key={l.id} value={l.id} className="bg-[#222428] text-white">
-                      {l.name}
-                    </option>
-                    ))
-                  )}
-                </select>
-                <span className="text-[11px] font-mono text-gray-500 hidden sm:inline">
-                  {monacoLang.toUpperCase()}
-                </span>
+                <div className="relative inline-flex items-center">
+                  <select
+                    id="languageSelect"
+                    value={selectedLanguage?.id ?? ''}
+                    onChange={handleLanguageChange}
+                    disabled={loadingLanguages || isExecuting || languages.length === 0}
+                    className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-xs rounded-full pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
+                  >
+                    {languages.length === 0 ? (
+                      <option value="" disabled>
+                        {loadingLanguages ? 'Loading languages…' : 'No languages available'}
+                      </option>
+                    ) : (
+                      languages.map((l) => (
+                        <option key={l.id} value={l.id} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
+                          {l.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <i className={`text-xs absolute left-3 pointer-events-none ${
+                    monacoLang === 'python'
+                      ? 'fa-brands fa-python text-blue-500'
+                      : monacoLang === 'cpp'
+                      ? 'fa-solid fa-c text-sky-600'
+                      : monacoLang === 'javascript'
+                      ? 'fa-brands fa-js text-amber-500'
+                      : 'fa-brands fa-java text-orange-500'
+                  }`}></i>
+                  <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3 pointer-events-none"></i>
+                </div>
               </div>
 
-              {/* Editor Actions: Reset, Copy */}
-              <div className="flex items-center gap-1.5">
+              {/* Editor Actions: Reset, Run, Submit, Fullscreen */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={handleResetCode}
                   disabled={isExecuting}
                   title="Reset to default starter template"
-                  className="px-2.5 py-1 rounded-lg text-xs font-mono text-gray-400 hover:text-white bg-[#222428] hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
-                  <i className="fa-solid fa-rotate-left text-[10px]"></i>
-                  <span className="hidden sm:inline">Reset</span>
+                  <i className="fa-solid fa-rotate-left text-[11px]"></i>
+                  <span>Reset</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={handleCopyCode}
-                  title="Copy code to clipboard"
-                  className="px-2.5 py-1 rounded-lg text-xs font-mono text-gray-400 hover:text-white bg-[#222428] hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1.5"
+                  onClick={handleRunCode}
+                  disabled={isExecuting}
+                  title="Run code against sample test cases (Ctrl + ')"
+                  className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
                 >
-                  <i className={`fa-solid ${copiedCode ? 'fa-check text-[#A3E635]' : 'fa-copy'} text-[10px]`}></i>
-                  <span className="hidden sm:inline">{copiedCode ? 'Copied' : 'Copy'}</span>
+                  <i className="fa-solid fa-play text-[11px] text-slate-700 dark:text-slate-300"></i>
+                  <span>Run</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSubmitCode}
+                  disabled={isExecuting}
+                  title="Submit code for full evaluation (Ctrl + Enter)"
+                  className="px-5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  <i className="fa-solid fa-paper-plane text-[11px]"></i>
+                  <span>Submit</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}
+                  className="p-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'} text-xs`}></i>
                 </button>
               </div>
             </div>
 
             {/* Monaco Editor Container */}
-            <div className={`w-full bg-[#121113] transition-all duration-300 ${consoleHeight === 'expanded' ? 'h-[260px]' : consoleHeight === 'collapsed' ? 'h-[680px]' : 'h-[430px]'}`}>
+            <div className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 ${consoleHeight === 'expanded' ? 'h-[240px]' : consoleHeight === 'collapsed' ? 'h-[620px]' : 'h-[380px]'}`}>
               <Editor
                 height="100%"
                 language={monacoLang}
                 value={currentCode}
                 onChange={handleEditorChange}
-                theme="vs-dark"
+                theme={theme === 'dark' ? 'vs-dark' : 'light'}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13.5,
@@ -1197,80 +1292,93 @@ export const ProblemDetails: React.FC = () => {
           </div>
 
           {/* ========================================================
-              BOTTOM RESULTS & INTERACTIVE CONSOLE (LeetCode Testbench)
+              BOTTOM RESULTS & INTERACTIVE CONSOLE (Matching Reference Image 5)
              ======================================================== */}
-          <div className={`bg-[#18191c] border border-white/10 rounded-xl shadow-xl flex flex-col transition-all duration-300 overflow-hidden ${consoleHeight === 'collapsed' ? 'h-[46px]' : consoleHeight === 'expanded' ? 'h-[480px]' : 'h-[320px]'}`}>
+          <div className={`bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs flex flex-col transition-all duration-300 overflow-hidden ${consoleHeight === 'collapsed' ? 'h-[48px]' : consoleHeight === 'expanded' ? 'h-[460px]' : 'h-[340px]'}`}>
             
             {/* Console Header Bar */}
-            <div className="flex items-center justify-between border-b border-white/10 bg-[#141517] px-3 py-2 flex-wrap gap-2 shrink-0">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-4 py-2.5 flex-wrap gap-2 shrink-0">
               
-              {/* Console Tabs: Testcase | Result */}
-              <div className="flex items-center gap-1.5">
+              {/* Console Tabs: Test Cases | Custom Input | Test Result */}
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => {
                     setBottomTab('testcases');
                     if (consoleHeight === 'collapsed') setConsoleHeight('normal');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 pb-0.5 ${
                     bottomTab === 'testcases'
-                      ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <i className="fa-solid fa-list-check text-xs text-[#A3E635]"></i>
-                  <span>Testcase</span>
+                  <i className="fa-regular fa-square-check text-xs"></i>
+                  <span>Test Cases</span>
                 </button>
 
+                <button
+                  onClick={() => {
+                    setBottomTab('custom');
+                    if (consoleHeight === 'collapsed') setConsoleHeight('normal');
+                  }}
+                  className={`text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 pb-0.5 ${
+                    bottomTab === 'custom'
+                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <i className="fa-solid fa-sliders text-xs"></i>
+                  <span>Custom Input</span>
+                </button>
+              </div>
+
+              {/* Right: Test Result > Tab & Console Height Controls */}
+              <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
                     setBottomTab('results');
                     if (consoleHeight === 'collapsed') setConsoleHeight('normal');
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                  className={`text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                     bottomTab === 'results'
-                      ? 'bg-[#222428] text-white shadow-xs border border-white/15'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
-                  <i className="fa-solid fa-square-poll-vertical text-xs text-sky-400"></i>
-                  <span>
-                    {lastExecutionMode === 'submit' ? 'Submission Verdict' : 'Run Result'}
-                  </span>
+                  <i className="fa-solid fa-list-check text-xs text-emerald-500"></i>
+                  <span>Test Result &gt;</span>
                   {executionResult && (
                     <span
-                      className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold ${
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
                         executionResult.failedTestCases === 0
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-rose-500/20 text-rose-400'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
+                          : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
                       }`}
                     >
                       {executionResult.passedTestCases}/{executionResult.totalTestCases}
                     </span>
                   )}
                 </button>
-              </div>
 
-              {/* Console Height & Execution Controls */}
-              <div className="flex items-center gap-2">
                 {isExecuting && (
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-[#A3E635]">
+                  <div className="flex items-center gap-1.5 text-xs font-mono text-blue-600 dark:text-blue-400">
                     <i className="fa-solid fa-circle-notch fa-spin text-xs"></i>
                     <span className="hidden sm:inline">Executing...</span>
                   </div>
                 )}
 
                 {/* Minimize / Normal / Maximize Height Toggle */}
-                <div className="flex items-center bg-[#222428] border border-white/10 rounded-lg overflow-hidden text-gray-400 text-xs">
+                <div className="flex items-center bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden text-slate-500 dark:text-slate-400 text-xs shadow-2xs">
                   <button
                     onClick={() => setConsoleHeight((prev) => (prev === 'collapsed' ? 'normal' : 'collapsed'))}
-                    className="p-1.5 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                    className="p-1.5 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                     title={consoleHeight === 'collapsed' ? 'Expand Console' : 'Minimize Console'}
                   >
                     <i className={`fa-solid ${consoleHeight === 'collapsed' ? 'fa-chevron-up' : 'fa-minus'} text-[11px]`}></i>
                   </button>
                   <button
                     onClick={() => setConsoleHeight((prev) => (prev === 'expanded' ? 'normal' : 'expanded'))}
-                    className="p-1.5 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                    className="p-1.5 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                     title={consoleHeight === 'expanded' ? 'Restore Size' : 'Maximize Console'}
                   >
                     <i className={`fa-solid ${consoleHeight === 'expanded' ? 'fa-compress' : 'fa-expand'} text-[11px]`}></i>
@@ -1279,99 +1387,173 @@ export const ProblemDetails: React.FC = () => {
               </div>
             </div>
 
-            {/* Console Scrollable Body (Visible when not collapsed) */}
+            {/* Console Body */}
             {consoleHeight !== 'collapsed' && (
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4">
                 
-                {/* 1. TESTCASE TAB (Sample Case Inspection) */}
+                {/* 1. TEST CASES TAB (Matching Reference Image 5) */}
                 {bottomTab === 'testcases' && (
-                  <div className="space-y-3 animate-fade-in">
-                    {/* Case Selector Pills */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {sampleTestCases.map((_, i) => (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full items-start">
+                    
+                    {/* Left Side: Case Selectors & Inputs */}
+                    <div className="md:col-span-7 space-y-3">
+                      {/* Case Pills: Case 1, Case 2, Case 3, + */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {sampleTestCases.map((_, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedTestCaseIdx(i)}
+                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                              selectedTestCaseIdx === i
+                                ? 'bg-blue-600 text-white shadow-xs'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
+                            }`}
+                          >
+                            Case {i + 1}
+                          </button>
+                        ))}
                         <button
-                          key={i}
-                          onClick={() => setSelectedTestCaseIdx(i)}
-                          className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
-                            selectedTestCaseIdx === i
-                              ? 'bg-[#A3E635] text-black shadow-xs font-bold'
-                              : 'bg-[#121113] text-gray-400 hover:text-white border border-white/10'
-                          }`}
+                          onClick={() => setBottomTab('custom')}
+                          className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                          title="Add custom case"
                         >
-                          Case {i + 1}
+                          +
                         </button>
-                      ))}
+                      </div>
+
+                      {/* Active Case Inputs */}
+                      {activeSampleCase ? (
+                        <div className="space-y-3 font-mono text-xs">
+                          <div>
+                            <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Input</span>
+                            <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-800 dark:text-slate-200 shadow-2xs">
+                              <pre className="whitespace-pre-wrap">{activeSampleCase.input}</pre>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(activeSampleCase.input);
+                                  toast.success('Input copied!');
+                                }}
+                                className="absolute top-2.5 right-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+                              >
+                                <i className="fa-regular fa-copy text-xs"></i>
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Expected Output</span>
+                            <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white font-bold shadow-2xs">
+                              <pre className="whitespace-pre-wrap">{activeSampleCase.expectedOutput}</pre>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(activeSampleCase.expectedOutput);
+                                  toast.success('Output copied!');
+                                }}
+                                className="absolute top-2.5 right-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+                              >
+                                <i className="fa-regular fa-copy text-xs"></i>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-400">
+                          No visible test cases were returned for this problem.
+                        </p>
+                      )}
                     </div>
 
-                    {/* Active Sample Case Content */}
-                    {activeSampleCase ? (
-                      <div className="space-y-3 font-mono text-xs">
-                        <div>
-                          <span className="text-gray-400 block mb-1 text-[11px]">Input:</span>
-                          <pre className="p-3 bg-[#121113] border border-white/10 rounded-xl text-gray-200 overflow-x-auto whitespace-pre-wrap">
-                            {activeSampleCase.input}
-                          </pre>
+                    {/* Right Side: Execution Illustration (Matching Reference Image 5) */}
+                    <div className="md:col-span-5 flex flex-col items-center justify-center p-6 text-center border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/80 my-auto h-full">
+                      <div className="w-44 h-32 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-2.5 flex flex-col shadow-xs mb-4">
+                        <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-700">
+                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
                         </div>
-                        <div>
-                          <span className="text-gray-400 block mb-1 text-[11px]">Expected Output:</span>
-                          <pre className="p-3 bg-[#121113] border border-white/10 rounded-xl text-[#A3E635] overflow-x-auto whitespace-pre-wrap font-bold">
-                            {activeSampleCase.expectedOutput}
-                          </pre>
+                        <div className="flex-1 flex items-center justify-center">
+                          <div className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
+                            <i className="fa-solid fa-play text-sm ml-0.5"></i>
+                          </div>
                         </div>
                       </div>
-                    ) : (
-                      <p className="p-4 bg-[#121113] border border-white/10 rounded-xl text-xs text-gray-500">
-                        No visible test cases were returned for this problem.
+                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
+                        Run your code to see the output
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-xs leading-relaxed">
+                        Test your solution against the sample test cases or custom input.
                       </p>
-                    )}
+                    </div>
+
                   </div>
                 )}
 
-                {/* 2. RESULTS TAB */}
+                {/* 2. CUSTOM INPUT TAB */}
+                {bottomTab === 'custom' && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Standard Input:</span>
+                      <button
+                        onClick={handleRunCode}
+                        disabled={isExecuting}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                      >
+                        Run with Custom Input
+                      </button>
+                    </div>
+                    <textarea
+                      value={customInput}
+                      onChange={(e) => setCustomInput(e.target.value)}
+                      placeholder="Enter custom input here..."
+                      className="w-full h-36 p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* 3. TEST RESULTS TAB */}
                 {bottomTab === 'results' && (
                   <div className="space-y-4 animate-fade-in">
                     
                     {/* Error Box */}
                     {executionError && (
-                      <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-mono space-y-1">
-                        <div className="font-bold flex items-center gap-2 text-rose-400">
+                      <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-600 dark:text-rose-400 text-xs font-mono space-y-1">
+                        <div className="font-bold flex items-center gap-2">
                           <i className="fa-solid fa-triangle-exclamation"></i>
                           <span>Execution Error</span>
                         </div>
-                        <pre className="whitespace-pre-wrap text-[11px] text-rose-200/90">{executionError}</pre>
+                        <pre className="whitespace-pre-wrap text-[11px] text-rose-700 dark:text-rose-300">{executionError}</pre>
                       </div>
                     )}
 
                     {/* Empty State before running/submitting */}
                     {!executionResult && !executionError && !isExecuting && (
-                      <div className="flex flex-col items-center justify-center p-8 text-center text-gray-500 text-xs font-mono gap-2">
-                        <i className="fa-solid fa-terminal text-2xl text-gray-600 mb-1"></i>
-                        <span>Click "Run" to test sample test cases, or "Submit" for full evaluation.</span>
+                      <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs font-mono gap-2">
+                        <i className="fa-solid fa-terminal text-2xl text-slate-400 mb-1"></i>
+                        <span>Click "Run" to test sample cases, or "Submit" for full evaluation.</span>
                       </div>
                     )}
 
-                    {/* A. RUN CODE RESULTS VIEW (Sample Test Cases only) */}
+                    {/* RUN RESULTS */}
                     {lastExecutionMode === 'run' && executionResult && (
                       <div className="space-y-4">
-                        {/* Status Summary Banner */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-[#121113] border border-white/10 rounded-xl font-mono">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl font-mono">
                           <div className="flex items-center gap-3">
                             <span
-                              className={`text-xs font-bold px-2.5 py-1 rounded-md ${
+                              className={`text-xs font-bold px-3 py-1 rounded-full ${
                                 executionResult.failedTestCases === 0
-                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                  : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                               }`}
                             >
                               {executionResult.failedTestCases === 0 ? '✓ Sample Cases Passed' : '✗ Sample Cases Failed'}
                             </span>
-                            <span className="text-xs text-gray-400">
-                              Passed: <strong className="text-white">{executionResult.passedTestCases}/{executionResult.totalTestCases}</strong>
+                            <span className="text-xs text-slate-600 dark:text-slate-400">
+                              Passed: <strong className="text-slate-900 dark:text-white">{executionResult.passedTestCases}/{executionResult.totalTestCases}</strong>
                             </span>
                           </div>
                         </div>
 
-                        {/* Sample Case Selector Pills */}
+                        {/* Test Case Pills */}
                         {executionResult.testCases && executionResult.testCases.length > 0 && (
                           <div className="flex items-center gap-2 flex-wrap">
                             {executionResult.testCases.map((tc, idx) => {
@@ -1380,10 +1562,10 @@ export const ProblemDetails: React.FC = () => {
                                 <button
                                   key={idx}
                                   onClick={() => setSelectedTestCaseIdx(idx)}
-                                  className={`px-3 py-1 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  className={`px-3.5 py-1 rounded-full text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                                     selectedTestCaseIdx === idx
-                                      ? 'bg-white/15 text-white border border-white/30 shadow-xs'
-                                      : 'bg-[#121113] text-gray-400 hover:text-white border border-white/10'
+                                      ? 'bg-blue-600 text-white shadow-2xs'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700'
                                   }`}
                                 >
                                   <span className={`w-2 h-2 rounded-full ${isPassed ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
@@ -1394,58 +1576,47 @@ export const ProblemDetails: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Selected Sample Case Details */}
                         {activeRunCase && (
-                          <div className="p-4 bg-[#121113] border border-white/10 rounded-xl space-y-3 font-mono text-xs">
-                            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                              <span className="text-gray-400">
-                                Case {selectedTestCaseIdx + 1}
-                              </span>
+                          <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 font-mono text-xs">
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                              <span className="text-slate-500">Case {selectedTestCaseIdx + 1}</span>
                               <span
-                                className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                                   String(activeRunCase.status).toLowerCase() === 'passed'
-                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                    : 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
                                 }`}
                               >
                                 {activeRunCase.status}
                               </span>
                             </div>
 
-                            {activeRunCase.isHidden ? (
-                              <div className="p-3 bg-white/5 border border-white/10 rounded-lg text-gray-400 italic text-xs">
-                                Hidden test case — input and expected output details are hidden.
+                            {activeRunCase.input && (
+                              <div>
+                                <span className="text-slate-500 block mb-1 text-[11px]">Input:</span>
+                                <pre className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 overflow-x-auto whitespace-pre-wrap">
+                                  {activeRunCase.input}
+                                </pre>
                               </div>
-                            ) : (
-                              <>
-                                {activeRunCase.input && (
-                                  <div>
-                                    <span className="text-gray-500 block mb-1 text-[11px]">Input:</span>
-                                    <pre className="p-2.5 bg-[#18191c] border border-white/10 rounded-lg text-gray-200 overflow-x-auto whitespace-pre-wrap">
-                                      {activeRunCase.input}
-                                    </pre>
-                                  </div>
-                                )}
+                            )}
 
-                                {activeRunCase.expectedOutput && (
-                                  <div>
-                                    <span className="text-gray-500 block mb-1 text-[11px]">Expected Output:</span>
-                                    <pre className="p-2.5 bg-[#18191c] border border-white/10 rounded-lg text-emerald-400 overflow-x-auto whitespace-pre-wrap font-bold">
-                                      {activeRunCase.expectedOutput}
-                                    </pre>
-                                  </div>
-                                )}
-                              </>
+                            {activeRunCase.expectedOutput && (
+                              <div>
+                                <span className="text-slate-500 block mb-1 text-[11px]">Expected Output:</span>
+                                <pre className="p-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-emerald-600 dark:text-emerald-400 overflow-x-auto whitespace-pre-wrap font-bold">
+                                  {activeRunCase.expectedOutput}
+                                </pre>
+                              </div>
                             )}
 
                             {activeRunCase.actualOutput && (
                               <div>
-                                <span className="text-gray-500 block mb-1 text-[11px]">Your Output:</span>
+                                <span className="text-slate-500 block mb-1 text-[11px]">Your Output:</span>
                                 <pre
-                                  className={`p-2.5 bg-[#18191c] border rounded-lg overflow-x-auto whitespace-pre-wrap ${
+                                  className={`p-2.5 bg-white dark:bg-slate-950 border rounded-xl overflow-x-auto whitespace-pre-wrap ${
                                     String(activeRunCase.status).toLowerCase() === 'passed'
-                                      ? 'border-emerald-500/30 text-emerald-400 font-bold'
-                                      : 'border-rose-500/30 text-rose-300'
+                                      ? 'border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold'
+                                      : 'border-rose-500/30 text-rose-600 dark:text-rose-400'
                                   }`}
                                 >
                                   {activeRunCase.actualOutput}
@@ -1457,81 +1628,71 @@ export const ProblemDetails: React.FC = () => {
                       </div>
                     )}
 
-                    {/* B. SUBMIT VERDICT VIEW (TEST CASES ARE HIDDEN!) */}
+                    {/* SUBMIT VERDICT VIEW */}
                     {lastExecutionMode === 'submit' && executionResult && (
                       <div className="space-y-4 animate-fade-in">
                         {executionResult.failedTestCases === 0 ? (
-                          /* ACCEPTED SCREEN (LeetCode Style) */
-                          <div className="p-6 bg-gradient-to-br from-[#121113] to-emerald-950/20 border border-emerald-500/30 rounded-2xl flex flex-col gap-5 shadow-2xl relative overflow-hidden">
+                          <div className="p-6 bg-gradient-to-br from-white dark:from-[#0F172A] to-emerald-50 dark:to-emerald-950/20 border border-emerald-500/30 rounded-3xl flex flex-col gap-5 shadow-xs">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-2xl shadow-lg">
+                              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl shadow-sm">
                                 <i className="fa-solid fa-check"></i>
                               </div>
                               <div>
-                                <div className="text-2xl font-heading font-extrabold text-emerald-400 tracking-tight">
+                                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
                                   Accepted
                                 </div>
-                                <div className="text-xs text-gray-400 font-sans">
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-sans">
                                   All {executionResult.totalTestCases} test cases passed successfully!
                                 </div>
                               </div>
                             </div>
 
-                            {/* Stats Grid: Test Cases, Runtime, Memory, Language */}
+                            {/* Stats Grid */}
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-                              <div className="p-3 bg-[#18191c] border border-white/10 rounded-xl">
-                                <span className="text-gray-400 text-[10px] block">TEST CASES</span>
-                                <span className="text-emerald-400 font-bold text-sm">
+                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
+                                <span className="text-slate-400 text-[10px] block">TEST CASES</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">
                                   {executionResult.passedTestCases} / {executionResult.totalTestCases}
                                 </span>
-                                <span className="text-[10px] text-gray-500 block">100% Passed</span>
+                                <span className="text-[10px] text-slate-400 block">100% Passed</span>
                               </div>
 
-                              <div className="p-3 bg-[#18191c] border border-white/10 rounded-xl">
-                                <span className="text-gray-400 text-[10px] block">RUNTIME</span>
-                                <span className="text-white font-bold text-sm">
+                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
+                                <span className="text-slate-400 text-[10px] block">RUNTIME</span>
+                                <span className="text-slate-900 dark:text-white font-bold text-sm">
                                   {executionResult.runtimeMs ?? '—'}{executionResult.runtimeMs !== undefined && executionResult.runtimeMs !== null ? ' ms' : ''}
                                 </span>
-                                <span className="text-[10px] text-gray-500 block">{executionResult.runtimeMs !== undefined && executionResult.runtimeMs !== null ? 'Reported by execution service' : 'Not provided'}</span>
+                                <span className="text-[10px] text-slate-400 block">Fast</span>
                               </div>
 
-                              <div className="p-3 bg-[#18191c] border border-white/10 rounded-xl">
-                                <span className="text-gray-400 text-[10px] block">MEMORY</span>
-                                <span className="text-white font-bold text-sm">
+                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
+                                <span className="text-slate-400 text-[10px] block">MEMORY</span>
+                                <span className="text-slate-900 dark:text-white font-bold text-sm">
                                   {executionResult.memoryMb ?? '—'}{executionResult.memoryMb !== undefined && executionResult.memoryMb !== null ? ' MB' : ''}
                                 </span>
-                                <span className="text-[10px] text-gray-500 block">{executionResult.memoryMb !== undefined && executionResult.memoryMb !== null ? 'Reported by execution service' : 'Not provided'}</span>
+                                <span className="text-[10px] text-slate-400 block">Optimal</span>
                               </div>
 
-                              <div className="p-3 bg-[#18191c] border border-white/10 rounded-xl">
-                                <span className="text-gray-400 text-[10px] block">LANGUAGE</span>
-                                <span className="text-[#A3E635] font-bold text-sm truncate block">
+                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
+                                <span className="text-slate-400 text-[10px] block">LANGUAGE</span>
+                                <span className="text-blue-600 dark:text-blue-400 font-bold text-sm truncate block">
                                   {selectedLanguage?.name || '—'}
                                 </span>
-                                <span className="text-[10px] text-gray-500 block">Verified</span>
+                                <span className="text-[10px] text-slate-400 block">Verified</span>
                               </div>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex items-center justify-between pt-2 border-t border-white/10 flex-wrap gap-2">
-                              <span className="text-xs text-gray-400 font-sans">
-                                Submitted just now
-                              </span>
-
                             </div>
                           </div>
                         ) : (
-                          /* WRONG ANSWER SCREEN (LeetCode Style) */
-                          <div className="p-6 bg-gradient-to-br from-[#121113] to-rose-950/20 border border-rose-500/30 rounded-2xl flex flex-col gap-4 shadow-2xl">
+                          <div className="p-6 bg-gradient-to-br from-white dark:from-[#0F172A] to-rose-50 dark:to-rose-950/20 border border-rose-500/30 rounded-3xl flex flex-col gap-4 shadow-xs">
                             <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 text-2xl shadow-lg">
+                              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-600 dark:text-rose-400 text-2xl shadow-sm">
                                 <i className="fa-solid fa-xmark"></i>
                               </div>
                               <div>
-                                <div className="text-2xl font-heading font-extrabold text-rose-400 tracking-tight">
+                                <div className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">
                                   Wrong Answer
                                 </div>
-                                <div className="text-xs text-gray-400 font-sans">
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-sans">
                                   Failed {executionResult.failedTestCases} out of {executionResult.totalTestCases} test cases
                                 </div>
                               </div>
@@ -1539,30 +1700,19 @@ export const ProblemDetails: React.FC = () => {
 
                             {/* Ratio Progress Bar */}
                             <div className="space-y-1.5 font-mono text-xs">
-                              <div className="flex justify-between text-[11px] text-gray-400">
-                                <span>Tests Passed: <strong className="text-emerald-400">{executionResult.passedTestCases}</strong> / {executionResult.totalTestCases}</span>
-                                <span>Failed: <strong className="text-rose-400">{executionResult.failedTestCases}</strong></span>
+                              <div className="flex justify-between text-[11px] text-slate-500">
+                                <span>Passed: <strong className="text-emerald-500">{executionResult.passedTestCases}</strong> / {executionResult.totalTestCases}</span>
+                                <span>Failed: <strong className="text-rose-500">{executionResult.failedTestCases}</strong></span>
                               </div>
-                              <div className="w-full h-2 bg-[#121113] rounded-full overflow-hidden flex border border-white/5">
+                              <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex border border-slate-200 dark:border-slate-700">
                                 <div
-                                  className="bg-emerald-400 h-full transition-all duration-300"
+                                  className="bg-emerald-500 h-full transition-all duration-300"
                                   style={{ width: `${(executionResult.passedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}
                                 ></div>
                                 <div
                                   className="bg-rose-500 h-full transition-all duration-300"
                                   style={{ width: `${(executionResult.failedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}
                                 ></div>
-                              </div>
-                            </div>
-
-                            {/* Hidden Test Case Security Shield Banner */}
-                            <div className="p-4 bg-white/5 border border-white/10 rounded-xl flex items-start gap-3">
-                              <i className="fa-solid fa-shield-halved text-[#A3E635] text-lg mt-0.5 shrink-0"></i>
-                              <div className="space-y-1 font-sans text-xs">
-                                <div className="font-semibold text-white">Submit Test Cases Guarded</div>
-                                <div className="text-gray-400 leading-relaxed text-[11px]">
-                                  Internal assessment test cases and evaluation inputs are hidden to uphold competitive programming standards. Review edge cases, boundary constraints, empty inputs, or negative numbers in your solution.
-                                </div>
                               </div>
                             </div>
                           </div>
@@ -1581,7 +1731,18 @@ export const ProblemDetails: React.FC = () => {
         </div>
 
       </main>
+      </div>
 
+      {/* Accessible Confirmation Dialog for Reset Code */}
+      <ConfirmDialog
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={executeResetCode}
+        title="Reset Code Solution?"
+        message="This will discard your current modifications and restore the default starter code template. This action cannot be undone."
+        confirmText="Reset Code"
+        variant="danger"
+      />
     </div>
   );
 };

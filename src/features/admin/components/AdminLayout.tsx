@@ -13,7 +13,7 @@ export const AdminLayout: React.FC = () => {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#090A0C] text-white flex flex-col font-sans admin-layout-container">
+    <div className="min-h-screen bg-neutral-950 text-white flex flex-col font-sans admin-layout-container">
       <div className="flex flex-1 relative overflow-hidden">
         {/* Admin Navigation Sidebar */}
         <AdminSidebar

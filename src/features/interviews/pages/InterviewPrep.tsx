@@ -97,8 +97,8 @@ export const InterviewPrep: React.FC = () => {
             onClick={() => setActiveCategory(cat)}
             className={`px-4 py-2 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
               activeCategory === cat
-                ? 'bg-[#A3E635] text-black border-[#A3E635] font-bold shadow-sm'
-                : 'bg-[#202225] text-gray-400 border-white/10 hover:text-white'
+                ? 'bg-neutral-100 text-neutral-900 text-black border-neutral-600 font-bold shadow-sm'
+                : 'bg-neutral-800 text-gray-400 border-white/10 hover:text-white'
             }`}
           >
             {cat}
@@ -113,7 +113,7 @@ export const InterviewPrep: React.FC = () => {
           return (
             <div
               key={q.id}
-              className="bg-[#202225] border border-white/10 hover:border-[#A3E635]/30 rounded-2xl overflow-hidden transition-colors"
+              className="bg-neutral-800 border border-white/10 hover:border-neutral-700 rounded-2xl overflow-hidden transition-colors"
             >
               <button
                 onClick={() => toggleExpand(q.id)}
@@ -130,13 +130,13 @@ export const InterviewPrep: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  <i className={`fa-solid ${isExpanded ? 'fa-chevron-up text-[#A3E635]' : 'fa-chevron-down text-gray-500'} text-sm`}></i>
+                  <i className={`fa-solid ${isExpanded ? 'fa-chevron-up text-neutral-300' : 'fa-chevron-down text-gray-500'} text-sm`}></i>
                 </div>
               </button>
 
               {isExpanded && (
                 <div className="px-5 pb-5 pt-2 border-t border-white/10 flex flex-col gap-4 text-xs font-sans leading-relaxed text-gray-300">
-                  <div className="whitespace-pre-line bg-[#121113] p-4 rounded-xl border border-white/10">
+                  <div className="whitespace-pre-line bg-neutral-900 p-4 rounded-xl border border-white/10">
                     {q.answer}
                   </div>
 
@@ -145,7 +145,7 @@ export const InterviewPrep: React.FC = () => {
                       <span className="text-[11px] font-mono font-semibold text-gray-400 block mb-1.5">
                         Code / Implementation Example:
                       </span>
-                      <pre className="p-3 bg-[#121113] border border-white/10 rounded-lg text-xs font-mono text-[#A3E635] overflow-x-auto">
+                      <pre className="p-3 bg-neutral-900 border border-white/10 rounded-lg text-xs font-mono text-neutral-300 overflow-x-auto">
                         <code>{q.codeExample}</code>
                       </pre>
                     </div>
@@ -159,7 +159,7 @@ export const InterviewPrep: React.FC = () => {
                         {q.companies.map((c) => (
                           <span
                             key={c}
-                            className="text-[10px] font-mono bg-[#121113] text-gray-400 border border-white/10 px-2 py-0.5 rounded"
+                            className="text-[10px] font-mono bg-neutral-900 text-gray-400 border border-white/10 px-2 py-0.5 rounded"
                           >
                             {c}
                           </span>

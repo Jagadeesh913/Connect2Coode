@@ -19,12 +19,12 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 font-sans">
       {/* Card 1: Total Problems */}
-      <div className="p-5 rounded-2xl bg-[#181A20] border border-white/10 space-y-3 shadow-xl text-left">
+      <div className="p-5 rounded-2xl bg-neutral-900 border border-white/10 space-y-3 shadow-xl text-left">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Total Question Bank
           </span>
-          <div className="w-9 h-9 rounded-xl bg-[#A3E635]/10 border border-[#A3E635]/20 text-[#A3E635] flex items-center justify-center">
+          <div className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center justify-center">
             <i className="fa-solid fa-code text-sm" />
           </div>
         </div>
@@ -39,7 +39,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
       </div>
 
       {/* Card 2: Easy Difficulty */}
-      <div className="p-5 rounded-2xl bg-[#181A20] border border-white/10 space-y-3 shadow-xl text-left">
+      <div className="p-5 rounded-2xl bg-neutral-900 border border-white/10 space-y-3 shadow-xl text-left">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Easy Tier Problems
@@ -59,7 +59,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
       </div>
 
       {/* Card 3: Medium Difficulty */}
-      <div className="p-5 rounded-2xl bg-[#181A20] border border-white/10 space-y-3 shadow-xl text-left">
+      <div className="p-5 rounded-2xl bg-neutral-900 border border-white/10 space-y-3 shadow-xl text-left">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Medium Tier Problems
@@ -79,7 +79,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
       </div>
 
       {/* Card 4: Target Companies */}
-      <div className="p-5 rounded-2xl bg-[#181A20] border border-white/10 space-y-3 shadow-xl text-left">
+      <div className="p-5 rounded-2xl bg-neutral-900 border border-white/10 space-y-3 shadow-xl text-left">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
             Target Companies

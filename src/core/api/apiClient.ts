@@ -52,17 +52,47 @@ export const getBackendOrigin = (rawUrl?: string | null): string => {
   return stripped;
 };
 
-const getBaseUrl = (): string => {
+export const resolveDeploymentApiBaseUrl = (
+  rawUrl?: string | null,
+  isLocal: boolean = false
+): string => {
+  if (isLocal) {
+    return '/api/v1';
+  }
+
+  const resolved = resolveApiBaseUrl(rawUrl);
+
+  // In deployed production environments, ALL API calls must strictly
+  // target the live backend origin https://codingplatform-tdt0.onrender.com/api/v1 and NEVER localhost.
+  if (
+    resolved.includes('localhost') ||
+    resolved.includes('127.0.0.1') ||
+    !resolved.startsWith('http')
+  ) {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  return resolved;
+};
+
+export const getBaseUrl = (): string => {
   const envUrl = typeof import.meta !== 'undefined' && import.meta.env
     ? import.meta.env.VITE_API_BASE_URL
     : undefined;
-  const resolved = resolveApiBaseUrl(envUrl);
-  // Ensure that in browser runtime, API requests always target Render backend
-  // because frontend and backend are deployed on different servers
-  if (typeof window !== 'undefined' && (!resolved || !resolved.startsWith('http'))) {
-    return DEFAULT_API_BASE_URL;
-  }
-  return resolved;
+
+  // In local browser development (localhost, 127.0.0.1, local IP, or Vite DEV mode),
+  // route through the local proxy (/api/v1) which forwards to https://codingplatform-tdt0.onrender.com
+  // with changeOrigin: true. This completely eliminates browser CORS preflight (OPTIONS) failures.
+  const isLocalDev =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.startsWith('192.168.') ||
+      window.location.hostname.startsWith('10.') ||
+      window.location.hostname.endsWith('.local') ||
+      Boolean(import.meta.env?.DEV));
+
+  return resolveDeploymentApiBaseUrl(envUrl, isLocalDev);
 };
 
 export const BASE_URL = getBaseUrl();
@@ -217,11 +247,21 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
+      // Do not attempt token refresh if there are no tokens in storage (unauthenticated visitor / guest)
+      const storedRefreshToken = tokenStorage.getRefreshToken();
+      const storedAccessToken = tokenStorage.getAccessToken();
+      if (!storedRefreshToken && !storedAccessToken) {
+        return Promise.reject({
+          statusCode: 401,
+          message: error.response?.data?.message || 'Authentication required. Please log in.',
+          errors: error.response?.data?.errors || ['Authentication required'],
+        });
+      }
+
       // Single-Flight Refresh: If a refresh is already in progress, wait for the shared promise
       if (!refreshTokenPromise) {
         refreshTokenPromise = (async () => {
           try {
-            const storedRefreshToken = tokenStorage.getRefreshToken();
             const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
             const refreshRes = await axios.post(
               `${BASE_URL}/auth/refresh`,
@@ -273,11 +313,32 @@ apiClient.interceptors.response.use(
       }
     }
 
-    const errorData = error.response?.data || {
-      statusCode: error.response?.status || 500,
-      message: error.message || 'Something went wrong. Please try again.',
-      errors: error.response?.data?.errors || [error.message],
-    };
+    const isNetworkError =
+      !error.response &&
+      (error.code === 'ERR_NETWORK' ||
+        error.message === 'Network Error' ||
+        error.message?.includes('network'));
+
+    const status = error.response?.status || (isNetworkError ? 0 : 500);
+    let errorData = error.response?.data;
+
+    if (errorData && typeof errorData === 'object' && !Array.isArray(errorData)) {
+      if (!errorData.statusCode && status) {
+        errorData.statusCode = status;
+      }
+    } else {
+      const fallbackMsg = isNetworkError
+        ? "We couldn't connect to the server. Check your connection and try again."
+        : typeof errorData === 'string' && errorData.trim()
+        ? errorData
+        : error.message || 'Unable to complete your request. Please try again.';
+
+      errorData = {
+        statusCode: status,
+        message: fallbackMsg,
+        errors: [fallbackMsg],
+      };
+    }
 
     return Promise.reject(errorData);
   }

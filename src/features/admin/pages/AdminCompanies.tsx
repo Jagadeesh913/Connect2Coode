@@ -8,6 +8,7 @@ import { CompanyFormModal, CompanyFormData } from '../components/companies/Compa
 import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal';
 import { adminCompanyService, CompanyItem } from '../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
+import { getActionableErrorMessage } from '../../../core/validation';
 
 export const AdminCompanies: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
@@ -26,7 +27,7 @@ export const AdminCompanies: React.FC = () => {
 
   /**
    * REAL API ONLY — GET /api/v1/company
-   * Fetches target company records directly from Java Spring Boot Backend.
+   * Fetches target company records directly from Backend.
    */
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -36,7 +37,7 @@ export const AdminCompanies: React.FC = () => {
       const list = res?.data || (Array.isArray(res) ? res : []);
       setCompanies(Array.isArray(list) ? list : []);
     } catch (err: any) {
-      const msg = err?.message || (err?.errors && err?.errors[0]) || 'Failed to fetch companies list from backend API';
+      const msg = getActionableErrorMessage(err, 'Failed to fetch companies list.');
       setError(msg);
       setCompanies([]);
     } finally {
@@ -58,11 +59,11 @@ export const AdminCompanies: React.FC = () => {
         setSelectedCompany(companyData);
       } else {
         setSelectedCompany(null);
-        toast.error('Company details not found on backend server');
+        toast.error('Company details not found.');
       }
     } catch (err: any) {
       setSelectedCompany(null);
-      toast.error(err?.message || 'Failed to fetch company details from backend');
+      toast.error(getActionableErrorMessage(err, 'Failed to fetch company details.'));
     } finally {
       setDetailsLoading(false);
     }
@@ -77,10 +78,10 @@ export const AdminCompanies: React.FC = () => {
         setSelectedCompany(companyData);
         setIsFormOpen(true);
       } else {
-        toast.error('Unable to retrieve full company data for editing');
+        toast.error('Unable to retrieve full company data for editing.');
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Error retrieving company for editing');
+      toast.error(getActionableErrorMessage(err, 'Error retrieving company for editing.'));
     }
   };
 
@@ -105,16 +106,16 @@ export const AdminCompanies: React.FC = () => {
       if (res && (res.statusCode === 200 || res.statusCode === 201 || (res as any).id || res.data)) {
         toast.success(
           formData.id
-            ? 'Company Updated Successfully in Java Database!'
-            : 'Company Created Successfully in Java Database!'
+            ? 'Company updated successfully.'
+            : 'Company created successfully.'
         );
         setIsFormOpen(false);
         fetchCompanies();
       } else {
-        toast.error(res?.message || 'Failed to save company to Java backend');
+        toast.error(res?.message || 'Failed to save company.');
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to save company to Java backend');
+      toast.error(getActionableErrorMessage(err, 'Failed to save company.'));
     } finally {
       setSubmitting(false);
     }
@@ -147,13 +148,13 @@ export const AdminCompanies: React.FC = () => {
               />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-white hover:text-[#A3E635] transition-colors font-heading text-sm">{row.name}</span>
+              <span className="font-bold text-white hover:text-white transition-colors font-heading text-sm">{row.name}</span>
               {row.websiteUrl && (
                 <a
                   href={row.websiteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-[#A3E635] hover:underline font-mono"
+                  className="text-xs text-neutral-300 hover:underline font-mono"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {row.websiteUrl}
@@ -186,7 +187,7 @@ export const AdminCompanies: React.FC = () => {
           </button>
           <button
             onClick={() => handleEditClick(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-[#A3E635]/20 text-gray-400 hover:text-[#A3E635] transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
             title="Edit Company Details"
           >
             <i className="fa-solid fa-pen-to-square text-xs"></i>
@@ -205,7 +206,7 @@ export const AdminCompanies: React.FC = () => {
         actions={
           <button
             onClick={handleCreateClick}
-            className="px-4 py-2.5 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-[#A3E635]/20 font-sans"
+            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
           >
             <i className="fa-solid fa-plus text-xs"></i>
             <span>Add Target Company</span>
@@ -214,7 +215,7 @@ export const AdminCompanies: React.FC = () => {
       />
 
       {/* Filter Bar Controls with Glassmorphism */}
-      <AdminCard className="p-4 bg-[#14202C]/75 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
+      <AdminCard className="p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
         <div className="space-y-1">
           <label className="block text-xs font-semibold text-gray-300">Search Target Companies</label>
           <div className="relative flex items-center">
@@ -224,7 +225,7 @@ export const AdminCompanies: React.FC = () => {
               placeholder="Search target companies by name..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#090A0C]/80 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-[#A3E635]"
+              className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
             />
           </div>
         </div>

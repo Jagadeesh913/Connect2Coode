@@ -34,12 +34,12 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
   };
 
   return (
-    <header className="h-16 bg-[#121316]/85 backdrop-blur-xl border-b border-white/10 px-8 flex items-center justify-between sticky top-0 z-10 font-sans">
+    <header className="h-16 bg-neutral-900 backdrop-blur-xl border-b border-white/10 px-8 flex items-center justify-between sticky top-0 z-10 font-sans">
       {/* Left Engine Indicator */}
       <div className="flex items-center gap-3">
         <button
           onClick={onToggleMobileSidebar}
-          className="lg:hidden p-2 rounded-xl bg-[#090A0C]/80 border border-white/10 text-gray-300 hover:text-white"
+          className="lg:hidden p-2 rounded-xl bg-neutral-950 border border-white/10 text-gray-300 hover:text-white"
           aria-label="Toggle Mobile Menu"
         >
           <i className="fa-solid fa-bars text-sm"></i>
@@ -55,7 +55,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
         {/* Switch to User Portal (Practice) */}
         <Link
           to="/practice"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#A3E635]/15 border border-[#A3E635]/30 hover:border-[#A3E635] text-[#A3E635] hover:bg-[#A3E635] hover:text-black text-xs font-bold transition-all shadow-sm group"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:border-neutral-600 text-neutral-300 hover:bg-neutral-200 hover:text-black text-xs font-bold transition-all shadow-sm group"
           title="Switch to User Portal (Practice)"
         >
           <i className="fa-solid fa-code text-xs group-hover:scale-110 transition-transform"></i>
@@ -66,7 +66,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
         <button
           type="button"
           onClick={toggleTheme}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#090A0C]/80 border border-white/10 hover:border-[#A3E635]/40 text-gray-300 text-xs font-semibold transition-all cursor-pointer"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-950 border border-white/10 hover:border-neutral-700 text-gray-300 text-xs font-semibold transition-all cursor-pointer"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
         >
           <i className={`fa-solid ${theme === 'dark' ? 'fa-sun text-[#EAB308]' : 'fa-moon text-sky-400'}`}></i>
@@ -83,20 +83,20 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
               <div className="text-xs font-bold text-white leading-tight">
                 {user?.firstName || 'Admin'} {user?.lastName || 'Administrator'}
               </div>
-              <div className="text-[10px] text-[#A3E635] font-semibold leading-tight mt-0.5">
+              <div className="text-[10px] text-neutral-300 font-semibold leading-tight mt-0.5">
                 {user?.email || 'admin@connect2code.io'}
               </div>
             </div>
 
-            <div className="w-9 h-9 rounded-xl bg-[#A3E635]/10 border border-[#A3E635]/30 text-[#A3E635] flex items-center justify-center font-bold text-xs font-heading">
+            <div className="w-9 h-9 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center justify-center font-bold text-xs font-heading">
               {user?.firstName ? user.firstName.charAt(0) : 'A'}
             </div>
           </button>
 
           {/* Profile Dropdown Menu */}
           {isProfileOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 bg-[#121316]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 z-50 animate-fade-in font-sans">
-              <div className="p-3 bg-[#090A0C]/80 border border-white/10 rounded-xl flex flex-col gap-1">
+            <div className="absolute right-0 top-full mt-2 w-56 bg-neutral-900 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 z-50 animate-fade-in font-sans">
+              <div className="p-3 bg-neutral-950 border border-white/10 rounded-xl flex flex-col gap-1">
                 <span className="text-xs font-bold text-white truncate">
                   {user?.firstName || 'Admin User'} {user?.lastName || ''}
                 </span>
@@ -110,7 +110,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
                 onClick={() => setIsProfileOpen(false)}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors w-full text-left"
               >
-                <i className="fa-solid fa-code text-xs text-[#A3E635]"></i>
+                <i className="fa-solid fa-code text-xs text-neutral-300"></i>
                 <span>Switch to User Portal</span>
               </Link>
               <button

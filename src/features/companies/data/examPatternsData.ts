@@ -97,8 +97,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "2.0 Mins",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Percentages & Averages",
           "Profit, Loss & Discount",
@@ -132,8 +132,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "2.25 Mins",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Blood Relations & Family Tree",
           "Seating Arrangements (Circular & Linear)",
@@ -354,8 +354,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "2.3 Mins",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Percentages & Averages",
           "Permutation & Combination",
@@ -372,8 +372,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "1.6 Mins",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Data Sufficiency",
           "Syllogisms",
@@ -465,7 +465,7 @@ export const examPatternsData: CompanyExamPattern[] = [
     "syllabus": [
       {
         "title": "Pseudo Code & Algorithm Tracing",
-        "icon": "fa-solid fa-[#A3E635] fa-code",
+        "icon": "fa-solid  fa-code",
         "importance": "Must Master",
         "topics": [
           {
@@ -488,7 +488,7 @@ export const examPatternsData: CompanyExamPattern[] = [
       },
       {
         "title": "Grid Puzzles",
-        "icon": "fa-solid fa-[#A3E635] fa-puzzle-piece",
+        "icon": "fa-solid  fa-puzzle-piece",
         "importance": "High Priority",
         "topics": [
           {
@@ -566,8 +566,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "1.0 Min",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "English Ability",
           "Critical Reasoning",
@@ -583,8 +583,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "1.0 Min",
         "marking": "+1 / 0",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Common Tech Concepts",
           "Pseudo Code Output",
@@ -600,8 +600,8 @@ export const examPatternsData: CompanyExamPattern[] = [
         "avgTimePerQ": "22.5 Mins",
         "marking": "Test Case Score",
         "difficulty": "Medium",
-        "diffBg": "bg-[#A3E635]/15 border border-[#A3E635]/30",
-        "diffText": "text-[#A3E635]",
+        "diffBg": "bg-neutral-800 border border-neutral-700",
+        "diffText": "text-neutral-300",
         "focusTopics": [
           "Array Transformation",
           "String Manipulation",
@@ -680,7 +680,7 @@ export const examPatternsData: CompanyExamPattern[] = [
     "syllabus": [
       {
         "title": "Cognitive & Critical Reasoning",
-        "icon": "fa-solid fa-[#A3E635] fa-brain",
+        "icon": "fa-solid  fa-brain",
         "importance": "Must Master",
         "topics": [
           {
@@ -699,7 +699,7 @@ export const examPatternsData: CompanyExamPattern[] = [
       },
       {
         "title": "Technical MCQs & Cloud",
-        "icon": "fa-solid fa-[#A3E635] fa-cloud",
+        "icon": "fa-solid  fa-cloud",
         "importance": "High Priority",
         "topics": [
           {

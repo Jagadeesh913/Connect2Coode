@@ -3,7 +3,6 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Company, Problem } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
-
 export type CompanyItem = Company;
 
 export const companyService = {

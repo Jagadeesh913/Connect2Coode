@@ -135,7 +135,7 @@ export const AdminDashboard: React.FC = () => {
                 const el = document.getElementById('dashboard-code-runner');
                 el?.scrollIntoView({ behavior: 'smooth' });
               }}
-              className="px-4 py-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-[#A3E635]/20 font-sans"
+              className="px-4 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
             >
               <i className="fa-solid fa-play text-xs text-black"></i>
               <span>Test &amp; Submit Code</span>
@@ -143,10 +143,10 @@ export const AdminDashboard: React.FC = () => {
             <button
               onClick={fetchDashboardData}
               disabled={loading}
-              className="px-4 py-2 bg-[#121316] hover:bg-[#1a1c22] text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 bg-neutral-900 hover:bg-neutral-900 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
               title="Refresh Data"
             >
-              <i className={`fa-solid fa-rotate-right text-xs ${loading ? 'animate-spin text-[#A3E635]' : ''}`}></i>
+              <i className={`fa-solid fa-rotate-right text-xs ${loading ? 'animate-spin text-neutral-300' : ''}`}></i>
               <span>Refresh</span>
             </button>
           </div>

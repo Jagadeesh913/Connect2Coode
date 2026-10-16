@@ -30,30 +30,37 @@ export const App: React.FC = () => {
     <Provider store={store}>
       <ProgressHydrator />
       <ThemeProvider>
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            background: '#111827',
-            color: '#F9FAFB',
-            border: '1px solid #1F2937',
-            fontSize: '13px',
-            fontFamily: 'Inter, sans-serif',
-          },
-          success: {
-            iconTheme: {
-              primary: '#10B981',
-              secondary: '#111827',
+        <Toaster
+          position="top-right"
+          gutter={10}
+          toastOptions={{
+            duration: 4000,
+            className: 'c2c-toast',
+            style: {
+              background: 'var(--toast-bg)',
+              color: 'var(--toast-color)',
+              border: '1px solid var(--toast-border)',
+              borderRadius: '16px',
+              padding: '12px 18px',
+              fontSize: '13px',
+              fontWeight: 600,
+              boxShadow: 'var(--toast-shadow)',
+              backdropFilter: 'blur(12px)',
             },
-          },
-          error: {
-            iconTheme: {
-              primary: '#F43F5E',
-              secondary: '#111827',
+            success: {
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#FFFFFF',
+              },
             },
-          },
-        }}
-      />
+            error: {
+              iconTheme: {
+                primary: '#F43F5E',
+                secondary: '#FFFFFF',
+              },
+            },
+          }}
+        />
       <AppErrorBoundary>
         <RouterProvider router={router} />
       </AppErrorBoundary>

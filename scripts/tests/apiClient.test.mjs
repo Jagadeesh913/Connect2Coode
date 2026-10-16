@@ -78,4 +78,50 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
   it('exported BASE_URL defaults to production Render backend URL in test/unconfigured environment', () => {
     assert.equal(BASE_URL, 'https://codingplatform-tdt0.onrender.com/api/v1');
   });
+
+  describe('Deployed / Vercel Environment URL Guarantees', () => {
+    const { resolveDeploymentApiBaseUrl } = apiClientModule;
+
+    it('returns local proxy /api/v1 when isLocal is true', () => {
+      assert.equal(resolveDeploymentApiBaseUrl(undefined, true), '/api/v1');
+      assert.equal(resolveDeploymentApiBaseUrl('https://custom.backend.com/api/v1', true), '/api/v1');
+    });
+
+    it('strictly enforces Render backend URL and rejects localhost in deployed production', () => {
+      assert.equal(
+        resolveDeploymentApiBaseUrl('http://localhost:8080/api/v1', false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+      assert.equal(
+        resolveDeploymentApiBaseUrl('http://127.0.0.1:8080/api/v1', false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+      assert.equal(
+        resolveDeploymentApiBaseUrl('http://localhost:3000', false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+    });
+
+    it('strictly falls back to live Render backend if relative URL is passed in deployed production', () => {
+      assert.equal(
+        resolveDeploymentApiBaseUrl('/api/v1', false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+    });
+
+    it('defaults to live Render backend when env variable is unconfigured in deployed production', () => {
+      assert.equal(
+        resolveDeploymentApiBaseUrl(undefined, false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+    });
+
+    it('preserves valid production HTTPS URL in deployed production', () => {
+      assert.equal(
+        resolveDeploymentApiBaseUrl('https://codingplatform-tdt0.onrender.com/api/v1', false),
+        'https://codingplatform-tdt0.onrender.com/api/v1'
+      );
+    });
+  });
 });
+

@@ -42,19 +42,19 @@ export const CompanyPatternDetails: React.FC = () => {
         <div className="mb-6 flex items-center justify-between">
           <Link
             to="/company-patterns"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white transition-all bg-[#202225] border border-white/10 hover:border-white/30 px-4 py-2 rounded-lg shadow-md"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white transition-all bg-neutral-800 border border-white/10 hover:border-white/30 px-4 py-2 rounded-lg shadow-md"
           >
             <i className="fa-solid fa-arrow-left text-xs text-gray-400"></i>
             <span>Back to Exam Patterns</span>
           </Link>
 
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-gray-300 bg-[#202225] border border-white/10 px-3 py-1.5 rounded-lg font-bold">
+            <span className="text-[11px] font-mono text-gray-300 bg-neutral-800 border border-white/10 px-3 py-1.5 rounded-lg font-bold">
               {pattern.category || 'Exam Pattern'}
             </span>
             <Link
               to={`/companies/${pattern.companySlug || pattern.slug}`} state={{ from: 'company-patterns' }}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-black bg-[#A3E635] hover:bg-[#84CC16] px-3.5 py-1.5 rounded-lg transition-all shadow-xs"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-black bg-neutral-100 text-neutral-900 hover:bg-neutral-200 px-3.5 py-1.5 rounded-lg transition-all shadow-xs"
             >
               <i className="fa-solid fa-code text-[10px] text-black"></i>
               <span>Practice Questions</span>
@@ -63,7 +63,7 @@ export const CompanyPatternDetails: React.FC = () => {
         </div>
 
         {/* HERO CARD CONTAINER - DSA Sheet Aesthetics */}
-        <div className="rounded-lg p-6 sm:p-8 bg-[#202225] border border-white/10 shadow-md mb-8">
+        <div className="rounded-lg p-6 sm:p-8 bg-neutral-800 border border-white/10 shadow-md mb-8">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             
             <div className="flex items-center gap-4">
@@ -97,11 +97,11 @@ export const CompanyPatternDetails: React.FC = () => {
 
             {/* Quick Stat Badges */}
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="bg-[#121113] border border-white/10 px-3.5 py-2 rounded-lg text-xs font-mono text-gray-300">
+              <div className="bg-neutral-900 border border-white/10 px-3.5 py-2 rounded-lg text-xs font-mono text-gray-300">
                 <span className="text-gray-400 block text-[10px] uppercase">Duration</span>
                 <span className="font-bold text-white">{pattern.duration || '180 Mins'}</span>
               </div>
-              <div className="bg-[#121113] border border-white/10 px-3.5 py-2 rounded-lg text-xs font-mono text-gray-300">
+              <div className="bg-neutral-900 border border-white/10 px-3.5 py-2 rounded-lg text-xs font-mono text-gray-300">
                 <span className="text-gray-400 block text-[10px] uppercase">Total Questions</span>
                 <span className="font-bold text-white">{pattern.questionsCount || '100+'}</span>
               </div>
@@ -111,7 +111,7 @@ export const CompanyPatternDetails: React.FC = () => {
         </div>
 
         {/* SEGMENTED TAB NAVIGATION */}
-        <div className="flex items-center gap-2 bg-[#202225] p-1.5 rounded-lg border border-white/10 shadow-md mb-8 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 bg-neutral-800 p-1.5 rounded-lg border border-white/10 shadow-md mb-8 overflow-x-auto scrollbar-none">
           {(
             [
               { id: 'breakdown', label: 'Section Breakdown', icon: 'fa-solid fa-list-check' },
@@ -125,7 +125,7 @@ export const CompanyPatternDetails: React.FC = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 min-w-[140px] px-4 py-2.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
                 activeTab === tab.id
-                  ? 'bg-[#A3E635] text-black shadow-sm'
+                  ? 'bg-neutral-100 text-neutral-900 text-black shadow-sm'
                   : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -137,11 +137,11 @@ export const CompanyPatternDetails: React.FC = () => {
 
         {/* TAB CONTENTS */}
         {activeTab === 'breakdown' && (
-          <div className="bg-[#202225] border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
+          <div className="bg-neutral-800 border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
             <h2 className="text-lg font-bold text-white font-heading mb-2">Pattern Section Breakdown</h2>
             <div className="grid grid-cols-1 gap-3">
               {safeArray(pattern.sections).map((sec: any, idx: number) => (
-                <div key={sec.num || idx} className="bg-[#121113] border border-white/10 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div key={sec.num || idx} className="bg-neutral-900 border border-white/10 p-4 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <h4 className="text-sm font-bold text-white font-heading">{sec.name || `Section ${idx + 1}`}</h4>
                     <p className="text-xs text-gray-400 font-sans mt-0.5">{sec.questions || '20 Questions'} • {sec.time || '30 Mins'} • Marking: {sec.marking || '+1 / 0'}</p>
@@ -156,11 +156,11 @@ export const CompanyPatternDetails: React.FC = () => {
         )}
 
         {activeTab === 'syllabus' && (
-          <div className="bg-[#202225] border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
+          <div className="bg-neutral-800 border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
             <h2 className="text-lg font-bold text-white font-heading mb-2">Exam Syllabus & Topics</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {safeArray(pattern.syllabus).map((cat: any, idx: number) => (
-                <div key={idx} className="bg-[#121113] border border-white/10 p-4 rounded-lg">
+                <div key={idx} className="bg-neutral-900 border border-white/10 p-4 rounded-lg">
                   <h4 className="text-sm font-bold text-white font-heading mb-2">{cat.title || `Category ${idx + 1}`}</h4>
                   <div className="flex flex-wrap gap-1.5">
                     {safeArray(cat.topics).map((t: any, tIdx: number) => {
@@ -179,7 +179,7 @@ export const CompanyPatternDetails: React.FC = () => {
         )}
 
         {activeTab === 'stages' && (
-          <div className="bg-[#202225] border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
+          <div className="bg-neutral-800 border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-4">
             <h2 className="text-lg font-bold text-white font-heading mb-2">Selection Rounds & Process</h2>
             <div className="flex flex-col gap-3">
               {stagesList.map((stage: any, idx: number) => {
@@ -189,8 +189,8 @@ export const CompanyPatternDetails: React.FC = () => {
                 const description = stage.description || '';
 
                 return (
-                  <div key={idx} className="bg-[#121113] border border-white/10 p-4 rounded-lg flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-[#202225] border border-white/10 flex items-center justify-center shrink-0 text-xs font-mono font-bold text-[#A3E635]">
+                  <div key={idx} className="bg-neutral-900 border border-white/10 p-4 rounded-lg flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-neutral-800 border border-white/10 flex items-center justify-center shrink-0 text-xs font-mono font-bold text-neutral-300">
                       {stepNum}
                     </div>
                     <div>
@@ -205,20 +205,20 @@ export const CompanyPatternDetails: React.FC = () => {
         )}
 
         {activeTab === 'strategy' && (
-          <div className="bg-[#202225] border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-6">
+          <div className="bg-neutral-800 border border-white/10 rounded-lg p-6 shadow-md flex flex-col gap-6">
             <h2 className="text-lg font-bold text-white font-heading mb-2">Preparation Strategy & Cutoff Insights</h2>
             
             {pattern.prepStrategy && typeof pattern.prepStrategy === 'object' && !Array.isArray(pattern.prepStrategy) ? (
               <div className="flex flex-col gap-4">
                 {pattern.prepStrategy.cutoffInsight && (
-                  <div className="p-4 bg-[#121113] border border-[#A3E635]/30 rounded-xl text-xs sm:text-sm text-gray-200">
-                    <span className="font-bold text-[#A3E635] block mb-1">Target Cutoff Insight:</span>
+                  <div className="p-4 bg-neutral-900 border border-neutral-700 rounded-xl text-xs sm:text-sm text-gray-200">
+                    <span className="font-bold text-neutral-300 block mb-1">Target Cutoff Insight:</span>
                     <p className="text-gray-300 leading-relaxed font-sans">{pattern.prepStrategy.cutoffInsight}</p>
                   </div>
                 )}
 
                 {pattern.prepStrategy.doList && safeArray(pattern.prepStrategy.doList).length > 0 && (
-                  <div className="p-4 bg-[#121113] border border-emerald-500/20 rounded-xl">
+                  <div className="p-4 bg-neutral-900 border border-emerald-500/20 rounded-xl">
                     <h4 className="text-xs font-bold font-mono text-emerald-400 uppercase tracking-wider mb-2">Recommended Do's</h4>
                     <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-gray-300">
                       {safeArray(pattern.prepStrategy.doList).map((item: string, idx: number) => (
@@ -229,7 +229,7 @@ export const CompanyPatternDetails: React.FC = () => {
                 )}
 
                 {pattern.prepStrategy.dontList && safeArray(pattern.prepStrategy.dontList).length > 0 && (
-                  <div className="p-4 bg-[#121113] border border-rose-500/20 rounded-xl">
+                  <div className="p-4 bg-neutral-900 border border-rose-500/20 rounded-xl">
                     <h4 className="text-xs font-bold font-mono text-rose-400 uppercase tracking-wider mb-2">Things to Avoid</h4>
                     <ul className="list-disc list-inside space-y-1.5 text-xs sm:text-sm text-gray-300">
                       {safeArray(pattern.prepStrategy.dontList).map((item: string, idx: number) => (
@@ -246,7 +246,7 @@ export const CompanyPatternDetails: React.FC = () => {
                   const description = typeof strat === 'string' ? strat : (strat.description || '');
 
                   return (
-                    <div key={idx} className="bg-[#121113] border border-white/10 p-4 rounded-lg">
+                    <div key={idx} className="bg-neutral-900 border border-white/10 p-4 rounded-lg">
                       <h4 className="text-sm font-bold text-white font-heading mb-1">{title}</h4>
                       <p className="text-xs text-gray-400 font-sans leading-relaxed">{description}</p>
                     </div>

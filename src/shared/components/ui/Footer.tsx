@@ -1,206 +1,224 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { BrandLogo } from './BrandLogo';
+import { toast } from 'react-hot-toast';
 
 export const Footer: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      setSubscribed(true);
+      toast.success('Thank you for subscribing to the Connect 2 Code newsletter!');
+      setEmail('');
+      setTimeout(() => setSubscribed(false), 4000);
+    }
+  };
+
   return (
-    <footer className="w-full bg-[#050607] text-[#98A2B3] border-t border-[#1C1F26] font-sans relative overflow-hidden">
-      {/* Top subtle glow line */}
-      <div className="h-[1px] w-full bg-gradient-to-r from-transparent via-[#A3E635]/50 to-transparent"></div>
-
-      <div className="mx-auto max-w-7xl px-6 pt-12 pb-8 sm:px-8 lg:px-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-12 pb-12 border-b border-[#1C1F26]">
+    <footer className="w-full bg-slate-50 dark:bg-[#070A13] text-slate-600 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/80 font-sans transition-colors duration-200">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-10 lg:gap-8 pb-12 border-b border-slate-200 dark:border-slate-800/80">
           
-          {/* Column 1: Brand & Tagline */}
+          {/* Brand info & Socials */}
           <div className="lg:col-span-2 flex flex-col gap-4">
-            <Link to="/" className="flex items-center gap-2.5 w-fit group">
-              <img
-                src="/logo-mark-transparent.png"
-                alt="Connect 2 Code Logo"
-                className="h-9 w-auto object-contain shrink-0 transition-transform group-hover:scale-105"
-              />
-              <div className="flex flex-col">
-                <span className="hero-font text-[20px] font-extrabold text-white leading-none">Connect 2 Code</span>
-                <span className="text-[9.5px] font-black uppercase tracking-[.2em] text-[#A3E635] mt-0.5">
-                  YOUR CAREER STARTS HERE
-                </span>
-              </div>
-            </Link>
+            <BrandLogo size="md" />
 
-            <p className="text-[13.5px] text-[#98A2B3] leading-relaxed max-w-sm font-normal mt-1">
-              Empowering engineering students across India to crack campus placement drives with topic-wise lessons, DSA sheets, and company-pattern mocks.
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm mt-2">
+              A complete platform for DSA, coding practice, company preparation and aptitude. Built for students, by a community that believes in growing together.
             </p>
 
-            {/* Social Icons */}
+            {/* Social Icons matching reference */}
             <div className="flex items-center gap-3 mt-2">
               <a
-                href="https://github.com"
+                href="https://instagram.com"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="GitHub"
-                className="w-9 h-9 rounded-xl bg-[#121316] border border-[#22252C] flex items-center justify-center text-[#98A2B3] hover:text-white hover:border-[#A3E635] hover:bg-[#A3E635]/10 transition-all cursor-pointer"
+                aria-label="Instagram"
+                className="w-9 h-9 rounded-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-pink-500 dark:hover:text-pink-400 hover:border-pink-300 transition-colors shadow-2xs"
               >
-                <i className="fa-brands fa-github text-sm"></i>
+                <i className="fa-brands fa-instagram text-sm"></i>
               </a>
               <a
                 href="https://linkedin.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="LinkedIn"
-                className="w-9 h-9 rounded-xl bg-[#121316] border border-[#22252C] flex items-center justify-center text-[#98A2B3] hover:text-white hover:border-[#A3E635] hover:bg-[#A3E635]/10 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 transition-colors shadow-2xs"
               >
                 <i className="fa-brands fa-linkedin-in text-sm"></i>
               </a>
               <a
-                href="https://twitter.com"
+                href="https://github.com"
                 target="_blank"
                 rel="noreferrer"
-                aria-label="Twitter"
-                className="w-9 h-9 rounded-xl bg-[#121316] border border-[#22252C] flex items-center justify-center text-[#98A2B3] hover:text-white hover:border-[#A3E635] hover:bg-[#A3E635]/10 transition-all cursor-pointer"
+                aria-label="GitHub"
+                className="w-9 h-9 rounded-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 transition-colors shadow-2xs"
               >
-                <i className="fa-brands fa-x-twitter text-sm"></i>
+                <i className="fa-brands fa-github text-sm"></i>
               </a>
               <a
                 href="https://discord.com"
                 target="_blank"
                 rel="noreferrer"
                 aria-label="Discord"
-                className="w-9 h-9 rounded-xl bg-[#121316] border border-[#22252C] flex items-center justify-center text-[#98A2B3] hover:text-white hover:border-[#A3E635] hover:bg-[#A3E635]/10 transition-all cursor-pointer"
+                className="w-9 h-9 rounded-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-300 transition-colors shadow-2xs"
               >
                 <i className="fa-brands fa-discord text-sm"></i>
+              </a>
+              <a
+                href="https://twitter.com"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Twitter"
+                className="w-9 h-9 rounded-full bg-white dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-sky-500 dark:hover:text-sky-400 hover:border-sky-300 transition-colors shadow-2xs"
+              >
+                <i className="fa-brands fa-x-twitter text-sm"></i>
               </a>
             </div>
           </div>
 
-          {/* Column 2: Placement Prep */}
+          {/* Quick Links */}
           <div className="flex flex-col gap-3">
-            <h3 className="text-[13px] font-black uppercase tracking-[.14em] text-white font-heading">
-              Placement Prep
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Quick Links
             </h3>
-            <ul className="flex flex-col gap-2.5 text-[13.5px]">
+            <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <li>
-                <Link to="/practice" className="hover:text-white transition-colors">
-                  Practice Problems
+                <Link to="/" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Home
                 </Link>
               </li>
               <li>
-                <Link to="/aptitude" className="hover:text-white transition-colors">
-                  Aptitude Preparation
+                <Link to="/practice" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Problems
                 </Link>
               </li>
               <li>
-                <Link to="/logical" className="hover:text-white transition-colors">
-                  Logical Reasoning
+                <Link to="/companies" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Company Prep
                 </Link>
               </li>
               <li>
-                <Link to="/verbal" className="hover:text-white transition-colors">
-                  Verbal Ability
-                </Link>
-              </li>
-              <li>
-                <Link to="/dsa-sheet" className="hover:text-white transition-colors">
-                  DSA Striver Sheet
-                </Link>
-              </li>
-              <li>
-                <Link to="/roadmaps" className="hover:text-white transition-colors">
-                  Tech Roadmaps
+                <Link to="/aptitude" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Aptitude
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Column 3: Company Patterns */}
+          {/* Resources */}
           <div className="flex flex-col gap-3">
-            <h3 className="text-[13px] font-black uppercase tracking-[.14em] text-white font-heading">
-              Exam Patterns
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Resources
             </h3>
-            <ul className="flex flex-col gap-2.5 text-[13.5px]">
+            <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <li>
-                <Link to="/company-patterns" className="text-[#A3E635] font-bold hover:underline transition-colors flex items-center gap-1.5">
-                  <span>Explore All Patterns</span>
-                  <i className="fa-solid fa-arrow-right text-[10px]"></i>
+                <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Blog
                 </Link>
               </li>
               <li>
-                <Link to="/companies" className="hover:text-white transition-colors">
-                  Company Guides &amp; PYQs
+                <Link to="/roadmaps" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Study Plans
                 </Link>
               </li>
               <li>
-                <Link to="/company-patterns" className="hover:text-white transition-colors">
-                  TCS NQT Pattern
+                <Link to="/companies" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Interview Guides
                 </Link>
               </li>
               <li>
-                <Link to="/company-patterns" className="hover:text-white transition-colors">
-                  Infosys Specialist Drive
+                <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  DSA Sheets
                 </Link>
               </li>
               <li>
-                <Link to="/company-patterns" className="hover:text-white transition-colors">
-                  Accenture ASE Pattern
-                </Link>
-              </li>
-              <li>
-                <Link to="/company-patterns" className="hover:text-white transition-colors">
-                  Cognizant &amp; Wipro Mocks
+                <Link to="/aptitude" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Aptitude Notes
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Column 4: Readiness & Status */}
-          <div className="flex flex-col gap-4">
-            <h3 className="text-[13px] font-black uppercase tracking-[.14em] text-white font-heading">
-              Placement Status
+          {/* Company */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Company
             </h3>
+            <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <li>
+                <Link to="/about" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Contact
+                </Link>
+              </li>
+              <li>
+                <Link to="/privacy" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Terms of Service
+                </Link>
+              </li>
+            </ul>
+          </div>
 
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#A3E635]/10 border border-[#A3E635]/25 w-fit">
-              <span className="w-2 h-2 rounded-full bg-[#A3E635] animate-pulse"></span>
-              <span className="text-[11.5px] font-bold text-[#A3E635]">Drive Season 2026 Active</span>
-            </div>
-
-            <p className="text-[12.5px] text-[#98A2B3] leading-relaxed">
-              Find your topic gaps first with structured practice before appearing for real company tests.
+          {/* Stay Updated / Newsletter */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Stay Updated
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Join our community for updates, new features and more.
             </p>
 
-            <Link
-              to="/practice"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#A3E635] hover:bg-[#84CC16] px-4 py-2.5 text-[13px] font-black text-black shadow-[0_4px_16px_rgba(163,230,53,0.35)] transition active:translate-y-0.5 cursor-pointer"
-            >
-              <span>Explore Practice Sheet</span>
-              <svg aria-hidden="true" className="lucide lucide-arrow-right" fill="none" height="14" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24" width="14" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </Link>
+            <form onSubmit={handleSubscribe} className="relative mt-2">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-full pl-4 pr-12 py-2.5 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 dark:focus:border-blue-400 shadow-2xs transition-colors"
+              />
+              <button
+                type="submit"
+                aria-label="Subscribe to newsletter"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-gradient-to-r from-violet-600 to-pink-500 text-white flex items-center justify-center hover:opacity-95 transition-opacity cursor-pointer shadow-xs"
+              >
+                <i className="fa-solid fa-arrow-right text-xs"></i>
+              </button>
+            </form>
+            {subscribed && (
+              <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 animate-fade-in">
+                ✓ Thank you for subscribing!
+              </span>
+            )}
           </div>
 
         </div>
 
-        {/* Bottom Bar: Copyright & Terms */}
-        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-[12px] text-[#667085]">
-          <p className="font-mono text-center sm:text-left">
-            © {new Date().getFullYear()} Connect 2 Code — Campus Placement Preparation. All rights reserved.
+        {/* Bottom Bar: Copyright & Tagline */}
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500 dark:text-slate-500">
+          <p className="text-center sm:text-left">
+            © 2025 connect2code. All rights reserved.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 text-[#98A2B3]">
-            <Link to="/company-patterns" className="hover:text-white transition-colors">
-              Exam Patterns
-            </Link>
-            <Link to="/practice" className="hover:text-white transition-colors">
-              Practice
-            </Link>
-            <Link to="/dsa-sheet" className="hover:text-white transition-colors">
-              DSA Sheet
-            </Link>
-            <Link to="/companies" className="hover:text-white transition-colors">
-              Companies
-            </Link>
-          </div>
+          <p className="text-center sm:text-right font-medium text-slate-600 dark:text-slate-400">
+            Code Together. Connect Forever.
+          </p>
         </div>
       </div>
     </footer>
   );
 };
+

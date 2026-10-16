@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import {
@@ -17,38 +16,26 @@ import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload, isJwtAdmin } from '../../../core/security/jwt';
 
-// 1. Login Validation Schema
-const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters long'),
-});
-type LoginFormData = z.infer<typeof loginSchema>;
+import {
+  loginSchema,
+  signupSchema,
+  forgotPasswordStep1Schema,
+  forgotPasswordStep2Schema,
+  LoginFormData,
+  SignupFormData,
+  getActionableErrorMessage,
+} from '../../../core/validation';
+import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
 
-// 2. Signup Validation Schema (Strictly NO username field!)
-const signupSchema = z
-  .object({
-    firstName: z
-      .string()
-      .min(2, 'First Name must be at least 2 characters')
-      .regex(/^[a-zA-Z\s]+$/, 'First Name must contain only letters'),
-    lastName: z
-      .string()
-      .min(1, 'Last Name is required')
-      .regex(/^[a-zA-Z\s]+$/, 'Last Name must contain only letters'),
-    email: z.string().email('Please enter a valid email address'),
-    password: z.string().min(6, 'Password must be at least 6 characters long'),
-    confirmPassword: z.string().min(6, 'Please confirm your password'),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'Passwords do not match',
-    path: ['confirmPassword'],
-  });
-type SignupFormData = z.infer<typeof signupSchema>;
 
 interface NavigationLocationState {
-  from?: {
-    pathname?: string;
-  };
+  from?:
+    | {
+        pathname?: string;
+        search?: string;
+        hash?: string;
+      }
+    | string;
 }
 
 interface AuthPageProps {
@@ -129,6 +116,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     formState: { errors: loginErrors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       email: '',
       password: '',
@@ -143,6 +132,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     formState: { errors: signupErrors },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -151,6 +142,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       confirmPassword: '',
     },
   });
+
 
   const handleClose = () => {
     if (onCloseModal) {
@@ -197,16 +189,39 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         }
 
         const navLocationState = location.state as NavigationLocationState | null;
-        const fromPath = navLocationState?.from?.pathname;
+        const from = navLocationState?.from;
+        let targetUrl: string | null = null;
+
+        if (from) {
+          if (typeof from === 'string') {
+            targetUrl = from;
+          } else if (from.pathname) {
+            targetUrl = `${from.pathname}${from.search || ''}${from.hash || ''}`;
+          }
+        }
+
+        if (!targetUrl) {
+          try {
+            const saved = sessionStorage.getItem('post_auth_redirect');
+            if (saved) {
+              targetUrl = saved;
+            }
+          } catch {}
+        }
+
+        try {
+          sessionStorage.removeItem('post_auth_redirect');
+        } catch {}
+
         if (isAdmin) {
-          navigate('/admin/dashboard', { replace: true });
-        } else if (fromPath && fromPath !== '/login' && fromPath !== '/signup') {
-          navigate(fromPath, { replace: true });
+          navigate(targetUrl?.startsWith('/admin') ? targetUrl : '/admin/dashboard', { replace: true });
+        } else if (targetUrl && targetUrl !== '/login' && targetUrl !== '/signup') {
+          navigate(targetUrl, { replace: true });
         } else {
           navigate('/practice', { replace: true });
         }
       } else {
-        toast.error((result.payload as string) || 'Invalid Email or Password');
+        toast.error(getActionableErrorMessage(result.payload, 'Invalid email or password. Please verify and try again.'));
       }
     } finally {
       setLoginSubmitting(false);
@@ -232,25 +247,19 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       setSignupLoading(false);
 
       if (signUpRes && (signUpRes.statusCode === 200 || signUpRes.statusCode === 201 || signUpRes.data)) {
-        toast.success('Account Created Successfully! Please log in with your credentials.');
+        toast.success('Account created successfully! Please log in with your credentials.');
         setLoginValue('email', data.email.trim());
         resetSignup();
         setMode('login');
         dispatch(setAuthModalMode('login'));
       } else {
-        const errMsg =
-          signUpRes?.message ||
-          (signUpRes?.errors && signUpRes?.errors[0]) ||
-          'Failed to create account.';
+        const errMsg = getActionableErrorMessage(signUpRes, 'Failed to create account.');
         setSignupError(errMsg);
         toast.error(errMsg);
       }
     } catch (err: any) {
       setSignupLoading(false);
-      const errMsg =
-        err?.message ||
-        (err?.errors && err?.errors[0]) ||
-        'Failed to create account. Please try again.';
+      const errMsg = getActionableErrorMessage(err, 'Failed to create account. Please try again.');
       setSignupError(errMsg);
       toast.error(errMsg);
     }
@@ -261,8 +270,9 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   // --------------------------------------------------------------------------
   const handleSendForgotOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim() || !forgotEmail.includes('@')) {
-      setForgotOtpError('Please enter a valid email address.');
+    const parseResult = forgotPasswordStep1Schema.safeParse({ email: forgotEmail });
+    if (!parseResult.success) {
+      setForgotOtpError(parseResult.error.errors[0]?.message || 'Enter your email address.');
       return;
     }
     setForgotOtpError('');
@@ -273,7 +283,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       setForgotOtpLoading(false);
 
       if (generatePasswordResetOtpThunk.fulfilled.match(res)) {
-        const msg = (res.payload as string) || 'Password Reset OTP Sent Successfully! Check your inbox.';
+        const msg = (res.payload as string) || 'Password reset OTP sent successfully! Check your inbox.';
         toast.success(msg, { duration: 6000 });
         setForgotStep(2);
         setForgotOtpTimer(60);
@@ -284,14 +294,15 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         setForgotNewPasswordError('');
         setForgotConfirmPasswordError('');
       } else {
-        const errMsg = (res.payload as string) || 'Failed to send OTP. Please check email address.';
+        const errMsg = getActionableErrorMessage(res.payload, 'Failed to send OTP. Please check email address.');
         setForgotOtpError(errMsg);
         toast.error(errMsg);
       }
     } catch (err: any) {
       setForgotOtpLoading(false);
-      setForgotOtpError(err?.message || 'Failed to send OTP.');
-      toast.error(err?.message || 'Failed to send OTP.');
+      const errMsg = getActionableErrorMessage(err, 'Failed to send OTP.');
+      setForgotOtpError(errMsg);
+      toast.error(errMsg);
     }
   };
 
@@ -305,36 +316,21 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     setForgotNewPasswordError('');
     setForgotConfirmPasswordError('');
 
-    let hasError = false;
+    const parseResult = forgotPasswordStep2Schema.safeParse({
+      otp: forgotOtpCode,
+      newPassword: forgotNewPassword,
+      confirmNewPassword: forgotConfirmPassword,
+    });
 
-    // Validate OTP Code
-    if (!forgotOtpCode.trim()) {
-      setForgotCodeError('OTP Code is required.');
-      hasError = true;
-    } else if (forgotOtpCode.trim().length !== 6) {
-      setForgotCodeError('OTP must be exactly 6 digits.');
-      hasError = true;
+    if (!parseResult.success) {
+      parseResult.error.errors.forEach((err) => {
+        const path = err.path[0];
+        if (path === 'otp') setForgotCodeError(err.message);
+        else if (path === 'newPassword') setForgotNewPasswordError(err.message);
+        else if (path === 'confirmNewPassword') setForgotConfirmPasswordError(err.message);
+      });
+      return;
     }
-
-    // Validate New Password
-    if (!forgotNewPassword) {
-      setForgotNewPasswordError('New Password is required.');
-      hasError = true;
-    } else if (forgotNewPassword.length < 6) {
-      setForgotNewPasswordError('Password must be at least 6 characters long.');
-      hasError = true;
-    }
-
-    // Validate Confirm Password
-    if (!forgotConfirmPassword) {
-      setForgotConfirmPasswordError('Please confirm your new password.');
-      hasError = true;
-    } else if (forgotNewPassword !== forgotConfirmPassword) {
-      setForgotConfirmPasswordError('Passwords do not match.');
-      hasError = true;
-    }
-
-    if (hasError) return;
 
     setForgotOtpLoading(true);
 
@@ -392,12 +388,12 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans">
-      <div className="relative w-full max-w-md bg-[#121316] border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white my-auto max-h-[90vh] overflow-y-auto animate-scale-up">
+      <div className="relative w-full max-w-md bg-neutral-900 border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white my-auto max-h-[90vh] overflow-y-auto animate-scale-up">
         {/* Close Button */}
         <button
           type="button"
           onClick={handleClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white w-8 h-8 rounded-full bg-[#090A0C] border border-white/15 hover:border-white/40 flex items-center justify-center transition-colors cursor-pointer z-10"
+          className="absolute top-4 right-4 text-gray-400 hover:text-white w-8 h-8 rounded-full bg-neutral-950 border border-white/15 hover:border-white/40 flex items-center justify-center transition-colors cursor-pointer z-10"
           aria-label="Close modal"
         >
           <i className="fa-solid fa-xmark text-sm"></i>
@@ -420,7 +416,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     setMode('signup');
                     dispatch(setAuthModalMode('signup'));
                   }}
-                  className="text-[#A3E635] hover:underline font-bold cursor-pointer"
+                  className="text-neutral-300 hover:underline font-bold cursor-pointer"
                 >
                   Register Now
                 </button>
@@ -430,22 +426,25 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
             <form onSubmit={handleSubmitLogin(onLoginSubmit)} className="flex flex-col gap-4">
               {/* Email Address */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-gray-200">Email Address</label>
+                <label htmlFor="login-email" className="text-sm font-medium text-gray-200">Email Address</label>
                 <input
+                  id="login-email"
                   type="email"
+                  aria-invalid={Boolean(loginErrors.email)}
+                  aria-describedby={loginErrors.email ? 'login-email-error' : undefined}
                   placeholder="Enter email address"
-                  className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-sm text-white placeholder-gray-500 px-3.5 py-2.5 rounded-lg outline-none transition-all"
+                  className={`w-full bg-neutral-950 border ${
+                    loginErrors.email ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                  } text-sm text-white placeholder-gray-500 px-3.5 py-2.5 rounded-lg outline-none transition-all`}
                   {...registerLogin('email')}
                 />
-                {loginErrors.email && (
-                  <span className="text-xs text-rose-400 font-sans">{loginErrors.email.message}</span>
-                )}
+                <FormFieldError id="login-email-error" error={loginErrors.email?.message} />
               </div>
 
               {/* Password & Forgot Password Link */}
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-200">Password</label>
+                  <label htmlFor="login-password" className="text-sm font-medium text-gray-200">Password</label>
                   <button
                     type="button"
                     onClick={() => {
@@ -458,16 +457,21 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                       setForgotOtpError('');
                       dispatch(setAuthModalMode('forgot'));
                     }}
-                    className="text-xs text-[#A3E635] hover:underline font-bold cursor-pointer"
+                    className="text-xs text-neutral-300 hover:underline font-bold cursor-pointer"
                   >
                     Forgot Password?
                   </button>
                 </div>
                 <div className="relative flex items-center">
                   <input
+                    id="login-password"
                     type={showPassword ? 'text' : 'password'}
+                    aria-invalid={Boolean(loginErrors.password)}
+                    aria-describedby={loginErrors.password ? 'login-password-error' : undefined}
                     placeholder="Enter password"
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-sm text-white placeholder-gray-500 px-3.5 py-2.5 pr-10 rounded-lg outline-none transition-all"
+                    className={`w-full bg-neutral-950 border ${
+                      loginErrors.password ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-sm text-white placeholder-gray-500 px-3.5 py-2.5 pr-10 rounded-lg outline-none transition-all`}
                     {...registerLogin('password')}
                   />
                   <button
@@ -479,9 +483,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                   </button>
                 </div>
-                {loginErrors.password && (
-                  <span className="text-xs text-rose-400 font-sans">{loginErrors.password.message}</span>
-                )}
+                <FormFieldError id="login-password-error" error={loginErrors.password?.message} />
               </div>
 
               {error && (
@@ -493,7 +495,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               <button
                 type="submit"
                 disabled={loginSubmitting}
-                className="w-full py-3 px-4 mt-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-base rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#A3E635]/25 active:scale-[0.99] disabled:opacity-50 font-sans"
+                className="w-full py-3 px-4 mt-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-base rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg  active:scale-[0.99] disabled:opacity-50 font-sans"
               >
                 {loginSubmitting ? (
                   <>
@@ -539,7 +541,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     setMode('login');
                     dispatch(setAuthModalMode('login'));
                   }}
-                  className="text-[#A3E635] hover:underline font-bold cursor-pointer"
+                  className="text-neutral-300 hover:underline font-bold cursor-pointer"
                 >
                   Log in
                 </button>
@@ -550,54 +552,68 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               {/* First Name & Last Name */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-200">First Name</label>
+                  <label htmlFor="signup-first-name" className="text-xs font-medium text-gray-200">First Name</label>
                   <input
+                    id="signup-first-name"
                     type="text"
+                    aria-invalid={Boolean(signupErrors.firstName)}
+                    aria-describedby={signupErrors.firstName ? 'signup-first-name-error' : undefined}
                     placeholder="e.g. Venkat"
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none"
+                    className={`w-full bg-neutral-950 border ${
+                      signupErrors.firstName ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none`}
                     {...registerSignup('firstName')}
                   />
-                  {signupErrors.firstName && (
-                    <span className="text-[10px] text-rose-400">{signupErrors.firstName.message}</span>
-                  )}
+                  <FormFieldError id="signup-first-name-error" error={signupErrors.firstName?.message} />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-200">Last Name</label>
+                  <label htmlFor="signup-last-name" className="text-xs font-medium text-gray-200">Last Name</label>
                   <input
+                    id="signup-last-name"
                     type="text"
+                    aria-invalid={Boolean(signupErrors.lastName)}
+                    aria-describedby={signupErrors.lastName ? 'signup-last-name-error' : undefined}
                     placeholder="e.g. Kaveti"
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none"
+                    className={`w-full bg-neutral-950 border ${
+                      signupErrors.lastName ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none`}
                     {...registerSignup('lastName')}
                   />
-                  {signupErrors.lastName && (
-                    <span className="text-[10px] text-rose-400">{signupErrors.lastName.message}</span>
-                  )}
+                  <FormFieldError id="signup-last-name-error" error={signupErrors.lastName?.message} />
                 </div>
               </div>
 
               {/* Email Address */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-200">Email Address</label>
+                <label htmlFor="signup-email" className="text-xs font-medium text-gray-200">Email Address</label>
                 <input
+                  id="signup-email"
                   type="email"
+                  aria-invalid={Boolean(signupErrors.email)}
+                  aria-describedby={signupErrors.email ? 'signup-email-error' : undefined}
                   placeholder="e.g. venkat@mailinator.com"
-                  className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none"
+                  className={`w-full bg-neutral-950 border ${
+                    signupErrors.email ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                  } text-xs text-white placeholder-gray-500 px-3 py-2 rounded-lg outline-none`}
                   {...registerSignup('email')}
                 />
-                {signupErrors.email && (
-                  <span className="text-[10px] text-rose-400">{signupErrors.email.message}</span>
-                )}
+                <FormFieldError id="signup-email-error" error={signupErrors.email?.message} />
               </div>
 
               {/* Password */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-200">Password</label>
+                <label htmlFor="signup-password" className="text-xs font-medium text-gray-200">Password</label>
                 <div className="relative flex items-center">
                   <input
+                    id="signup-password"
                     type={showPassword ? 'text' : 'password'}
+                    aria-invalid={Boolean(signupErrors.password)}
+                    aria-describedby={signupErrors.password ? 'signup-password-error' : undefined}
                     placeholder="Create a password (min 6 characters)"
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none"
+                    className={`w-full bg-neutral-950 border ${
+                      signupErrors.password ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none`}
                     {...registerSignup('password')}
                   />
                   <button
@@ -609,19 +625,22 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     <i className={`fa-solid ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                   </button>
                 </div>
-                {signupErrors.password && (
-                  <span className="text-[10px] text-rose-400">{signupErrors.password.message}</span>
-                )}
+                <FormFieldError id="signup-password-error" error={signupErrors.password?.message} />
               </div>
 
               {/* Confirm Password */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-gray-200">Confirm Password</label>
+                <label htmlFor="signup-confirm-password" className="text-xs font-medium text-gray-200">Confirm Password</label>
                 <div className="relative flex items-center">
                   <input
+                    id="signup-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    aria-invalid={Boolean(signupErrors.confirmPassword)}
+                    aria-describedby={signupErrors.confirmPassword ? 'signup-confirm-password-error' : undefined}
                     placeholder="Confirm your password"
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none"
+                    className={`w-full bg-neutral-950 border ${
+                      signupErrors.confirmPassword ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none`}
                     {...registerSignup('confirmPassword')}
                   />
                   <button
@@ -633,9 +652,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     <i className={`fa-solid ${showConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                   </button>
                 </div>
-                {signupErrors.confirmPassword && (
-                  <span className="text-[10px] text-rose-400">{signupErrors.confirmPassword.message}</span>
-                )}
+                <FormFieldError id="signup-confirm-password-error" error={signupErrors.confirmPassword?.message} />
               </div>
 
               {signupError && (
@@ -647,7 +664,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               <button
                 type="submit"
                 disabled={signupLoading}
-                className="w-full py-2.5 px-4 mt-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#A3E635]/25 active:scale-[0.99] disabled:opacity-50 font-sans"
+                className="w-full py-2.5 px-4 mt-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg  active:scale-[0.99] disabled:opacity-50 font-sans"
               >
                 {signupLoading ? (
                   <>
@@ -696,23 +713,29 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
             {forgotStep === 1 ? (
               <form onSubmit={handleSendForgotOtp} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-gray-200">Email Address</label>
+                  <label htmlFor="forgot-email-input" className="text-sm font-medium text-gray-200">Email Address</label>
                   <input
+                    id="forgot-email-input"
                     type="email"
                     placeholder="Enter registered email"
                     value={forgotEmail}
-                    onChange={(e) => setForgotEmail(e.target.value)}
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-sm text-white placeholder-gray-500 px-3.5 py-2.5 rounded-lg outline-none transition-all"
+                    aria-invalid={Boolean(forgotOtpError)}
+                    aria-describedby={forgotOtpError ? 'forgot-email-error' : undefined}
+                    onChange={(e) => {
+                      setForgotEmail(e.target.value);
+                      if (forgotOtpError) setForgotOtpError('');
+                    }}
+                    className={`w-full bg-neutral-950 border ${
+                      forgotOtpError ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-sm text-white placeholder-gray-500 px-3.5 py-2.5 rounded-lg outline-none transition-all`}
                   />
-                  {forgotOtpError && (
-                    <span className="text-xs text-rose-400 font-sans">{forgotOtpError}</span>
-                  )}
+                  <FormFieldError id="forgot-email-error" error={forgotOtpError} />
                 </div>
 
                 <button
                   type="submit"
                   disabled={forgotOtpLoading || !forgotEmail.trim()}
-                  className="w-full py-3 px-4 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#A3E635]/25 active:scale-[0.99] disabled:opacity-50 font-sans"
+                  className="w-full py-3 px-4 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg  active:scale-[0.99] disabled:opacity-50 font-sans"
                 >
                   {forgotOtpLoading ? (
                     <>
@@ -743,31 +766,45 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               <form onSubmit={handleVerifyForgotOtpAndReset} className="flex flex-col gap-3.5">
                 {/* 6-Digit OTP */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-200">6-Digit OTP Code *</label>
+                  <label htmlFor="forgot-otp-input" className="text-xs font-semibold text-gray-200">6-Digit OTP Code *</label>
                   <input
+                    id="forgot-otp-input"
                     type="text"
                     maxLength={6}
                     autoFocus
                     placeholder="e.g. 550865"
+                    aria-invalid={Boolean(forgotCodeError)}
+                    aria-describedby={forgotCodeError ? 'forgot-otp-error' : undefined}
                     value={forgotOtpCode}
-                    onChange={(e) => setForgotOtpCode(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-base text-center tracking-widest font-mono text-white placeholder-gray-600 px-3 py-2 rounded-lg outline-none"
+                    onChange={(e) => {
+                      setForgotOtpCode(e.target.value.replace(/\D/g, ''));
+                      if (forgotCodeError) setForgotCodeError('');
+                    }}
+                    className={`w-full bg-neutral-950 border ${
+                      forgotCodeError ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                    } text-base text-center tracking-widest font-mono text-white placeholder-gray-600 px-3 py-2 rounded-lg outline-none`}
                   />
-                  {forgotCodeError && (
-                    <span className="text-[10px] text-rose-400">{forgotCodeError}</span>
-                  )}
+                  <FormFieldError id="forgot-otp-error" error={forgotCodeError} />
                 </div>
 
                 {/* New Password */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-200">New Password *</label>
+                  <label htmlFor="forgot-new-password" className="text-xs font-semibold text-gray-200">New Password *</label>
                   <div className="relative flex items-center">
                     <input
+                      id="forgot-new-password"
                       type={showNewPassword ? 'text' : 'password'}
                       placeholder="Enter new password (min 6 characters)"
+                      aria-invalid={Boolean(forgotNewPasswordError)}
+                      aria-describedby={forgotNewPasswordError ? 'forgot-new-password-error' : undefined}
                       value={forgotNewPassword}
-                      onChange={(e) => setForgotNewPassword(e.target.value)}
-                      className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none"
+                      onChange={(e) => {
+                        setForgotNewPassword(e.target.value);
+                        if (forgotNewPasswordError) setForgotNewPasswordError('');
+                      }}
+                      className={`w-full bg-neutral-950 border ${
+                        forgotNewPasswordError ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                      } text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none`}
                     />
                     <button
                       type="button"
@@ -778,21 +815,27 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                       <i className={`fa-solid ${showNewPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                     </button>
                   </div>
-                  {forgotNewPasswordError && (
-                    <span className="text-[10px] text-rose-400">{forgotNewPasswordError}</span>
-                  )}
+                  <FormFieldError id="forgot-new-password-error" error={forgotNewPasswordError} />
                 </div>
 
                 {/* Confirm New Password */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-gray-200">Confirm New Password *</label>
+                  <label htmlFor="forgot-confirm-password" className="text-xs font-semibold text-gray-200">Confirm New Password *</label>
                   <div className="relative flex items-center">
                     <input
+                      id="forgot-confirm-password"
                       type={showNewConfirmPassword ? 'text' : 'password'}
                       placeholder="Re-enter new password"
+                      aria-invalid={Boolean(forgotConfirmPasswordError)}
+                      aria-describedby={forgotConfirmPasswordError ? 'forgot-confirm-password-error' : undefined}
                       value={forgotConfirmPassword}
-                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                      className="w-full bg-[#090A0C] border border-white/15 focus:border-[#A3E635] text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none"
+                      onChange={(e) => {
+                        setForgotConfirmPassword(e.target.value);
+                        if (forgotConfirmPasswordError) setForgotConfirmPasswordError('');
+                      }}
+                      className={`w-full bg-neutral-950 border ${
+                        forgotConfirmPasswordError ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
+                      } text-xs text-white placeholder-gray-500 px-3 py-2 pr-9 rounded-lg outline-none`}
                     />
                     <button
                       type="button"
@@ -803,13 +846,11 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                       <i className={`fa-solid ${showNewConfirmPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                     </button>
                   </div>
-                  {forgotConfirmPasswordError && (
-                    <span className="text-[10px] text-rose-400">{forgotConfirmPasswordError}</span>
-                  )}
+                  <FormFieldError id="forgot-confirm-password-error" error={forgotConfirmPasswordError} />
                 </div>
 
                 {forgotOtpError && (
-                  <div className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-lg">
+                  <div role="alert" className="p-2.5 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs rounded-lg">
                     {forgotOtpError}
                   </div>
                 )}
@@ -819,14 +860,14 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <span>Didn't receive OTP?</span>
                   {forgotOtpTimer > 0 ? (
                     <span className="font-mono text-gray-400">
-                      Resend in <strong className="text-[#A3E635]">{forgotOtpTimer}s</strong>
+                      Resend in <strong className="text-neutral-300">{forgotOtpTimer}s</strong>
                     </span>
                   ) : (
                     <button
                       type="button"
                       onClick={handleResendForgotOtp}
                       disabled={forgotOtpLoading}
-                      className="text-[#A3E635] hover:underline font-bold cursor-pointer"
+                      className="text-neutral-300 hover:underline font-bold cursor-pointer"
                     >
                       Resend OTP
                     </button>
@@ -836,7 +877,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                 <button
                   type="submit"
                   disabled={forgotOtpLoading}
-                  className="w-full py-2.5 px-4 mt-1 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-[#A3E635]/25 active:scale-[0.99] disabled:opacity-50 font-sans"
+                  className="w-full py-2.5 px-4 mt-1 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-lg transition-all cursor-pointer flex items-center justify-center gap-2 shadow-lg  active:scale-[0.99] disabled:opacity-50 font-sans"
                 >
                   {forgotOtpLoading ? (
                     <>
@@ -864,7 +905,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                       setMode('login');
                       dispatch(setAuthModalMode('login'));
                     }}
-                    className="text-[#A3E635] hover:underline font-bold cursor-pointer"
+                    className="text-neutral-300 hover:underline font-bold cursor-pointer"
                   >
                     Back to Login
                   </button>

@@ -12,6 +12,9 @@ export type AttemptedByProblemId = Record<string, boolean>;
 export interface ProblemProgressState {
   solvedByProblemId: SolvedByProblemId;
   attemptedByProblemId: AttemptedByProblemId;
+  loading: boolean;
+  lastFetchedUserId: string | number | null;
+  lastFetchedAt: number | null;
 }
 
 const readMap = (key: string): SolvedByProblemId => {
@@ -54,6 +57,9 @@ const persistProgress = (solvedByProblemId: SolvedByProblemId): void => {
 const initialState: ProblemProgressState = {
   solvedByProblemId: loadInitialProgress(),
   attemptedByProblemId: {},
+  loading: false,
+  lastFetchedUserId: null,
+  lastFetchedAt: null,
 };
 
 export interface ProblemProgressRef {
@@ -71,7 +77,10 @@ export const getProblemAttemptedStatus = (
   ref: ProblemProgressRef
 ): boolean => Boolean(attemptedByProblemId?.[String(ref.id)]);
 
-export const hydrateProgress = createAsyncThunk(
+export const hydrateProgress = createAsyncThunk<
+  { solved: SolvedByProblemId; attempted: AttemptedByProblemId; userId?: string | number | null },
+  { force?: boolean } | boolean | void
+>(
   'progress/hydrate',
   async (_, { getState }) => {
     const canonical = loadInitialProgress();
@@ -113,7 +122,29 @@ export const hydrateProgress = createAsyncThunk(
     return {
       solved: canonical,
       attempted: attemptedMap,
+      userId: userId || null,
     };
+  },
+  {
+    condition: (arg, { getState }) => {
+      const state = getState() as RootState;
+      if (state.progress?.loading) {
+        return false;
+      }
+      const force = typeof arg === 'boolean' ? arg : Boolean(arg?.force);
+      if (force) {
+        return true;
+      }
+      const userId = state.auth?.user?.id ?? null;
+      const isSameUser = String(state.progress?.lastFetchedUserId ?? '') === String(userId ?? '');
+      const isFresh =
+        state.progress?.lastFetchedAt &&
+        Date.now() - state.progress.lastFetchedAt < 60_000;
+      if (isSameUser && isFresh) {
+        return false;
+      }
+      return true;
+    },
   }
 );
 
@@ -145,13 +176,22 @@ const problemProgressSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      .addCase(hydrateProgress.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(hydrateProgress.fulfilled, (state, action) => {
+        state.loading = false;
+        state.lastFetchedAt = Date.now();
         if (action.payload && typeof action.payload === 'object' && 'solved' in action.payload) {
           state.solvedByProblemId = action.payload.solved;
           state.attemptedByProblemId = action.payload.attempted;
+          state.lastFetchedUserId = action.payload.userId ?? null;
         } else {
           state.solvedByProblemId = action.payload as any;
         }
+      })
+      .addCase(hydrateProgress.rejected, (state) => {
+        state.loading = false;
       })
       .addCase(toggleSolvedProblem.fulfilled, (state, action) => {
         state.solvedByProblemId[action.payload.problemId] = action.payload.isSolved;

@@ -7,10 +7,10 @@ export const DashboardOverview: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);
 
   return (
-    <AdminCard className="bg-gradient-to-r from-[#121316] via-[#161920] to-[#121316] border-[#A3E635]/30">
+    <AdminCard className="bg-gradient-to-r from-[#171717] via-[#161920] to-[#171717] border-neutral-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-[#A3E635]/15 border border-[#A3E635]/30 text-[#A3E635] flex items-center justify-center text-xl font-bold font-heading shrink-0 shadow-md">
+          <div className="w-12 h-12 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center justify-center text-xl font-bold font-heading shrink-0 shadow-md">
             <i className="fa-solid fa-shield-halved"></i>
           </div>
           <div className="flex flex-col">

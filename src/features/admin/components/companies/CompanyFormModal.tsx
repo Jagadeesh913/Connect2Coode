@@ -1,20 +1,12 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import { CompanyItem } from '../../../../services/admin/adminCompanyService';
+import { adminCompanySchema, AdminCompanyFormData } from '../../../../core/validation';
+import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 
-const companySchema = z.object({
-  id: z.number().nullable().optional(),
-  name: z.string().min(2, 'Company name must be at least 2 characters'),
-  websiteUrl: z.string().optional(),
-  logoUrl: z.string().optional(),
-  description: z.string().optional(),
-  isActive: z.boolean().default(true),
-});
-
-export type CompanyFormData = z.infer<typeof companySchema>;
+export type CompanyFormData = AdminCompanyFormData;
 
 interface CompanyFormModalProps {
   isOpen: boolean;
@@ -43,7 +35,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
     watch,
     formState: { errors },
   } = useForm<CompanyFormData>({
-    resolver: zodResolver(companySchema) as any,
+    resolver: zodResolver(adminCompanySchema) as any,
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       id: null,
       name: '',
@@ -77,9 +71,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   }, [initialData, reset]);
 
   const handleSelectPreset = (company: CompanyItem) => {
-    setValue('name', company.name, { shouldValidate: true });
-    setValue('logoUrl', company.logoUrl || '', { shouldValidate: true });
-    setValue('websiteUrl', company.websiteUrl || '', { shouldValidate: true });
+    setValue('name', company.name, { shouldValidate: true, shouldDirty: true });
+    setValue('logoUrl', company.logoUrl || '', { shouldValidate: true, shouldDirty: true });
+    setValue('websiteUrl', company.websiteUrl || '', { shouldValidate: true, shouldDirty: true });
   };
 
   const handleFormSubmit = (data: CompanyFormData) => {
@@ -104,13 +98,13 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Existing Backend Companies
             </label>
-            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 rounded-xl bg-[#121317] border border-white/5">
+            <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 rounded-xl bg-neutral-900 border border-white/5">
               {availableCompanies.map((company) => (
                 <button
                   key={company.id || company.name}
                   type="button"
                   onClick={() => handleSelectPreset(company)}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#181A20] hover:bg-white/10 text-xs font-medium text-gray-300 hover:text-white flex items-center gap-2 border border-white/10 transition-all cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-white/10 text-xs font-medium text-gray-300 hover:text-white flex items-center gap-2 border border-white/10 transition-all cursor-pointer"
                 >
                   <img src={company.logoUrl || '/logo-mark-transparent.png'} alt={company.name} className="w-3.5 h-3.5 object-contain" />
                   <span>{company.name}</span>
@@ -125,48 +119,71 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Company Name */}
         <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-300">Company Name *</label>
+          <label htmlFor="company-name-input" className="block text-xs font-semibold text-gray-300">Company Name *</label>
           <input
+            id="company-name-input"
             type="text"
             placeholder="e.g. Google, Accenture, TCS"
-            className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] focus:ring-1 focus:ring-[#A3E635]"
+            aria-invalid={errors.name ? 'true' : 'false'}
+            aria-describedby={errors.name ? 'company-name-error' : undefined}
+            className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-1 ${
+              errors.name ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-white/10 focus:border-neutral-600 focus:ring-neutral-500'
+            }`}
             {...register('name')}
           />
-          {errors.name && <p className="text-xs text-rose-400 mt-1">{errors.name.message}</p>}
+          <FormFieldError error={errors.name?.message} id="company-name-error" />
         </div>
 
         {/* Logo URL & Website Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Logo Image URL</label>
+            <label htmlFor="company-logo-input" className="block text-xs font-semibold text-gray-300">Logo Image URL</label>
             <input
+              id="company-logo-input"
               type="text"
               placeholder="https://example.com/logo.png"
-              className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] focus:ring-1 focus:ring-[#A3E635]"
+              aria-invalid={errors.logoUrl ? 'true' : 'false'}
+              aria-describedby={errors.logoUrl ? 'company-logo-error' : undefined}
+              className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-1 ${
+                errors.logoUrl ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-white/10 focus:border-neutral-600 focus:ring-neutral-500'
+              }`}
               {...register('logoUrl')}
             />
+            <FormFieldError error={errors.logoUrl?.message} id="company-logo-error" />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Official Website URL</label>
+            <label htmlFor="company-website-input" className="block text-xs font-semibold text-gray-300">Official Website URL</label>
             <input
+              id="company-website-input"
               type="text"
               placeholder="https://company.com"
-              className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] focus:ring-1 focus:ring-[#A3E635]"
+              aria-invalid={errors.websiteUrl ? 'true' : 'false'}
+              aria-describedby={errors.websiteUrl ? 'company-website-error' : undefined}
+              className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border transition-all focus:outline-none focus:border-neutral-600 focus:ring-1 focus:ring-neutral-500 ${
+                errors.websiteUrl ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-white/10 focus:border-neutral-600 focus:ring-neutral-500'
+              }`}
               {...register('websiteUrl')}
             />
+            <FormFieldError error={errors.websiteUrl?.message} id="company-website-error" />
           </div>
         </div>
 
         {/* Description */}
         <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-300">Company Overview / Placement Context</label>
+          <label htmlFor="company-description-input" className="block text-xs font-semibold text-gray-300">Company Overview / Placement Context</label>
           <textarea
+            id="company-description-input"
             rows={3}
             placeholder="Enter brief description of company hiring context..."
-            className="w-full bg-[#181A20] text-gray-100 placeholder-gray-500 rounded-xl p-3 text-sm border border-white/10 transition-all focus:outline-none focus:border-[#A3E635] focus:ring-1 focus:ring-[#A3E635] leading-relaxed"
+            aria-invalid={errors.description ? 'true' : 'false'}
+            aria-describedby={errors.description ? 'company-desc-error' : undefined}
+            className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl p-3 text-sm border transition-all focus:outline-none focus:ring-1 leading-relaxed ${
+              errors.description ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-white/10 focus:border-neutral-600 focus:ring-neutral-500'
+            }`}
             {...register('description')}
           />
+          <FormFieldError error={errors.description?.message} id="company-desc-error" />
         </div>
 
         {/* Active Toggle */}
@@ -174,7 +191,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           <input
             type="checkbox"
             id="companyIsActiveToggle"
-            className="w-4 h-4 rounded bg-[#121317] border-white/10 text-[#A3E635] focus:ring-[#A3E635] cursor-pointer"
+            className="w-4 h-4 rounded bg-neutral-900 border-white/10 text-neutral-300 focus:ring-neutral-500 cursor-pointer"
             checked={watch('isActive') !== false}
             onChange={(e) => setValue('isActive', e.target.checked, { shouldValidate: true, shouldDirty: true })}
           />
@@ -188,14 +205,14 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-300 border border-white/10 rounded-xl text-sm font-semibold transition-all cursor-pointer"
+            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-sm font-semibold transition-all cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={submitting}
-            className="px-5 py-2 bg-[#A3E635] hover:bg-[#b4f043] text-black font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#A3E635]/10 disabled:opacity-50"
+            className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-[#b4f043] text-black font-bold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md  disabled:opacity-50"
           >
             {submitting ? (
               <>

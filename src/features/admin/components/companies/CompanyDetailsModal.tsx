@@ -62,7 +62,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       footer={
         <button
           onClick={onClose}
-          className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
+          className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
         >
           Close Inspector
         </button>
@@ -70,13 +70,13 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
     >
       {loading ? (
         <div className="flex items-center justify-center p-8 text-gray-400 gap-2 font-sans">
-          <i className="fa-solid fa-spinner animate-spin text-[#A3E635]"></i>
+          <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
           <span>Loading Company Details...</span>
         </div>
       ) : company ? (
         <div className="flex flex-col gap-4 font-sans text-xs">
           {/* Header Banner */}
-          <div className="flex items-center gap-4 p-4 bg-[#121317] border border-white/10 rounded-2xl">
+          <div className="flex items-center gap-4 p-4 bg-neutral-900 border border-white/10 rounded-2xl">
             <div className="w-12 h-12 rounded-xl bg-white p-2 flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
               <img
                 src={logoUrl}
@@ -105,7 +105,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
                 Overview & Hiring Context
               </h4>
-              <div className="p-3.5 bg-[#121317] border border-white/10 rounded-xl text-gray-200 whitespace-pre-wrap leading-relaxed">
+              <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl text-gray-200 whitespace-pre-wrap leading-relaxed">
                 {company.description}
               </div>
             </div>
@@ -120,7 +120,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                   href={company.websiteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-[#A3E635] hover:underline font-mono truncate"
+                  className="text-xs text-neutral-300 hover:underline font-mono truncate"
                 >
                   {company.websiteUrl}
                 </a>
@@ -140,13 +140,13 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
               </h4>
               {problemsLoading && (
                 <span className="text-[11px] text-gray-400 flex items-center gap-1 font-mono">
-                  <i className="fa-solid fa-spinner animate-spin text-[#A3E635]"></i> Loading...
+                  <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i> Loading...
                 </span>
               )}
             </div>
 
             {problems.length === 0 ? (
-              <div className="p-3 bg-[#121317] border border-white/10 rounded-xl text-gray-500 italic text-[11px]">
+              <div className="p-3 bg-neutral-900 border border-white/10 rounded-xl text-gray-500 italic text-[11px]">
                 {problemsLoading ? 'Fetching tagged questions...' : 'No DSA questions currently tagged to this company.'}
               </div>
             ) : (
@@ -154,7 +154,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                 {problems.map((p: any, idx: number) => (
                   <div
                     key={p.id || idx}
-                    className="p-3 bg-[#121317] border border-white/10 rounded-xl flex items-center justify-between text-xs"
+                    className="p-3 bg-neutral-900 border border-white/10 rounded-xl flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center gap-2 font-sans">
                       <span className="font-mono text-gray-500 text-[11px]">#{p.id}</span>

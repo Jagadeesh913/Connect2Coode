@@ -24,6 +24,18 @@ export const ProtectedRoute: React.FC = () => {
   }
 
   if (!isAuthenticated && !token) {
+    try {
+      const fullPath = location.pathname + location.search + location.hash;
+      if (
+        fullPath &&
+        fullPath !== '/' &&
+        fullPath !== '/login' &&
+        fullPath !== '/signup' &&
+        !fullPath.startsWith('/oauth')
+      ) {
+        sessionStorage.setItem('post_auth_redirect', fullPath);
+      }
+    } catch {}
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

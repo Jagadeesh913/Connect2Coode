@@ -10,6 +10,9 @@ import {
 } from '../../../services/admin/adminLanguageService';
 import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { toast } from 'react-hot-toast';
+import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
+import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
+import { getActionableErrorMessage } from '../../../core/validation';
 
 export const AdminLanguages: React.FC = () => {
   const [languages, setLanguages] = useState<AdminLanguageItem[]>([]);
@@ -24,10 +27,12 @@ export const AdminLanguages: React.FC = () => {
   const [formJudge0Id, setFormJudge0Id] = useState<number>(62);
   const [formVersion, setFormVersion] = useState<string>('Java 17');
   const [formIsActive, setFormIsActive] = useState<boolean>(true);
+  const [formErrors, setFormErrors] = useState<{ referenceId?: string; judge0Id?: string }>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Deactivate confirmation
-  const [deactivatingId, setDeactivatingId] = useState<number | null>(null);
+  // Deactivate confirmation state
+  const [languageToDeactivate, setLanguageToDeactivate] = useState<AdminLanguageItem | null>(null);
+  const [submittingDeactivation, setSubmittingDeactivation] = useState<boolean>(false);
 
   const fetchLanguagesData = useCallback(async () => {
     setLoading(true);
@@ -67,6 +72,7 @@ export const AdminLanguages: React.FC = () => {
     setFormJudge0Id(62);
     setFormVersion('Java 17');
     setFormIsActive(true);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
@@ -76,15 +82,24 @@ export const AdminLanguages: React.FC = () => {
     setFormJudge0Id(lang.judge0LanguageId || 62);
     setFormVersion(lang.version || '');
     setFormIsActive(lang.isActive !== false);
+    setFormErrors({});
     setIsModalOpen(true);
   };
 
   const handleSaveLanguage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formReferenceId || !formJudge0Id) {
-      toast.error('Reference ID and Judge0 ID are required');
+    const errors: { referenceId?: string; judge0Id?: string } = {};
+    if (!formReferenceId || isNaN(formReferenceId) || formReferenceId <= 0) {
+      errors.referenceId = 'Select a valid language from the list.';
+    }
+    if (!formJudge0Id || isNaN(formJudge0Id) || formJudge0Id <= 0) {
+      errors.judge0Id = 'Enter a valid numeric Judge0 Language ID.';
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
 
     setSubmitting(true);
     try {
@@ -111,22 +126,24 @@ export const AdminLanguages: React.FC = () => {
       setIsModalOpen(false);
       fetchLanguagesData();
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to save language.');
+      toast.error(getActionableErrorMessage(err, 'Failed to save language.'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleDeactivate = async (id: number) => {
-    setDeactivatingId(id);
+  const confirmDeactivateLanguage = async () => {
+    if (!languageToDeactivate?.id) return;
+    setSubmittingDeactivation(true);
     try {
-      await adminLanguageService.deleteLanguage(id);
-      toast.success(`Language #${id} deactivated successfully (soft delete)!`);
+      await adminLanguageService.deleteLanguage(languageToDeactivate.id);
+      toast.success(`Language #${languageToDeactivate.id} deactivated successfully.`);
+      setLanguageToDeactivate(null);
       fetchLanguagesData();
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to deactivate language.');
+      toast.error(getActionableErrorMessage(err, 'Failed to deactivate language.'));
     } finally {
-      setDeactivatingId(null);
+      setSubmittingDeactivation(false);
     }
   };
 
@@ -136,7 +153,7 @@ export const AdminLanguages: React.FC = () => {
     if (n.includes('python')) return 'fa-brands fa-python text-amber-400';
     if (n.includes('c++') || n.includes('cpp')) return 'fa-solid fa-c text-blue-400';
     if (n.includes('javascript') || n.includes('js')) return 'fa-brands fa-js text-yellow-400';
-    return 'fa-solid fa-code text-[#A3E635]';
+    return 'fa-solid fa-code text-neutral-300';
   };
 
   const columns: Column<AdminLanguageItem>[] = [
@@ -167,7 +184,7 @@ export const AdminLanguages: React.FC = () => {
     {
       header: 'Version',
       cell: (row) => (
-        <span className="font-mono text-xs text-gray-300 bg-[#090A0C] px-2.5 py-1 rounded-lg border border-white/10">
+        <span className="font-mono text-xs text-gray-300 bg-neutral-950 px-2.5 py-1 rounded-lg border border-white/10">
           {row.version || 'Default'}
         </span>
       ),
@@ -197,19 +214,18 @@ export const AdminLanguages: React.FC = () => {
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleOpenEditModal(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-[#A3E635]/20 text-gray-400 hover:text-[#A3E635] transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
             title="Edit Language"
           >
             <i className="fa-solid fa-pen-to-square text-xs"></i>
           </button>
           {row.isActive !== false && row.id && (
             <button
-              onClick={() => handleDeactivate(row.id!)}
-              disabled={deactivatingId === row.id}
-              className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-colors cursor-pointer disabled:opacity-50"
-              title="Deactivate Language (Soft delete: DELETE /api/v1/language/{id})"
+              onClick={() => setLanguageToDeactivate(row)}
+              className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
+              title="Deactivate Language"
             >
-              <i className={`fa-solid ${deactivatingId === row.id ? 'fa-spinner animate-spin text-rose-400' : 'fa-power-off'} text-xs`}></i>
+              <i className="fa-solid fa-power-off text-xs"></i>
             </button>
           )}
         </div>
@@ -227,7 +243,7 @@ export const AdminLanguages: React.FC = () => {
         actions={
           <button
             onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shadow-[#A3E635]/20 font-sans"
+            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
           >
             <i className="fa-solid fa-plus text-xs"></i>
             <span>Add New Language</span>
@@ -236,9 +252,9 @@ export const AdminLanguages: React.FC = () => {
       />
 
       {/* Active Dropdown Status Banner */}
-      <div className="p-4 bg-[#14202C]/80 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl backdrop-blur-md">
+      <div className="p-4 bg-neutral-900 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#A3E635]/10 border border-[#A3E635]/20 flex items-center justify-center text-[#A3E635]">
+          <div className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300">
             <i className="fa-solid fa-terminal text-sm"></i>
           </div>
           <div>
@@ -255,9 +271,9 @@ export const AdminLanguages: React.FC = () => {
           {activeDropdown.map((lang) => (
             <span
               key={lang.id}
-              className="px-2.5 py-1 rounded-lg bg-[#090A0C] border border-white/10 text-xs font-mono font-semibold text-gray-200 flex items-center gap-1.5"
+              className="px-2.5 py-1 rounded-lg bg-neutral-950 border border-white/10 text-xs font-mono font-semibold text-gray-200 flex items-center gap-1.5"
             >
-              <span className="w-2 h-2 rounded-full bg-[#A3E635]"></span>
+              <span className="w-2 h-2 rounded-full bg-neutral-100 text-neutral-900"></span>
               <span>{lang.name}</span>
               <span className="text-gray-500 text-[10px]">ID: {lang.id}</span>
             </span>
@@ -287,7 +303,7 @@ export const AdminLanguages: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+              className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -295,7 +311,7 @@ export const AdminLanguages: React.FC = () => {
               type="button"
               onClick={handleSaveLanguage}
               disabled={submitting}
-              className="px-5 py-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-[#A3E635]/20 disabled:opacity-50"
+              className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md  disabled:opacity-50"
             >
               {submitting ? (
                 <>
@@ -312,59 +328,87 @@ export const AdminLanguages: React.FC = () => {
         <form onSubmit={handleSaveLanguage} className="space-y-4 font-sans text-xs">
           {/* Reference Library ID */}
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">
+            <label htmlFor="language-ref-select" className="block text-xs font-semibold text-gray-300">
               Reference Library ID <span className="text-rose-400">*</span>
             </label>
             {refLanguages.length > 0 ? (
-              <select
-                value={formReferenceId}
-                onChange={(e) => setFormReferenceId(Number(e.target.value))}
-                className="w-full bg-[#090A0C] text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635] cursor-pointer"
-              >
-                {refLanguages.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.refName} (ID: {r.id})
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="language-ref-select"
+                  value={formReferenceId}
+                  aria-invalid={Boolean(formErrors.referenceId)}
+                  aria-describedby={formErrors.referenceId ? 'language-ref-error' : undefined}
+                  onChange={(e) => {
+                    setFormReferenceId(Number(e.target.value));
+                    if (formErrors.referenceId) setFormErrors((prev) => ({ ...prev, referenceId: undefined }));
+                  }}
+                  className={`w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border transition-colors focus:outline-none cursor-pointer ${
+                    formErrors.referenceId ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 hover:border-white/20 focus:border-blue-500'
+                  }`}
+                >
+                  {refLanguages.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.refName} (ID: {r.id})
+                    </option>
+                  ))}
+                </select>
+                <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+              </div>
             ) : (
               <input
+                id="language-ref-input"
                 type="number"
                 value={formReferenceId}
-                onChange={(e) => setFormReferenceId(Number(e.target.value))}
+                aria-invalid={Boolean(formErrors.referenceId)}
+                aria-describedby={formErrors.referenceId ? 'language-ref-error' : undefined}
+                onChange={(e) => {
+                  setFormReferenceId(Number(e.target.value));
+                  if (formErrors.referenceId) setFormErrors((prev) => ({ ...prev, referenceId: undefined }));
+                }}
                 placeholder="e.g. 5 for Java, 6 for Python, 7 for C++, 8 for JavaScript"
-                className="w-full bg-[#090A0C] text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635]"
-                required
+                className={`w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border transition-colors focus:outline-none ${
+                  formErrors.referenceId ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
+                }`}
               />
             )}
+            <FormFieldError id="language-ref-error" error={formErrors.referenceId} />
             <span className="text-[10px] text-gray-500">ID from referenceLibrary (Java: 5, Python: 6, C++: 7, JS: 8)</span>
           </div>
 
           {/* Judge0 Language ID */}
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">
+            <label htmlFor="language-judge0-input" className="block text-xs font-semibold text-gray-300">
               Judge0 Language ID <span className="text-rose-400">*</span>
             </label>
             <input
+              id="language-judge0-input"
               type="number"
               value={formJudge0Id}
-              onChange={(e) => setFormJudge0Id(Number(e.target.value))}
+              aria-invalid={Boolean(formErrors.judge0Id)}
+              aria-describedby={formErrors.judge0Id ? 'language-judge0-error' : undefined}
+              onChange={(e) => {
+                setFormJudge0Id(Number(e.target.value));
+                if (formErrors.judge0Id) setFormErrors((prev) => ({ ...prev, judge0Id: undefined }));
+              }}
               placeholder="e.g. 62 (Java 17), 71 (Python 3), 54 (C++ 17), 63 (Node.js)"
-              className="w-full bg-[#090A0C] text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635]"
-              required
+              className={`w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border transition-colors focus:outline-none ${
+                formErrors.judge0Id ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
+              }`}
             />
+            <FormFieldError id="language-judge0-error" error={formErrors.judge0Id} />
             <span className="text-[10px] text-gray-500">Official Judge0 compiler runtime ID</span>
           </div>
 
           {/* Version */}
           <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Runtime Version Label</label>
+            <label htmlFor="language-version-input" className="block text-xs font-semibold text-gray-300">Runtime Version Label</label>
             <input
+              id="language-version-input"
               type="text"
               value={formVersion}
               onChange={(e) => setFormVersion(e.target.value)}
               placeholder="e.g. Java 17, Java 21, Python 3, C++ 17"
-              className="w-full bg-[#090A0C] text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-[#A3E635]"
+              className="w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
             />
           </div>
 
@@ -375,7 +419,7 @@ export const AdminLanguages: React.FC = () => {
               id="isActiveToggle"
               checked={formIsActive}
               onChange={(e) => setFormIsActive(e.target.checked)}
-              className="w-4 h-4 rounded bg-[#090A0C] border-white/20 accent-[#A3E635] cursor-pointer"
+              className="w-4 h-4 rounded bg-neutral-950 border-white/20 accent-[#a3a3a3] cursor-pointer"
             />
             <label htmlFor="isActiveToggle" className="text-xs font-semibold text-gray-300 cursor-pointer">
               Active for Problem Solving &amp; Code Execution
@@ -383,6 +427,18 @@ export const AdminLanguages: React.FC = () => {
           </div>
         </form>
       </AdminModal>
+
+      {/* Accessible Confirmation Dialog for Deactivation */}
+      <ConfirmDialog
+        isOpen={languageToDeactivate !== null}
+        onClose={() => setLanguageToDeactivate(null)}
+        onConfirm={confirmDeactivateLanguage}
+        title="Deactivate Language Configuration?"
+        message={`Are you sure you want to deactivate ${languageToDeactivate?.languageName || 'this runtime'} (#${languageToDeactivate?.id})? Students will not be able to execute code using this runtime.`}
+        confirmText="Deactivate Language"
+        variant="danger"
+        isLoading={submittingDeactivation}
+      />
     </div>
   );
 };

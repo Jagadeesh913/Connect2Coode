@@ -68,7 +68,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                 onClose();
                 onOpenTestCode(question);
               }}
-              className="px-4 py-2 bg-[#A3E635] hover:bg-[#84CC16] text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md shadow-[#A3E635]/20 cursor-pointer font-sans"
+              className="px-4 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md  cursor-pointer font-sans"
               title="Open Admin Code Runner & Tester (Sample & Full Test Suite)"
             >
               <i className="fa-solid fa-terminal text-black text-xs"></i>
@@ -77,7 +77,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-[#181A20] hover:bg-[#22252D] text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans ml-auto"
+            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans ml-auto"
           >
             Close Inspector
           </button>
@@ -86,7 +86,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
     >
       {loading ? (
         <div className="flex items-center justify-center p-8 text-gray-400 gap-2 font-sans">
-          <i className="fa-solid fa-spinner animate-spin text-[#A3E635]"></i>
+          <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
           <span>Loading Question Statement...</span>
         </div>
       ) : question ? (
@@ -117,13 +117,13 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
 
           {/* Asked Date & Derived Asked Year */}
           {question.askedDate && (
-            <div className="p-3.5 bg-[#121317] border border-white/10 rounded-xl flex items-center justify-between font-sans">
+            <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl flex items-center justify-between font-sans">
               <div className="flex items-center gap-2 text-gray-300">
-                <i className="fa-regular fa-calendar text-[#A3E635] text-xs"></i>
+                <i className="fa-regular fa-calendar text-neutral-300 text-xs"></i>
                 <span>Originally Asked Date: <strong className="text-white font-mono">{formattedAskedDate}</strong></span>
               </div>
               {askedYear && (
-                <span className="px-2 py-0.5 rounded bg-[#A3E635]/10 text-[#A3E635] font-bold text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 font-bold text-[11px]">
                   Asked Year: {askedYear}
                 </span>
               )}
@@ -135,7 +135,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
               Problem Description
             </h4>
-            <div className="p-3.5 bg-[#121317] border border-white/10 rounded-xl text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
+            <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
               {question.description || 'No description provided.'}
             </div>
           </div>
@@ -146,7 +146,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
               <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
                 Constraints
               </h4>
-              <div className="p-3.5 bg-[#121317] border border-white/10 rounded-xl font-mono text-gray-300">
+              <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl font-mono text-gray-300">
                 {question.constraints}
               </div>
             </div>
@@ -160,8 +160,8 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
               </h4>
               <div className="flex flex-col gap-2">
                 {question.questionHints.map((hint, idx) => (
-                  <div key={idx} className="p-3 bg-[#121317] border border-white/10 rounded-xl text-gray-300 flex items-start gap-2.5">
-                    <span className="font-mono text-[#A3E635] text-[11px]">#{idx + 1}</span>
+                  <div key={idx} className="p-3 bg-neutral-900 border border-white/10 rounded-xl text-gray-300 flex items-start gap-2.5">
+                    <span className="font-mono text-neutral-300 text-[11px]">#{idx + 1}</span>
                     <span className="text-xs">{hint.hintText}</span>
                   </div>
                 ))}
@@ -196,7 +196,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                   href={question.leetCodeUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-[#A3E635] flex items-center gap-1 font-mono text-[11px] text-[#A3E635]"
+                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
                 >
                   <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> LeetCode
                 </a>
@@ -206,7 +206,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                   href={question.gfgUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-[#A3E635] flex items-center gap-1 font-mono text-[11px] text-[#A3E635]"
+                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
                 >
                   <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> GeeksforGeeks
                 </a>
@@ -216,7 +216,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                   href={question.hackerRankUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:text-[#A3E635] flex items-center gap-1 font-mono text-[11px] text-[#A3E635]"
+                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
                 >
                   <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> HackerRank
                 </a>
@@ -236,13 +236,13 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
               </h4>
               <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
                 {question.testCases.map((tc, idx) => (
-                  <div key={idx} className="p-3 bg-[#121317] border border-white/10 rounded-xl text-xs font-mono text-gray-300">
+                  <div key={idx} className="p-3 bg-neutral-900 border border-white/10 rounded-xl text-xs font-mono text-gray-300">
                     <div className="flex items-center justify-between text-[11px] text-gray-400 pb-1 mb-1 border-b border-white/5">
                       <span>Case #{idx + 1} ({tc.typeRefCode || 'STANDARD'})</span>
                       {tc.isHidden && <span className="text-amber-400 text-[10px]">Hidden</span>}
                     </div>
                     <div>Input: <span className="text-white">{tc.input}</span></div>
-                    <div>Output: <span className="text-[#A3E635]">{tc.expectedOutput}</span></div>
+                    <div>Output: <span className="text-neutral-300">{tc.expectedOutput}</span></div>
                   </div>
                 ))}
               </div>

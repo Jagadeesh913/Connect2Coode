@@ -43,16 +43,22 @@ const AdminDashboard = lazy(() => import('../features/admin/pages/AdminDashboard
 const AdminQuestions = lazy(() => import('../features/admin/pages/AdminQuestions').then((m: any) => ({ default: m.AdminQuestions || m.default })));
 const AdminCompanies = lazy(() => import('../features/admin/pages/AdminCompanies').then((m: any) => ({ default: m.AdminCompanies || m.default })));
 const AdminLanguages = lazy(() => import('../features/admin/pages/AdminLanguages').then((m: any) => ({ default: m.AdminLanguages || m.default })));
+const AdminInstitutions = lazy(() => import('../features/admin/pages/AdminInstitutions').then((m: any) => ({ default: m.AdminInstitutions || m.default })));
 
 const NotFound = lazy(() => import('../shared/components/errors/NotFound').then((m: any) => ({ default: m.NotFound || m.default })));
 const ServerError = lazy(() => import('../shared/components/errors/ServerError').then((m: any) => ({ default: m.ServerError || m.default })));
 const ComingSoon = lazy<React.ComponentType<any>>(() => import('../shared/components/ComingSoon').then((m: any) => ({ default: m.ComingSoon || m.default })));
 
 const PageLoader: React.FC = () => (
-  <div className="p-8 flex flex-col gap-4 max-w-5xl mx-auto font-sans">
-    <Skeleton className="h-10 w-64" />
-    <Skeleton className="h-48 w-full" />
-    <Skeleton className="h-64 w-full" />
+  <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col gap-6 font-sans animate-fade-in">
+    <div className="flex items-center justify-between">
+      <Skeleton className="h-10 w-48 rounded-xl" />
+      <Skeleton className="h-8 w-24 rounded-full" />
+    </div>
+    <Skeleton className="h-56 w-full rounded-3xl" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-2">
+      <Skeleton className="h-44 w-full rounded-2xl" count={4} />
+    </div>
   </div>
 );
 
@@ -102,28 +108,32 @@ const appRoutes = [
   {
     element: <MainLayout />,
     children: [
-      // Practice & Companies Pages (Publicly accessible with in-app tracking for logged-in users)
-      { path: '/dsa-sheet', element: withSuspense(ProblemList) },
-      { path: '/practice', element: withSuspense(PracticePage) },
-      { path: '/problems', element: <Navigate to="/practice" replace /> },
-      { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
-      { path: '/companies', element: withSuspense(CompanyList) },
-      { path: '/companies/:slug', element: withSuspense(CompanyDetails) },
-
-      // Temporarily Hidden Feature Pages -> Reusable Coming Soon UI
-      { path: '/roadmaps', element: renderFeature(RoadmapList, 'Roadmaps') },
-      { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
-      { path: '/company-patterns', element: renderFeature(CompanyPatterns, 'Company Exam Patterns') },
-      { path: '/company-patterns/:slug', element: renderFeature(CompanyPatternDetails, 'Company Exam Patterns') },
-      { path: '/aptitude', element: renderFeature(AptitudePrep, 'Aptitude') },
-      { path: '/logical', element: renderFeature(LogicalPrep, 'Logical Reasoning') },
-      { path: '/verbal', element: renderFeature(VerbalPrep, 'Verbal Ability') },
-      { path: '/interviews', element: renderFeature(InterviewPrep, 'Interview Questions') },
-
-      // Active User Features (Require Login)
+      // All app features require authentication except the Home landing page
       {
         element: <ProtectedRoute />,
         children: [
+          // Practice & Problems Pages
+          { path: '/dsa-sheet', element: withSuspense(ProblemList) },
+          { path: '/practice', element: withSuspense(PracticePage) },
+          { path: '/problems', element: <Navigate to="/practice" replace /> },
+          { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
+
+          // Companies Pages
+          { path: '/companies', element: withSuspense(CompanyList) },
+          { path: '/companies/:slug', element: withSuspense(CompanyDetails) },
+          { path: '/company-patterns', element: renderFeature(CompanyPatterns, 'Company Exam Patterns') },
+          { path: '/company-patterns/:slug', element: renderFeature(CompanyPatternDetails, 'Company Exam Patterns') },
+
+          // Aptitude Practice Pages
+          { path: '/aptitude', element: withSuspense(AptitudePrep) },
+          { path: '/progress', element: <Navigate to="/aptitude" replace /> },
+          { path: '/roadmaps', element: <Navigate to="/aptitude" replace /> },
+          { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
+          { path: '/logical', element: <Navigate to="/aptitude?category=reasoning" replace /> },
+          { path: '/verbal', element: <Navigate to="/aptitude?category=verbal" replace /> },
+          { path: '/interviews', element: renderFeature(InterviewPrep, 'Interview Questions') },
+
+          // Active User Features
           { path: '/dashboard', element: <Navigate to="/practice" replace /> },
           { path: '/bookmarks', element: withSuspense(BookmarksList) },
           { path: '/profile', element: withSuspense(ProfileSettings) },
@@ -145,6 +155,7 @@ const appRoutes = [
           { path: 'questions', element: withSuspense(AdminQuestions) },
           { path: 'companies', element: withSuspense(AdminCompanies) },
           { path: 'languages', element: withSuspense(AdminLanguages) },
+          { path: 'institutions', element: withSuspense(AdminInstitutions) },
         ],
       },
     ],

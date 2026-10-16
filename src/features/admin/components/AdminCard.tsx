@@ -17,7 +17,7 @@ export const AdminCard: React.FC<AdminCardProps> = ({
 }) => {
   return (
     <div
-      className={`bg-[#14202C]/75 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col font-sans ${className}`}
+      className={`bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl flex flex-col font-sans ${className}`}
     >
       {(title || action) && (
         <div className="flex items-center justify-between gap-4 pb-3.5 mb-4 border-b border-white/10">
