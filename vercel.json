@@ -1,10 +1,6 @@
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://codingplatform-tdt0.onrender.com/api/:path*"
-    },
-    {
       "source": "/oauth2/:path*",
       "destination": "https://codingplatform-tdt0.onrender.com/oauth2/:path*"
     },

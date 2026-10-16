@@ -80,9 +80,13 @@ export const getBaseUrl = (): string => {
     ? import.meta.env.VITE_API_BASE_URL
     : undefined;
 
-  // In local browser development (localhost, 127.0.0.1, local IP, or Vite DEV mode),
-  // route through the local proxy (/api/v1) which forwards to https://codingplatform-tdt0.onrender.com
-  // with changeOrigin: true. This completely eliminates browser CORS preflight (OPTIONS) failures.
+  // In any browser execution environment, route through relative '/api/v1'.
+  // This enables Vite's development proxy locally and the edge proxy in production,
+  // completely eliminating browser cross-origin preflight (OPTIONS) failures on all deployed domains.
+  if (typeof window !== 'undefined' && window.location.origin !== RENDER_BACKEND_ORIGIN) {
+    return '/api/v1';
+  }
+
   const isLocalDev =
     typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' ||
