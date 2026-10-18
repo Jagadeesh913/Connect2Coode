@@ -128,11 +128,20 @@ export const AdminMcqs: React.FC = () => {
       if (match?.id) subjectIds = [match.id];
     }
 
+    // Resolve difficulty filter to numeric ID if selected
+    let difficultyIds: number[] = [];
+    if (selectedDifficulty) {
+      const diffMatch = difficulties.find(
+        (d) => String(d.refCode).toUpperCase() === selectedDifficulty.toUpperCase()
+      );
+      if (diffMatch?.id) difficultyIds = [diffMatch.id];
+    }
+
     try {
       const response = await adminMcqService.getMcqs(
         {
           subject: subjectIds,
-          difficulty: selectedDifficulty ? [selectedDifficulty] : [],
+          difficulty: difficultyIds,
           companies: [],
           topic: null,
           searchText: debouncedSearch,
@@ -148,16 +157,28 @@ export const AdminMcqs: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      const pageData = response.data;
-      if (pageData && Array.isArray(pageData.content)) {
-        setMcqs(pageData.content);
-        setTotalElements(pageData.totalElements ?? pageData.content.length);
-        setTotalPages(Math.max(1, pageData.totalPages ?? 1));
-      } else {
-        setMcqs([]);
-        setTotalElements(0);
-        setTotalPages(1);
-      }
+      const rawData: any = (response?.data as any)?.data || response?.data || response;
+      const contentList: McqQuestion[] = Array.isArray(rawData?.content)
+        ? rawData.content
+        : Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.data)
+        ? rawData.data
+        : [];
+
+      const total = typeof rawData?.totalElements === 'number'
+        ? rawData.totalElements
+        : typeof rawData?.total === 'number'
+        ? rawData.total
+        : contentList.length;
+
+      const computedPages = typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
+        ? rawData.totalPages
+        : Math.max(1, Math.ceil(total / pageSize));
+
+      setMcqs(contentList);
+      setTotalElements(total);
+      setTotalPages(computedPages);
     } catch (err: any) {
       if (controller.signal.aborted) return;
       console.error('Failed to fetch admin MCQs:', err);

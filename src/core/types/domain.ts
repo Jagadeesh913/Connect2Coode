@@ -354,9 +354,9 @@ export interface McqQuestion {
 
 export interface McqQueryPayload {
   subject?: number[];
-  difficulty?: (string | number)[];
-  companies?: (string | number)[];
-  topic?: string | number | null;
+  difficulty?: number[];
+  companies?: number[];
+  topic?: number[] | null;
   searchText?: string;
   pageRequest: {
     pageNumber: number;

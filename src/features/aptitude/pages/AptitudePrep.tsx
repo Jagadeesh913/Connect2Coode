@@ -75,8 +75,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   // Filter States
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
-  const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [selectedDifficulties, setSelectedDifficulties] = useState<number[]>([]);
+  const [selectedTopic, setSelectedTopic] = useState<number | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState<'default' | 'diff-asc' | 'diff-desc' | 'id-desc'>('default');
 
@@ -90,6 +90,14 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const [questions, setQuestions] = useState<McqQuestion[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Live subject question counters
+  const [subjectCounts, setSubjectCounts] = useState<Record<AptitudeSubjectCode, number>>({
+    APTITUDE: 15,
+    PSEUDOCODE: 6,
+    REASONING: 11,
+    VERBAL: 9,
+  });
 
   // Reference Library Options (Subjects, Difficulties, Topics, Companies)
   const [subjectRefMap, setSubjectRefMap] = useState<Record<AptitudeSubjectCode, number>>({
@@ -139,15 +147,21 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
         if (!isMounted) return;
 
-        if (subjRes.status === 'fulfilled' && subjRes.value?.data) {
-          const rawSubjs = Array.isArray(subjRes.value.data) ? subjRes.value.data : [];
+        if (subjRes.status === 'fulfilled') {
+          const rawSubjs = Array.isArray((subjRes.value as any)?.data)
+            ? (subjRes.value as any).data
+            : Array.isArray((subjRes.value as any)?.data?.data)
+            ? (subjRes.value as any).data.data
+            : Array.isArray(subjRes.value)
+            ? subjRes.value
+            : [];
           const map: Record<AptitudeSubjectCode, number> = {
             APTITUDE: 30,
             PSEUDOCODE: 31,
             REASONING: 32,
             VERBAL: 33,
           };
-          rawSubjs.forEach((s) => {
+          rawSubjs.forEach((s: any) => {
             const code = String(s.refCode || '').toUpperCase().trim();
             if (code === 'APTITUDE' && typeof s.id === 'number') map.APTITUDE = s.id;
             if (code === 'PSEUDOCODE' && typeof s.id === 'number') map.PSEUDOCODE = s.id;
@@ -157,20 +171,61 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           setSubjectRefMap(map);
         }
 
-        if (diffRes.status === 'fulfilled' && diffRes.value?.data) {
-          const rawDiffs = Array.isArray(diffRes.value.data) ? diffRes.value.data : [];
+        if (diffRes.status === 'fulfilled') {
+          const rawDiffs = Array.isArray((diffRes.value as any)?.data)
+            ? (diffRes.value as any).data
+            : Array.isArray((diffRes.value as any)?.data?.data)
+            ? (diffRes.value as any).data.data
+            : Array.isArray(diffRes.value)
+            ? diffRes.value
+            : [];
           setDifficulties(rawDiffs);
         }
 
-        if (topicRes.status === 'fulfilled' && topicRes.value?.data) {
-          const rawTopics = Array.isArray(topicRes.value.data) ? topicRes.value.data : [];
+        if (topicRes.status === 'fulfilled') {
+          const rawTopics = Array.isArray((topicRes.value as any)?.data)
+            ? (topicRes.value as any).data
+            : Array.isArray((topicRes.value as any)?.data?.data)
+            ? (topicRes.value as any).data.data
+            : Array.isArray(topicRes.value)
+            ? topicRes.value
+            : [];
           setTopics(rawTopics);
         }
 
-        if (compRes.status === 'fulfilled' && compRes.value?.data) {
-          const rawComps = Array.isArray(compRes.value.data) ? compRes.value.data : [];
+        if (compRes.status === 'fulfilled') {
+          const rawComps = Array.isArray((compRes.value as any)?.data)
+            ? (compRes.value as any).data
+            : Array.isArray((compRes.value as any)?.data?.content)
+            ? (compRes.value as any).data.content
+            : Array.isArray(compRes.value)
+            ? compRes.value
+            : [];
           setCompanies(rawComps);
         }
+
+        // Fetch live question counts for each category
+        Promise.allSettled([
+          mcqService.getMcqList({ subject: [30], pageRequest: { pageNumber: 0, pageSize: 1 } }),
+          mcqService.getMcqList({ subject: [31], pageRequest: { pageNumber: 0, pageSize: 1 } }),
+          mcqService.getMcqList({ subject: [32], pageRequest: { pageNumber: 0, pageSize: 1 } }),
+          mcqService.getMcqList({ subject: [33], pageRequest: { pageNumber: 0, pageSize: 1 } }),
+        ]).then(([aptRes, pseRes, reaRes, verRes]) => {
+          if (!isMounted) return;
+          const parseTotal = (res: any) => {
+            if (res.status === 'fulfilled') {
+              const d: any = (res.value?.data as any)?.data || res.value?.data || res.value;
+              if (typeof d?.totalElements === 'number') return d.totalElements;
+            }
+            return undefined;
+          };
+          setSubjectCounts((prev) => ({
+            APTITUDE: parseTotal(aptRes) ?? prev.APTITUDE,
+            PSEUDOCODE: parseTotal(pseRes) ?? prev.PSEUDOCODE,
+            REASONING: parseTotal(reaRes) ?? prev.REASONING,
+            VERBAL: parseTotal(verRes) ?? prev.VERBAL,
+          }));
+        });
       } catch (err) {
         console.warn('Error loading reference library filters for Aptitude:', err);
       }
@@ -212,7 +267,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           subject: [activeSubjectId],
           difficulty: selectedDifficulties,
           companies: selectedCompanies,
-          topic: selectedTopic || null,
+          topic: selectedTopic !== null ? [selectedTopic] : null,
           searchText: debouncedSearch,
           pageRequest: {
             pageNumber: Math.max(0, currentPage - 1),
@@ -226,16 +281,28 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
       if (controller.signal.aborted) return;
 
-      const pageData = response.data;
-      if (pageData && Array.isArray(pageData.content)) {
-        setQuestions(pageData.content);
-        setTotalElements(pageData.totalElements ?? pageData.content.length);
-        setTotalPages(Math.max(1, pageData.totalPages ?? 1));
-      } else {
-        setQuestions([]);
-        setTotalElements(0);
-        setTotalPages(1);
-      }
+      const rawData: any = (response?.data as any)?.data || response?.data || response;
+      const contentList: McqQuestion[] = Array.isArray(rawData?.content)
+        ? rawData.content
+        : Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.data)
+        ? rawData.data
+        : [];
+
+      const total = typeof rawData?.totalElements === 'number'
+        ? rawData.totalElements
+        : typeof rawData?.total === 'number'
+        ? rawData.total
+        : contentList.length;
+
+      const computedPages = typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
+        ? rawData.totalPages
+        : Math.max(1, Math.ceil(total / pageSize));
+
+      setQuestions(contentList);
+      setTotalElements(total);
+      setTotalPages(computedPages);
     } catch (err: any) {
       if (controller.signal.aborted) return;
       console.error('Failed to fetch MCQs:', err);
@@ -275,15 +342,15 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     setSearchQuery('');
     setDebouncedSearch('');
     setSelectedDifficulties([]);
-    setSelectedTopic('');
+    setSelectedTopic(null);
     setSelectedCompanies([]);
     setCurrentPage(1);
   };
 
   // Toggle filter selections
-  const handleDifficultyToggle = (code: string) => {
+  const handleDifficultyToggle = (diffId: number) => {
     setSelectedDifficulties((prev) =>
-      prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
+      prev.includes(diffId) ? prev.filter((d) => d !== diffId) : [...prev, diffId]
     );
     setCurrentPage(1);
   };
@@ -299,7 +366,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     setSearchQuery('');
     setDebouncedSearch('');
     setSelectedDifficulties([]);
-    setSelectedTopic('');
+    setSelectedTopic(null);
     setSelectedCompanies([]);
     setSortBy('default');
     setCurrentPage(1);
@@ -339,11 +406,11 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
     // If item doesn't have options populated, fetch full details via GET /api/v1/mcq/{id}
     if (!item.options || item.options.length === 0) {
-      setModalDetailsLoading(true);
       try {
-        const fullRes = await mcqService.getMcqById(item.id);
-        if (fullRes?.data) {
-          setActiveSolveQuestion(fullRes.data);
+        const fullRes: any = await mcqService.getMcqById(item.id);
+        const singleData = (fullRes?.data as any)?.data || fullRes?.data || fullRes;
+        if (singleData && singleData.id) {
+          setActiveSolveQuestion(singleData);
         }
       } catch (err) {
         console.warn('Could not fetch single MCQ details:', err);
@@ -410,9 +477,18 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                     <i className={conf.icon}></i>
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
-                      {conf.title}
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
+                        {conf.title}
+                      </h3>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                        isActive
+                          ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {subjectCounts[code]} Qs
+                      </span>
+                    </div>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
                       {conf.subtitle}
                     </p>
@@ -439,7 +515,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 <span>Filters</span>
               </div>
               {(selectedDifficulties.length > 0 ||
-                selectedTopic ||
+                selectedTopic !== null ||
                 selectedCompanies.length > 0 ||
                 searchQuery) && (
                 <button
@@ -467,8 +543,9 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                       { id: 4, refCode: 'HARD', refName: 'Hard' },
                     ]
                 ).map((diff) => {
-                  const code = String(diff.refCode || '').toUpperCase();
-                  const isChecked = selectedDifficulties.includes(code);
+                  if (diff.id === undefined) return null;
+                  const diffId = Number(diff.id);
+                  const isChecked = selectedDifficulties.includes(diffId);
                   return (
                     <label
                       key={diff.refCode || diff.id}
@@ -477,7 +554,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => handleDifficultyToggle(code)}
+                        onChange={() => handleDifficultyToggle(diffId)}
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                       <span>{diff.refName || diff.refCode}</span>
@@ -508,9 +585,9 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                     <input
                       type="radio"
                       name="topicSelection"
-                      checked={selectedTopic === ''}
+                      checked={selectedTopic === null}
                       onChange={() => {
-                        setSelectedTopic('');
+                        setSelectedTopic(null);
                         setCurrentPage(1);
                       }}
                       className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -518,7 +595,9 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                     <span>All Topics</span>
                   </label>
                   {topics.map((t) => {
-                    const isSelected = selectedTopic === t.refCode;
+                    if (t.id === undefined) return null;
+                    const topicId = Number(t.id);
+                    const isSelected = selectedTopic === topicId;
                     return (
                       <label
                         key={t.refCode || t.id}
@@ -529,7 +608,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                           name="topicSelection"
                           checked={isSelected}
                           onChange={() => {
-                            setSelectedTopic(t.refCode);
+                            setSelectedTopic(topicId);
                             setCurrentPage(1);
                           }}
                           className="w-3.5 h-3.5 text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -688,7 +767,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                   We couldn't find any questions matching your current filters in {SUBJECT_CONFIG[activeSubject].title}.
                 </p>
-                {(selectedDifficulties.length > 0 || selectedTopic || selectedCompanies.length > 0 || searchQuery) && (
+                {(selectedDifficulties.length > 0 || selectedTopic !== null || selectedCompanies.length > 0 || searchQuery) && (
                   <button
                     type="button"
                     onClick={handleClearAll}
