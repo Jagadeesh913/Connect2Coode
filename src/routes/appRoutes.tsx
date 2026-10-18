@@ -44,6 +44,7 @@ const AdminQuestions = lazy(() => import('../features/admin/pages/AdminQuestions
 const AdminCompanies = lazy(() => import('../features/admin/pages/AdminCompanies').then((m: any) => ({ default: m.AdminCompanies || m.default })));
 const AdminLanguages = lazy(() => import('../features/admin/pages/AdminLanguages').then((m: any) => ({ default: m.AdminLanguages || m.default })));
 const AdminInstitutions = lazy(() => import('../features/admin/pages/AdminInstitutions').then((m: any) => ({ default: m.AdminInstitutions || m.default })));
+const AdminMcqs = lazy(() => import('../features/admin/pages/AdminMcqs').then((m: any) => ({ default: m.AdminMcqs || m.default })));
 
 const NotFound = lazy(() => import('../shared/components/errors/NotFound').then((m: any) => ({ default: m.NotFound || m.default })));
 const ServerError = lazy(() => import('../shared/components/errors/ServerError').then((m: any) => ({ default: m.ServerError || m.default })));
@@ -131,6 +132,7 @@ const appRoutes = [
           { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
           { path: '/logical', element: <Navigate to="/aptitude?category=reasoning" replace /> },
           { path: '/verbal', element: <Navigate to="/aptitude?category=verbal" replace /> },
+          { path: '/pseudocode', element: <Navigate to="/aptitude?category=pseudocode" replace /> },
           { path: '/interviews', element: renderFeature(InterviewPrep, 'Interview Questions') },
 
           // Active User Features
@@ -153,6 +155,7 @@ const appRoutes = [
           { path: '', element: <Navigate to="/admin/dashboard" replace /> },
           { path: 'dashboard', element: withSuspense(AdminDashboard) },
           { path: 'questions', element: withSuspense(AdminQuestions) },
+          { path: 'mcqs', element: withSuspense(AdminMcqs) },
           { path: 'companies', element: withSuspense(AdminCompanies) },
           { path: 'languages', element: withSuspense(AdminLanguages) },
           { path: 'institutions', element: withSuspense(AdminInstitutions) },

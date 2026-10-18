@@ -326,3 +326,61 @@ export interface UpdateInstitutionStatusRequest {
   isActive: boolean;
 }
 
+export interface McqOption {
+  id?: number;
+  optionLabel: string;
+  optionText: string;
+  isCorrect?: boolean;
+}
+
+export interface McqQuestion {
+  id: number;
+  subjectGroupCode: string;
+  subjectRefCode: string;
+  subjectRefName: string;
+  topicGroupCode?: string | null;
+  topicRefCode?: string | null;
+  topicRefName?: string | null;
+  difficultyGroupCode?: string | null;
+  difficultyRefCode?: string | null;
+  difficultyRefName?: string | null;
+  companyName?: string | null;
+  companyId?: number | null;
+  question: string;
+  explanation?: string | null;
+  isActive?: boolean;
+  options: McqOption[];
+}
+
+export interface McqQueryPayload {
+  subject?: number[];
+  difficulty?: (string | number)[];
+  companies?: (string | number)[];
+  topic?: string | number | null;
+  searchText?: string;
+  pageRequest: {
+    pageNumber: number;
+    pageSize: number;
+    sortBy?: string;
+    sortDirection?: 'ASC' | 'DESC';
+  };
+}
+
+export interface AdminCreateMcqPayload {
+  subjectGroupCode: string;
+  subjectRefCode: string;
+  topicGroupCode: string;
+  topicRefCode: string;
+  difficultyGroupCode: string;
+  difficultyRefCode: string;
+  companyId?: number | null;
+  question: string;
+  explanation?: string;
+  options: Array<{
+    optionLabel: string;
+    optionText: string;
+    isCorrect: boolean;
+  }>;
+}
+
+

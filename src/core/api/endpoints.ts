@@ -64,4 +64,10 @@ export const API_ENDPOINTS = {
       DETAILS: (id: string | number) => `/institutions/${id}`,
     },
   },
+  MCQ: {
+    LIST: '/mcq',
+    DETAILS: (id: string | number) => `/mcq/${id}`,
+    ADMIN_CREATE: '/admin/mcq',
+    ADMIN_DELETE: (id: string | number) => `/admin/mcq/${id}`,
+  },
 } as const;
