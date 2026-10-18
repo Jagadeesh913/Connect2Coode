@@ -91,6 +91,15 @@ const SUBJECT_CONFIG: Record<
 };
 
 /**
+ * Strips internal question code prefixes like [MCQ-PSEUDO-001], [MCQ-REAS-015], [MCQ-APT-002], etc.
+ * so only the clean question text is displayed to the user.
+ */
+export function cleanQuestionText(text?: string | null): string {
+  if (!text) return '';
+  return text.replace(/^\[MCQ[^\]]*\]\s*/i, '').trim();
+}
+
+/**
  * Ensures that every MCQ has 4 clear, interactive multiple-choice options (A, B, C, D).
  * If the live API returns options, it maps them.
  * If options array is empty in the database, it derives realistic choices from the question and explanation.
@@ -105,7 +114,7 @@ function synthesizeMcqOptions(q: McqQuestion): SynthesizedOption[] {
     }));
   }
 
-  const rawQ = (q.question || '').replace(/^\[MCQ-[A-Z0-9_-]+\]\s*/i, '').trim();
+  const rawQ = cleanQuestionText(q.question);
   const rawExpl = (q.explanation || '').trim();
   const lowerQ = rawQ.toLowerCase();
   const lowerExpl = rawExpl.toLowerCase();
@@ -562,7 +571,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       toggleBookmarkItem({
         itemId: id,
         type: 'APTITUDE',
-        title: item.question || `Question #${item.id}`,
+        title: cleanQuestionText(item.question) || `Question #${item.id}`,
         difficulty: item.difficultyRefName || item.difficultyRefCode || 'Medium',
         category: item.topicRefName || item.topicRefCode || 'General',
       })
@@ -855,7 +864,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                       {/* Left Details: Title & Tags */}
                       <div className="flex flex-col items-start gap-2 flex-1 min-w-0 pr-2">
                         <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-                          {q.question}
+                          {cleanQuestionText(q.question)}
                         </h4>
 
                         {/* Tag badges */}
@@ -1044,7 +1053,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               
               {/* Question Statement */}
               <div className="text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
-                {activeSolveQuestion.question}
+                {cleanQuestionText(activeSolveQuestion.question)}
               </div>
 
               {/* Company reference tag if available */}
