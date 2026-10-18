@@ -22,7 +22,6 @@ import { toast } from 'react-hot-toast';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { isJwtAdmin } from '../../../core/security/jwt';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 
@@ -107,8 +106,6 @@ export const ProblemDetails: React.FC = () => {
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated, user } = useAppSelector((state) => state.auth);
   const { theme } = useTheme();
-
-  const token = tokenStorage.getAccessToken();
 
   // Server state owned by Redux; only editor/execution/UI state stays local.
   const { selectedProblem: problem, loading: loadingProblem, error: problemError } = useAppSelector((state) => state.problems);
@@ -472,7 +469,6 @@ export const ProblemDetails: React.FC = () => {
     }
 
     setIsExecuting(true);
-    setExecutionType('run');
     setLastExecutionMode('run');
     setExecutionError(null);
     setBottomTab('results');
@@ -500,7 +496,6 @@ export const ProblemDetails: React.FC = () => {
       toast.error(msg);
     } finally {
       setIsExecuting(false);
-      setExecutionType(null);
     }
   }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight]);
 
@@ -523,7 +518,6 @@ export const ProblemDetails: React.FC = () => {
     }
 
     setIsExecuting(true);
-    setExecutionType('submit');
     setLastExecutionMode('submit');
     setExecutionError(null);
     setBottomTab('results');
@@ -579,7 +573,6 @@ export const ProblemDetails: React.FC = () => {
       toast.error(msg);
     } finally {
       setIsExecuting(false);
-      setExecutionType(null);
     }
   }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch]);
 
