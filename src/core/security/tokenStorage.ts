@@ -59,7 +59,12 @@ function removeCookie(name: string): void {
 
 function getLocalItem(key: string): string | null {
   try {
-    return localStorage.getItem(`${LOCAL_STORAGE_PREFIX}${key}`);
+    return (
+      localStorage.getItem(`${LOCAL_STORAGE_PREFIX}${key}`) ||
+      localStorage.getItem(key) ||
+      sessionStorage.getItem(`${LOCAL_STORAGE_PREFIX}${key}`) ||
+      sessionStorage.getItem(key)
+    );
   } catch {
     return null;
   }
@@ -68,12 +73,18 @@ function getLocalItem(key: string): string | null {
 function setLocalItem(key: string, value: string): void {
   try {
     localStorage.setItem(`${LOCAL_STORAGE_PREFIX}${key}`, value);
+    localStorage.setItem(key, value);
+    sessionStorage.setItem(`${LOCAL_STORAGE_PREFIX}${key}`, value);
+    sessionStorage.setItem(key, value);
   } catch {}
 }
 
 function removeLocalItem(key: string): void {
   try {
     localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}${key}`);
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(`${LOCAL_STORAGE_PREFIX}${key}`);
+    sessionStorage.removeItem(key);
   } catch {}
 }
 
@@ -82,19 +93,30 @@ let inMemoryRefreshToken: string | null = null;
 
 export const tokenStorage = {
   getAccessToken(): string | null {
-    return inMemoryAccessToken || getCookie(ACCESS_TOKEN_KEY) || getLocalItem(ACCESS_TOKEN_KEY);
+    return (
+      inMemoryAccessToken ||
+      getCookie(ACCESS_TOKEN_KEY) ||
+      getCookie('token') ||
+      getCookie('accessToken') ||
+      getLocalItem(ACCESS_TOKEN_KEY) ||
+      getLocalItem('token')
+    );
   },
 
   setAccessToken(token: string, maxAgeSeconds: number = 900): void {
     inMemoryAccessToken = token;
     setCookie(ACCESS_TOKEN_KEY, token, maxAgeSeconds);
+    setCookie('token', token, maxAgeSeconds);
     setLocalItem(ACCESS_TOKEN_KEY, token);
+    setLocalItem('token', token);
   },
 
   removeAccessToken(): void {
     inMemoryAccessToken = null;
     removeCookie(ACCESS_TOKEN_KEY);
+    removeCookie('token');
     removeLocalItem(ACCESS_TOKEN_KEY);
+    removeLocalItem('token');
   },
 
   getRefreshToken(): string | null {
@@ -102,23 +124,29 @@ export const tokenStorage = {
       inMemoryRefreshToken ||
       getCookie(REFRESH_TOKEN_KEY) ||
       getCookie('refresh_token') ||
+      getCookie('refreshToken') ||
       getLocalItem(REFRESH_TOKEN_KEY) ||
-      getLocalItem('refresh_token')
+      getLocalItem('refresh_token') ||
+      getLocalItem('refreshToken')
     );
   },
 
   setRefreshToken(token: string, maxAgeSeconds: number = 604800): void {
     inMemoryRefreshToken = token;
     setCookie(REFRESH_TOKEN_KEY, token, maxAgeSeconds);
+    setCookie('refresh_token', token, maxAgeSeconds);
     setLocalItem(REFRESH_TOKEN_KEY, token);
+    setLocalItem('refresh_token', token);
   },
 
   removeRefreshToken(): void {
     inMemoryRefreshToken = null;
     removeCookie(REFRESH_TOKEN_KEY);
     removeCookie('refresh_token');
+    removeCookie('refreshToken');
     removeLocalItem(REFRESH_TOKEN_KEY);
     removeLocalItem('refresh_token');
+    removeLocalItem('refreshToken');
   },
 
   // User profile is UI/session metadata, not an authentication credential (F-013).

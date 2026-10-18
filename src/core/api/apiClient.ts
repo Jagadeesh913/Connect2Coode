@@ -154,10 +154,58 @@ function notifyAuthFailure() {
   });
 }
 
-// Shared Promise Lock for Single-Flight Concurrent 401 Refresh Requests
+// Shared Promise Lock for Single-Flight Concurrent 401/403 Refresh Requests
 let refreshTokenPromise: Promise<string> | null = null;
 
-// Request Interceptor: Attach In-Memory Access Token (EXCLUDES Public Auth Endpoints)
+export const executeRefreshToken = async (): Promise<string> => {
+  if (refreshTokenPromise) {
+    return refreshTokenPromise;
+  }
+
+  refreshTokenPromise = (async () => {
+    try {
+      const storedRefreshToken = tokenStorage.getRefreshToken();
+      const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
+      const refreshRes = await axios.post(
+        `${BASE_URL}/auth/refresh`,
+        payload,
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        }
+      );
+
+      const responseData = refreshRes.data;
+      const tokenData = responseData?.data || responseData;
+      const newAccessToken = tokenData?.accessToken || tokenData?.token;
+      const newRefreshToken = tokenData?.refreshToken || storedRefreshToken;
+
+      if (newAccessToken) {
+        tokenStorage.setAccessToken(newAccessToken);
+        if (newRefreshToken) {
+          tokenStorage.setRefreshToken(newRefreshToken);
+        }
+        notifyAuthListeners(newAccessToken, tokenData);
+        return newAccessToken;
+      } else {
+        throw new Error('No access token returned from refresh endpoint');
+      }
+    } catch (refreshErr) {
+      tokenStorage.clearTokens();
+      notifyAuthFailure();
+      throw refreshErr;
+    } finally {
+      refreshTokenPromise = null;
+    }
+  })();
+
+  return refreshTokenPromise;
+};
+
+// Request Interceptor: Attach Access Token & Proactively Refresh if Expired
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const reqUrl = config.url || '';
@@ -169,7 +217,16 @@ apiClient.interceptors.request.use(
       reqUrl.includes('/auth/generatePasswordResetOtp') ||
       reqUrl.includes('/auth/verifyPasswordResetOtp');
 
-    const token = tokenStorage.getAccessToken();
+    let token = tokenStorage.getAccessToken();
+    const storedRefreshToken = tokenStorage.getRefreshToken();
+    const storedUser = tokenStorage.getUser();
+
+    // Proactively refresh if access token is missing but refresh token or user session exists
+    if (!token && (storedRefreshToken || storedUser) && !isPublicAuthEndpoint) {
+      try {
+        token = await executeRefreshToken();
+      } catch {}
+    }
 
     if (token && config.headers && !isPublicAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -180,11 +237,30 @@ apiClient.interceptors.request.use(
 );
 
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
+  async (response: AxiosResponse) => {
     const resData = response.data;
+    const originalRequest = response.config as any;
+    const reqUrl = originalRequest?.url || '';
+
+    const isPublicAuthEndpoint =
+      reqUrl.includes('/auth/refresh') ||
+      reqUrl.includes('/auth/login') ||
+      reqUrl.includes('/signUp') ||
+      reqUrl.includes('/auth/generatePasswordResetOtp') ||
+      reqUrl.includes('/auth/verifyPasswordResetOtp');
 
     // Reject unexpected HTML responses from an API request when unauthenticated.
     if (typeof resData === 'string' && (resData.includes('<!doctype') || resData.includes('<html') || resData.includes('accounts.google.com'))) {
+      if (!originalRequest?._retry && !isPublicAuthEndpoint && (tokenStorage.getRefreshToken() || tokenStorage.getAccessToken() || tokenStorage.getUser())) {
+        originalRequest._retry = true;
+        try {
+          const newAccessToken = await executeRefreshToken();
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          return apiClient(originalRequest);
+        } catch {}
+      }
+
       const errorMsg = 'Authentication required. Please log in.';
       return Promise.reject({
         statusCode: 401,
@@ -197,6 +273,26 @@ apiClient.interceptors.response.use(
     // Accept all 2xx HTTP and inner backend status codes (200, 201 Created, 202 Accepted, 204 No Content)
     if (resData && typeof resData === 'object' && 'statusCode' in resData) {
       const code = Number(resData.statusCode);
+
+      // Handle 401 / 403 returned inside a 200 envelope
+      if ((code === 401 || code === 403) && !originalRequest?._retry && !isPublicAuthEndpoint) {
+        if (tokenStorage.getRefreshToken() || tokenStorage.getAccessToken() || tokenStorage.getUser()) {
+          originalRequest._retry = true;
+          try {
+            const newAccessToken = await executeRefreshToken();
+            originalRequest.headers = originalRequest.headers || {};
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            return apiClient(originalRequest);
+          } catch (refreshErr: any) {
+            return Promise.reject({
+              statusCode: 401,
+              message: 'Your session has expired. Please login again.',
+              errors: refreshErr?.response?.data?.errors || ['Session expired or unauthorized'],
+            });
+          }
+        }
+      }
+
       if (code < 200 || code >= 300) {
         const errorMsg = resData.message || (resData.errors && resData.errors[0]) || 'Server processing error';
         return Promise.reject({
@@ -215,7 +311,7 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
     const reqUrl = originalRequest?.url || '';
 
     // Handle Timeout Errors gracefully with user-friendly cold-start explanation
@@ -227,8 +323,11 @@ apiClient.interceptors.response.use(
       });
     }
 
-    // Check for HTTP 401 Unauthorized
-    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+    const status = error.response?.status;
+    const isAuthFailure = status === 401 || status === 403;
+
+    // Check for HTTP 401 / 403 Unauthorized
+    if (isAuthFailure && !originalRequest._retry) {
       // Exclude public auth and refresh endpoints from the refresh loop to prevent recursion
       if (
         reqUrl.includes('/auth/refresh') ||
@@ -243,7 +342,7 @@ apiClient.interceptors.response.use(
         }
         const errBody = error.response?.data || {};
         return Promise.reject({
-          statusCode: error.response.status,
+          statusCode: error.response?.status || status,
           message: errBody.message || 'Authentication error',
           errors: errBody.errors || [error.message],
         });
@@ -251,10 +350,12 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      // Do not attempt token refresh if there are no tokens in storage (unauthenticated visitor / guest)
+      // Do not attempt token refresh if there are no tokens in storage or user session
       const storedRefreshToken = tokenStorage.getRefreshToken();
       const storedAccessToken = tokenStorage.getAccessToken();
-      if (!storedRefreshToken && !storedAccessToken) {
+      const storedUser = tokenStorage.getUser();
+
+      if (!storedRefreshToken && !storedAccessToken && !storedUser) {
         return Promise.reject({
           statusCode: 401,
           message: error.response?.data?.message || 'Authentication required. Please log in.',
@@ -262,50 +363,9 @@ apiClient.interceptors.response.use(
         });
       }
 
-      // Single-Flight Refresh: If a refresh is already in progress, wait for the shared promise
-      if (!refreshTokenPromise) {
-        refreshTokenPromise = (async () => {
-          try {
-            const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
-            const refreshRes = await axios.post(
-              `${BASE_URL}/auth/refresh`,
-              payload,
-              {
-                withCredentials: true,
-                headers: {
-                  'Content-Type': 'application/json',
-                  Accept: 'application/json',
-                },
-              }
-            );
-
-            const responseData = refreshRes.data;
-            const tokenData = responseData?.data || responseData;
-            const newAccessToken = tokenData?.accessToken || tokenData?.token;
-            const newRefreshToken = tokenData?.refreshToken || storedRefreshToken;
-
-            if (newAccessToken) {
-              tokenStorage.setAccessToken(newAccessToken);
-              if (newRefreshToken) {
-                tokenStorage.setRefreshToken(newRefreshToken);
-              }
-              notifyAuthListeners(newAccessToken, tokenData);
-              return newAccessToken;
-            } else {
-              throw new Error('No access token returned from refresh endpoint');
-            }
-          } catch (refreshErr) {
-            tokenStorage.clearTokens();
-            notifyAuthFailure();
-            throw refreshErr;
-          } finally {
-            refreshTokenPromise = null;
-          }
-        })();
-      }
-
       try {
-        const newAccessToken = await refreshTokenPromise;
+        const newAccessToken = await executeRefreshToken();
+        originalRequest.headers = originalRequest.headers || {};
         originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr: any) {
@@ -323,12 +383,12 @@ apiClient.interceptors.response.use(
         error.message === 'Network Error' ||
         error.message?.includes('network'));
 
-    const status = error.response?.status || (isNetworkError ? 0 : 500);
+    const finalStatus = error.response?.status || (isNetworkError ? 0 : 500);
     let errorData = error.response?.data;
 
     if (errorData && typeof errorData === 'object' && !Array.isArray(errorData)) {
-      if (!errorData.statusCode && status) {
-        errorData.statusCode = status;
+      if (!errorData.statusCode && finalStatus) {
+        errorData.statusCode = finalStatus;
       }
     } else {
       const fallbackMsg = isNetworkError
@@ -338,7 +398,7 @@ apiClient.interceptors.response.use(
         : error.message || 'Unable to complete your request. Please try again.';
 
       errorData = {
-        statusCode: status,
+        statusCode: finalStatus,
         message: fallbackMsg,
         errors: [fallbackMsg],
       };

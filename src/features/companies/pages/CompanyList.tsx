@@ -5,15 +5,12 @@ import { fetchCompanies } from '../redux/companySlice';
 import { CompanyCardSkeleton } from '../../../shared/components/ui/Skeleton';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
-import { toast } from 'react-hot-toast';
 
 export const CompanyList: React.FC = () => {
   const dispatch = useAppDispatch();
   const { companies, listLoading, loading } = useAppSelector((state) => state.companies);
   const isLoading = listLoading ?? loading;
-  const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,28 +67,6 @@ export const CompanyList: React.FC = () => {
     });
   }, [allCompanies, searchTerm, selectedIndustry]);
 
-  const handleBookmarkToggle = (company: any, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isAuthenticated) {
-      toast.error('Please log in to bookmark companies');
-      dispatch(openAuthModal({ mode: 'login' }));
-      return;
-    }
-
-    const companyId = String(company.id || company.slug || company.name);
-    dispatch(
-      toggleBookmarkItem({
-        itemId: companyId,
-        type: 'COMPANY',
-        title: company.name,
-        difficulty: '',
-        category: company.industry || 'Company Prep',
-      })
-    );
-    toast.success('Bookmark updated');
-  };
-
   return (
     <div className="w-full flex flex-col items-center pb-20 font-sans bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 overflow-x-hidden">
       
@@ -104,16 +79,16 @@ export const CompanyList: React.FC = () => {
         
         {/* 1. HERO BANNER SECTION (Using exact Light and Dark theme banners provided by user) */}
         <section className="w-full pb-6">
-          <div className="w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80">
+          <div className="w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 bg-slate-100 dark:bg-[#050D1D]">
             {/* Light Theme Banner */}
             <img
-              src="/companies_banner_light.png"
+              src="/companies_banner_light.png?v=2"
               alt="Practice by Company Banner"
               className="w-full h-auto block dark:hidden object-cover select-none pointer-events-none"
             />
             {/* Dark Theme Banner */}
             <img
-              src="/companies_banner_dark.png"
+              src="/companies_banner_dark.png?v=2"
               alt="Practice by Company Banner"
               className="w-full h-auto hidden dark:block object-cover select-none pointer-events-none"
             />
@@ -199,10 +174,6 @@ export const CompanyList: React.FC = () => {
                 company.slug ||
                 (company.id ? String(company.id) : company.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
 
-              const isBookmarked = bookmarks.some(
-                (b) => b.itemId === String(company.id || companySlug) || b.title === company.name
-              );
-
               return (
                 <div
                   key={company.id || company.name}
@@ -210,27 +181,26 @@ export const CompanyList: React.FC = () => {
                 >
                   {/* Faint Background Watermark Logo Silhouette */}
                   <div className="absolute -right-3 -top-3 w-32 h-32 opacity-[0.06] dark:opacity-[0.07] text-slate-900 dark:text-white pointer-events-none select-none overflow-hidden flex items-center justify-center">
-                    <CompanyBrandLogo name={company.name} className="w-full h-full" watermark />
+                    <CompanyBrandLogo
+                      name={company.name}
+                      logo={company.logo || company.logoUrl}
+                      website={company.website || company.websiteUrl}
+                      className="w-full h-full"
+                      watermark
+                    />
                   </div>
 
                   <div>
-                    {/* Top Row: Authentic Brand Logo on Left, Bookmark on Right */}
+                    {/* Top Row: Authentic Brand Logo */}
                     <div className="flex items-center justify-between relative z-10">
                       <div className="w-12 h-12 flex items-center justify-start shrink-0">
-                        <CompanyBrandLogo name={company.name} className="w-10 h-10" />
+                        <CompanyBrandLogo
+                          name={company.name}
+                          logo={company.logo || company.logoUrl}
+                          website={company.website || company.websiteUrl}
+                          className="w-10 h-10"
+                        />
                       </div>
-
-                      <button
-                        onClick={(e) => handleBookmarkToggle(company, e)}
-                        className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                          isBookmarked
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50'
-                            : 'text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800/50'
-                        }`}
-                        title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Company'}
-                      >
-                        <i className={`fa-${isBookmarked ? 'solid' : 'regular'} fa-bookmark text-base`}></i>
-                      </button>
                     </div>
 
                     {/* Company Name & Real Problem Count (ONLY if present in API) */}

@@ -109,8 +109,6 @@ export const ProblemDetails: React.FC = () => {
   const { theme } = useTheme();
 
   const token = tokenStorage.getAccessToken();
-  const userRole = String(user?.role || '').toUpperCase();
-  const isAdmin = (isAuthenticated || Boolean(token)) && (userRole === 'ADMIN' || userRole === 'ROLE_ADMIN' || userRole.includes('ADMIN') || isJwtAdmin(token));
 
   // Server state owned by Redux; only editor/execution/UI state stays local.
   const { selectedProblem: problem, loading: loadingProblem, error: problemError } = useAppSelector((state) => state.problems);
@@ -123,7 +121,6 @@ export const ProblemDetails: React.FC = () => {
   // Editor State
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
-  const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
 
@@ -183,7 +180,6 @@ export const ProblemDetails: React.FC = () => {
 
   // Execution State
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
-  const [executionType, setExecutionType] = useState<'run' | 'submit' | null>(null);
   const [lastExecutionMode, setLastExecutionMode] = useState<'run' | 'submit' | null>(null);
   const [executionResult, setExecutionResult] = useState<ExecutionResultData | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
@@ -424,13 +420,6 @@ export const ProblemDetails: React.FC = () => {
     toast.success('Code reset to default starter template');
   };
 
-  // Copy Code
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(currentCode);
-    setCopiedCode(true);
-    toast.success('Code copied to clipboard!');
-    setTimeout(() => setCopiedCode(false), 2000);
-  };
 
   // Bookmark Status
   const isBookmarked = useMemo(() => {
@@ -689,8 +678,12 @@ export const ProblemDetails: React.FC = () => {
   if (!isProblemLoadedForRoute || problemError) {
     return (
       <div className="relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-16">
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex flex-col items-center justify-center flex-1">
-          <NotFound />
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col items-center justify-center flex-1">
+          <NotFound
+            embedded
+            title="Problem Not Found"
+            description="The requested coding problem could not be found or loaded from the platform repository."
+          />
         </div>
       </div>
     );

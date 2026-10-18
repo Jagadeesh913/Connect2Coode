@@ -217,26 +217,18 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       {/* Main Content Container (Exact max-w-7xl matching Home & Practice page) */}
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12">
         
-        {/* 1. BREADCRUMB */}
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-400 dark:text-slate-500 mb-4 select-none">
-          <i className="fa-solid fa-house text-slate-400"></i>
-          <span>Home</span>
-          <span>&gt;</span>
-          <span className="text-slate-700 dark:text-slate-300 font-semibold">Aptitude</span>
-        </div>
-
-        {/* 2. HERO BANNER SECTION (Using exact Light and Dark theme banners provided by user) */}
+        {/* HERO BANNER SECTION (Using exact Light and Dark theme banners provided by user) */}
         <section className="w-full pb-6">
-          <div className="w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80">
+          <div className="w-full overflow-hidden rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200/60 dark:border-slate-800/80 bg-slate-100 dark:bg-[#050D1D]">
             {/* Light Theme Banner */}
             <img
-              src="/aptitude_banner_light.png"
+              src="/aptitude_banner_light.png?v=2"
               alt="Aptitude Practice Banner"
               className="w-full h-auto block dark:hidden object-cover select-none pointer-events-none"
             />
             {/* Dark Theme Banner */}
             <img
-              src="/aptitude_banner_dark.png"
+              src="/aptitude_banner_dark.png?v=2"
               alt="Aptitude Practice Banner"
               className="w-full h-auto hidden dark:block object-cover select-none pointer-events-none"
             />

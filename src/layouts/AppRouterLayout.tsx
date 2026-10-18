@@ -50,8 +50,9 @@ export const AppRouterLayout: React.FC = () => {
       const token = tokenStorage.getAccessToken();
       const hasValidToken = Boolean(token && !isJwtExpired(decodeJwtPayload(token)));
       const hasRefreshToken = Boolean(tokenStorage.getRefreshToken());
-      // Only refresh proactively if no active valid access token exists and a refresh token is stored
-      if (!hasValidToken && hasRefreshToken) {
+      const hasUser = Boolean(tokenStorage.getUser());
+      // Refresh proactively if no active valid access token exists and a refresh token or user profile is stored
+      if (!hasValidToken && (hasRefreshToken || hasUser)) {
         dispatch(refreshSessionThunk());
       }
     }

@@ -66,8 +66,8 @@ export const EditInstitutionModal: React.FC<EditInstitutionModalProps> = ({
   const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
 
-    if (!selectedInst.id || !selectedInst.name?.trim()) {
-      errors.name = 'Select your college or university from the search results.';
+    if (!selectedInst.name?.trim()) {
+      errors.name = 'Please enter or select your college or university name.';
     }
 
     if (selectedInst.website?.trim()) {

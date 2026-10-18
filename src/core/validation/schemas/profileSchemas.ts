@@ -31,13 +31,13 @@ export type PersonalInfoFormData = z.infer<typeof personalInfoSchema>;
  */
 export const academicDetailsSchema = z
   .object({
-    regNumber: requiredTextRule('Registration number', 2),
-    degree: requiredTextRule('Degree', 2),
-    branch: requiredTextRule('Branch / Major', 2),
+    regNumber: requiredTextRule('Registration number', 1),
+    degree: z.string().trim().optional().or(z.literal('')),
+    branch: z.string().trim().optional().or(z.literal('')),
     joinedYear: yearRule(1990, currentYear + 5, 'Joined year'),
     passedOutYear: yearRule(1990, currentYear + 10, 'Graduation year'),
     college: requiredTextRule('College or university name', 2),
-    bio: requiredTextRule('Bio', 2),
+    bio: z.string().trim().optional().or(z.literal('')),
   })
   .refine((data) => data.passedOutYear >= data.joinedYear, {
     message: 'Graduation year cannot be earlier than joined year.',
@@ -48,7 +48,7 @@ export type AcademicDetailsFormData = z.infer<typeof academicDetailsSchema>;
 
 /**
  * Institution Selection / Affiliation Schema
- * Ensures valid selection from registered search results rather than free text.
+ * Accepts either registered search results or typed institution name.
  */
 export const institutionSelectionSchema = z.object({
   id: z

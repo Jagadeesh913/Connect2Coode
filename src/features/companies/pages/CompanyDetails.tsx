@@ -27,7 +27,7 @@ export const CompanyDetails: React.FC = () => {
   // Filters matching Image 1
   const [questionSearch, setQuestionSearch] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'All' | 'Easy' | 'Medium' | 'Hard'>('All');
-  const [sortBy, setSortBy] = useState<'default' | 'difficulty-asc' | 'difficulty-desc' | 'acceptance-desc'>('default');
+  const [sortBy, setSortBy] = useState<'default' | 'difficulty-asc' | 'difficulty-desc'>('default');
   const [loadedCompanyKey, setLoadedCompanyKey] = useState<string | null>(null);
 
   useEffect(() => {
@@ -93,8 +93,6 @@ export const CompanyDetails: React.FC = () => {
     } else if (sortBy === 'difficulty-desc') {
       const rank: Record<string, number> = { easy: 1, medium: 2, hard: 3 };
       list.sort((a, b) => (rank[b.difficulty.toLowerCase()] || 2) - (rank[a.difficulty.toLowerCase()] || 2));
-    } else if (sortBy === 'acceptance-desc') {
-      list.sort((a, b) => (parseFloat(String(b.acceptanceRate)) || 0) - (parseFloat(String(a.acceptanceRate)) || 0));
     }
 
     return list;
@@ -218,7 +216,12 @@ export const CompanyDetails: React.FC = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 relative z-10 w-full">
             {/* Big Company Logo Box */}
             <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200/80 dark:border-slate-700/80 p-3 flex items-center justify-center shrink-0 shadow-xs">
-              <CompanyBrandLogo name={company.name} className="w-12 h-12 sm:w-14 sm:h-14" />
+              <CompanyBrandLogo
+                name={company.name}
+                logo={company.logo || company.logoUrl}
+                website={company.website || company.websiteUrl}
+                className="w-12 h-12 sm:w-14 sm:h-14"
+              />
             </div>
 
             <div>
@@ -311,7 +314,6 @@ export const CompanyDetails: React.FC = () => {
                   <option value="default" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Sort by: Default</option>
                   <option value="difficulty-asc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty (Easy to Hard)</option>
                   <option value="difficulty-desc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty (Hard to Easy)</option>
-                  <option value="acceptance-desc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Acceptance Rate</option>
                 </select>
                 <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               </div>
@@ -327,7 +329,6 @@ export const CompanyDetails: React.FC = () => {
                   <th className="py-3.5 px-4 w-12 text-center">#</th>
                   <th className="py-3.5 px-4">Title</th>
                   <th className="py-3.5 px-4 w-32">Difficulty</th>
-                  <th className="py-3.5 px-4 w-28">Acceptance</th>
                   <th className="py-3.5 px-4 w-28">Status</th>
                   <th className="py-3.5 px-2 w-10 text-center"></th>
                   <th className="py-3.5 px-4 w-24 text-right"></th>
@@ -339,7 +340,7 @@ export const CompanyDetails: React.FC = () => {
                   <TableRowSkeleton rows={8} />
                 ) : !isAuthenticated && companyProblems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-14 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={6} className="py-14 text-center text-slate-500 dark:text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
                         <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-xs">
                           <i className="fa-solid fa-lock"></i>
@@ -360,7 +361,7 @@ export const CompanyDetails: React.FC = () => {
                   </tr>
                 ) : filteredProblems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <i className="fa-solid fa-code text-2xl text-slate-300 dark:text-slate-600"></i>
                         <span className="font-semibold text-sm">No questions found</span>
@@ -377,10 +378,6 @@ export const CompanyDetails: React.FC = () => {
                     const isSolved = Boolean(solvedByProblemId[problem.id]);
                     const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(problem.id));
                     const diff = problem.difficulty?.toLowerCase();
-                    const acceptance =
-                      problem.acceptanceRate && problem.acceptanceRate !== '—'
-                        ? `${String(problem.acceptanceRate).replace('%', '')}%`
-                        : '—';
 
                     return (
                       <tr
@@ -430,11 +427,6 @@ export const CompanyDetails: React.FC = () => {
                           ) : (
                             <span className="text-slate-400 text-xs">—</span>
                           )}
-                        </td>
-
-                        {/* Acceptance */}
-                        <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-mono text-xs">
-                          {acceptance}
                         </td>
 
                         {/* Status Pill (Read-only, derived from user submissions) */}

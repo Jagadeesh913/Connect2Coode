@@ -240,6 +240,18 @@ export const fetchProblemById = createAsyncThunk(
       if (isRequestCanceled(err)) {
         throw err;
       }
+      const existingInList = state.problems.problems.find(
+        (p) =>
+          String(p.id).trim().toLowerCase() === key ||
+          (p.slug && String(p.slug).trim().toLowerCase() === key)
+      );
+      if (existingInList) {
+        return {
+          key,
+          problem: existingInList,
+          fetchedAt: Date.now(),
+        };
+      }
       return rejectWithValue(err?.message || 'Failed to fetch problem detail');
     }
   },

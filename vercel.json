@@ -5,6 +5,14 @@
       "destination": "https://codingplatform-tdt0.onrender.com/api/:path*"
     },
     {
+      "source": "/refresh",
+      "destination": "https://codingplatform-tdt0.onrender.com/api/v1/auth/refresh"
+    },
+    {
+      "source": "/auth/refresh",
+      "destination": "https://codingplatform-tdt0.onrender.com/api/v1/auth/refresh"
+    },
+    {
       "source": "/oauth2/:path*",
       "destination": "https://codingplatform-tdt0.onrender.com/oauth2/:path*"
     },
