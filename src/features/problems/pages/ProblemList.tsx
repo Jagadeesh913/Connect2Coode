@@ -61,6 +61,8 @@ export const ProblemList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchInput, rawPage, setSearchParams]);
 
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
+
   useEffect(() => {
     const request = dispatch(
       fetchProblems({
@@ -71,8 +73,17 @@ export const ProblemList: React.FC = () => {
       })
     );
 
+    request
+      .unwrap()
+      .catch(() => {})
+      .finally(() => {
+        setHasFetchedOnce(true);
+      });
+
     return () => request.abort();
   }, [dispatch, debouncedSearch, currentPage]);
+
+  const isListLoading = loading || !hasFetchedOnce;
 
   const groupedProblems = useMemo(() => {
     const groups = new Map<string, typeof problems>();
@@ -170,7 +181,7 @@ export const ProblemList: React.FC = () => {
         </div>
       </div>
 
-      {loading && problems.length === 0 ? (
+      {isListLoading ? (
         <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4">
           <Skeleton className="h-16 w-full rounded-2xl" count={6} />
         </div>

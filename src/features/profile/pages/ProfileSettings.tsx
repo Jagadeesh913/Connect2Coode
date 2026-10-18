@@ -33,10 +33,11 @@ import { toast } from 'react-hot-toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload } from '../../../core/security/jwt';
+import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
 
 export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const profile = useAppSelector((state) => state.profile.profile);
+  const { profile, loading: profileLoading } = useAppSelector((state) => state.profile);
   const reduxUserInfo = useAppSelector((state) => state.profile.userInfo);
   const authUser = useAppSelector((state) => state.auth.user);
 
@@ -330,6 +331,16 @@ export const UserProfilePage: React.FC = () => {
             Sign In
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (profileLoading && !profile) {
+    return (
+      <div className="w-full min-h-screen bg-[#FFFFFF] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
+        <div className="fixed top-24 -left-48 w-96 h-[400px] bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+        <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+        <ProfilePageSkeleton />
       </div>
     );
   }

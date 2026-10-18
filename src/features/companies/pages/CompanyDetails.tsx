@@ -86,14 +86,8 @@ export const CompanyDetails: React.FC = () => {
 
   // Section Selection (Coding, Aptitude, Reasoning, Verbal, Pseudocode)
   const [activeSection, setActiveSection] = useState<CompanySection>('coding');
-  const [mcqsBySection, setMcqsBySection] = useState<Record<CompanySection, McqQuestion[]>>({
-    coding: [],
-    aptitude: [],
-    reasoning: [],
-    verbal: [],
-    pseudocode: [],
-  });
-  const [mcqsLoading, setMcqsLoading] = useState<boolean>(false);
+  const [mcqsBySection, setMcqsBySection] = useState<Partial<Record<CompanySection, McqQuestion[]>>>({});
+  const [mcqsLoading, setMcqsLoading] = useState<boolean>(true);
 
   // Filters matching Image 1
   const [questionSearch, setQuestionSearch] = useState('');
@@ -110,6 +104,8 @@ export const CompanyDetails: React.FC = () => {
   useEffect(() => {
     if (!slug) return;
     setLoadedCompanyKey(null);
+    setMcqsLoading(true);
+    setMcqsBySection({});
     const request = dispatch(fetchCompanyBySlug(slug));
     return () => {
       request.abort();
@@ -246,6 +242,7 @@ export const CompanyDetails: React.FC = () => {
   };
 
   // MCQ Filter for active section
+  const isMcqSectionLoading = mcqsLoading || mcqsBySection[activeSection] === undefined;
   const currentMcqList = mcqsBySection[activeSection] || [];
   const filteredMcqs = useMemo(() => {
     let list = [...currentMcqList];
@@ -487,8 +484,8 @@ export const CompanyDetails: React.FC = () => {
             const isActive = activeSection === sec.id;
             const count =
               sec.id === 'coding'
-                ? companyProblems.length
-                : (mcqsBySection[sec.id]?.length ?? null);
+                ? (isQuestionsLoading ? null : companyProblems.length)
+                : (mcqsBySection[sec.id] !== undefined ? mcqsBySection[sec.id]!.length : null);
 
             return (
               <button
@@ -508,7 +505,9 @@ export const CompanyDetails: React.FC = () => {
               >
                 <i className={`${sec.icon} ${isActive ? 'text-white' : 'text-slate-400'}`}></i>
                 <span>{sec.label}</span>
-                {count !== null && (
+                {count === null ? (
+                  <span className="w-5 h-3.5 bg-slate-200 dark:bg-slate-700/80 animate-pulse rounded-full inline-block ml-1" />
+                ) : (
                   <span
                     className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                       isActive
@@ -749,8 +748,8 @@ export const CompanyDetails: React.FC = () => {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs sm:text-sm">
-                  {mcqsLoading && filteredMcqs.length === 0 ? (
-                    <TableRowSkeleton rows={6} />
+                  {isMcqSectionLoading ? (
+                    <TableRowSkeleton rows={6} showExamPlatform={false} showCompanies={false} />
                   ) : filteredMcqs.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">

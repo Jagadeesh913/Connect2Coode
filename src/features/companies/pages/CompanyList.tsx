@@ -16,9 +16,22 @@ export const CompanyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
 
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
+
   useEffect(() => {
-    dispatch(fetchCompanies(undefined));
+    const req = dispatch(fetchCompanies(undefined));
+    req
+      .unwrap()
+      .catch(() => {})
+      .finally(() => {
+        setHasFetchedOnce(true);
+      });
+    return () => {
+      req.abort();
+    };
   }, [dispatch]);
+
+  const isCompaniesLoading = isLoading || !hasFetchedOnce;
 
   // Exclusively map real backend companies - NO MOCK DATA
   const allCompanies = useMemo(() => {
@@ -140,7 +153,7 @@ export const CompanyList: React.FC = () => {
         </div>
 
         {/* 3. COMPANIES 4-COLUMN RESPONSIVE GRID */}
-        {isLoading && filteredCompanies.length === 0 ? (
+        {isCompaniesLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <CompanyCardSkeleton count={8} />
           </div>

@@ -535,7 +535,7 @@ export const AdminMcqs: React.FC = () => {
         />
 
         {/* Pagination Bar */}
-        {totalPages > 1 && (
+        {!loading && totalPages > 1 && (
           <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10 text-xs">
             <div className="text-gray-400">
               Showing page <span className="font-bold text-white">{pageNumber + 1}</span> of{' '}

@@ -188,6 +188,8 @@ export const PracticePage: React.FC = () => {
     return found?.id !== undefined && !isNaN(Number(found.id)) ? Number(found.id) : undefined;
   }, [selectedPlatform, apiPlatforms]);
 
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
+
   // Load catalog reference data from APIs once
   useEffect(() => {
     dispatch(fetchReferenceGroup('DIFF'));
@@ -220,6 +222,13 @@ export const PracticePage: React.FC = () => {
       })
     );
 
+    request
+      .unwrap()
+      .catch(() => {})
+      .finally(() => {
+        setHasFetchedOnce(true);
+      });
+
     return () => {
       request.abort();
     };
@@ -232,6 +241,8 @@ export const PracticePage: React.FC = () => {
     resolvedPlatformId,
     currentPage,
   ]);
+
+  const isProblemsLoading = loading || !hasFetchedOnce;
 
   // Filter Selection handlers (updates DRAFT state ONLY - NO API call until Apply clicked)
   const handleDifficultyClick = (diffVal: string) => {
@@ -846,7 +857,7 @@ export const PracticePage: React.FC = () => {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                    {loading ? (
+                    {isProblemsLoading ? (
                       <TableRowSkeleton rows={20} />
                     ) : !isAuthenticated && displayedProblems.length === 0 ? (
                       <tr>
@@ -1022,7 +1033,7 @@ export const PracticePage: React.FC = () => {
             </div>
 
             {/* Pagination Controls (Standardized 20 problems per page) */}
-            {totalPages > 0 && (
+            {!isProblemsLoading && totalPages > 0 && displayedProblems.length > 0 && (
               <div className="pt-2">
                 <Pagination
                   currentPage={currentPage}

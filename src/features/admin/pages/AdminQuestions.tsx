@@ -592,7 +592,8 @@ export const AdminQuestions: React.FC = () => {
           />
 
           {/* Full-Featured Admin Pagination Footer */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl text-xs font-sans text-gray-300 shadow-2xl">
+          {!loading && totalElements > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl text-xs font-sans text-gray-300 shadow-2xl">
             <div className="flex items-center gap-3 flex-wrap">
               <span>
                 Showing{' '}
@@ -693,7 +694,8 @@ export const AdminQuestions: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
+        )}
+      </div>
       )}
 
       {/* Single Popup Question + Test Case Form Modal */}

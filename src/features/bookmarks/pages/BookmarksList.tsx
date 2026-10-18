@@ -4,16 +4,29 @@ import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchBookmarks, toggleBookmarkItem } from '../redux/bookmarkSlice';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Badge } from '../../../shared/components/ui/Badge';
+import { BookmarkItemSkeleton } from '../../../shared/components/ui/Skeleton';
 import { toast } from 'react-hot-toast';
 
 export const BookmarksList: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { bookmarks } = useAppSelector((state) => state.bookmarks);
+  const { bookmarks, loading } = useAppSelector((state) => state.bookmarks);
   const [filterType, setFilterType] = useState<'ALL' | 'PROBLEM' | 'APTITUDE' | 'COMPANY'>('ALL');
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchBookmarks());
+    const req = dispatch(fetchBookmarks());
+    req
+      .unwrap()
+      .catch(() => {})
+      .finally(() => {
+        setHasFetchedOnce(true);
+      });
+    return () => {
+      req.abort();
+    };
   }, [dispatch]);
+
+  const isBookmarksLoading = loading || !hasFetchedOnce;
 
   const handleRemove = (itemId: string) => {
     dispatch(toggleBookmarkItem({ itemId }))
@@ -84,7 +97,9 @@ export const BookmarksList: React.FC = () => {
 
       {/* Bookmarks List Container */}
       <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 mt-2">
-        {filteredBookmarks.length === 0 ? (
+        {isBookmarksLoading ? (
+          <BookmarkItemSkeleton count={4} />
+        ) : filteredBookmarks.length === 0 ? (
           <EmptyState
             title="No bookmarks saved"
             description="Click the star bookmark icon on any problem, aptitude, or company page to save it for quick revision."

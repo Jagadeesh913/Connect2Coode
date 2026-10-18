@@ -241,3 +241,136 @@ export const CompanyDetailsSkeleton: React.FC = () => {
     </div>
   );
 };
+
+export interface AptitudeQuestionSkeletonProps {
+  count?: number;
+}
+
+/**
+ * Realistic Aptitude / MCQ Card Skeleton matching AptitudePrep layout
+ */
+export const AptitudeQuestionSkeleton: React.FC<AptitudeQuestionSkeletonProps> = ({ count = 6 }) => {
+  return (
+    <div className="flex flex-col gap-3">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={`aptitude-skeleton-${i}`}
+          className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          {/* Left Details: Title & Tags */}
+          <div className="flex flex-col items-start gap-2.5 flex-1 min-w-0 pr-2">
+            <Skeleton className={`h-5 ${i % 3 === 0 ? 'w-4/5' : i % 3 === 1 ? 'w-2/3' : 'w-3/4'} rounded-lg`} />
+            <div className="flex items-center gap-2 mt-1">
+              <Skeleton className="h-4 w-20 rounded-md" />
+              <Skeleton className="h-4 w-24 rounded-md" />
+              <Skeleton className="h-4 w-16 rounded-md" />
+            </div>
+          </div>
+
+          {/* Right Details: Difficulty + Bookmark + Solve CTA */}
+          <div className="flex items-center gap-4 sm:gap-6 self-end sm:self-center shrink-0">
+            <div className="flex items-center gap-2">
+              <Skeleton className="w-2 h-2 rounded-full" />
+              <Skeleton className="h-4 w-14 rounded-md" />
+            </div>
+            <Skeleton className="w-6 h-6 rounded-full" />
+            <Skeleton className="h-8 w-20 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+export interface BookmarkItemSkeletonProps {
+  count?: number;
+}
+
+/**
+ * Realistic Bookmark Item Skeleton matching BookmarksList cards
+ */
+export const BookmarkItemSkeleton: React.FC<BookmarkItemSkeletonProps> = ({ count = 4 }) => {
+  return (
+    <div className="flex flex-col gap-3.5">
+      {Array.from({ length: count }).map((_, i) => (
+        <div
+          key={`bookmark-skeleton-${i}`}
+          className="p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0D1322] rounded-2xl flex items-center justify-between gap-4 shadow-xs"
+        >
+          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+            <Skeleton className="w-9 h-9 rounded-xl shrink-0" />
+            <div className="flex flex-col gap-2 flex-1">
+              <Skeleton className={`h-4 ${i % 2 === 0 ? 'w-64' : 'w-48'} rounded-md`} />
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-16 rounded-full" />
+                <Skeleton className="h-4 w-20 rounded-md" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <Skeleton className="h-8 w-16 rounded-xl" />
+            <Skeleton className="w-8 h-8 rounded-xl" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * Realistic Profile Page Skeleton matching ProfileSettings
+ */
+export const ProfilePageSkeleton: React.FC = () => {
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Breadcrumb Skeleton */}
+      <div className="flex items-center gap-2">
+        <Skeleton className="h-4 w-12 rounded" />
+        <span className="text-slate-300 dark:text-slate-700">&gt;</span>
+        <Skeleton className="h-4 w-20 rounded" />
+      </div>
+
+      {/* Hero Banner Skeleton */}
+      <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <Skeleton className="w-20 h-20 rounded-2xl shrink-0" />
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 rounded-xl" />
+            <Skeleton className="h-4 w-36 rounded-md" />
+            <Skeleton className="h-4 w-28 rounded-md mt-1" />
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-28 rounded-2xl" />
+          <Skeleton className="h-16 w-28 rounded-2xl" />
+        </div>
+      </div>
+
+      {/* Tabs Skeleton */}
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-10 w-28 rounded-xl" />
+        <Skeleton className="h-10 w-28 rounded-xl" />
+        <Skeleton className="h-10 w-32 rounded-xl" />
+      </div>
+
+      {/* Grid Content Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 flex flex-col gap-6">
+          <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 flex flex-col gap-4">
+            <Skeleton className="h-6 w-40 rounded-lg" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <Skeleton className="h-48 w-full rounded-3xl" />
+        </div>
+      </div>
+    </div>
+  );
+};
+

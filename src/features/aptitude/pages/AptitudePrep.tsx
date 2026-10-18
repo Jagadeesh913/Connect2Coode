@@ -12,6 +12,7 @@ import {
   cleanQuestionText,
   synthesizeMcqOptions,
 } from '../utils/mcqUtils';
+import { Skeleton, AptitudeQuestionSkeleton } from '../../../shared/components/ui/Skeleton';
 
 export type AptitudeItem = McqQuestion;
 
@@ -581,8 +582,13 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                         onChange={() => handleDifficultyToggle(diff)}
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
-                      <span>
-                        {diff} ({count})
+                      <span className="flex items-center gap-1.5">
+                        <span>{diff}</span>
+                        {loading && count === 0 ? (
+                          <span className="inline-block w-5 h-3 bg-slate-200 dark:bg-slate-700/80 rounded animate-pulse" />
+                        ) : (
+                          <span>({count})</span>
+                        )}
                       </span>
                     </label>
                   );
@@ -603,25 +609,36 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
               {isQuestionTypeOpen && (
                 <div className="flex flex-col gap-2 pt-3 animate-fade-in max-h-64 overflow-y-auto pr-1">
-                  {availableQuestionTypes.map((t) => {
-                    const isChecked = selectedTypes.includes(t.name);
-                    return (
-                      <label
-                        key={t.name}
-                        className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => handleTypeToggle(t.name)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                        />
-                        <span className="truncate">
-                          {t.name} ({t.count})
-                        </span>
-                      </label>
-                    );
-                  })}
+                  {loading && availableQuestionTypes.length === 0 ? (
+                    <div className="flex flex-col gap-2.5 py-1">
+                      {[1, 2, 3, 4].map((idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <Skeleton className="w-4 h-4 rounded" />
+                          <Skeleton className={`h-3 ${idx % 2 === 0 ? 'w-24' : 'w-20'} rounded`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    availableQuestionTypes.map((t) => {
+                      const isChecked = selectedTypes.includes(t.name);
+                      return (
+                        <label
+                          key={t.name}
+                          className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => handleTypeToggle(t.name)}
+                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          />
+                          <span className="truncate">
+                            {t.name} ({t.count})
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
                 </div>
               )}
             </div>
@@ -680,25 +697,23 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
             </div>
 
             {/* Questions Counter */}
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 pt-1 flex items-center justify-between">
-              <span>{totalElements} Questions Found</span>
-              {loading && <span className="text-blue-500 flex items-center gap-1.5"><i className="fa-solid fa-spinner fa-spin text-xs"></i> Loading...</span>}
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 pt-1 flex items-center justify-between min-h-[22px]">
+              {loading && totalElements === 0 ? (
+                <Skeleton className="h-4 w-32 rounded-md" />
+              ) : (
+                <span>{totalElements} Questions Found</span>
+              )}
+              {loading && (
+                <span className="text-blue-500 flex items-center gap-1.5 font-medium">
+                  <i className="fa-solid fa-spinner fa-spin text-xs"></i> Loading...
+                </span>
+              )}
             </div>
 
             {/* Questions List */}
             <div className="flex flex-col gap-3">
-              {loading && questions.length === 0 ? (
-                <div className="flex flex-col gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 shadow-2xs animate-pulse flex flex-col gap-3"
-                    >
-                      <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-3/4"></div>
-                      <div className="h-3 bg-slate-100 dark:bg-slate-850 rounded-md w-1/3"></div>
-                    </div>
-                  ))}
-                </div>
+              {loading ? (
+                <AptitudeQuestionSkeleton count={6} />
               ) : error ? (
                 <div className="text-center py-12 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6">
                   <i className="fa-solid fa-triangle-exclamation text-amber-500 text-3xl mb-3"></i>
@@ -801,7 +816,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
             </div>
 
             {/* Pagination Matching Reference Layout */}
-            {totalPages > 1 && (
+            {!loading && totalPages > 1 && (
               <div className="flex items-center justify-center gap-1.5 pt-6 pb-2">
                 <button
                   type="button"
