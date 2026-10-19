@@ -1,7 +1,7 @@
 # Connect-2-Code — API Audit & Test Execution Report
 
 **Audit Date**: October 9, 2026<br/>
-**Environment**: Production Remote Backend (`https://codingplatform-tdt0.onrender.com/api/v1`)<br/>
+**Environment**: Production Remote Backend (`https://api.connect2code.in/api/v1`)<br/>
 **Judge0 Execution Cluster**: Remote Judge0 CE Cluster (`http://165.22.217.218:2358`)<br/>
 **Audit Scope**: Complete evidence-based audit of all APIs, Postman MCP verification, and contract analysis.
 

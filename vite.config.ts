@@ -18,28 +18,28 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://codingplatform-tdt0.onrender.com',
+        target: 'https://api.connect2code.in',
         changeOrigin: true,
         secure: false,
         headers: {
-          Origin: 'https://codingplatform-tdt0.onrender.com',
+          Origin: 'https://api.connect2code.in',
         },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Origin', 'https://codingplatform-tdt0.onrender.com');
+            proxyReq.setHeader('Origin', 'https://api.connect2code.in');
           });
         },
       },
       '/oauth2': {
-        target: 'https://codingplatform-tdt0.onrender.com',
+        target: 'https://api.connect2code.in',
         changeOrigin: true,
         secure: false,
         headers: {
-          Origin: 'https://codingplatform-tdt0.onrender.com',
+          Origin: 'https://api.connect2code.in',
         },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Origin', 'https://codingplatform-tdt0.onrender.com');
+            proxyReq.setHeader('Origin', 'https://api.connect2code.in');
           });
         },
       }
@@ -49,28 +49,28 @@ export default defineConfig({
     port: 4173,
     proxy: {
       '/api': {
-        target: 'https://codingplatform-tdt0.onrender.com',
+        target: 'https://api.connect2code.in',
         changeOrigin: true,
         secure: false,
         headers: {
-          Origin: 'https://codingplatform-tdt0.onrender.com',
+          Origin: 'https://api.connect2code.in',
         },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Origin', 'https://codingplatform-tdt0.onrender.com');
+            proxyReq.setHeader('Origin', 'https://api.connect2code.in');
           });
         },
       },
       '/oauth2': {
-        target: 'https://codingplatform-tdt0.onrender.com',
+        target: 'https://api.connect2code.in',
         changeOrigin: true,
         secure: false,
         headers: {
-          Origin: 'https://codingplatform-tdt0.onrender.com',
+          Origin: 'https://api.connect2code.in',
         },
         configure: (proxy) => {
           proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('Origin', 'https://codingplatform-tdt0.onrender.com');
+            proxyReq.setHeader('Origin', 'https://api.connect2code.in');
           });
         },
       }

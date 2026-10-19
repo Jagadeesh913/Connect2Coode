@@ -60,23 +60,23 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
     );
   });
 
-  it('defaults to production Render backend URL when env variable is unconfigured (undefined)', () => {
+  it('defaults to production backend URL when env variable is unconfigured (undefined)', () => {
     const result = resolveApiBaseUrl(undefined);
-    assert.equal(result, 'https://codingplatform-tdt0.onrender.com/api/v1');
+    assert.equal(result, 'https://api.connect2code.in/api/v1');
   });
 
-  it('empty or whitespace-only env variable defaults to production Render backend URL', () => {
-    assert.equal(resolveApiBaseUrl(''), 'https://codingplatform-tdt0.onrender.com/api/v1');
-    assert.equal(resolveApiBaseUrl('   '), 'https://codingplatform-tdt0.onrender.com/api/v1');
+  it('empty or whitespace-only env variable defaults to production backend URL', () => {
+    assert.equal(resolveApiBaseUrl(''), 'https://api.connect2code.in/api/v1');
+    assert.equal(resolveApiBaseUrl('   '), 'https://api.connect2code.in/api/v1');
   });
 
-  it('invalid protocol safely falls back to production Render backend URL', () => {
+  it('invalid protocol safely falls back to production backend URL', () => {
     const result = resolveApiBaseUrl('ftp://invalid-server/api');
-    assert.equal(result, 'https://codingplatform-tdt0.onrender.com/api/v1');
+    assert.equal(result, 'https://api.connect2code.in/api/v1');
   });
 
-  it('exported BASE_URL defaults to production Render backend URL in test/unconfigured environment', () => {
-    assert.equal(BASE_URL, 'https://codingplatform-tdt0.onrender.com/api/v1');
+  it('exported BASE_URL defaults to production backend URL in test/unconfigured environment', () => {
+    assert.equal(BASE_URL, 'https://api.connect2code.in/api/v1');
   });
 
   describe('Deployed / Vercel Environment URL Guarantees', () => {
@@ -87,39 +87,39 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
       assert.equal(resolveDeploymentApiBaseUrl('https://custom.backend.com/api/v1', true), '/api/v1');
     });
 
-    it('strictly enforces Render backend URL and rejects localhost in deployed production', () => {
+    it('strictly enforces backend URL and rejects localhost in deployed production', () => {
       assert.equal(
         resolveDeploymentApiBaseUrl('http://localhost:8080/api/v1', false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        'https://api.connect2code.in/api/v1'
       );
       assert.equal(
         resolveDeploymentApiBaseUrl('http://127.0.0.1:8080/api/v1', false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        'https://api.connect2code.in/api/v1'
       );
       assert.equal(
         resolveDeploymentApiBaseUrl('http://localhost:3000', false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        'https://api.connect2code.in/api/v1'
       );
     });
 
-    it('strictly falls back to live Render backend if relative URL is passed in deployed production', () => {
+    it('strictly falls back to live backend if relative URL is passed in deployed production', () => {
       assert.equal(
         resolveDeploymentApiBaseUrl('/api/v1', false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        'https://api.connect2code.in/api/v1'
       );
     });
 
-    it('defaults to live Render backend when env variable is unconfigured in deployed production', () => {
+    it('defaults to live backend when env variable is unconfigured in deployed production', () => {
       assert.equal(
         resolveDeploymentApiBaseUrl(undefined, false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        'https://api.connect2code.in/api/v1'
       );
     });
 
     it('preserves valid production HTTPS URL in deployed production', () => {
       assert.equal(
-        resolveDeploymentApiBaseUrl('https://codingplatform-tdt0.onrender.com/api/v1', false),
-        'https://codingplatform-tdt0.onrender.com/api/v1'
+        resolveDeploymentApiBaseUrl('https://api.connect2code.in/api/v1', false),
+        'https://api.connect2code.in/api/v1'
       );
     });
   });

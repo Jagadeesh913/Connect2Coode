@@ -4,7 +4,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/signUp",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/signUp",
+    "fullUrl": "https://api.connect2code.in/api/v1/signUp",
     "purpose": "Create and register a new user account on the platform",
     "frontendCallers": [
       "src/services/authService.ts (authService.signUp)"
@@ -109,7 +109,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/auth/login",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/auth/login",
+    "fullUrl": "https://api.connect2code.in/api/v1/auth/login",
     "purpose": "Authenticate user credentials and issue JWT access token and refresh token",
     "frontendCallers": [
       "src/services/authService.ts (authService.login)",
@@ -206,7 +206,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/auth/refresh",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/auth/refresh",
+    "fullUrl": "https://api.connect2code.in/api/v1/auth/refresh",
     "purpose": "Exchange a valid refresh token for a fresh short-lived JWT access token",
     "frontendCallers": [
       "src/services/authService.ts (authService.refreshToken)",
@@ -281,7 +281,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/auth/generatePasswordResetOtp",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/auth/generatePasswordResetOtp",
+    "fullUrl": "https://api.connect2code.in/api/v1/auth/generatePasswordResetOtp",
     "purpose": "Generate and email a password recovery OTP to the user",
     "frontendCallers": [
       "src/services/authService.ts (authService.generatePasswordResetOtp)"
@@ -343,7 +343,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/auth/verifyPasswordResetOtp",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/auth/verifyPasswordResetOtp",
+    "fullUrl": "https://api.connect2code.in/api/v1/auth/verifyPasswordResetOtp",
     "purpose": "Verify reset OTP and update password",
     "frontendCallers": [
       "src/services/authService.ts (authService.verifyPasswordResetOtp)"
@@ -410,7 +410,7 @@
     "module": "Authentication",
     "method": "POST",
     "path": "/auth/logout",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/auth/logout",
+    "fullUrl": "https://api.connect2code.in/api/v1/auth/logout",
     "purpose": "Invalidate refresh token session on backend",
     "frontendCallers": [
       "src/services/authService.ts (authService.logout)"
@@ -467,7 +467,7 @@
     "module": "Reference Library",
     "method": "GET",
     "path": "/referenceLibrary/refGroupCode/TOPIC",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/referenceLibrary/refGroupCode/TOPIC",
+    "fullUrl": "https://api.connect2code.in/api/v1/referenceLibrary/refGroupCode/TOPIC",
     "purpose": "Fetch list of problem topic categories",
     "frontendCallers": [
       "src/services/referenceService.ts (referenceService.getByGroupCode('TOPIC'))"
@@ -538,7 +538,7 @@
     "module": "Reference Library",
     "method": "GET",
     "path": "/referenceLibrary/refGroupCode/DIFF",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/referenceLibrary/refGroupCode/DIFF",
+    "fullUrl": "https://api.connect2code.in/api/v1/referenceLibrary/refGroupCode/DIFF",
     "purpose": "Fetch problem difficulty tiers (Basic, Easy, Medium, Hard)",
     "frontendCallers": [
       "src/services/referenceService.ts (referenceService.getByGroupCode('DIFF'))"
@@ -586,7 +586,7 @@
     "module": "Reference Library",
     "method": "GET",
     "path": "/referenceLibrary/refGroupCode/QPF",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/referenceLibrary/refGroupCode/QPF",
+    "fullUrl": "https://api.connect2code.in/api/v1/referenceLibrary/refGroupCode/QPF",
     "purpose": "Fetch question platform flags",
     "frontendCallers": [
       "src/services/referenceService.ts"
@@ -625,7 +625,7 @@
     "module": "Reference Library",
     "method": "GET",
     "path": "/referenceLibrary",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/referenceLibrary",
+    "fullUrl": "https://api.connect2code.in/api/v1/referenceLibrary",
     "purpose": "Base reference endpoint probe",
     "frontendCallers": [],
     "authentication": "UNKNOWN",
@@ -653,7 +653,7 @@
     "module": "Companies",
     "method": "GET",
     "path": "/company",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/company",
+    "fullUrl": "https://api.connect2code.in/api/v1/company",
     "purpose": "Retrieve list of all hiring companies with logos and website links",
     "frontendCallers": [
       "src/services/companyService.ts (companyService.getCompanies)",
@@ -728,7 +728,7 @@
     "module": "Companies",
     "method": "GET",
     "path": "/company/{id}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/company/{id}",
+    "fullUrl": "https://api.connect2code.in/api/v1/company/{id}",
     "purpose": "Retrieve single company details by numeric database ID",
     "frontendCallers": [
       "src/services/companyService.ts (companyService.getCompanyBySlug)",
@@ -777,7 +777,7 @@
     "module": "Companies",
     "method": "GET",
     "path": "/company/{slug}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/company/tcs",
+    "fullUrl": "https://api.connect2code.in/api/v1/company/tcs",
     "purpose": "Retrieve company by text slug (e.g. tcs)",
     "frontendCallers": [
       "src/services/companyService.ts"
@@ -809,7 +809,7 @@
     "module": "Companies",
     "method": "GET",
     "path": "/company/{id}/problems",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/company/1/problems",
+    "fullUrl": "https://api.connect2code.in/api/v1/company/1/problems",
     "purpose": "Direct endpoint for company problems defined in endpoints.ts",
     "frontendCallers": [
       "src/core/api/endpoints.ts (COMPANY.PROBLEMS)"
@@ -841,7 +841,7 @@
     "module": "Companies",
     "method": "POST",
     "path": "/company",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/company",
+    "fullUrl": "https://api.connect2code.in/api/v1/company",
     "purpose": "Create or update company record",
     "frontendCallers": [
       "src/services/admin/adminCompanyService.ts (adminCompanyService.saveOrUpdateCompany)"
@@ -901,7 +901,7 @@
     "module": "Languages",
     "method": "GET",
     "path": "/language",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/language",
+    "fullUrl": "https://api.connect2code.in/api/v1/language",
     "purpose": "Fetch all available programming languages with Table IDs and Reference IDs",
     "frontendCallers": [
       "src/services/executionService.ts (executionService.getLanguageDropdown)",
@@ -971,7 +971,7 @@
     "module": "Languages",
     "method": "GET",
     "path": "/language/dropdown",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/language/dropdown",
+    "fullUrl": "https://api.connect2code.in/api/v1/language/dropdown",
     "purpose": "Fetch language dropdown options",
     "frontendCallers": [
       "src/services/executionService.ts"
@@ -1008,7 +1008,7 @@
     "module": "Languages",
     "method": "GET",
     "path": "/language/{id}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/language/1",
+    "fullUrl": "https://api.connect2code.in/api/v1/language/1",
     "purpose": "Fetch language details by ID",
     "frontendCallers": [
       "src/services/admin/adminLanguageService.ts (adminLanguageService.getLanguageById)"
@@ -1047,7 +1047,7 @@
     "module": "Languages",
     "method": "POST",
     "path": "/language",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/language",
+    "fullUrl": "https://api.connect2code.in/api/v1/language",
     "purpose": "Create or update language configuration",
     "frontendCallers": [
       "src/services/admin/adminLanguageService.ts (createLanguage, updateLanguage)"
@@ -1103,7 +1103,7 @@
     "module": "Languages",
     "method": "DELETE",
     "path": "/language/{id}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/language/9999",
+    "fullUrl": "https://api.connect2code.in/api/v1/language/9999",
     "purpose": "Soft delete language",
     "frontendCallers": [
       "src/services/admin/adminLanguageService.ts (deleteLanguage)"
@@ -1141,7 +1141,7 @@
     "module": "Questions",
     "method": "POST",
     "path": "/questions",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/questions",
+    "fullUrl": "https://api.connect2code.in/api/v1/questions",
     "purpose": "Paginated, filtered search and retrieval of coding questions",
     "frontendCallers": [
       "src/services/problemService.ts (problemService.getProblems)",
@@ -1257,7 +1257,7 @@
     "module": "Questions",
     "method": "GET",
     "path": "/question/{id}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/question/1",
+    "fullUrl": "https://api.connect2code.in/api/v1/question/1",
     "purpose": "Retrieve single question details and visible test cases by numeric ID",
     "frontendCallers": [
       "src/services/problemService.ts (problemService.getProblemById)",
@@ -1327,7 +1327,7 @@
     "module": "Questions",
     "method": "GET",
     "path": "/question/{slug}",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/question/two-sum",
+    "fullUrl": "https://api.connect2code.in/api/v1/question/two-sum",
     "purpose": "Question detail by text slug probe",
     "frontendCallers": [],
     "authentication": "UNKNOWN",
@@ -1357,7 +1357,7 @@
     "module": "Questions",
     "method": "POST",
     "path": "/question",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/question",
+    "fullUrl": "https://api.connect2code.in/api/v1/question",
     "purpose": "Create or update question in database",
     "frontendCallers": [
       "src/services/questionService.ts (questionService.saveOrUpdate)",
@@ -1397,7 +1397,7 @@
     "module": "Questions",
     "method": "POST",
     "path": "/question/{id}/testCases",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/question/1/testCases",
+    "fullUrl": "https://api.connect2code.in/api/v1/question/1/testCases",
     "purpose": "Attach test cases to a question",
     "frontendCallers": [
       "src/services/questionService.ts (questionService.addTestCases)",
@@ -1439,7 +1439,7 @@
     "module": "Questions",
     "method": "POST",
     "path": "/question/{id}/submit",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/question/1/submit",
+    "fullUrl": "https://api.connect2code.in/api/v1/question/1/submit",
     "purpose": "Legacy submit route in endpoints.ts",
     "frontendCallers": [
       "src/core/api/endpoints.ts (PROBLEMS.SUBMIT)"
@@ -1471,7 +1471,7 @@
     "module": "Code Execution",
     "method": "POST",
     "path": "/runCode",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/runCode",
+    "fullUrl": "https://api.connect2code.in/api/v1/runCode",
     "purpose": "Execute code against visible sample test cases via Judge0",
     "frontendCallers": [
       "src/services/executionService.ts (executionService.runCode)"
@@ -1573,7 +1573,7 @@
     "module": "Code Execution",
     "method": "POST",
     "path": "/submitCode",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/submitCode",
+    "fullUrl": "https://api.connect2code.in/api/v1/submitCode",
     "purpose": "Evaluate complete problem submission against visible and hidden test cases",
     "frontendCallers": [
       "src/services/executionService.ts (executionService.submitCode)"
@@ -1629,7 +1629,7 @@
     "module": "Code Execution",
     "method": "POST",
     "path": "/admin/testCode",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/admin/testCode",
+    "fullUrl": "https://api.connect2code.in/api/v1/admin/testCode",
     "purpose": "Admin privileged code execution runner",
     "frontendCallers": [
       "src/services/executionService.ts (executionService.adminTestCode)",
@@ -1669,7 +1669,7 @@
     "module": "Code Execution",
     "method": "POST",
     "path": "/admin/submitCode",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/admin/submitCode",
+    "fullUrl": "https://api.connect2code.in/api/v1/admin/submitCode",
     "purpose": "Admin privileged submission validation runner",
     "frontendCallers": [
       "src/services/executionService.ts (executionService.adminSubmitCode)",
@@ -1709,7 +1709,7 @@
     "module": "User Profile",
     "method": "GET",
     "path": "/user/profile",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/user/profile",
+    "fullUrl": "https://api.connect2code.in/api/v1/user/profile",
     "purpose": "Retrieve authenticated user profile",
     "frontendCallers": [
       "src/services/profileService.ts (profileService.getProfile)"
@@ -1739,7 +1739,7 @@
     "module": "User Profile",
     "method": "PUT",
     "path": "/user/profile",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/user/profile",
+    "fullUrl": "https://api.connect2code.in/api/v1/user/profile",
     "purpose": "Update authenticated user profile",
     "frontendCallers": [
       "src/services/profileService.ts (profileService.updateProfile)"
@@ -1769,7 +1769,7 @@
     "module": "Bookmarks",
     "method": "POST",
     "path": "/users/{userId}/questions/{questionId}/bookmark",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/users/63/questions/1/bookmark",
+    "fullUrl": "https://api.connect2code.in/api/v1/users/63/questions/1/bookmark",
     "purpose": "Save question bookmark for authenticated user",
     "frontendCallers": [],
     "authentication": "USER_ONLY",
@@ -1816,7 +1816,7 @@
     "module": "Bookmarks",
     "method": "GET",
     "path": "/users/{userId}/questions/bookmarks",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/users/63/questions/bookmarks",
+    "fullUrl": "https://api.connect2code.in/api/v1/users/63/questions/bookmarks",
     "purpose": "Retrieve all bookmarked questions for user",
     "frontendCallers": [],
     "authentication": "USER_ONLY",
@@ -1878,7 +1878,7 @@
     "module": "Bookmarks",
     "method": "DELETE",
     "path": "/users/{userId}/questions/{questionId}/bookmark",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/users/63/questions/1/bookmark",
+    "fullUrl": "https://api.connect2code.in/api/v1/users/63/questions/1/bookmark",
     "purpose": "Remove question bookmark for user",
     "frontendCallers": [],
     "authentication": "USER_ONLY",
@@ -1925,7 +1925,7 @@
     "module": "Progress",
     "method": "GET",
     "path": "/users/{userId}/solvedQuestions",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/users/63/solvedQuestions",
+    "fullUrl": "https://api.connect2code.in/api/v1/users/63/solvedQuestions",
     "purpose": "Retrieve solved questions for user progress",
     "frontendCallers": [],
     "authentication": "UNKNOWN",
@@ -1955,7 +1955,7 @@
     "module": "Progress",
     "method": "GET",
     "path": "/users/{userId}/attemptedQuestions",
-    "fullUrl": "https://codingplatform-tdt0.onrender.com/api/v1/users/63/attemptedQuestions",
+    "fullUrl": "https://api.connect2code.in/api/v1/users/63/attemptedQuestions",
     "purpose": "Retrieve attempted questions for user progress",
     "frontendCallers": [],
     "authentication": "UNKNOWN",

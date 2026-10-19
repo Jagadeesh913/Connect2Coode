@@ -27,7 +27,7 @@ The platform backend is a Java Spring Boot REST API service connected to a remot
 
 - **Production / Remote Base URL:**
   ```text
-  https://codingplatform-tdt0.onrender.com/api/v1
+  https://api.connect2code.in/api/v1
   ```
 - **Local Development / Proxy Path:**
   ```text

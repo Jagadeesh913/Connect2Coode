@@ -1,26 +1,29 @@
 import React, { useEffect, useRef } from 'react';
-import { Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
+import { Outlet, ScrollRestoration, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
 import {
   initializeAuth,
   refreshSessionThunk,
   setAuthenticatedSession,
   setUnauthenticatedSession,
+  closeAuthModal,
 } from '../features/auth/redux/authSlice';
 import { fetchBookmarks } from '../features/bookmarks/redux/bookmarkSlice';
 import { registerAuthListener, registerAuthFailureListener } from '../core/api/apiClient';
 import { tokenStorage } from '../core/security/tokenStorage';
 import { decodeJwtPayload, isJwtExpired } from '../core/security/jwt';
+import { toast } from 'react-hot-toast';
 
 /**
  * Root route shell (F-010, F-039):
  * Initializes Redux store authentication state and bookmarks globally on app bootstrap
  * for ALL routes (Landing, Login, Practice, Admin, 404, 500).
- * Coordinates single canonical session restoration via HttpOnly refresh cookie.
+ * Coordinates single canonical session restoration and OAuth parameter forwarding.
  */
 export const AppRouterLayout: React.FC = () => {
   const dispatch = useAppDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
   const userId = useAppSelector((state) => state.auth?.user?.id);
   const hasInitializedRef = useRef(false);
 
@@ -38,8 +41,47 @@ export const AppRouterLayout: React.FC = () => {
     };
   }, [dispatch]);
 
-  // App Bootstrap: Restore session once from backend HttpOnly refresh cookie
+  // Intercept popup OAuth completion messages
   useEffect(() => {
+    const handleOAuthMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'C2C_GOOGLE_OAUTH_SUCCESS') {
+        const token = event.data.refreshToken || event.data.token;
+        if (token) {
+          const res = await dispatch(refreshSessionThunk(token));
+          if (refreshSessionThunk.fulfilled.match(res)) {
+            dispatch(closeAuthModal());
+            toast.success('Signed in with Google!');
+            navigate('/practice', { replace: true });
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleOAuthMessage);
+    return () => {
+      window.removeEventListener('message', handleOAuthMessage);
+    };
+  }, [dispatch, navigate]);
+
+  // App Bootstrap: Restore session once from backend refresh cookie
+  useEffect(() => {
+    // Intercept OAuth parameters if redirected to root or any non-callback route
+    if (!location.pathname.startsWith('/oauth')) {
+      const searchParams = new URLSearchParams(location.search);
+      const hasOAuthParams =
+        searchParams.has('refreshToken') ||
+        searchParams.has('refresh_token') ||
+        searchParams.has('token') ||
+        searchParams.has('accessToken') ||
+        searchParams.has('access_token');
+
+      if (hasOAuthParams) {
+        navigate(`/oauth/callback${location.search}${location.hash}`, { replace: true });
+        return;
+      }
+    }
+
     if (hasInitializedRef.current) return;
     hasInitializedRef.current = true;
 
@@ -56,7 +98,7 @@ export const AppRouterLayout: React.FC = () => {
         dispatch(refreshSessionThunk());
       }
     }
-  }, [dispatch, location.pathname]);
+  }, [dispatch, location.pathname, location.search, location.hash, navigate]);
 
   // Fetch bookmarks once user session is active
   useEffect(() => {

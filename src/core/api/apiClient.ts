@@ -11,8 +11,9 @@ import { tokenStorage } from '../security/tokenStorage';
  *   to relative '/api/v1' with a diagnostic warning, removing silent fallback to a
  *   hardcoded production Render instance (F-005, F-006).
  */
-export const RENDER_BACKEND_ORIGIN = 'https://codingplatform-tdt0.onrender.com';
-export const DEFAULT_API_BASE_URL = 'https://codingplatform-tdt0.onrender.com/api/v1';
+export const BACKEND_ORIGIN = 'https://api.connect2code.in';
+export const RENDER_BACKEND_ORIGIN = BACKEND_ORIGIN;
+export const DEFAULT_API_BASE_URL = 'https://api.connect2code.in/api/v1';
 
 export const resolveApiBaseUrl = (rawUrl?: string | null): string => {
   if (typeof rawUrl !== 'string') {
@@ -39,7 +40,7 @@ export const resolveApiBaseUrl = (rawUrl?: string | null): string => {
     return `/${trimmed}`.replace(/\/+$/, '');
   }
 
-  // 4. Invalid protocol or unsupported format -> fallback to default Render backend
+  // 4. Invalid protocol or unsupported format -> fallback to default backend
   return DEFAULT_API_BASE_URL;
 };
 
@@ -47,7 +48,7 @@ export const getBackendOrigin = (rawUrl?: string | null): string => {
   const resolved = resolveApiBaseUrl(rawUrl);
   const stripped = resolved.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
   if (!stripped || !stripped.startsWith('http')) {
-    return RENDER_BACKEND_ORIGIN;
+    return BACKEND_ORIGIN;
   }
   return stripped;
 };
@@ -63,7 +64,7 @@ export const resolveDeploymentApiBaseUrl = (
   const resolved = resolveApiBaseUrl(rawUrl);
 
   // In deployed production environments, ALL API calls must strictly
-  // target the live backend origin https://codingplatform-tdt0.onrender.com/api/v1 and NEVER localhost.
+  // target the live backend origin https://api.connect2code.in/api/v1 and NEVER localhost.
   if (
     resolved.includes('localhost') ||
     resolved.includes('127.0.0.1') ||
@@ -83,7 +84,7 @@ export const getBaseUrl = (): string => {
   // In any browser execution environment, route through relative '/api/v1'.
   // This enables Vite's development proxy locally and the edge proxy in production,
   // completely eliminating browser cross-origin preflight (OPTIONS) failures on all deployed domains.
-  if (typeof window !== 'undefined' && window.location.origin !== RENDER_BACKEND_ORIGIN) {
+  if (typeof window !== 'undefined' && window.location.origin !== BACKEND_ORIGIN) {
     return '/api/v1';
   }
 

@@ -57,7 +57,7 @@ This document is the central, comprehensive developer reference for all APIs in 
 
 ## 1. Architectural Overview & Base URLs
 
-- **Remote Production Base URL**: `https://codingplatform-tdt0.onrender.com/api/v1`
+- **Remote Production Base URL**: `https://api.connect2code.in/api/v1`
 - **Development Proxy Path**: `/api/v1` (forwarded via Vite development server)
 - **Base URL Source**: Configured in `src/core/api/apiClient.ts` via `import.meta.env.VITE_API_BASE_URL`.
 - **Standard Envelope**: Most successful responses follow the Java Spring Boot `ApiResponse<T>` wrapper:
@@ -111,7 +111,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Authentication & Registration
 - **HTTP Method**: `POST`
 - **Exact Path**: `/signUp`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/signUp`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/signUp`
 - **Purpose**: Creates and registers a new platform user account.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.signUp`)
 - **Authentication Requirement**: `PUBLIC`
@@ -172,7 +172,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Authentication
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/login`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/auth/login`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/login`
 - **Purpose**: Authenticates credentials and returns JWT Bearer token and refresh token.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.login`), `src/features/auth/redux/authSlice.ts`
 - **Authentication Requirement**: `PUBLIC`
@@ -225,7 +225,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Authentication & Token Management
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/refresh`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/auth/refresh`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/refresh`
 - **Purpose**: Exchanges a valid refresh token for a fresh short-lived JWT access token and rolling refresh token.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.refreshToken`), Axios response interceptor in `src/core/api/apiClient.ts`
 - **Authentication Requirement**: `AUTHENTICATED` (Token-based via payload)
@@ -275,7 +275,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Password Recovery
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/generatePasswordResetOtp`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/auth/generatePasswordResetOtp`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/generatePasswordResetOtp`
 - **Purpose**: Generates and dispatches a numeric OTP to the registered account email for password reset.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.generatePasswordResetOtp`)
 - **Authentication Requirement**: `PUBLIC`
@@ -315,7 +315,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Password Recovery
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/verifyPasswordResetOtp`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/auth/verifyPasswordResetOtp`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/verifyPasswordResetOtp`
 - **Purpose**: Verifies the received OTP and sets a new password.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.verifyPasswordResetOtp`)
 - **Authentication Requirement**: `PUBLIC`
@@ -350,7 +350,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Feature / Module**: Session Termination
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/logout`
-- **Full Remote URL**: `https://codingplatform-tdt0.onrender.com/api/v1/auth/logout`
+- **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/logout`
 - **Purpose**: Invalidates the active refresh token session on the server.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.logout`)
 - **Authentication Requirement**: `PUBLIC` (Accepts session token in payload)
