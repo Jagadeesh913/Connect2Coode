@@ -1,4 +1,4 @@
-import { apiClient } from '../core/api/apiClient';
+import { apiClient, DEFAULT_API_BASE_URL } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import { tokenStorage } from '../core/security/tokenStorage';
 import type { ApiResponse } from '../core/types/api';
@@ -103,16 +103,39 @@ export const authService = {
   },
 
   // Refresh Token: POST /api/v1/auth/refresh with credentials
-  // Obtains refresh token from explicit argument or tokenStorage (cookies/localStorage),
-  // transmitting it in request payload { refreshToken }
+  // Browser automatically transmits HttpOnly refreshToken cookie to backend origin
   async refreshToken(explicitRefreshToken?: string): Promise<ApiResponse<AuthResponseData>> {
     const token = explicitRefreshToken || tokenStorage.getRefreshToken();
     const payload = token ? { refreshToken: token } : {};
-    const response: any = await apiClient.post(
-      API_ENDPOINTS.AUTH.REFRESH,
-      payload,
-      { withCredentials: true, timeout: 60000 }
-    );
+
+    // In local dev with Vite proxy, use relative API_ENDPOINTS.AUTH.REFRESH.
+    // In production, target the backend origin directly so the browser attaches the HttpOnly refreshToken cookie.
+    const isLocalDev =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    const refreshUrl = isLocalDev
+      ? API_ENDPOINTS.AUTH.REFRESH
+      : `${DEFAULT_API_BASE_URL}${API_ENDPOINTS.AUTH.REFRESH}`;
+
+    let response: any;
+    try {
+      response = await apiClient.post(
+        refreshUrl,
+        payload,
+        { withCredentials: true, timeout: 60000 }
+      );
+    } catch (directErr: any) {
+      if (!isLocalDev && typeof refreshUrl === 'string' && refreshUrl.startsWith('http')) {
+        response = await apiClient.post(
+          API_ENDPOINTS.AUTH.REFRESH,
+          payload,
+          { withCredentials: true, timeout: 60000 }
+        );
+      } else {
+        throw directErr;
+      }
+    }
     if (response) {
       const data = response.data || response;
       const bearerToken = data.accessToken || data.token;

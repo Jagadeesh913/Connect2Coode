@@ -167,17 +167,43 @@ export const executeRefreshToken = async (): Promise<string> => {
     try {
       const storedRefreshToken = tokenStorage.getRefreshToken();
       const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
-      const refreshRes = await axios.post(
-        `${BASE_URL}/auth/refresh`,
-        payload,
-        {
-          withCredentials: true,
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          },
+      const isLocalDev =
+        typeof window !== 'undefined' &&
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+      const refreshUrl = isLocalDev
+        ? `${BASE_URL}/auth/refresh`
+        : `${DEFAULT_API_BASE_URL}/auth/refresh`;
+
+      let refreshRes: any;
+      try {
+        refreshRes = await axios.post(
+          refreshUrl,
+          payload,
+          {
+            withCredentials: true,
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+          }
+        );
+      } catch (directErr) {
+        if (!isLocalDev && refreshUrl.startsWith('http')) {
+          refreshRes = await axios.post(
+            `${BASE_URL}/auth/refresh`,
+            payload,
+            {
+              withCredentials: true,
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+            }
+          );
+        } else {
+          throw directErr;
         }
-      );
+      }
 
       const responseData = refreshRes.data;
       const tokenData = responseData?.data || responseData;

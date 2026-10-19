@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch } from '../../../app/hooks';
 import { refreshSessionThunk, closeAuthModal } from '../redux/authSlice';
-import { isJwtAdmin, decodeJwtPayload, isJwtExpired } from '../../../core/security/jwt';
+import { isJwtAdmin } from '../../../core/security/jwt';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { toast } from 'react-hot-toast';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
@@ -40,74 +40,17 @@ export const OAuthCallback: React.FC = () => {
     if (executionRef.current) return;
     executionRef.current = true;
 
-    // Check if backend reported an error in query parameters
+    // Extract any error reported in query parameters
     const errorParam = searchParams.get('error') || searchParams.get('error_description');
     if (errorParam) {
       setError(errorParam);
       return;
     }
 
-    // Extract any token passed via query parameter, URL hash, or cookies/storage
-    const refreshTokenFromQuery =
-      searchParams.get('refreshToken') ||
-      searchParams.get('refresh_token');
-
-    const accessTokenFromQuery =
-      searchParams.get('token') ||
-      searchParams.get('accessToken') ||
-      searchParams.get('access_token') ||
-      searchParams.get('jwt');
-
-    let refreshTokenFromHash: string | null = null;
-    let accessTokenFromHash: string | null = null;
-    try {
-      const hash = window.location.hash ? window.location.hash.replace(/^#\/?/, '') : '';
-      const hashParams = new URLSearchParams(hash);
-      refreshTokenFromHash =
-        hashParams.get('refreshToken') ||
-        hashParams.get('refresh_token');
-      accessTokenFromHash =
-        hashParams.get('token') ||
-        hashParams.get('accessToken') ||
-        hashParams.get('access_token') ||
-        hashParams.get('jwt');
-    } catch {}
-
-    const storedRefreshToken = tokenStorage.getRefreshToken();
-    const resolvedRefreshToken = refreshTokenFromQuery || refreshTokenFromHash || storedRefreshToken || undefined;
-    const resolvedAccessToken = accessTokenFromQuery || accessTokenFromHash || undefined;
-
-    if (resolvedRefreshToken && resolvedRefreshToken !== storedRefreshToken) {
-      tokenStorage.setRefreshToken(resolvedRefreshToken);
-    }
-    if (resolvedAccessToken) {
-      tokenStorage.setAccessToken(resolvedAccessToken);
-    }
-
-    // If running inside a popup window, transmit to parent window and close self
-    if (window.opener && window.opener !== window) {
-      try {
-        window.opener.postMessage(
-          {
-            type: 'C2C_GOOGLE_OAUTH_SUCCESS',
-            refreshToken: resolvedRefreshToken,
-            token: resolvedAccessToken || resolvedRefreshToken,
-          },
-          window.location.origin
-        );
-        setTimeout(() => {
-          try { window.close(); } catch {}
-        }, 150);
-        return;
-      } catch (e) {
-        console.warn('Popup postMessage warning:', e);
-      }
-    }
-
-    // Coordinate session establishment with resolved refresh token (or fallback to credentials cookie)
+    // Safest flow: Establish authenticated session using the backend HttpOnly refreshToken cookie
     const completeAuth = async () => {
       try {
-        const result = await dispatch(refreshSessionThunk(resolvedRefreshToken));
+        const result = await dispatch(refreshSessionThunk());
 
         if (refreshSessionThunk.fulfilled.match(result)) {
           dispatch(closeAuthModal());
@@ -117,6 +60,22 @@ export const OAuthCallback: React.FC = () => {
           const userName = user?.firstName || user?.fullName || 'User';
 
           toast.success(`Welcome back, ${userName}! Signed in with Google.`);
+
+          // If running inside a popup window, transmit success to parent window and close self
+          if (window.opener && window.opener !== window) {
+            try {
+              window.opener.postMessage(
+                { type: 'C2C_GOOGLE_OAUTH_SUCCESS' },
+                window.location.origin
+              );
+              setTimeout(() => {
+                try { window.close(); } catch {}
+              }, 150);
+              return;
+            } catch (e) {
+              console.warn('Popup postMessage warning:', e);
+            }
+          }
 
           // Determine safe destination
           let destination = '/practice';
@@ -135,26 +94,6 @@ export const OAuthCallback: React.FC = () => {
 
           navigate(destination, { replace: true });
         } else {
-          // If refresh thunk failed but we have a valid unexpired access token from URL
-          if (resolvedAccessToken) {
-            const decoded = decodeJwtPayload(resolvedAccessToken);
-            if (decoded && !isJwtExpired(decoded)) {
-              const userObj = {
-                id: (decoded as any).id || (decoded as any).userId,
-                email: decoded.sub || decoded.email || '',
-                role: (decoded.Role || decoded.role || 'USER') as string,
-                firstName: (decoded as any).firstName || '',
-                lastName: (decoded as any).lastName || '',
-              };
-              tokenStorage.setAccessToken(resolvedAccessToken);
-              tokenStorage.setUser(userObj);
-              dispatch(closeAuthModal());
-              toast.success('Signed in with Google!');
-              navigate('/practice', { replace: true });
-              return;
-            }
-          }
-
           const rawError = (result.payload as string) || '';
           const errMsg =
             rawError && !rawError.toLowerCase().includes('missing')
