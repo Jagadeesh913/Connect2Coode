@@ -88,13 +88,20 @@ export const profileService = {
 
   /**
    * POST /api/v1/userInfo/{userId}
-   * Creates or updates academic user profile info
+   * Creates or updates academic user profile info with token in payload
    */
   async saveUserInfo(
     userId: string | number,
     payload: SaveUserInfoPayload
   ): Promise<ApiResponse<UserInfoData>> {
-    const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payload);
+    const token = tokenStorage.getAccessToken();
+    const payloadWithToken = {
+      ...payload,
+      token: token || payload.token,
+      ...(payload.id ? { id: Number(payload.id) } : {}),
+      userId: Number(userId),
+    };
+    const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payloadWithToken);
     return {
       statusCode: res?.statusCode || 200,
       message: res?.message || 'User profile saved successfully',

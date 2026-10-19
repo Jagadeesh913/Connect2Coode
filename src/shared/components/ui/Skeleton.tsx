@@ -49,10 +49,10 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
           </td>
 
           {/* Title */}
-          <td className="py-3.5 px-4">
+          <td className="py-3.5 px-4 min-w-[340px] xl:min-w-[420px]">
             <div className="flex flex-col gap-1.5">
-              <Skeleton className={`h-4 ${i % 3 === 0 ? 'w-48' : i % 3 === 1 ? 'w-64' : 'w-56'} rounded-md`} />
-              <Skeleton className="h-2.5 w-24 rounded-sm opacity-60" />
+              <Skeleton className={`h-4 ${i % 3 === 0 ? 'w-72' : i % 3 === 1 ? 'w-96' : 'w-80'} rounded-md`} />
+              <Skeleton className="h-2.5 w-32 rounded-sm opacity-60" />
             </div>
           </td>
 
@@ -249,32 +249,43 @@ export interface AptitudeQuestionSkeletonProps {
 /**
  * Realistic Aptitude / MCQ Card Skeleton matching AptitudePrep layout
  */
-export const AptitudeQuestionSkeleton: React.FC<AptitudeQuestionSkeletonProps> = ({ count = 6 }) => {
+export const AptitudeQuestionSkeleton: React.FC<AptitudeQuestionSkeletonProps> = ({ count = 5 }) => {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={`aptitude-skeleton-${i}`}
-          className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col gap-4"
         >
-          {/* Left Details: Title & Tags */}
-          <div className="flex flex-col items-start gap-2.5 flex-1 min-w-0 pr-2">
-            <Skeleton className={`h-5 ${i % 3 === 0 ? 'w-4/5' : i % 3 === 1 ? 'w-2/3' : 'w-3/4'} rounded-lg`} />
-            <div className="flex items-center gap-2 mt-1">
-              <Skeleton className="h-4 w-20 rounded-md" />
-              <Skeleton className="h-4 w-24 rounded-md" />
-              <Skeleton className="h-4 w-16 rounded-md" />
+          {/* Header */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-5 w-24 rounded-md" />
+              <Skeleton className="h-5 w-20 rounded-md" />
             </div>
+            <Skeleton className="h-4 w-16 rounded-md" />
           </div>
 
-          {/* Right Details: Difficulty + Bookmark + Solve CTA */}
-          <div className="flex items-center gap-4 sm:gap-6 self-end sm:self-center shrink-0">
-            <div className="flex items-center gap-2">
-              <Skeleton className="w-2 h-2 rounded-full" />
-              <Skeleton className="h-4 w-14 rounded-md" />
+          {/* Question Text */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className={`h-5 ${i % 2 === 0 ? 'w-full' : 'w-4/5'} rounded-lg`} />
+            <Skeleton className="h-5 w-2/3 rounded-lg" />
+          </div>
+
+          {/* Options Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+            <Skeleton className="h-12 w-full rounded-xl" />
+          </div>
+
+          {/* Action Row */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-2.5">
+              <Skeleton className="h-8 w-28 rounded-xl" />
+              <Skeleton className="h-8 w-24 rounded-xl" />
             </div>
-            <Skeleton className="w-6 h-6 rounded-full" />
-            <Skeleton className="h-8 w-20 rounded-xl" />
           </div>
         </div>
       ))}

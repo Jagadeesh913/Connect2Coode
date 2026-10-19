@@ -9,14 +9,27 @@ import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal
 import { adminCompanyService, CompanyItem } from '../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
+import {
+  Building2,
+  Plus,
+  RotateCw,
+  Search,
+  LayoutGrid,
+  List,
+  ExternalLink,
+  Edit3,
+  Eye,
+  Globe,
+} from 'lucide-react';
 
 export const AdminCompanies: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search State
+  // Search & View Mode State
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   // Modals State
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -27,7 +40,7 @@ export const AdminCompanies: React.FC = () => {
 
   /**
    * REAL API ONLY — GET /api/v1/company
-   * Fetches target company records directly from Backend.
+   * Fetches target company records directly from Backend database.
    */
   const fetchCompanies = useCallback(async () => {
     setLoading(true);
@@ -99,45 +112,47 @@ export const AdminCompanies: React.FC = () => {
         websiteUrl: formData.websiteUrl ? formData.websiteUrl.trim() : '',
         logoUrl: formData.logoUrl ? formData.logoUrl.trim() : '',
         description: formData.description ? formData.description.trim() : '',
-        isActive: !formData.id ? (formData.isActive !== false) : (formData.isActive ?? true),
+        isActive: formData.isActive ?? true,
       };
 
-      const res = await adminCompanyService.saveOrUpdateCompany(payload);
-      if (res && (res.statusCode === 200 || res.statusCode === 201 || (res as any).id || res.data)) {
-        toast.success(
-          formData.id
-            ? 'Company updated successfully.'
-            : 'Company created successfully.'
-        );
-        setIsFormOpen(false);
-        fetchCompanies();
-      } else {
-        toast.error(res?.message || 'Failed to save company.');
-      }
+      await adminCompanyService.saveOrUpdateCompany(payload);
+      toast.success(formData.id ? 'Company updated successfully!' : 'Company registered successfully!');
+      setIsFormOpen(false);
+      await fetchCompanies();
     } catch (err: any) {
-      toast.error(getActionableErrorMessage(err, 'Failed to save company.'));
+      toast.error(getActionableErrorMessage(err, 'Failed to save company entity.'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Filter companies based on search term
   const filteredCompanies = companies.filter((c) => {
-    if (!searchTerm.trim()) return true;
-    const term = searchTerm.toLowerCase();
-    return c.name.toLowerCase().includes(term);
+    const q = searchTerm.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q) ||
+      c.websiteUrl?.toLowerCase().includes(q)
+    );
   });
 
   const columns: Column<CompanyItem>[] = [
     {
-      header: 'Company',
+      header: 'Identifier',
+      accessorKey: 'id',
+      className: 'w-24 font-mono text-slate-400 font-semibold',
+      cell: (row) => <span>#{row.id}</span>,
+    },
+    {
+      header: 'Company Profile',
+      className: 'min-w-[220px]',
       cell: (row) => {
-        const logo = row.logoUrl || '/logo-mark-transparent.png';
+        const logoUrl = row.logoUrl || '/logo-mark-transparent.png';
         return (
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 p-1.5 flex items-center justify-center shrink-0 overflow-hidden">
+            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs">
               <img
-                src={logo}
+                src={logoUrl}
                 alt={row.name}
                 className="w-full h-full object-contain"
                 onError={(e) => {
@@ -147,18 +162,23 @@ export const AdminCompanies: React.FC = () => {
                 }}
               />
             </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-white hover:text-white transition-colors font-heading text-sm">{row.name}</span>
-              {row.websiteUrl && (
+            <div className="flex flex-col min-w-0">
+              <span className="font-bold text-slate-900 dark:text-white truncate">
+                {row.name}
+              </span>
+              {row.websiteUrl ? (
                 <a
                   href={row.websiteUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs text-neutral-300 hover:underline font-mono"
                   onClick={(e) => e.stopPropagation()}
+                  className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono truncate"
                 >
-                  {row.websiteUrl}
+                  <span className="truncate">{row.websiteUrl.replace(/^https?:\/\//, '')}</span>
+                  <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                 </a>
+              ) : (
+                <span className="text-[11px] text-slate-400 italic">No website specified</span>
               )}
             </div>
           </div>
@@ -166,90 +186,233 @@ export const AdminCompanies: React.FC = () => {
       },
     },
     {
-      header: 'Status',
+      header: 'Overview Notes',
+      className: 'max-w-md hidden md:table-cell',
       cell: (row) => (
-        <AdminBadge variant={row.isActive !== false ? 'accent' : 'neutral'}>
-          {row.isActive !== false ? 'Active Tagging' : 'Inactive'}
+        <span className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+          {row.description || 'No specific notes recorded.'}
+        </span>
+      ),
+    },
+    {
+      header: 'Tagging Status',
+      className: 'w-32',
+      cell: (row) => (
+        <AdminBadge
+          variant={row.isActive !== false ? 'success' : 'neutral'}
+          dot
+          size="sm"
+        >
+          {row.isActive !== false ? 'Active' : 'Inactive'}
         </AdminBadge>
       ),
-      className: 'w-36',
     },
     {
       header: 'Actions',
+      className: 'w-28 text-right',
       cell: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => handleInspect(row.id!)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Inspect Company & Problems"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            title="Inspect Company"
           >
-            <i className="fa-solid fa-eye text-xs"></i>
+            <Eye className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => handleEditClick(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Edit Company Details"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
+            title="Edit Company"
           >
-            <i className="fa-solid fa-pen-to-square text-xs"></i>
+            <Edit3 className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
-      className: 'w-28 text-right',
     },
   ];
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      {/* Page Header */}
       <AdminPageHeader
-        title="Companies"
-        description="Manage target hiring companies"
+        title="Target Hiring Companies"
+        description="Manage company profiles, brand assets, and link them to DSA question tags for company-specific interview preparation."
+        badge={
+          <AdminBadge variant="primary">
+            {companies.length} Indexed
+          </AdminBadge>
+        }
         actions={
-          <button
-            onClick={handleCreateClick}
-            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
-          >
-            <i className="fa-solid fa-plus text-xs"></i>
-            <span>Add Target Company</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleCreateClick}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Company</span>
+            </button>
+            <button
+              onClick={fetchCompanies}
+              disabled={loading}
+              className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              title="Refresh"
+            >
+              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+            </button>
+          </div>
         }
       />
 
-      {/* Filter Bar Controls with Glassmorphism */}
-      <AdminCard className="p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-300">Search Target Companies</label>
-          <div className="relative flex items-center">
-            <i className="fa-solid fa-magnifying-glass absolute left-3.5 text-gray-500 text-xs"></i>
-            <input
-              type="text"
-              placeholder="Search target companies by name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
-            />
-          </div>
+      {/* Filter and View Bar */}
+      <div className="p-4 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
+        {/* Search Input */}
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by company name or domain..."
+            className="w-full pl-10 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-      </AdminCard>
 
-      {/* Error State Handler */}
-      {error ? (
-        <AdminErrorState
-          title="Backend Company API Error"
-          message={error}
-          onRetry={fetchCompanies}
-        />
-      ) : (
-        <AdminTable
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              viewMode === 'table'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+            title="Table View"
+          >
+            <List className="w-4 h-4" />
+            <span className="hidden sm:inline">Table</span>
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              viewMode === 'grid'
+                ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+            title="Card Grid View"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span className="hidden sm:inline">Grid</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Error State */}
+      {error && <AdminErrorState message={error} onRetry={fetchCompanies} />}
+
+      {/* Main Content: Table or Grid */}
+      {!error && viewMode === 'table' && (
+        <AdminTable<CompanyItem>
           columns={columns}
           data={filteredCompanies}
           loading={loading}
-          emptyTitle="No hiring companies configured."
-          emptyDescription="No target hiring company records match your search parameters in the database."
-          keyExtractor={(item) => item.id || item.name}
+          keyExtractor={(row) => row.id || row.name}
+          onRowClick={(row) => row.id && handleInspect(row.id)}
+          emptyTitle="No Companies Found"
+          emptyDescription="There are currently no companies registered matching your search query."
+          emptyAction={
+            <button
+              onClick={handleCreateClick}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Register First Company</span>
+            </button>
+          }
         />
       )}
 
-      {/* Create / Edit Form Modal */}
+      {!error && viewMode === 'grid' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCompanies.map((c) => {
+            const logoUrl = c.logoUrl || '/logo-mark-transparent.png';
+            return (
+              <div
+                key={c.id || c.name}
+                onClick={() => c.id && handleInspect(c.id)}
+                className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 space-y-3.5 shadow-xs hover:shadow-md hover:border-blue-400/50 transition-all cursor-pointer group text-left"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs">
+                    <img
+                      src={logoUrl}
+                      alt={c.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = '/logo-mark-transparent.png';
+                      }}
+                    />
+                  </div>
+                  <AdminBadge
+                    variant={c.isActive !== false ? 'success' : 'neutral'}
+                    dot
+                    size="sm"
+                  >
+                    {c.isActive !== false ? 'Active' : 'Inactive'}
+                  </AdminBadge>
+                </div>
+
+                <div>
+                  <h4 className="text-base font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                    {c.name}
+                  </h4>
+                  <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                    ID: #{c.id}
+                  </span>
+                </div>
+
+                {c.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                    {c.description}
+                  </p>
+                )}
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                  {c.websiteUrl ? (
+                    <a
+                      href={c.websiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[150px]"
+                    >
+                      <Globe className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{c.websiteUrl.replace(/^https?:\/\//, '')}</span>
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 text-[11px] italic">No URL</span>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClick(c);
+                      }}
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 transition-colors cursor-pointer"
+                      title="Edit"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Company Form Modal */}
       <CompanyFormModal
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
@@ -259,7 +422,7 @@ export const AdminCompanies: React.FC = () => {
         submitting={submitting}
       />
 
-      {/* Details View Modal */}
+      {/* Company Details Modal */}
       <CompanyDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
@@ -269,3 +432,5 @@ export const AdminCompanies: React.FC = () => {
     </div>
   );
 };
+
+export default AdminCompanies;

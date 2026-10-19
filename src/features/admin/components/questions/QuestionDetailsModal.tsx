@@ -2,6 +2,16 @@ import React from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload } from '../../../../services/questionService';
+import {
+  Code2,
+  Terminal,
+  Lightbulb,
+  Building2,
+  Calendar,
+  Layers,
+  FileText,
+  Loader2,
+} from 'lucide-react';
 
 interface QuestionDetailsModalProps {
   isOpen: boolean;
@@ -22,21 +32,10 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
 
   const getDifficultyVariant = (diff?: string) => {
     const d = (diff || '').toLowerCase();
-    if (d === 'easy') return 'easy';
-    if (d === 'medium') return 'medium';
-    if (d === 'hard') return 'hard';
+    if (d.includes('easy') || d.includes('basic')) return 'easy';
+    if (d.includes('med')) return 'medium';
+    if (d.includes('hard')) return 'hard';
     return 'neutral';
-  };
-
-  const getAskedYear = (dateStr?: string | null) => {
-    if (!dateStr) return null;
-    try {
-      const date = new Date(dateStr);
-      if (!isNaN(date.getFullYear())) {
-        return date.getFullYear().toString();
-      }
-    } catch {}
-    return dateStr.split('-')[0] || null;
   };
 
   const formatAskedDate = (dateStr?: string | null) => {
@@ -50,16 +49,16 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
     return dateStr;
   };
 
-  const askedYear = getAskedYear(question?.askedDate);
   const formattedAskedDate = formatAskedDate(question?.askedDate);
 
   return (
     <AdminModal
       isOpen={isOpen}
       onClose={onClose}
-      title={question?.title ? `Question #${question.id || ''}: ${question.title}` : 'Question Details'}
-      subtitle="Complete problem statement, metadata, hints, and attached test cases"
-      maxWidth="xl"
+      title={question?.title ? `#${question.id || ''}: ${question.title}` : 'Question Details'}
+      subtitle="Complete problem statement, constraints, attached test cases, and company tags"
+      icon={<Code2 className="w-5 h-5" />}
+      maxWidth="2xl"
       footer={
         <div className="flex items-center justify-between w-full">
           {question && onOpenTestCode && (
@@ -68,16 +67,16 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                 onClose();
                 onOpenTestCode(question);
               }}
-              className="px-4 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 shadow-md  cursor-pointer font-sans"
-              title="Open Admin Code Runner & Tester (Sample & Full Test Suite)"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-2 shadow-xs hover:shadow-md cursor-pointer font-sans"
+              title="Open Admin Code Runner & Tester"
             >
-              <i className="fa-solid fa-terminal text-black text-xs"></i>
-              <span>Test &amp; Validate Code</span>
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Test Runtime Execution</span>
             </button>
           )}
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans ml-auto"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans ml-auto shadow-xs"
           >
             Close Inspector
           </button>
@@ -85,164 +84,183 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
       }
     >
       {loading ? (
-        <div className="flex items-center justify-center p-8 text-gray-400 gap-2 font-sans">
-          <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
+        <div className="flex items-center justify-center p-8 text-slate-500 gap-2 font-sans">
+          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
           <span>Loading Question Statement...</span>
         </div>
       ) : question ? (
-        <div className="flex flex-col gap-4 font-sans text-xs">
+        <div className="flex flex-col gap-5 font-sans text-xs">
           {/* Metadata Badges */}
-          <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-white/10">
+          <div className="flex items-center gap-2 flex-wrap pb-3 border-b border-slate-200/80 dark:border-slate-800/80">
             {question.id && (
-              <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300 font-mono text-[11px]">
+              <span className="px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-mono text-[11px] font-bold">
                 ID: #{question.id}
               </span>
             )}
-            <AdminBadge variant={question.isActive !== false ? 'accent' : 'neutral'}>
-              {question.isActive !== false ? 'Active' : 'Inactive'}
+
+            <AdminBadge
+              variant={getDifficultyVariant(
+                question.difficultyRefName ||
+                  (question as any).difficultyName ||
+                  (question as any).difficulty ||
+                  question.difficultyRefCode
+              )}
+              size="sm"
+            >
+              {question.difficultyRefName ||
+                (question as any).difficultyName ||
+                (question as any).difficulty ||
+                question.difficultyRefCode ||
+                'Medium'}
             </AdminBadge>
-            <AdminBadge variant={getDifficultyVariant(question.difficultyRefName)}>
-              {question.difficultyRefName || '—'}
+
+            {(question.topicRefName ||
+              (question as any).topicName ||
+              (question as any).category ||
+              (question as any).topic) && (
+              <AdminBadge variant="primary" size="sm">
+                {question.topicRefName ||
+                  (question as any).topicName ||
+                  (question as any).category ||
+                  (question as any).topic}
+              </AdminBadge>
+            )}
+
+            {(question.qpfRefName ||
+              (question as any).questionPlatform ||
+              (question as any).platformName ||
+              (question as any).platform) && (
+              <AdminBadge variant="neutral" size="sm">
+                Platform: {question.qpfRefName ||
+                  (question as any).questionPlatform ||
+                  (question as any).platformName ||
+                  (question as any).platform}
+              </AdminBadge>
+            )}
+
+            <AdminBadge
+              variant={question.isActive !== false ? 'success' : 'neutral'}
+              dot
+              size="sm"
+            >
+              {question.isActive !== false ? 'Active' : 'Disabled'}
             </AdminBadge>
-            {question.topicRefName && (
-              <AdminBadge variant="primary">{question.topicRefName}</AdminBadge>
-            )}
-            {question.qpfRefName && (
-              <AdminBadge variant="neutral">{question.qpfRefName}</AdminBadge>
-            )}
-            {question.isOwnProblem && (
-              <AdminBadge variant="accent">Original Problem</AdminBadge>
+
+            {formattedAskedDate && (
+              <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
+                <Calendar className="w-3 h-3 text-slate-400" /> Asked: {formattedAskedDate}
+              </span>
             )}
           </div>
 
-          {/* Asked Date & Derived Asked Year */}
-          {question.askedDate && (
-            <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl flex items-center justify-between font-sans">
-              <div className="flex items-center gap-2 text-gray-300">
-                <i className="fa-regular fa-calendar text-neutral-300 text-xs"></i>
-                <span>Originally Asked Date: <strong className="text-white font-mono">{formattedAskedDate}</strong></span>
-              </div>
-              {askedYear && (
-                <span className="px-2 py-0.5 rounded bg-neutral-800 text-neutral-300 font-bold text-[11px]">
-                  Asked Year: {askedYear}
-                </span>
-              )}
+          {/* Problem Statement */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <FileText className="w-3.5 h-3.5 text-blue-600" />
+              <span>Problem Statement</span>
             </div>
-          )}
-
-          {/* Description */}
-          <div>
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
-              Problem Description
-            </h4>
-            <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl text-gray-200 whitespace-pre-wrap leading-relaxed font-sans">
-              {question.description || 'No description provided.'}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed text-xs">
+              {question.description}
             </div>
           </div>
 
           {/* Constraints */}
           {question.constraints && (
-            <div>
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Constraints
-              </h4>
-              <div className="p-3.5 bg-neutral-900 border border-white/10 rounded-xl font-mono text-gray-300">
+              </span>
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-xl font-mono text-slate-700 dark:text-slate-300 text-xs whitespace-pre-wrap">
                 {question.constraints}
               </div>
             </div>
           )}
 
-          {/* Question Hints */}
-          {question.questionHints && question.questionHints.length > 0 && (
-            <div className="pt-2 border-t border-white/10">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
-                Problem Hints ({question.questionHints.length})
-              </h4>
-              <div className="flex flex-col gap-2">
-                {question.questionHints.map((hint, idx) => (
-                  <div key={idx} className="p-3 bg-neutral-900 border border-white/10 rounded-xl text-gray-300 flex items-start gap-2.5">
-                    <span className="font-mono text-neutral-300 text-[11px]">#{idx + 1}</span>
-                    <span className="text-xs">{hint.hintText}</span>
+          {/* Tagged Companies */}
+          {question.companies && question.companies.length > 0 && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <Building2 className="w-3.5 h-3.5 text-purple-600" />
+                <span>Tagged Hiring Companies</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {question.companies.map((c: any, i: number) => {
+                  const companyName = typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c);
+                  return (
+                    <span
+                      key={c.id ? `comp-${c.id}` : `comp-name-${companyName || i}-${i}`}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-semibold"
+                    >
+                      <Building2 className="w-3 h-3" />
+                      {companyName}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Test Cases Preview */}
+          {question.testCases && question.testCases.length > 0 && (
+            <div className="space-y-2 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Configured Test Cases ({question.testCases.length})</span>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {question.testCases.map((tc, idx) => (
+                  <div
+                    key={tc.id ? `tc-${tc.id}` : `tc-idx-${idx}`}
+                    className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl space-y-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 dark:text-slate-200">
+                        Case #{idx + 1}
+                      </span>
+                      <AdminBadge
+                        variant={tc.isHidden ? 'neutral' : 'success'}
+                        size="sm"
+                      >
+                        {tc.isHidden ? 'Hidden Evaluation Case' : 'Visible Sample Case'}
+                      </AdminBadge>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
+                      <div>
+                        <span className="text-slate-400 block mb-0.5">Input:</span>
+                        <pre className="p-2 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 whitespace-pre-wrap overflow-x-auto">
+                          {tc.input}
+                        </pre>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block mb-0.5">Expected Output:</span>
+                        <pre className="p-2 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 whitespace-pre-wrap overflow-x-auto">
+                          {tc.expectedOutput}
+                        </pre>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Associated Companies */}
-          {question.companies && question.companies.length > 0 && (
-            <div className="pt-2 border-t border-white/10">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
-                Target Companies
-              </h4>
-              <div className="flex items-center gap-2 flex-wrap">
-                {question.companies.map((c: any, idx: number) => (
-                  <span key={idx} className="px-2.5 py-1 bg-white/5 border border-white/10 rounded-lg text-gray-200 text-xs font-semibold">
-                    {c.name}
-                  </span>
-                ))}
+          {/* Hints Section */}
+          {question.questionHints && question.questionHints.length > 0 && (
+            <div className="space-y-1.5 pt-2 border-t border-slate-200/80 dark:border-slate-800/80">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+                <Lightbulb className="w-3.5 h-3.5" />
+                <span>Hints ({question.questionHints.length})</span>
               </div>
-            </div>
-          )}
-
-          {/* External Platform Links (LeetCode, GeeksforGeeks, HackerRank) - Temporarily Commented Out
-          <div className="flex flex-col gap-1.5 pt-2 border-t border-white/10">
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading">
-              Platform Links
-            </h4>
-            <div className="flex items-center gap-3 flex-wrap text-gray-300">
-              {question.leetCodeUrl && (
-                <a
-                  href={question.leetCodeUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
-                >
-                  <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> LeetCode
-                </a>
-              )}
-              {question.gfgUrl && (
-                <a
-                  href={question.gfgUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
-                >
-                  <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> GeeksforGeeks
-                </a>
-              )}
-              {question.hackerRankUrl && (
-                <a
-                  href={question.hackerRankUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="hover:text-white flex items-center gap-1 font-mono text-[11px] text-neutral-300"
-                >
-                  <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> HackerRank
-                </a>
-              )}
-              {!question.leetCodeUrl && !question.gfgUrl && !question.hackerRankUrl && (
-                <span className="text-gray-500 italic">No external links attached.</span>
-              )}
-            </div>
-          </div>
-          */}
-
-          {/* Attached Test Cases */}
-          {question.testCases && question.testCases.length > 0 && (
-            <div className="pt-2 border-t border-white/10">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider font-heading mb-1.5">
-                Attached Test Cases ({question.testCases.length})
-              </h4>
-              <div className="flex flex-col gap-2 max-h-40 overflow-y-auto pr-1">
-                {question.testCases.map((tc, idx) => (
-                  <div key={idx} className="p-3 bg-neutral-900 border border-white/10 rounded-xl text-xs font-mono text-gray-300">
-                    <div className="flex items-center justify-between text-[11px] text-gray-400 pb-1 mb-1 border-b border-white/5">
-                      <span>Case #{idx + 1} ({tc.typeRefCode || 'STANDARD'})</span>
-                      {tc.isHidden && <span className="text-amber-400 text-[10px]">Hidden</span>}
-                    </div>
-                    <div>Input: <span className="text-white">{tc.input}</span></div>
-                    <div>Output: <span className="text-neutral-300">{tc.expectedOutput}</span></div>
+              <div className="space-y-1.5">
+                {question.questionHints.map((hint, i) => (
+                  <div
+                    key={hint.id ? `hint-${hint.id}` : `hint-idx-${i}`}
+                    className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs"
+                  >
+                    <span className="font-bold mr-1.5">Hint {i + 1}:</span>
+                    {hint.hintText || (hint as any).hint}
                   </div>
                 ))}
               </div>

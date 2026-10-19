@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InstitutionAutocomplete } from '../../../institutions/components/InstitutionAutocomplete';
 import type { Institution, InstitutionOptionDTO } from '../../../../core/types/domain';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
-import { optionalUrlRule } from '../../../../core/validation';
+import { Landmark, MapPin, Building, X, Loader2, CheckCircle2 } from 'lucide-react';
 
 interface EditInstitutionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (institution: Partial<Institution>) => Promise<void>;
   initialData?: Institution | null;
+  defaultCollegeName?: string;
   submitting?: boolean;
 }
 
@@ -17,81 +18,74 @@ export const EditInstitutionModal: React.FC<EditInstitutionModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  defaultCollegeName = '',
   submitting = false,
 }) => {
   const [selectedInst, setSelectedInst] = useState<Partial<Institution>>({
     id: initialData?.id,
-    name: initialData?.name || '',
-    aisheCode: initialData?.aisheCode || '',
+    name: initialData?.name || defaultCollegeName || '',
     institutionType: initialData?.institutionType || 'COLLEGE',
     state: initialData?.state || '',
     district: initialData?.district || '',
-    website: initialData?.website || '',
-    yearOfEstablishment: initialData?.yearOfEstablishment || undefined,
     isActive: initialData?.isActive ?? true,
   });
 
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  React.useEffect(() => {
-    if (initialData) {
+  useEffect(() => {
+    if (isOpen) {
       setSelectedInst({
-        id: initialData.id,
-        name: initialData.name || '',
-        aisheCode: initialData.aisheCode || '',
-        institutionType: initialData.institutionType || 'COLLEGE',
-        state: initialData.state || '',
-        district: initialData.district || '',
-        website: initialData.website || '',
-        yearOfEstablishment: initialData.yearOfEstablishment || undefined,
-        isActive: initialData.isActive ?? true,
+        id: initialData?.id,
+        name: initialData?.name || defaultCollegeName || '',
+        institutionType: initialData?.institutionType || 'COLLEGE',
+        state: initialData?.state || '',
+        district: initialData?.district || '',
+        isActive: initialData?.isActive ?? true,
       });
+      setErrorMessage('');
     }
-  }, [initialData]);
+  }, [isOpen, initialData, defaultCollegeName]);
 
   if (!isOpen) return null;
 
   const handleSelectAutocomplete = (opt: InstitutionOptionDTO) => {
-    setSelectedInst((prev) => ({
-      ...prev,
+    setSelectedInst({
       id: opt.id,
       name: opt.name,
       institutionType: opt.institutionType,
       state: opt.state,
       district: opt.district,
-    }));
-    setFormErrors((prev) => ({ ...prev, name: '' }));
+      isActive: true,
+    });
+    setErrorMessage('');
   };
 
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    if (!selectedInst.name?.trim()) {
-      errors.name = 'Please enter or select your college or university name.';
-    }
-
-    if (selectedInst.website?.trim()) {
-      const urlCheck = optionalUrlRule('Website').safeParse(selectedInst.website.trim());
-      if (!urlCheck.success) {
-        errors.website = urlCheck.error.errors[0]?.message || 'Enter a valid website URL starting with http:// or https://';
+  const handleInputChange = (val: string, opt?: InstitutionOptionDTO | null) => {
+    if (opt) {
+      handleSelectAutocomplete(opt);
+    } else {
+      setSelectedInst((prev) => ({
+        ...prev,
+        id: undefined,
+        name: val,
+      }));
+      if (val.trim()) {
+        setErrorMessage('');
       }
     }
-
-    setFormErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    const collegeName = selectedInst.name?.trim();
+    if (!collegeName || collegeName.length < 2) {
+      setErrorMessage('Please search and select or enter a valid college or university name.');
+      return;
+    }
 
     await onSubmit({
       ...selectedInst,
-      name: selectedInst.name?.trim(),
-      aisheCode: selectedInst.aisheCode ? selectedInst.aisheCode.toUpperCase().trim() : undefined,
-      state: selectedInst.state?.trim(),
-      district: selectedInst.district?.trim(),
-      website: selectedInst.website?.trim() || undefined,
+      name: collegeName,
     });
   };
 
@@ -102,153 +96,108 @@ export const EditInstitutionModal: React.FC<EditInstitutionModalProps> = ({
       aria-labelledby="edit-institution-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in font-sans"
     >
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-gray-200 dark:border-white/10 shadow-2xl overflow-hidden text-left">
+      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-100 dark:border-white/10">
-          <div>
-            <h3 id="edit-institution-modal-title" className="text-base font-bold text-gray-900 dark:text-white">
-              Edit Institution Information
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Search your college or university to link verified affiliations.
-            </p>
+        <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-white/10 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Landmark className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 id="edit-institution-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
+                Link / Update Institution
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Search your college or university to link verified academic affiliation.
+              </p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-white p-1 rounded-lg"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
           >
-            <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSave} className="p-6 space-y-4">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
+          {/* Autocomplete Input */}
           <div>
             <InstitutionAutocomplete
               id="profile-institution-search"
-              label="Search College or University"
+              label="College or University Name"
+              required
+              placeholder="Search by college name, city or keyword..."
               value={selectedInst.name || ''}
-              error={formErrors.name}
-              onChange={(val, opt) => {
-                if (opt) {
-                  handleSelectAutocomplete(opt);
-                } else {
-                  setSelectedInst((prev) => ({ ...prev, name: val, id: undefined }));
-                  if (!val.trim()) {
-                    setFormErrors((prev) => ({ ...prev, name: 'Select your college or university from the search results.' }));
-                  } else {
-                    setFormErrors((prev) => ({ ...prev, name: '' }));
-                  }
-                }
-              }}
+              error={errorMessage}
+              onChange={handleInputChange}
               onSelectOption={handleSelectAutocomplete}
             />
-            <p className="text-[11px] text-gray-400 mt-1">
-              Select from registered AISHE institutions for automatic verification.
+            <p className="text-[11px] text-slate-500 dark:text-gray-400 mt-1.5 flex items-center gap-1.5">
+              <span>💡</span>
+              <span>Search across 2,800+ registered colleges and universities in the database.</span>
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="inst-aishe-code" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                AISHE Code
-              </label>
-              <input
-                id="inst-aishe-code"
-                type="text"
-                value={selectedInst.aisheCode || ''}
-                onChange={(e) => setSelectedInst({ ...selectedInst, aisheCode: e.target.value.toUpperCase() })}
-                className="w-full px-3.5 py-2 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white font-mono uppercase focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="inst-type-select" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Institution Type
-              </label>
-              <div className="relative">
-                <select
-                  id="inst-type-select"
-                  value={selectedInst.institutionType || 'COLLEGE'}
-                  onChange={(e) => setSelectedInst({ ...selectedInst, institutionType: e.target.value as any })}
-                  className="w-full appearance-none px-3.5 pr-9 py-2 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs transition-colors"
-                >
-                  <option value="COLLEGE" className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white">COLLEGE</option>
-                  <option value="UNIVERSITY" className="bg-white dark:bg-neutral-900 text-gray-900 dark:text-white">UNIVERSITY</option>
-                </select>
-                <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          {/* Selected Institution Preview Badge */}
+          {selectedInst.name && selectedInst.name.trim().length > 0 && (
+            <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 text-xs">
+                    <Building className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-snug">
+                      {selectedInst.name}
+                    </h4>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Selected Affiliation
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 shrink-0">
+                  {selectedInst.institutionType || 'College'}
+                </span>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="inst-state" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                State
-              </label>
-              <input
-                id="inst-state"
-                type="text"
-                value={selectedInst.state || ''}
-                onChange={(e) => setSelectedInst({ ...selectedInst, state: e.target.value })}
-                className="w-full px-3.5 py-2 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-              />
+              {(selectedInst.state || selectedInst.district) && (
+                <div className="pt-2 border-t border-blue-100 dark:border-blue-900/40 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <MapPin className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span>
+                    {selectedInst.district ? `${selectedInst.district}, ` : ''}{selectedInst.state}
+                  </span>
+                </div>
+              )}
             </div>
+          )}
 
-            <div>
-              <label htmlFor="inst-district" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                District
-              </label>
-              <input
-                id="inst-district"
-                type="text"
-                value={selectedInst.district || ''}
-                onChange={(e) => setSelectedInst({ ...selectedInst, district: e.target.value })}
-                className="w-full px-3.5 py-2 bg-gray-50 dark:bg-neutral-950 border border-gray-200 dark:border-white/10 rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none focus:border-blue-500"
-              />
-            </div>
-
-            <div className="col-span-2">
-              <label htmlFor="inst-website" className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                Official Website
-              </label>
-              <input
-                id="inst-website"
-                type="url"
-                placeholder="https://example.edu"
-                aria-invalid={Boolean(formErrors.website)}
-                aria-describedby={formErrors.website ? 'inst-website-error' : undefined}
-                value={selectedInst.website || ''}
-                onChange={(e) => {
-                  setSelectedInst({ ...selectedInst, website: e.target.value });
-                  if (formErrors.website) setFormErrors((prev) => ({ ...prev, website: '' }));
-                }}
-                className={`w-full px-3.5 py-2 bg-gray-50 dark:bg-neutral-950 border ${
-                  formErrors.website ? 'border-rose-500 focus:border-rose-500' : 'border-gray-200 dark:border-white/10 focus:border-blue-500'
-                } rounded-xl text-xs text-gray-900 dark:text-white focus:outline-none`}
-              />
-              <FormFieldError id="inst-website-error" error={formErrors.website} />
-            </div>
-          </div>
+          <FormFieldError id="institution-form-error" error={errorMessage} />
 
           {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-white/10">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-white/10 shrink-0">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 text-xs font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/5 rounded-xl transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow-md shadow-blue-600/30 transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 active:scale-[0.98] rounded-xl shadow-md shadow-blue-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {submitting ? (
                 <>
-                  <i className="fa-solid fa-spinner fa-spin text-xs" aria-hidden="true" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Saving...</span>
                 </>
               ) : (

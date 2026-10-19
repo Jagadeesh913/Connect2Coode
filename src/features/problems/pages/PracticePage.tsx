@@ -841,18 +841,18 @@ export const PracticePage: React.FC = () => {
             
             <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[960px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
-                      <th className="py-3 px-4 w-12 text-center">#</th>
-                      <th className="py-3 px-4">Title</th>
-                      <th className="py-3 px-4">Topic</th>
-                      <th className="py-3 px-4 text-center">Difficulty</th>
-                      <th className="py-3 px-4">Platform</th>
-                      <th className="py-3 px-4">Companies</th>
-                      <th className="py-3 px-4 w-28 text-center">Status</th>
-                      <th className="py-3 px-2 w-10 text-center"></th>
-                      <th className="py-3 px-4 w-24 text-right">Action</th>
+                      <th className="py-3 px-4 w-12 text-center shrink-0">#</th>
+                      <th className="py-3 px-4 min-w-[340px] xl:min-w-[420px] w-[40%]">Title</th>
+                      <th className="py-3 px-4 w-32 whitespace-nowrap">Topic</th>
+                      <th className="py-3 px-4 w-28 text-center whitespace-nowrap">Difficulty</th>
+                      <th className="py-3 px-4 w-28 whitespace-nowrap">Platform</th>
+                      <th className="py-3 px-4 w-40 whitespace-nowrap">Companies</th>
+                      <th className="py-3 px-4 w-24 text-center whitespace-nowrap">Status</th>
+                      <th className="py-3 px-2 w-10 text-center shrink-0"></th>
+                      <th className="py-3 px-4 w-24 text-right whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
 
@@ -903,15 +903,15 @@ export const PracticePage: React.FC = () => {
                             className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                           >
                             {/* Row Number */}
-                            <td className="py-3 px-4 text-center font-mono font-bold text-slate-400 text-xs">
+                            <td className="py-3 px-4 text-center font-mono font-bold text-slate-400 text-xs shrink-0">
                               {rowNumber}
                             </td>
 
                             {/* Title */}
-                            <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white">
+                            <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[340px] xl:min-w-[420px] text-sm">
                               <Link
                                 to={`/problems/${prob.slug || prob.id}`}
-                                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-block leading-snug"
                               >
                                 {prob.title}
                               </Link>

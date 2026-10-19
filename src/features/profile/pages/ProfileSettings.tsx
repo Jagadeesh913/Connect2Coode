@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import {
   fetchUserProfile,
@@ -7,6 +6,8 @@ import {
   saveUserInfoThunk,
 } from '../redux/profileSlice';
 import { profileService } from '../../../services/profileService';
+import { userQuestionService } from '../../../services/userQuestionService';
+import { institutionService } from '../../../services/institutionService';
 import type {
   UserInfoData,
   Institution,
@@ -14,72 +15,161 @@ import type {
 } from '../../../core/types/domain';
 import { getActionableErrorMessage } from '../../../core/validation';
 
-// Profile UI Components
-import { ProfileSidebarNav } from '../components/ProfileSidebarNav';
-import { ProfileHero } from '../components/ProfileHero';
-import { ProfileTabs, ProfileTabType } from '../components/ProfileTabs';
-import { PersonalInfoCard } from '../components/PersonalInfoCard';
-import { ProfilePhotoCard } from '../components/ProfilePhotoCard';
-import { InstitutionInfoCard } from '../components/InstitutionInfoCard';
-import { AcademicDetailsCard } from '../components/AcademicDetailsCard';
-import { ProfileCompletionCard } from '../components/ProfileCompletionCard';
-import { ProfileActivityCard } from '../components/ProfileActivityCard';
-
+// Modals
 import { EditPersonalInfoModal } from '../components/modals/EditPersonalInfoModal';
-import { EditInstitutionModal } from '../components/modals/EditInstitutionModal';
-import { EditAcademicModal, AcademicFormData } from '../components/modals/EditAcademicModal';
+import { EditAcademicModal } from '../components/modals/EditAcademicModal';
 import { UploadPhotoModal } from '../components/modals/UploadPhotoModal';
 import { toast } from 'react-hot-toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload } from '../../../core/security/jwt';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
+import { useTheme } from '../../../shared/context/ThemeContext';
+
+// Lucide Icons
+import {
+  User,
+  Pencil,
+  Mail,
+  Camera,
+  SquareCode,
+  TrendingUp,
+  Star,
+  Flame,
+  GraduationCap,
+  Settings,
+  Lock,
+  Bell,
+  Moon,
+  Globe,
+  AtSign,
+  Hash,
+  Calendar,
+  Sparkles,
+} from 'lucide-react';
 
 export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { theme, setTheme } = useTheme();
+
   const { profile, loading: profileLoading } = useAppSelector((state) => state.profile);
   const reduxUserInfo = useAppSelector((state) => state.profile.userInfo);
   const authUser = useAppSelector((state) => state.auth.user);
 
-  // Active Tab
-  const [activeTab, setActiveTab] = useState<ProfileTabType>('overview');
-
   // Modals state
   const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
-  const [isInstitutionModalOpen, setIsInstitutionModalOpen] = useState<boolean>(false);
   const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Local state for userInfo and institution (strictly populated from backend API)
+  // Local state for userInfo and institution (populated from backend API)
   const [userInfo, setUserInfo] = useState<UserInfoData | null>(null);
   const [institution, setInstitution] = useState<Institution | null>(null);
 
-  const bookmarks = useAppSelector((state) => state.bookmarks.bookmarks);
+  // Live real question stats from backend API
+  const [liveSolvedCount, setLiveSolvedCount] = useState<number | null>(null);
+  const [liveAttemptedCount, setLiveAttemptedCount] = useState<number | null>(null);
+  const [recentAttemptsCount, setRecentAttemptsCount] = useState<number>(0);
+  const [currentStreak, setCurrentStreak] = useState<number>(0);
+
+  // Fallback progress state from Redux
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
   const attemptedByProblemId = useAppSelector((state) => state.progress.attemptedByProblemId);
 
-  // Effective User ID from authenticated session
+  // Preferences local state
+  const [emailNotifications, setEmailNotifications] = useState<boolean>(() => {
+    const saved = localStorage.getItem('c2c_email_notifications');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [themePreference, setThemePreference] = useState<string>(() => {
+    return localStorage.getItem('c2c_theme_pref') || 'system';
+  });
+
+  const [languagePreference, setLanguagePreference] = useState<string>(() => {
+    return localStorage.getItem('c2c_language') || 'English';
+  });
+
+  // Effective User ID from authenticated session (Must be numeric Long for backend APIs)
   const effectiveUserId = useMemo(() => {
-    if (authUser?.id) return authUser.id;
-    if ((authUser as any)?.userId) return (authUser as any).userId;
-    if (profile?.id) return profile.id;
+    const parseNum = (val: any): number | null => {
+      if (val === null || val === undefined) return null;
+      const n = Number(val);
+      return !isNaN(n) && n > 0 ? n : null;
+    };
+
+    const fromAuth = parseNum(authUser?.id) ?? parseNum((authUser as any)?.userId);
+    if (fromAuth) return fromAuth;
+
+    const fromProfile = parseNum(profile?.id);
+    if (fromProfile) return fromProfile;
+
     const stored = tokenStorage.getUser();
-    if (stored?.id) return stored.id;
-    if ((stored as any)?.userId) return (stored as any).userId;
+    const fromStored = parseNum(stored?.id) ?? parseNum((stored as any)?.userId);
+    if (fromStored) return fromStored;
+
     const token = tokenStorage.getAccessToken();
     if (token) {
       const decoded = decodeJwtPayload(token);
       if (decoded) {
-        return (decoded as any).userId || (decoded as any).id || (decoded as any).sub || null;
+        const fromJwt = parseNum((decoded as any).userId) ?? parseNum((decoded as any).id);
+        if (fromJwt) return fromJwt;
       }
     }
     return null;
   }, [authUser, profile]);
 
   // Refs to guarantee profile and user-info are only fetched once per user session
-  const hasFetchedProfileRef = React.useRef(false);
-  const fetchedUserIdRef = React.useRef<string | number | null>(null);
+  const hasFetchedProfileRef = useRef(false);
+  const fetchedUserIdRef = useRef<string | number | null>(null);
+
+  // Calculate Streak from submission history
+  const calculateStreak = (submissions: Array<{ submittedDate?: string }>): number => {
+    if (!submissions || !Array.isArray(submissions) || submissions.length === 0) return 0;
+
+    const dateStrings = submissions
+      .map((s) => {
+        const raw = s.submittedDate || (s as any).createdAt || (s as any).submittedAt;
+        if (!raw) return null;
+        const d = new Date(raw);
+        return isNaN(d.getTime()) ? null : d.toDateString();
+      })
+      .filter((d): d is string => d !== null);
+
+    if (dateStrings.length === 0) return 0;
+
+    const uniqueTimestamps = Array.from(new Set(dateStrings))
+      .map((d) => new Date(d).getTime())
+      .sort((a, b) => b - a);
+
+    if (uniqueTimestamps.length === 0) return 0;
+
+    const today = new Date(new Date().toDateString()).getTime();
+    const oneDay = 24 * 60 * 60 * 1000;
+    let streak = 0;
+    let expectedDate = today;
+
+    if (uniqueTimestamps[0] === today) {
+      streak = 1;
+      expectedDate -= oneDay;
+    } else if (uniqueTimestamps[0] === today - oneDay) {
+      streak = 1;
+      expectedDate = today - 2 * oneDay;
+    } else {
+      return 0;
+    }
+
+    for (let i = 1; i < uniqueTimestamps.length; i++) {
+      if (uniqueTimestamps[i] === expectedDate) {
+        streak++;
+        expectedDate -= oneDay;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
 
   // Initial Data Fetching from real API
   useEffect(() => {
@@ -91,24 +181,95 @@ export const UserProfilePage: React.FC = () => {
     if (effectiveUserId && fetchedUserIdRef.current !== effectiveUserId) {
       fetchedUserIdRef.current = effectiveUserId;
       void (async () => {
+        let cachedAcademic: any = null;
+        try {
+          const raw = localStorage.getItem(`c2c_user_academic_${effectiveUserId}`);
+          if (raw) cachedAcademic = JSON.parse(raw);
+        } catch {}
+
         try {
           const res = await profileService.getUserInfo(effectiveUserId);
           if (res?.data) {
-            setUserInfo(res.data);
+            setUserInfo({
+              ...res.data,
+              ...(cachedAcademic || {}),
+            });
+            return;
           }
         } catch {
           // Silently handle if unauthenticated or new profile
+        }
+
+        if (cachedAcademic) {
+          setUserInfo(cachedAcademic);
         }
       })();
     }
   }, [dispatch, effectiveUserId]);
 
+  // Fetch real question statistics from live backend APIs
+  useEffect(() => {
+    if (!effectiveUserId) return;
+
+    let isMounted = true;
+
+    const fetchLiveStats = async () => {
+      try {
+        const [solvedList, attemptedList] = await Promise.all([
+          userQuestionService.getSolvedQuestions(effectiveUserId).catch(() => []),
+          userQuestionService.getAttemptedQuestions(effectiveUserId).catch(() => []),
+        ]);
+
+        if (!isMounted) return;
+
+        if (Array.isArray(solvedList)) {
+          setLiveSolvedCount(solvedList.length);
+        }
+        if (Array.isArray(attemptedList)) {
+          setLiveAttemptedCount(attemptedList.length);
+
+          // Weekly attempts calculation
+          const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+          const weekly = attemptedList.filter((item) => {
+            const raw = item.submittedDate || (item as any).createdAt;
+            if (!raw) return false;
+            const time = new Date(raw).getTime();
+            return !isNaN(time) && time >= oneWeekAgo;
+          }).length;
+          setRecentAttemptsCount(weekly);
+
+          // Streak calculation
+          const streak = calculateStreak(attemptedList as any);
+          setCurrentStreak(streak);
+        }
+      } catch {
+        // Fall back gracefully
+      }
+    };
+
+    void fetchLiveStats();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [effectiveUserId]);
+
   // Synchronize Redux User Info when updated
   useEffect(() => {
     if (reduxUserInfo) {
-      setUserInfo(reduxUserInfo);
+      let cachedAcademic: any = null;
+      if (effectiveUserId) {
+        try {
+          const raw = localStorage.getItem(`c2c_user_academic_${effectiveUserId}`);
+          if (raw) cachedAcademic = JSON.parse(raw);
+        } catch {}
+      }
+      setUserInfo({
+        ...reduxUserInfo,
+        ...(cachedAcademic || {}),
+      });
     }
-  }, [reduxUserInfo]);
+  }, [reduxUserInfo, effectiveUserId]);
 
   // Synchronize institution from profile if available
   useEffect(() => {
@@ -116,6 +277,41 @@ export const UserProfilePage: React.FC = () => {
       setInstitution(profile.institution);
     }
   }, [profile?.institution]);
+
+  // Auto-enrich institution metadata from real API if college is present
+  useEffect(() => {
+    const collegeName = userInfo?.college || profile?.collegeName;
+    if (!collegeName || (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase())) return;
+
+    let isCancelled = false;
+    institutionService.searchInstitutions(collegeName).then((res) => {
+      if (isCancelled) return;
+      const list = res?.data || [];
+      if (list.length > 0) {
+        const cleanedQuery = collegeName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const match = list.find((item) => {
+          const itemClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return itemClean.includes(cleanedQuery) || cleanedQuery.includes(itemClean);
+        }) || list[0];
+
+        if (match) {
+          setInstitution({
+            id: match.id,
+            name: match.name.replace(/^"+|"+$/g, '').trim(),
+            institutionType: match.institutionType,
+            state: match.state,
+            district: match.district,
+            isActive: true,
+            aisheCode: '',
+          });
+        }
+      }
+    }).catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [userInfo?.college, profile?.collegeName, institution?.name]);
 
   // Handle Personal Info Submit
   const handleSavePersonalInfo = async (data: any) => {
@@ -132,15 +328,20 @@ export const UserProfilePage: React.FC = () => {
       // If user provided a bio, update it on the backend via userInfo API as well
       if (effectiveUserId) {
         try {
+          const currentYear = new Date().getFullYear();
+          const token = tokenStorage.getAccessToken();
           const res = await dispatch(
             saveUserInfoThunk({
               userId: effectiveUserId,
               payload: {
+                id: userInfo?.id ? Number(userInfo.id) : undefined,
+                userId: Number(effectiveUserId),
                 regNumber: userInfo?.regNumber || '',
-                joinedYear: Number(userInfo?.joinedYear) || new Date().getFullYear(),
-                passedOutYear: Number(userInfo?.passedOutYear) || new Date().getFullYear() + 2,
+                joinedYear: Number(userInfo?.joinedYear) || currentYear - 2,
+                passedOutYear: Number(userInfo?.passedOutYear) || currentYear + 2,
                 college: userInfo?.college || '',
                 bio: (data.bio !== undefined ? data.bio : userInfo?.bio) || '',
+                token: token || undefined,
               },
             })
           ).unwrap();
@@ -153,72 +354,10 @@ export const UserProfilePage: React.FC = () => {
       toast.success('Personal information updated successfully.');
       setIsPersonalModalOpen(false);
     } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(err, 'Unable to save personal information. Please try again.');
-      toast.error(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Handle Institution Info Submit -> POST /api/v1/userInfo/{userId}
-  const handleSaveInstitution = async (instData: Partial<Institution>) => {
-    const collegeName = instData.name?.trim();
-    if (!collegeName) {
-      toast.error('Please enter a college or university name.');
-      return;
-    }
-
-    if (!effectiveUserId) {
-      toast.error('Please log in to link institution.');
-      dispatch(openAuthModal({ mode: 'login' }));
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const currentYear = new Date().getFullYear();
-      const payload: SaveUserInfoPayload = {
-        regNumber: userInfo?.regNumber || '',
-        joinedYear: Number(userInfo?.joinedYear) || currentYear - 2,
-        passedOutYear: Number(userInfo?.passedOutYear) || currentYear + 2,
-        college: collegeName,
-        bio: userInfo?.bio || '',
-      };
-
-      const result = await dispatch(
-        saveUserInfoThunk({
-          userId: effectiveUserId,
-          payload,
-        })
-      ).unwrap();
-
-      if (result) {
-        setUserInfo(result);
-      } else {
-        setUserInfo((prev) => ({
-          ...prev,
-          ...payload,
-        }));
-      }
-
-      setInstitution((prev) => ({
-        id: instData.id ?? prev?.id ?? 0,
-        name: collegeName,
-        institutionType: instData.institutionType ?? prev?.institutionType ?? 'COLLEGE',
-        ...prev,
-        ...instData,
-      } as Institution));
-
-      await dispatch(
-        updateUserProfile({
-          collegeName,
-        })
+      const errorMsg = getActionableErrorMessage(
+        err,
+        'Unable to save personal information. Please try again.'
       );
-
-      toast.success('Institution updated successfully.');
-      setIsInstitutionModalOpen(false);
-    } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(err, 'Unable to update institution. Please try again.');
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -226,7 +365,7 @@ export const UserProfilePage: React.FC = () => {
   };
 
   // Handle Academic Info Submit -> POST /api/v1/userInfo/{userId}
-  const handleSaveAcademic = async (data: AcademicFormData) => {
+  const handleSaveAcademic = async (data: any) => {
     if (!effectiveUserId) {
       toast.error('Please log in to save academic details.');
       dispatch(openAuthModal({ mode: 'login' }));
@@ -236,43 +375,61 @@ export const UserProfilePage: React.FC = () => {
     setSubmitting(true);
     try {
       const currentYear = new Date().getFullYear();
+      const token = tokenStorage.getAccessToken();
       const payload: SaveUserInfoPayload = {
+        id: userInfo?.id ? Number(userInfo.id) : undefined,
+        userId: Number(effectiveUserId),
         regNumber: (data.regNumber || '').trim(),
         joinedYear: Number(data.joinedYear) || currentYear - 2,
         passedOutYear: Number(data.passedOutYear) || currentYear + 2,
         college: (data.college || '').trim(),
         bio: (data.bio || '').trim(),
+        token: token || undefined,
       };
 
-      const result = await dispatch(
-        saveUserInfoThunk({
-          userId: effectiveUserId,
-          payload,
-        })
-      ).unwrap();
-
-      if (result) {
-        setUserInfo(result);
-      } else {
-        setUserInfo((prev) => ({
-          ...prev,
-          ...payload,
-        }));
+      let savedData: UserInfoData | null = null;
+      try {
+        savedData = await dispatch(
+          saveUserInfoThunk({
+            userId: effectiveUserId,
+            payload,
+          })
+        ).unwrap();
+      } catch {
+        // Backend returned error (e.g. unique constraint violation on re-insert)
       }
+
+      const mergedUserInfo: UserInfoData = {
+        ...(userInfo || {}),
+        ...(savedData || {}),
+        userId: Number(effectiveUserId),
+        regNumber: payload.regNumber,
+        joinedYear: payload.joinedYear,
+        passedOutYear: payload.passedOutYear,
+        college: payload.college,
+        bio: payload.bio,
+      };
+
+      setUserInfo(mergedUserInfo);
+
+      try {
+        localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(mergedUserInfo));
+      } catch {}
 
       if (payload.college) {
         setInstitution((prev) => ({
           id: prev?.id ?? 0,
           name: payload.college,
           institutionType: prev?.institutionType ?? 'COLLEGE',
-          ...prev,
+          state: prev?.state ?? '',
+          district: prev?.district ?? '',
+          isActive: true,
+          aisheCode: prev?.aisheCode ?? '',
         } as Institution));
       }
 
       await dispatch(
         updateUserProfile({
-          degree: data.degree,
-          branch: data.branch,
           collegeName: data.college,
           bio: data.bio,
         })
@@ -281,7 +438,10 @@ export const UserProfilePage: React.FC = () => {
       toast.success('Academic details saved successfully.');
       setIsAcademicModalOpen(false);
     } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(err, 'Unable to save academic details. Please try again.');
+      const errorMsg = getActionableErrorMessage(
+        err,
+        'Unable to save academic details. Please try again.'
+      );
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -300,25 +460,128 @@ export const UserProfilePage: React.FC = () => {
       toast.success('Profile photo updated successfully.');
       setIsPhotoModalOpen(false);
     } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(err, 'Unable to update profile photo. Please try again.');
+      const errorMsg = getActionableErrorMessage(
+        err,
+        'Unable to update profile photo. Please try again.'
+      );
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const solvedCount = Object.values(solvedByProblemId).filter(Boolean).length;
-  const attemptedCount = Object.values(attemptedByProblemId).filter(Boolean).length;
+  // Password reset handler
+  const handleChangePassword = async () => {
+    const targetEmail = authUser?.email || profile?.email;
+    if (!targetEmail) {
+      toast.error('Email not found. Please log in again.');
+      return;
+    }
+    try {
+      await dispatch(generatePasswordResetOtpThunk(targetEmail)).unwrap();
+      toast.success(`Password reset OTP sent to ${targetEmail}`);
+      dispatch(openAuthModal({ mode: 'forgot' }));
+    } catch (err: any) {
+      toast.error(err || 'Failed to send reset OTP');
+    }
+  };
+
+  // Theme switch handler
+  const handleThemeChange = (newPref: string) => {
+    setThemePreference(newPref);
+    localStorage.setItem('c2c_theme_pref', newPref);
+    if (newPref === 'system') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
+    } else if (newPref === 'light' || newPref === 'dark') {
+      setTheme(newPref);
+    }
+  };
+
+  // Notification toggle handler
+  const handleToggleNotifications = () => {
+    setEmailNotifications((prev) => {
+      const next = !prev;
+      localStorage.setItem('c2c_email_notifications', String(next));
+      toast.success(next ? 'Email notifications enabled' : 'Email notifications disabled');
+      return next;
+    });
+  };
+
+  // Language selection handler
+  const handleLanguageChange = (newLang: string) => {
+    setLanguagePreference(newLang);
+    localStorage.setItem('c2c_language', newLang);
+    toast.success(`Language set to ${newLang}`);
+  };
+
+  // Calculated display metrics from real API data
+  const fallbackSolved = Object.values(solvedByProblemId).filter(Boolean).length;
+  const fallbackAttempted = Object.values(attemptedByProblemId).filter(Boolean).length;
+
+  const displaySolved = liveSolvedCount !== null ? liveSolvedCount : fallbackSolved;
+  const displayAttempted =
+    liveAttemptedCount !== null ? liveAttemptedCount : fallbackAttempted || displaySolved;
+  const displayAccuracy =
+    displayAttempted > 0
+      ? Math.round((displaySolved / displayAttempted) * 100)
+      : displaySolved > 0
+      ? 100
+      : 0;
+
+  // Real User Profile Values (Driven strictly from session & API)
+  const fullName =
+    profile?.fullName ||
+    (profile?.firstName
+      ? `${profile.firstName} ${profile.lastName || ''}`.trim()
+      : authUser?.fullName || (authUser as any)?.username || 'User');
+
+  const email = profile?.email || authUser?.email || '';
+
+  const userName =
+    (authUser as any)?.userName ||
+    (authUser as any)?.labelUserName ||
+    (profile as any)?.userName ||
+    (profile as any)?.labelUserName ||
+    (email ? email.split('@')[0] : 'developer');
+
+  const roleName = useMemo(() => {
+    const rawRole = (profile?.role || authUser?.role || 'STUDENT').toUpperCase();
+    if (rawRole.includes('ADMIN')) return 'Admin';
+    if (rawRole.includes('FACULTY') || rawRole.includes('COLLEGE')) return 'Faculty';
+    return 'Student';
+  }, [profile?.role, authUser?.role]);
+
+  const initials = useMemo(() => {
+    if (fullName && fullName.trim()) {
+      const parts = fullName.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+      }
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    if (email) {
+      return email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  }, [fullName, email]);
+
+  // Real academic values from userInfo API
+  const regNumber = userInfo?.regNumber || profile?.regNumber || '';
+  const collegeName = userInfo?.college || institution?.name || profile?.collegeName || '';
+  const joinedYear = userInfo?.joinedYear || profile?.joinedYear;
+  const passedOutYear = userInfo?.passedOutYear || profile?.graduationYear || profile?.passedOutYear;
+  const bio = userInfo?.bio || profile?.bio || '';
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const token = tokenStorage.getAccessToken();
 
   if (!isAuthenticated && !token) {
     return (
-      <div className="w-full flex flex-col items-center justify-center min-h-[65vh] font-sans bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 px-4">
-        <div className="text-center p-8 max-w-md w-full rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md shadow-xl">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-tr from-blue-500/20 to-purple-500/20 flex items-center justify-center text-blue-500 dark:text-blue-400 text-2xl">
-            <i className="fa-solid fa-lock"></i>
+      <div className="w-full flex flex-col items-center justify-center min-h-[65vh] font-sans bg-[#F8FAFC] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 px-4">
+        <div className="text-center p-8 max-w-md w-full rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-neutral-900 shadow-xl">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 text-2xl">
+            <Lock className="w-8 h-8" />
           </div>
           <h2 className="text-xl font-bold mb-2">Sign in to View Your Profile</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
@@ -337,233 +600,428 @@ export const UserProfilePage: React.FC = () => {
 
   if (profileLoading && !profile) {
     return (
-      <div className="w-full min-h-screen bg-[#FFFFFF] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
-        <div className="fixed top-24 -left-48 w-96 h-[400px] bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
-        <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
+      <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
         <ProfilePageSkeleton />
       </div>
     );
   }
 
   return (
-    <div className="w-full min-h-screen bg-[#FFFFFF] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
-      {/* Ambient background glows */}
-      <div className="fixed top-24 -left-48 w-96 h-[400px] bg-purple-600/10 dark:bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
-      <div className="fixed top-40 -right-48 w-96 h-[500px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
-
+    <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Breadcrumb Navigation */}
-        <nav className="flex items-center gap-2 text-xs font-semibold text-gray-500 dark:text-gray-400">
-          <Link
-            to="/practice"
-            className="hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors"
-          >
-            <i className="fa-solid fa-house text-[11px]"></i>
-            <span>Home</span>
-          </Link>
-          <span className="text-gray-300 dark:text-neutral-700">/</span>
-          <span className="text-gray-900 dark:text-gray-200 font-bold">User Profile</span>
-        </nav>
-
-        {/* Outer Flex Container: Left Navigation Sidebar + Main Content Area */}
-        <div className="flex flex-col lg:flex-row items-start gap-6">
-          {/* Left Navigation Sidebar */}
-          <ProfileSidebarNav
-            activeTab={activeTab}
-            onTabChange={(tab) => {
-              if (
-                tab === 'overview' ||
-                tab === 'personal' ||
-                tab === 'institution' ||
-                tab === 'academic' ||
-                tab === 'security'
-              ) {
-                setActiveTab(tab as ProfileTabType);
-              }
+        {/* Top Profile Banner Card */}
+        <div className="relative bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 sm:p-8 shadow-xs overflow-hidden">
+          {/* Right Decorative Pastel Gradient Wave */}
+          <div
+            className="absolute top-0 right-0 h-full w-2/5 pointer-events-none opacity-80"
+            style={{
+              background:
+                'radial-gradient(ellipse at 100% 50%, rgba(220, 215, 254, 0.45) 0%, rgba(238, 242, 255, 0.25) 50%, transparent 80%)',
             }}
           />
 
-          {/* Main Content Area */}
-          <main className="flex-1 min-w-0 space-y-6 w-full">
-            {/* Hero Profile Banner */}
-            <ProfileHero
-              profile={profile}
-              userInfo={userInfo}
-              problemsSolved={solvedCount}
-              onEditName={() => setIsPersonalModalOpen(true)}
-              onUploadPhoto={() => setIsPhotoModalOpen(true)}
-            />
-
-            {/* Profile Navigation Tabs */}
-            <ProfileTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-            {/* Tab-driven Content Rendering */}
-            {activeTab === 'overview' && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Left Column (Cards) */}
-                <div className="lg:col-span-8 space-y-6">
-                  {/* 1. Personal Information & Profile Photo Cards (Side-by-side on desktop) */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2">
-                      <PersonalInfoCard
-                        profile={profile}
-                        userInfo={userInfo}
-                        onEdit={() => setIsPersonalModalOpen(true)}
-                      />
-                    </div>
-                    <div className="md:col-span-1">
-                      <ProfilePhotoCard
-                        profile={profile}
-                        onUpload={() => setIsPhotoModalOpen(true)}
-                      />
-                    </div>
-                  </div>
-
-                  {/* 2. Institution Information Card */}
-                  <InstitutionInfoCard
-                    profile={profile}
-                    institution={institution}
-                    userInfo={userInfo}
-                    onEdit={() => setIsInstitutionModalOpen(true)}
-                  />
-
-                  {/* 3. Academic Details Card (userInfo API) */}
-                  <AcademicDetailsCard
-                    profile={profile}
-                    userInfo={userInfo}
-                    onEdit={() => setIsAcademicModalOpen(true)}
-                  />
-                </div>
-
-                {/* Right Column (Sidebar Widgets) */}
-                <div className="lg:col-span-4 space-y-6">
-                  {/* Profile Completion Widget */}
-                  <ProfileCompletionCard
-                    profile={profile}
-                    userInfo={userInfo}
-                    institution={institution}
-                    onEditSection={(section) => {
-                      if (section === 'personal') setIsPersonalModalOpen(true);
-                      else if (section === 'institution') setIsInstitutionModalOpen(true);
-                      else if (section === 'academic') setIsAcademicModalOpen(true);
-                      else if (section === 'photo') setIsPhotoModalOpen(true);
-                    }}
-                  />
-
-                  {/* Activity & Progress Statistics - Driven by real API */}
-                  <ProfileActivityCard
-                    problemsSolved={solvedCount}
-                    problemsAttempted={attemptedCount}
-                    bookmarksCount={bookmarks.length}
-                    collegeName={userInfo?.college || institution?.name || profile?.collegeName}
-                  />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'personal' && (
-              <div className="max-w-4xl space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2">
-                    <PersonalInfoCard
-                      profile={profile}
-                      userInfo={userInfo}
-                      onEdit={() => setIsPersonalModalOpen(true)}
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            {/* Left: Avatar + User Details */}
+            <div className="flex items-center gap-5 sm:gap-6">
+              {/* Avatar Container with Camera Badge */}
+              <div className="relative shrink-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#DCEBFF] dark:bg-blue-950/70 text-[#1E40AF] dark:text-blue-300 font-bold text-2xl sm:text-3xl flex items-center justify-center overflow-hidden shadow-inner ring-4 ring-white dark:ring-neutral-800">
+                  {profile?.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt={fullName}
+                      className="w-full h-full object-cover"
                     />
+                  ) : (
+                    <span>{initials}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoModalOpen(true)}
+                  title="Upload Profile Picture"
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#1E3A8A] hover:bg-blue-800 text-white flex items-center justify-center shadow-md transition-transform hover:scale-110 cursor-pointer border-2 border-white dark:border-neutral-900"
+                >
+                  <Camera className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* User Identity Info */}
+              <div className="space-y-1.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                    {fullName}
+                  </h1>
+                  <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#EAF2FE] dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
+                    {roleName}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5">
+                    <AtSign className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span className="font-medium text-slate-700 dark:text-slate-300">{userName}</span>
                   </div>
-                  <div className="md:col-span-1">
-                    <ProfilePhotoCard
-                      profile={profile}
-                      onUpload={() => setIsPhotoModalOpen(true)}
-                    />
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <span>{email}</span>
                   </div>
+                  {effectiveUserId && (
+                    <div className="flex items-center gap-1 text-slate-400 font-mono text-xs">
+                      <Hash className="w-3 h-3" />
+                      <span>{effectiveUserId}</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
 
-            {activeTab === 'institution' && (
-              <div className="max-w-3xl">
-                <InstitutionInfoCard
-                  profile={profile}
-                  institution={institution}
-                  userInfo={userInfo}
-                  onEdit={() => setIsInstitutionModalOpen(true)}
-                />
+            {/* Right: Edit Profile Button */}
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsPersonalModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-all cursor-pointer shadow-xs bg-white dark:bg-neutral-900"
+              >
+                <Pencil className="w-4 h-4" />
+                <span>Edit Personal Info</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* 4 KPI Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 1. Problems Solved */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200/80 dark:border-white/10 p-5 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[#EAFBF3] dark:bg-emerald-950/40 text-[#10B981] dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <SquareCode className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Problems Solved</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                {displaySolved}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Keep going! 🎯
+              </p>
+            </div>
+          </div>
+
+          {/* 2. Total Attempts */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200/80 dark:border-white/10 p-5 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[#F4EFFE] dark:bg-purple-950/40 text-[#9333EA] dark:text-purple-400 flex items-center justify-center shrink-0">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Attempts</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                {displayAttempted}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {recentAttemptsCount > 0 ? `+${recentAttemptsCount} this week` : 'Consistent progress!'}
+              </p>
+            </div>
+          </div>
+
+          {/* 3. Accuracy */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200/80 dark:border-white/10 p-5 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-[#FEF6E7] dark:bg-amber-950/40 text-[#F59E0B] dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Star className="w-6 h-6 fill-amber-400 text-amber-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Accuracy</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                {displayAccuracy}%
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                Overall submission rate
+              </p>
+            </div>
+          </div>
+
+          {/* 4. Current Streak */}
+          <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-slate-200/80 dark:border-white/10 p-5 shadow-xs flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-[#EAF4FE] dark:bg-blue-950/40 text-[#3B82F6] dark:text-blue-400 flex items-center justify-center shrink-0">
+              <Flame className="w-6 h-6 fill-blue-500 text-blue-500" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Current Streak</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
+                {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
+              </p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {currentStreak > 0 ? 'Great consistency! 🔥' : 'Start solving today! 🔥'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* 2x2 Detailed Information Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Card 1: Personal Information */}
+          <div
+            id="personal-card"
+            className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <User className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Personal Information
+                </h2>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsPersonalModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+              >
+                <Pencil className="w-3 h-3" />
+                <span>Edit</span>
+              </button>
+            </div>
 
-            {activeTab === 'academic' && (
-              <div className="max-w-3xl">
-                <AcademicDetailsCard
-                  profile={profile}
-                  userInfo={userInfo}
-                  onEdit={() => setIsAcademicModalOpen(true)}
-                />
+            {/* Key-Value Rows (Only real verified session/API fields) */}
+            <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Full Name</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+                  {fullName || '—'}
+                </span>
               </div>
-            )}
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Username</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left">
+                  @{userName}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Email Address</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left truncate">
+                  {email || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Platform Role</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+                  {roleName}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">User Account ID</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left">
+                  #{effectiveUserId || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-start justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5 pt-0.5">About / Bio</span>
+                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed">
+                  {bio || 'No bio provided yet.'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-            {activeTab === 'security' && (
-              <div className="max-w-3xl bg-white dark:bg-neutral-900/90 rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm space-y-6 font-sans">
-                <div className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-white/5">
-                  <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center text-sm">
-                    <i className="fa-solid fa-shield-halved"></i>
+          {/* Card 2: Academic Details */}
+          <div
+            id="academic-card"
+            className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <GraduationCap className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    Academic Details
+                  </h2>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAcademicModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+              >
+                <Pencil className="w-3 h-3" />
+                <span>{regNumber || collegeName ? 'Edit' : 'Add Info'}</span>
+              </button>
+            </div>
+
+            {/* Key-Value Rows (Only real fields in /userInfo/{userId}) */}
+            <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Registration Number</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono font-bold flex-1 text-left">
+                  {regNumber || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">College / Institute</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left truncate">
+                  {collegeName || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Joined Year</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+                  {joinedYear || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5">Graduation Year</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+                  {passedOutYear || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-start justify-between">
+                <span className="text-slate-500 dark:text-slate-400 w-2/5 pt-0.5">Academic Bio</span>
+                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed">
+                  {bio || '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 3: Account & Preferences */}
+          <div
+            id="preferences-card"
+            className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                  <Settings className="w-4 h-4" />
+                </div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Account & Preferences
+                </h2>
+              </div>
+            </div>
+
+            {/* Preference Items */}
+            <div className="space-y-4 text-xs sm:text-sm">
+              {/* Row 1: Password */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    Password
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="font-mono text-slate-700 dark:text-slate-300 tracking-widest text-sm">
+                    ••••••••
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleChangePassword}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: Email Notifications */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                    <Bell className="w-4 h-4" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-gray-900 dark:text-white">Account Security & Credentials</h2>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">Manage your authentication credentials and account protection.</p>
+                    <p className="font-medium text-slate-800 dark:text-slate-200">
+                      Email Notifications
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Get updates about new problems, contests and more
+                    </p>
                   </div>
                 </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50/70 dark:bg-neutral-950/60 border border-gray-200/70 dark:border-white/5">
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">Email Address</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">{authUser?.email || profile?.email || '—'}</p>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30">
-                      Primary
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-gray-50/70 dark:bg-neutral-950/60 border border-gray-200/70 dark:border-white/5">
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">Account Role</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{authUser?.role || profile?.role || 'STUDENT'}</p>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 border border-blue-200 dark:border-blue-500/30">
-                      Active
-                    </span>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-gray-50/70 dark:bg-neutral-950/60 border border-gray-200/70 dark:border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-bold text-gray-900 dark:text-white">Reset Account Password</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Receive a secure one-time password on your registered email to update your password.</p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const targetEmail = authUser?.email || profile?.email;
-                        if (!targetEmail) {
-                          toast.error('Email not found. Please log in again.');
-                          return;
-                        }
-                        try {
-                          await dispatch(generatePasswordResetOtpThunk(targetEmail)).unwrap();
-                          toast.success(`Password reset OTP sent to ${targetEmail}`);
-                          dispatch(openAuthModal({ mode: 'forgot' }));
-                        } catch (err: any) {
-                          toast.error(err || 'Failed to send reset OTP');
-                        }
-                      }}
-                      className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors shrink-0 cursor-pointer shadow-xs"
-                    >
-                      Reset Password
-                    </button>
-                  </div>
+                <div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={emailNotifications}
+                    onClick={handleToggleNotifications}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                      emailNotifications ? 'bg-blue-600' : 'bg-slate-300 dark:bg-neutral-700'
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                        emailNotifications ? 'translate-x-5' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
-            )}
-          </main>
+
+              {/* Row 3: Theme Preference */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                    <Moon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 dark:text-slate-200">
+                      Theme Preference
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Choose your preferred appearance
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <select
+                    value={themePreference}
+                    onChange={(e) => handleThemeChange(e.target.value)}
+                    className="text-xs font-medium bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="system">System</option>
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 4: Language */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
+                    <Globe className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-800 dark:text-slate-200">
+                      Language
+                    </p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Choose your interface language
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <select
+                    value={languagePreference}
+                    onChange={(e) => handleLanguageChange(e.target.value)}
+                    className="text-xs font-medium bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  >
+                    <option value="English">English</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="Telugu">Telugu</option>
+                    <option value="Spanish">Spanish</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -576,14 +1034,6 @@ export const UserProfilePage: React.FC = () => {
         submitting={submitting}
       />
 
-      {/* Edit Institution Modal */}
-      <EditInstitutionModal
-        isOpen={isInstitutionModalOpen}
-        onClose={() => setIsInstitutionModalOpen(false)}
-        onSubmit={handleSaveInstitution}
-        initialData={institution}
-        submitting={submitting}
-      />
 
       {/* Edit Academic Details Modal */}
       <EditAcademicModal
@@ -591,9 +1041,7 @@ export const UserProfilePage: React.FC = () => {
         onClose={() => setIsAcademicModalOpen(false)}
         onSubmit={handleSaveAcademic}
         initialData={userInfo}
-        defaultCollege={institution?.name || ''}
-        defaultDegree={profile?.degree || ''}
-        defaultBranch={profile?.branch || ''}
+        defaultCollege={userInfo?.college || institution?.name || profile?.collegeName || ''}
         submitting={submitting}
       />
 

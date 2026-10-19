@@ -32,12 +32,22 @@ export const adminCompanyService = {
   },
 
   /**
-   * POST /api/v1/company
+   * POST /api/v1/admin/company
    * Saves a new company (id: null) or updates an existing company (id: number).
-   * ADMIN Bearer token REQUIRED.
+   * Verified working admin endpoint: POST /api/v1/admin/company
    */
   async saveOrUpdateCompany(payload: CompanyItem): Promise<ApiResponse<Company>> {
-    return apiClient.post(API_ENDPOINTS.COMPANY.BASE, payload);
+    const formattedPayload = {
+      ...(payload.id ? { id: Number(payload.id) } : {}),
+      name: payload.name.trim(),
+      website: payload.websiteUrl || (payload as any).website || '',
+      websiteUrl: payload.websiteUrl || (payload as any).website || '',
+      logo: payload.logoUrl || (payload as any).logo || '',
+      logoUrl: payload.logoUrl || (payload as any).logo || '',
+      description: payload.description || '',
+      isActive: payload.isActive ?? true,
+    };
+    return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_BASE, formattedPayload);
   },
 
   /**

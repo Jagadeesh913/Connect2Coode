@@ -98,8 +98,15 @@ export const tokenStorage = {
       getCookie(ACCESS_TOKEN_KEY) ||
       getCookie('token') ||
       getCookie('accessToken') ||
+      getCookie('jwt') ||
+      getCookie('jwtToken') ||
+      getCookie('authToken') ||
       getLocalItem(ACCESS_TOKEN_KEY) ||
-      getLocalItem('token')
+      getLocalItem('token') ||
+      getLocalItem('accessToken') ||
+      getLocalItem('jwt') ||
+      getLocalItem('jwtToken') ||
+      getLocalItem('authToken')
     );
   },
 

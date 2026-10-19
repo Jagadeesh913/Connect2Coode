@@ -5,9 +5,12 @@ import { AdminModal } from '../AdminModal';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
 import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminCompanyService, CompanyItem } from '../../../../services/admin/adminCompanyService';
+import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../utils/testCaseUtils';
+import { Code2, Building2, Plus, Trash2, X } from 'lucide-react';
 
 export type QuestionFormData = AdminQuestionFormData & {
   questionHints?: QuestionHint[];
@@ -41,13 +44,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const [allCompanies, setAllCompanies] = useState<CompanyItem[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<CompanyItem[]>([]);
 
-  const [refLoading, setRefLoading] = useState<boolean>(false);
-  const [refError, setRefError] = useState<string | null>(null);
-
   // Question Hints State
   const [hints, setHints] = useState<QuestionHint[]>([]);
 
-  // Inline Test Cases State for Own Problems
+  // Inline Test Cases State
   const [testCases, setTestCases] = useState<QuestionTestCase[]>([
     {
       input: '',
@@ -89,14 +89,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     },
   });
 
-  // Fetch Reference Libraries and Companies from REAL backend API when modal opens
+  // Fetch Reference Libraries and Companies from REAL backend API
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     const loadReferenceData = async () => {
-      setRefLoading(true);
-      setRefError(null);
       try {
         const [diffRes, topicRes, qpfRes, tcTypeRes, compRes] = await Promise.all([
           referenceService.getByGroupCode('DIFF'),
@@ -114,53 +112,13 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         const tcTypeList = tcTypeRes?.data || (Array.isArray(tcTypeRes) ? tcTypeRes : []);
         const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
 
-        const validDiffs = Array.isArray(diffList) ? diffList : [];
-        const validTopics = Array.isArray(topicList) ? topicList : [];
-        const validQpfs = Array.isArray(qpfList) ? qpfList : [];
-        const validTcTypes = Array.isArray(tcTypeList) ? tcTypeList : [];
-        const validCompanies = Array.isArray(compList) ? compList : [];
-
-        setDifficulties(validDiffs);
-        setTopics(validTopics);
-        setQpfs(validQpfs);
-        setTestCaseTypes(validTcTypes);
-        setAllCompanies(validCompanies);
-
-        if (validTcTypes.length > 0) {
-          setTestCases((prev) =>
-            prev.map((tc) => ({
-              ...tc,
-              typeRefCode: tc.typeRefCode || validTcTypes[0].refCode,
-            }))
-          );
-        }
-
-        // If creating a new question, populate defaults from API list
-        if (!initialData) {
-          if (validDiffs.length > 0 && !watch('difficultyRefCode')) {
-            setValue('difficultyRefGroupCode', validDiffs[0].refGroupCode || 'DIFF');
-            setValue('difficultyRefCode', validDiffs[0].refCode);
-            setValue('difficultyRefName', validDiffs[0].refName);
-          }
-          if (validTopics.length > 0 && !watch('topicRefCode')) {
-            setValue('topicRefGroupCode', validTopics[0].refGroupCode || 'TOPIC');
-            setValue('topicRefCode', validTopics[0].refCode);
-            setValue('topicRefName', validTopics[0].refName);
-          }
-          if (validQpfs.length > 0 && !watch('qpfRefCode')) {
-            setValue('qpfRefGroupCode', validQpfs[0].refGroupCode || 'QPF');
-            setValue('qpfRefCode', validQpfs[0].refCode);
-            setValue('qpfRefName', validQpfs[0].refName);
-          }
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setRefError(err?.message || 'Failed to load reference options from server');
-        }
-      } finally {
-        if (isMounted) {
-          setRefLoading(false);
-        }
+        setDifficulties(Array.isArray(diffList) ? diffList : []);
+        setTopics(Array.isArray(topicList) ? topicList : []);
+        setQpfs(Array.isArray(qpfList) ? qpfList : []);
+        setTestCaseTypes(Array.isArray(tcTypeList) ? tcTypeList : []);
+        setAllCompanies(Array.isArray(compList) ? compList : []);
+      } catch (err) {
+        console.warn('Failed to load reference metadata:', err);
       }
     };
 
@@ -170,55 +128,137 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     };
   }, [isOpen]);
 
+  // Sync Form Values when initialData or references change
   useEffect(() => {
-    setActiveTab('METADATA');
+    if (!isOpen) return;
+
     if (initialData) {
-      const formattedAskedDate = initialData.askedDate
-        ? initialData.askedDate.split('T')[0]
-        : '';
+      const diffName = (
+        initialData.difficultyRefName ||
+        (initialData as any).difficultyName ||
+        (initialData as any).difficulty ||
+        ''
+      ).toLowerCase();
+      const matchedDiff = difficulties.find(
+        (d) =>
+          (initialData.difficultyRefCode && d.refCode === initialData.difficultyRefCode) ||
+          (initialData as any).difficultyId === d.id ||
+          (diffName && d.refName.toLowerCase() === diffName) ||
+          (diffName && d.refCode.toLowerCase() === diffName)
+      );
+
+      const topicName = (
+        initialData.topicRefName ||
+        (initialData as any).topicName ||
+        (initialData as any).category ||
+        (initialData as any).topic ||
+        ''
+      ).toLowerCase();
+      const matchedTopic = topics.find(
+        (t) =>
+          (initialData.topicRefCode && t.refCode === initialData.topicRefCode) ||
+          (initialData as any).topicId === t.id ||
+          (topicName && t.refName.toLowerCase() === topicName) ||
+          (topicName && t.refCode.toLowerCase() === topicName)
+      );
+
+      const qpfName = (
+        initialData.qpfRefName ||
+        (initialData as any).questionPlatform ||
+        (initialData as any).platformName ||
+        (initialData as any).platform ||
+        ''
+      ).toLowerCase().trim();
+      const matchedQpf = qpfs.find(
+        (q) =>
+          (initialData.qpfRefCode && q.refCode.toUpperCase() === initialData.qpfRefCode.toUpperCase()) ||
+          (qpfName && q.refName.toLowerCase() === qpfName) ||
+          (qpfName && q.refCode.toLowerCase() === qpfName) ||
+          (qpfName && (qpfName.includes(q.refName.toLowerCase()) || q.refName.toLowerCase().includes(qpfName)))
+      );
+
       reset({
-        id: initialData.id ?? null,
+        id: initialData.id,
         title: initialData.title || '',
         description: initialData.description || '',
-        difficultyRefGroupCode: initialData.difficultyRefGroupCode || 'DIFF',
-        difficultyRefCode: initialData.difficultyRefCode || '',
-        difficultyRefName: initialData.difficultyRefName || '',
-        topicRefGroupCode: initialData.topicRefGroupCode || 'TOPIC',
-        topicRefCode: initialData.topicRefCode || '',
-        topicRefName: initialData.topicRefName || '',
-        qpfRefGroupCode: initialData.qpfRefGroupCode || 'QPF',
-        qpfRefCode: initialData.qpfRefCode || '',
-        qpfRefName: initialData.qpfRefName || '',
+        constraints: initialData.constraints || extractConstraintsFromDescription(initialData.description),
+        difficultyRefGroupCode: matchedDiff?.refGroupCode || initialData.difficultyRefGroupCode || 'DIFF',
+        difficultyRefCode: matchedDiff?.refCode || initialData.difficultyRefCode || '',
+        difficultyRefName: matchedDiff?.refName || initialData.difficultyRefName || '',
+        topicRefGroupCode: matchedTopic?.refGroupCode || initialData.topicRefGroupCode || 'TOPIC',
+        topicRefCode: matchedTopic?.refCode || initialData.topicRefCode || '',
+        topicRefName: matchedTopic?.refName || initialData.topicRefName || '',
+        qpfRefGroupCode: matchedQpf?.refGroupCode || initialData.qpfRefGroupCode || 'QPF',
+        qpfRefCode: matchedQpf?.refCode || initialData.qpfRefCode || '',
+        qpfRefName: matchedQpf?.refName || initialData.qpfRefName || (initialData as any).questionPlatform || '',
         leetCodeUrl: initialData.leetCodeUrl || '',
         gfgUrl: initialData.gfgUrl || '',
         hackerRankUrl: initialData.hackerRankUrl || '',
         isOwnProblem: initialData.isOwnProblem ?? true,
         isActive: initialData.isActive ?? true,
-        askedDate: formattedAskedDate,
+        askedDate: initialData.askedDate ? initialData.askedDate.split('T')[0] : '',
       });
+
       setHints(
-        Array.isArray(initialData.questionHints)
-          ? initialData.questionHints.map((h) => ({ id: h.id ?? null, hintText: h.hintText }))
+        Array.isArray(initialData.questionHints) && initialData.questionHints.length > 0
+          ? initialData.questionHints.map((h: any) => ({
+              id: h.id ?? null,
+              hintText: h.hintText || h.hint || '',
+            }))
           : []
       );
-      setSelectedCompanies(Array.isArray(initialData.companies) ? initialData.companies : []);
-      if (Array.isArray(initialData.testCases) && initialData.testCases.length > 0) {
-        setTestCases(initialData.testCases);
+
+      if (Array.isArray(initialData.companies)) {
+        const mapped = initialData.companies
+          .map((c: any) => {
+            const cName = typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c).trim();
+            if (!cName) return null;
+            const found = allCompanies.find((ac) => ac.name.toLowerCase() === cName.toLowerCase());
+            return (
+              found || {
+                id: typeof c === 'object' && c?.id ? c.id : null,
+                name: cName,
+              }
+            );
+          })
+          .filter((c): c is { id?: any; name: string } => c !== null);
+        setSelectedCompanies(mapped);
+      } else {
+        setSelectedCompanies([]);
+      }
+
+      const resolvedTestCases = extractTestCasesFromProblem(initialData);
+      if (resolvedTestCases.length > 0) {
+        setTestCases(resolvedTestCases);
+      } else if (initialData.id) {
+        adminQuestionService
+          .getTestCases(initialData.id)
+          .then((cases) => {
+            if (cases && cases.length > 0) {
+              setTestCases(cases);
+            }
+          })
+          .catch(() => {});
       }
     } else {
+      const defaultDiff = difficulties[0];
+      const defaultTopic = topics[0];
+      const defaultQpf = qpfs[0];
+
       reset({
         id: null,
         title: '',
         description: '',
-        difficultyRefGroupCode: 'DIFF',
-        difficultyRefCode: '',
-        difficultyRefName: '',
-        topicRefGroupCode: 'TOPIC',
-        topicRefCode: '',
-        topicRefName: '',
-        qpfRefGroupCode: 'QPF',
-        qpfRefCode: '',
-        qpfRefName: '',
+        constraints: '',
+        difficultyRefGroupCode: defaultDiff?.refGroupCode || 'DIFF',
+        difficultyRefCode: defaultDiff?.refCode || '',
+        difficultyRefName: defaultDiff?.refName || '',
+        topicRefGroupCode: defaultTopic?.refGroupCode || 'TOPIC',
+        topicRefCode: defaultTopic?.refCode || '',
+        topicRefName: defaultTopic?.refName || '',
+        qpfRefGroupCode: defaultQpf?.refGroupCode || 'QPF',
+        qpfRefCode: defaultQpf?.refCode || '',
+        qpfRefName: defaultQpf?.refName || '',
         leetCodeUrl: '',
         gfgUrl: '',
         hackerRankUrl: '',
@@ -236,11 +276,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           isHidden: false,
           displayOrder: 1,
           typeRefGroupCode: 'TESTCASETYPE',
-          typeRefCode: testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'NECESSARY',
+          typeRefCode: testCaseTypes[0]?.refCode || 'SAMPLE',
         },
       ]);
     }
-  }, [initialData, reset]);
+    setActiveTab('METADATA');
+  }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, reset]);
 
   const handleDifficultySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedCode = e.target.value;
@@ -288,7 +329,6 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     });
   };
 
-  // Target Companies Dropdown & Multiselect Handlers
   const handleSelectCompanyFromDropdown = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
     if (!val) return;
@@ -296,17 +336,13 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     if (match && !selectedCompanies.some((c) => (c.id && c.id === match.id) || c.name.toLowerCase() === match.name.toLowerCase())) {
       setSelectedCompanies((prev) => [...prev, match]);
     }
-  };
-
-  const handleClearAllCompanies = () => {
-    setSelectedCompanies([]);
+    e.target.value = '';
   };
 
   const handleRemoveCompany = (companyName: string) => {
-    setSelectedCompanies(selectedCompanies.filter((c) => c.name !== companyName));
+    setSelectedCompanies(selectedCompanies.filter((c) => c.name.toLowerCase() !== companyName.toLowerCase()));
   };
 
-  // Test Case Management Handlers
   const handleAddTestCase = () => {
     const defaultType = testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'NECESSARY';
     setTestCases((prev) => [
@@ -325,7 +361,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
   const handleRemoveTestCase = (index: number) => {
     if (testCases.length === 1) {
-      toast.error('At least one test case is required for your own problem');
+      toast.error('At least one testcase is required.');
       return;
     }
     setTestCases((prev) => prev.filter((_, i) => i !== index));
@@ -346,10 +382,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       if (field === 'isHidden') {
         if (value === true && target.typeRefCode === 'SAMPLE') {
           target.typeRefCode = 'NECESSARY';
-          target.typeRefName = testCaseTypes.find((t) => t.refCode === 'NECESSARY')?.refName || 'Mandatory Test Case';
+          target.typeRefName =
+            testCaseTypes.find((t) => t.refCode === 'NECESSARY')?.refName || 'Mandatory Test Case';
         } else if (value === false && target.typeRefCode === 'NECESSARY') {
           target.typeRefCode = 'SAMPLE';
-          target.typeRefName = testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refName || 'Visible Sample Test Case';
+          target.typeRefName =
+            testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refName || 'Visible Sample Test Case';
         }
       }
 
@@ -377,22 +415,22 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     const finalIsActive = isNew ? (data.isActive !== false) : (data.isActive ?? true);
     const isOwn = data.isOwnProblem === true;
 
-    // Validate inline test cases for own problems
-    if (isOwn) {
-      if (testCases.length === 0) {
-        toast.error('At least one Test Case is required for your own problem.');
-        setActiveTab('TESTCASES');
-        return;
-      }
-      const newErrors: Record<number, { input?: string; expectedOutput?: string }> = {};
-      let hasError = false;
-      for (let i = 0; i < testCases.length; i++) {
+    // Validate any test cases that have partial input/output
+    const newErrors: Record<number, { input?: string; expectedOutput?: string }> = {};
+    let hasError = false;
+    for (let i = 0; i < testCases.length; i++) {
+      const tc = testCases[i];
+      const hasInput = Boolean(tc.input?.trim());
+      const hasOutput = Boolean(tc.expectedOutput?.trim());
+
+      // If either input or output is provided, or if isOwn is true, require both
+      if (hasInput || hasOutput || isOwn) {
         const tcErrors: { input?: string; expectedOutput?: string } = {};
-        if (!testCases[i].input.trim()) {
+        if (!hasInput) {
           tcErrors.input = 'Input raw string is required.';
           hasError = true;
         }
-        if (!testCases[i].expectedOutput.trim()) {
+        if (!hasOutput) {
           tcErrors.expectedOutput = 'Expected output raw string is required.';
           hasError = true;
         }
@@ -400,23 +438,38 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           newErrors[i] = tcErrors;
         }
       }
-      if (hasError) {
-        setTestCaseErrors(newErrors);
-        setActiveTab('TESTCASES');
-        toast.error('Please enter required inputs and outputs for all test cases.');
-        return;
-      }
     }
 
-    const sanitizedTestCases: QuestionTestCase[] = testCases.map((tc, idx) => {
-      const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
-      const matched = testCaseTypes.find((t) => t.refCode === typeCode);
+    if (hasError) {
+      setTestCaseErrors(newErrors);
+      setActiveTab('TESTCASES');
+      toast.error('Please enter required inputs and outputs for all test cases.');
+      return;
+    }
+
+    const sanitizedTestCases: QuestionTestCase[] = testCases
+      .filter((tc) => tc.input?.trim() && tc.expectedOutput?.trim())
+      .map((tc, idx) => {
+        const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
+        const matched = testCaseTypes.find((t) => t.refCode === typeCode);
+        return {
+          ...tc,
+          input: tc.input.trim(),
+          expectedOutput: tc.expectedOutput.trim(),
+          explanation: tc.explanation ? tc.explanation.trim() : '',
+          displayOrder: idx + 1,
+          typeRefGroupCode: 'TESTCASETYPE',
+          typeRefCode: typeCode,
+          typeRefName:
+            matched?.refName || tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
+        };
+      });
+
+    const resolvedCompanies = selectedCompanies.map((c) => {
+      const match = allCompanies.find((ac) => ac.name.toLowerCase() === c.name.toLowerCase());
       return {
-        ...tc,
-        displayOrder: idx + 1,
-        typeRefGroupCode: 'TESTCASETYPE',
-        typeRefCode: typeCode,
-        typeRefName: matched?.refName || tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
+        id: c.id || match?.id || null,
+        name: c.name,
       };
     });
 
@@ -429,541 +482,398 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       gfgUrl: !isOwn && data.gfgUrl ? data.gfgUrl.trim() : '',
       hackerRankUrl: !isOwn && data.hackerRankUrl ? data.hackerRankUrl.trim() : '',
       questionHints: hints.filter((h) => h.hintText.trim() !== ''),
-      testCases: isOwn ? sanitizedTestCases : [],
-      companies: selectedCompanies,
+      testCases: sanitizedTestCases,
+      companies: resolvedCompanies,
     });
   };
-
-  const isOwnProblem = watch('isOwnProblem') === true;
 
   return (
     <AdminModal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? `Edit DSA Problem #${initialData?.id}` : 'Create New DSA Problem'}
-      subtitle="Author problem metadata, companies, hints, and testcase assertions"
+      title={isEditing ? `Edit Problem #${initialData?.id}` : 'Create New Problem'}
+      subtitle="Configure problem statement, metadata, constraints, hints, and testcase assertions"
+      icon={<Code2 className="w-5 h-5" />}
       maxWidth="4xl"
-    >
-      <div className="space-y-6 font-sans text-left">
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-white/10 gap-6">
-          <button
-            type="button"
-            onClick={() => setActiveTab('METADATA')}
-            className={`pb-3 text-xs font-bold transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
-              activeTab === 'METADATA'
-                ? 'border-neutral-600 text-neutral-300'
-                : 'border-transparent text-gray-400 hover:text-white'
-            }`}
-          >
-            <i className="fa-solid fa-file-pen" />
-            <span>Problem Details &amp; Metadata</span>
-          </button>
-
-          {isOwnProblem && (
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setActiveTab('METADATA')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'METADATA'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              1. Metadata &amp; Content
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('TESTCASES')}
-              className={`pb-3 text-xs font-bold transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'TESTCASES'
-                  ? 'border-neutral-600 text-neutral-300'
-                  : 'border-transparent text-gray-400 hover:text-white'
+                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
+                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <i className="fa-solid fa-vials" />
-              <span>Test Cases &amp; Assertions ({testCases.length})</span>
+              2. Test Cases ({testCases.length})
             </button>
-          )}
-        </div>
+          </div>
 
-        <form onSubmit={handleSubmit(handleFormSubmit as any)} className="space-y-5">
-          {refError && (
-            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs">
-              <i className="fa-solid fa-triangle-exclamation mr-2"></i>
-              {refError}
-            </div>
-          )}
-
-          {/* TAB 1: METADATA & PROBLEM STATEMENT */}
-          {activeTab === 'METADATA' ? (
-            <div className="space-y-4">
-              {/* Question Title */}
-              <div className="space-y-1">
-                <label htmlFor="question-title-input" className="block text-xs font-semibold text-gray-300">Problem Title *</label>
-                <input
-                  id="question-title-input"
-                  type="text"
-                  placeholder="e.g. Two Sum, Binary Search"
-                  aria-invalid={errors.title ? 'true' : 'false'}
-                  aria-describedby={errors.title ? 'question-title-error' : undefined}
-                  className={`w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm border transition-all focus:outline-none focus:ring-1 ${
-                    errors.title ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-white/10 focus:border-neutral-600 focus:ring-neutral-500'
-                  }`}
-                  {...register('title')}
-                />
-                <FormFieldError error={errors.title?.message} id="question-title-error" />
-              </div>
-
-              {/* Problem Ownership Selection (Radio Buttons) */}
-              <div className="p-4 bg-neutral-950 backdrop-blur-md border border-white/10 rounded-2xl space-y-2">
-                <label className="block text-xs font-semibold text-gray-300">Is this your own problem? *</label>
-                <div className="flex items-center gap-6 pt-0.5">
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-white">
-                    <input
-                      type="radio"
-                      name="isOwnProblemRadio"
-                      className="w-4 h-4 text-neutral-300 focus:ring-neutral-500 bg-neutral-950 border-white/20 cursor-pointer"
-                      checked={isOwnProblem}
-                      onChange={() => setValue('isOwnProblem', true, { shouldValidate: true, shouldDirty: true })}
-                    />
-                    <span>( ) Yes — My Own Problem</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-white">
-                    <input
-                      type="radio"
-                      name="isOwnProblemRadio"
-                      className="w-4 h-4 text-neutral-300 focus:ring-neutral-500 bg-neutral-950 border-white/20 cursor-pointer"
-                      checked={!isOwnProblem}
-                      onChange={() => setValue('isOwnProblem', false, { shouldValidate: true, shouldDirty: true })}
-                    />
-                    <span>( ) No — External Problem</span>
-                  </label>
-                </div>
-              </div>
-
-              {/* Dynamic Reference Library Dropdowns */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Difficulty Dropdown */}
-                <div className="space-y-1">
-                  <label htmlFor="question-difficulty-select" className="block text-xs font-semibold text-gray-300">Difficulty Level *</label>
-                  <div className="relative">
-                    <select
-                      id="question-difficulty-select"
-                      disabled={refLoading || difficulties.length === 0}
-                      className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-3.5 pr-8 py-2.5 text-xs font-semibold border border-white/10 hover:border-white/20 focus:border-blue-500 transition-all focus:outline-none cursor-pointer disabled:opacity-50"
-                      value={watch('difficultyRefCode') || ''}
-                      onChange={handleDifficultySelect}
-                    >
-                      {refLoading ? (
-                        <option value="">Loading difficulties...</option>
-                      ) : difficulties.length === 0 ? (
-                        <option value="">No options available</option>
-                      ) : (
-                        difficulties.map((item) => (
-                          <option key={item.id || item.refCode} value={item.refCode}>
-                            {item.refName} ({item.refCode})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                  </div>
-                  <FormFieldError error={errors.difficultyRefCode?.message} />
-                </div>
-
-                {/* Topic Dropdown */}
-                <div className="space-y-1">
-                  <label htmlFor="question-topic-select" className="block text-xs font-semibold text-gray-300">DSA Topic / Category *</label>
-                  <div className="relative">
-                    <select
-                      id="question-topic-select"
-                      disabled={refLoading || topics.length === 0}
-                      className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-3.5 pr-8 py-2.5 text-xs font-semibold border border-white/10 hover:border-white/20 focus:border-blue-500 transition-all focus:outline-none cursor-pointer disabled:opacity-50"
-                      value={watch('topicRefCode') || ''}
-                      onChange={handleTopicSelect}
-                    >
-                      {refLoading ? (
-                        <option value="">Loading topics...</option>
-                      ) : topics.length === 0 ? (
-                        <option value="">No options available</option>
-                      ) : (
-                        topics.map((item) => (
-                          <option key={item.id || item.refCode} value={item.refCode}>
-                            {item.refName} ({item.refCode})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                  </div>
-                  <FormFieldError error={errors.topicRefCode?.message} />
-                </div>
-
-                {/* Question Exam Platform / QPF Dropdown */}
-                <div className="space-y-1">
-                  <label htmlFor="question-qpf-select" className="block text-xs font-semibold text-gray-300">Exam Platform (QPF) *</label>
-                  <div className="relative">
-                    <select
-                      id="question-qpf-select"
-                      disabled={refLoading || qpfs.length === 0}
-                      className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-3.5 pr-8 py-2.5 text-xs font-semibold border border-white/10 hover:border-white/20 focus:border-blue-500 transition-all focus:outline-none cursor-pointer disabled:opacity-50"
-                      value={watch('qpfRefCode') || ''}
-                      onChange={handleQpfSelect}
-                    >
-                      {refLoading ? (
-                        <option value="">Loading platforms...</option>
-                      ) : qpfs.length === 0 ? (
-                        <option value="">No options available</option>
-                      ) : (
-                        qpfs.map((item) => (
-                          <option key={item.id || item.refCode} value={item.refCode}>
-                            {item.refName} ({item.refCode})
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                  </div>
-                  <FormFieldError error={errors.qpfRefCode?.message} />
-                </div>
-              </div>
-
-              {/* Problem Description */}
-              <div className="space-y-1">
-                <label htmlFor="question-description-input" className="block text-xs font-semibold text-gray-300">Problem Description *</label>
-                <textarea
-                  id="question-description-input"
-                  rows={4}
-                  placeholder="Describe the problem statement, inputs, constraints, and expected output format..."
-                  aria-invalid={errors.description ? 'true' : 'false'}
-                  aria-describedby={errors.description ? 'question-desc-error' : undefined}
-                  className={`w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl p-3.5 text-xs border transition-all focus:outline-none leading-relaxed ${
-                    errors.description ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                  }`}
-                  {...register('description')}
-                />
-                <FormFieldError error={errors.description?.message} id="question-desc-error" />
-              </div>
-
-              {/* Active Status & Conditional Asked Date Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-white/10">
-                {/* Active Status Toggle - Temporarily Commented Out
-                <div className="flex items-center gap-3 p-3.5 bg-neutral-950 backdrop-blur-md border border-white/10 rounded-xl cursor-pointer">
-                  <input
-                    type="checkbox"
-                    id="isActiveToggle"
-                    className="w-4 h-4 rounded bg-neutral-950 border-white/10 text-neutral-300 focus:ring-neutral-500 cursor-pointer"
-                    checked={watch('isActive') !== false}
-                    onChange={(e) => setValue('isActive', e.target.checked, { shouldValidate: true, shouldDirty: true })}
-                  />
-                  <label htmlFor="isActiveToggle" className="text-xs font-semibold text-gray-300 cursor-pointer select-none">
-                    Active Problem (Published to users)
-                  </label>
-                </div>
-                */}
-
-                {/* Conditional Field: Originally Asked Date (ONLY when isOwnProblem === true) */}
-                {isOwnProblem && (
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-300">
-                      Originally Asked Date
-                    </label>
-                    <input
-                      type="date"
-                      onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
-                      className="w-full bg-neutral-950 text-white rounded-xl px-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600 font-sans cursor-pointer"
-                      style={{ colorScheme: 'dark' }}
-                      {...register('askedDate')}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Conditional Field: External Platform URLs (LeetCode, GeeksforGeeks, HackerRank) - Temporarily Commented Out */}
-              {/*
-              {!isOwnProblem && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-white/10">
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-400">LeetCode URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://leetcode.com/..."
-                      className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
-                      {...register('leetCodeUrl')}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-400">GeeksforGeeks URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://geeksforgeeks.org/..."
-                      className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
-                      {...register('gfgUrl')}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-xs font-semibold text-gray-400">HackerRank URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://hackerrank.com/..."
-                      className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
-                      {...register('hackerRankUrl')}
-                    />
-                  </div>
-                </div>
-              )}
-              */}
-
-              {/* Tagged Hiring Companies Multiselect Dropdown */}
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-gray-300">
-                    Tagged Hiring Companies <span className="text-gray-500 font-normal">(Select multiple)</span>
-                  </label>
-                  {selectedCompanies.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearAllCompanies}
-                      className="text-[11px] text-gray-400 hover:text-rose-400 cursor-pointer transition-colors"
-                    >
-                      Clear All ({selectedCompanies.length})
-                    </button>
-                  )}
-                </div>
-
-                {/* Dropdown Selector containing all added companies */}
-                <div className="relative">
-                  <select
-                    value=""
-                    onChange={handleSelectCompanyFromDropdown}
-                    className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 pr-8 py-2.5 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 transition-all focus:outline-none cursor-pointer"
-                  >
-                    <option value="" disabled>-- Select a hiring company from list --</option>
-                    {allCompanies.map((c) => {
-                      const isSelected = selectedCompanies.some(
-                        (sc) => (sc.id && sc.id === c.id) || sc.name.toLowerCase() === c.name.toLowerCase()
-                      );
-                      return (
-                        <option key={c.id || c.name} value={String(c.id || c.name)} disabled={isSelected} className="bg-neutral-900 text-white">
-                          {isSelected ? `✓ ${c.name} (Tagged)` : c.name}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                </div>
-
-                {/* Tagged Companies Chips List */}
-                {selectedCompanies.length > 0 ? (
-                  <div className="flex flex-wrap gap-2 pt-1.5">
-                    {selectedCompanies.map((c) => (
-                      <span
-                        key={c.id || c.name}
-                        className="px-3 py-1.5 rounded-xl bg-neutral-900 border border-white/15 text-xs text-white flex items-center gap-2 font-medium shadow-xs"
-                      >
-                        <i className="fa-solid fa-building text-[10px] text-neutral-300"></i>
-                        <span>{c.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCompany(c.name)}
-                          className="text-gray-400 hover:text-rose-400 cursor-pointer ml-1 text-xs font-bold"
-                          title="Remove company tag"
-                        >
-                          <i className="fa-solid fa-xmark text-xs"></i>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-[11px] text-gray-500 italic">No companies tagged yet. Select one or more from the dropdown above.</p>
-                )}
-              </div>
-
-              {/* Problem Hints Section */}
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-gray-300">Problem Hints</label>
-                  <button
-                    type="button"
-                    onClick={handleAddHint}
-                    className="px-3 py-1 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 font-sans"
-                  >
-                    + Add Hint
-                  </button>
-                </div>
-                {hints.length === 0 ? (
-                  <p className="text-xs text-gray-500 italic">No hints added yet.</p>
-                ) : (
-                  <div className="space-y-2">
-                    {hints.map((hint, idx) => (
-                      <div key={idx} className="flex gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder={`Hint #${idx + 1}...`}
-                          value={hint.hintText}
-                          onChange={(e) => handleHintChange(idx, e.target.value)}
-                          className="flex-1 bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveHint(idx)}
-                          className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 text-xs transition-colors cursor-pointer"
-                        >
-                          <i className="fa-solid fa-trash text-xs" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* TAB 2: TEST CASES & ASSERTIONS */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-white font-heading">Test Cases &amp; Assertions</h4>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Configure sample test cases and hidden evaluation cases for your problem.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddTestCase}
-                  className="px-3.5 py-2 bg-neutral-950 hover:bg-white/10 text-gray-200 border border-white/10 rounded-xl text-xs font-bold transition-all cursor-pointer font-sans"
-                >
-                  + Add Test Case
-                </button>
-              </div>
-
-              <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-1">
-                {testCases.map((tc, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 rounded-2xl bg-neutral-950 backdrop-blur-md border border-white/10 space-y-3 relative group"
-                  >
-                    <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-extrabold text-neutral-300 font-mono">Case #{idx + 1}</span>
-                        <label className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={!tc.isHidden}
-                            onChange={(e) => handleTestCaseChange(idx, 'isHidden', !e.target.checked)}
-                            className="rounded bg-neutral-950 border-white/10 text-neutral-300 focus:ring-neutral-500 cursor-pointer"
-                          />
-                          <span>Public Example</span>
-                        </label>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        {/* Reference Library Type Selector */}
-                        <div className="relative">
-                          <select
-                            value={tc.typeRefCode || 'NECESSARY'}
-                            onChange={(e) => handleTestCaseChange(idx, 'typeRefCode', e.target.value)}
-                            className="appearance-none bg-neutral-950 text-gray-200 text-xs rounded-xl pl-3 pr-8 py-1.5 border border-white/10 focus:outline-none focus:border-neutral-500 cursor-pointer shadow-2xs transition-colors"
-                          >
-                            {testCaseTypes.length > 0 ? (
-                              testCaseTypes.map((t) => (
-                                <option key={t.refCode} value={t.refCode} className="bg-neutral-900 text-white">
-                                  {t.refName || t.refCode}
-                                </option>
-                              ))
-                            ) : (
-                              <>
-                                <option value="NECESSARY" className="bg-neutral-900 text-white">Mandatory Case (NECESSARY)</option>
-                                <option value="CORNER" className="bg-neutral-900 text-white">Edge Case (CORNER)</option>
-                                <option value="TLE" className="bg-neutral-900 text-white">Time Limit (TLE)</option>
-                              </>
-                            )}
-                          </select>
-                          <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveTestCase(idx)}
-                          className="text-gray-500 hover:text-rose-400 transition-colors p-1 cursor-pointer"
-                        >
-                          <i className="fa-solid fa-trash-can text-xs" />
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <label htmlFor={`modal-tc-input-${idx}`} className="block text-[11px] font-semibold text-gray-400">
-                          Standard Input Raw String *
-                        </label>
-                        <textarea
-                          id={`modal-tc-input-${idx}`}
-                          rows={3}
-                          value={tc.input}
-                          aria-invalid={testCaseErrors[idx]?.input ? 'true' : 'false'}
-                          aria-describedby={testCaseErrors[idx]?.input ? `modal-tc-input-error-${idx}` : undefined}
-                          onChange={(e) => handleTestCaseChange(idx, 'input', e.target.value)}
-                          placeholder="Raw stdin input..."
-                          className={`w-full bg-neutral-950 font-mono text-emerald-400 text-xs p-2.5 rounded-xl border transition-colors focus:outline-none ${
-                            testCaseErrors[idx]?.input ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                          }`}
-                        />
-                        <FormFieldError error={testCaseErrors[idx]?.input} id={`modal-tc-input-error-${idx}`} />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`modal-tc-output-${idx}`} className="block text-[11px] font-semibold text-gray-400">
-                          Expected Output Raw String *
-                        </label>
-                        <textarea
-                          id={`modal-tc-output-${idx}`}
-                          rows={3}
-                          value={tc.expectedOutput}
-                          aria-invalid={testCaseErrors[idx]?.expectedOutput ? 'true' : 'false'}
-                          aria-describedby={testCaseErrors[idx]?.expectedOutput ? `modal-tc-output-error-${idx}` : undefined}
-                          onChange={(e) => handleTestCaseChange(idx, 'expectedOutput', e.target.value)}
-                          placeholder="Expected stdout output..."
-                          className={`w-full bg-neutral-950 font-mono text-neutral-300 text-xs p-2.5 rounded-xl border transition-colors focus:outline-none ${
-                            testCaseErrors[idx]?.expectedOutput ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                          }`}
-                        />
-                        <FormFieldError error={testCaseErrors[idx]?.expectedOutput} id={`modal-tc-output-error-${idx}`} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-semibold text-gray-400">
-                        Explanation (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Why this case is expected..."
-                        value={tc.explanation || ''}
-                        onChange={(e) => handleTestCaseChange(idx, 'explanation', e.target.value)}
-                        className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Modal Action Buttons Footer */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-neutral-950 hover:bg-white/10 text-gray-300 border border-white/10 rounded-xl text-sm font-semibold transition-all cursor-pointer font-sans"
+              disabled={submitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
             >
               Cancel
             </button>
             <button
-              type="submit"
-              disabled={submitting || refLoading}
-              className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-lg  disabled:opacity-50 font-sans"
+              type="button"
+              onClick={handleSubmit(handleFormSubmit)}
+              disabled={submitting}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
-              {submitting ? (
-                <>
-                  <i className="fa-solid fa-spinner animate-spin text-xs"></i>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>{initialData ? 'Save Question Changes' : 'Create Problem'}</span>
-              )}
+              {submitting ? 'Saving Problem...' : isEditing ? 'Update Problem' : 'Create Problem'}
             </button>
           </div>
-        </form>
-      </div>
+        </div>
+      }
+    >
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5 font-sans text-left">
+        {activeTab === 'METADATA' && (
+          <div className="space-y-4">
+            {/* Title */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Problem Title <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                {...register('title')}
+                placeholder="e.g. Two Sum, Reverse Linked List"
+                className={`w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border ${
+                  errors.title
+                    ? 'border-rose-500 bg-rose-50/20'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all`}
+              />
+              <FormFieldError error={errors.title?.message} />
+            </div>
+
+            {/* Classification: Difficulty, Topic, Platform */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Difficulty <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={watch('difficultyRefCode') || ''}
+                  onChange={handleDifficultySelect}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Difficulty</option>
+                  {difficulties.map((d) => (
+                    <option key={d.id} value={d.refCode}>
+                      {d.refName}
+                    </option>
+                  ))}
+                </select>
+                <FormFieldError error={errors.difficultyRefCode?.message} />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Category / Topic <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={watch('topicRefCode') || ''}
+                  onChange={handleTopicSelect}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Category</option>
+                  {topics.map((t) => (
+                    <option key={t.id} value={t.refCode}>
+                      {t.refName}
+                    </option>
+                  ))}
+                </select>
+                <FormFieldError error={errors.topicRefCode?.message} />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Platform Origin <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={watch('qpfRefCode') || ''}
+                  onChange={handleQpfSelect}
+                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select Platform</option>
+                  {qpfs.map((q) => (
+                    <option key={q.id} value={q.refCode}>
+                      {q.refName}
+                    </option>
+                  ))}
+                </select>
+                <FormFieldError error={errors.qpfRefCode?.message} />
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Problem Description <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={5}
+                {...register('description')}
+                placeholder="Full problem statement with input/output format, examples..."
+                className={`w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border ${
+                  errors.description
+                    ? 'border-rose-500 bg-rose-50/20'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all`}
+              />
+              <FormFieldError error={errors.description?.message} />
+            </div>
+
+            {/* Constraints */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Constraints (e.g. 1 &lt;= N &lt;= 10^5)
+              </label>
+              <textarea
+                rows={2}
+                {...register('constraints')}
+                placeholder="1 <= nums.length <= 10^4&#10;-10^9 <= nums[i] <= 10^9"
+                className="w-full px-3.5 py-2.5 text-xs font-mono font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            </div>
+
+            {/* Company Tagging */}
+            <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Target Hiring Companies
+                </label>
+                <select
+                  onChange={handleSelectCompanyFromDropdown}
+                  defaultValue=""
+                  className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">+ Associate Company</option>
+                  {allCompanies.map((c) => (
+                    <option key={c.id ?? c.name} value={c.id ?? ''}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedCompanies.length === 0 ? (
+                <p className="text-[11px] text-slate-400 italic">
+                  No company tags added. Use the dropdown above to associate hiring partners.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap pt-1">
+                  {selectedCompanies.map((c) => (
+                    <span
+                      key={c.id || c.name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-semibold"
+                    >
+                      <Building2 className="w-3 h-3" />
+                      <span>{c.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCompany(c.name)}
+                        className="text-purple-400 hover:text-purple-700 dark:hover:text-purple-100 ml-1 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Hints Section */}
+            <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Problem Hints ({hints.length})
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddHint}
+                  className="px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Add Hint</span>
+                </button>
+              </div>
+
+              {hints.map((hint, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs font-mono font-bold text-slate-400 w-12 shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <input
+                    type="text"
+                    value={hint.hintText}
+                    onChange={(e) => handleHintChange(idx, e.target.value)}
+                    placeholder="Enter progressive hint guidance..."
+                    className="flex-1 px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveHint(idx)}
+                    className="p-2 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Configuration Toggles */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  {...register('isOwnProblem')}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <span>Internal Native Problem</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  {...register('isActive')}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                />
+                <span>Active &amp; Published</span>
+              </label>
+
+              <div>
+                <input
+                  type="date"
+                  {...register('askedDate')}
+                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'TESTCASES' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 dark:border-slate-800/80">
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Test Case Assertions
+                </h4>
+                <p className="text-[11px] text-slate-500">
+                  Provide at least one test case. Visible sample cases help user sandbox verification; hidden cases evaluate correctness on submission.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddTestCase}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Test Case</span>
+              </button>
+            </div>
+
+            <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1">
+              {testCases.map((tc, idx) => (
+                <div
+                  key={idx}
+                  className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-3 shadow-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                        #{idx + 1}
+                      </span>
+                      <span className="font-bold text-slate-900 dark:text-white text-xs">
+                        Assertion #{idx + 1}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={tc.isHidden}
+                          onChange={(e) => handleTestCaseChange(idx, 'isHidden', e.target.checked)}
+                          className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span>Hidden Test Case</span>
+                      </label>
+
+                      {testCases.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTestCase(idx)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                        Input Raw String <span className="text-rose-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={tc.input}
+                        onChange={(e) => handleTestCaseChange(idx, 'input', e.target.value)}
+                        placeholder="e.g. 5&#10;1 2 3 4 5"
+                        className={`w-full px-3 py-2 text-xs font-mono font-medium rounded-xl border ${
+                          testCaseErrors[idx]?.input
+                            ? 'border-rose-500 bg-rose-50/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                        } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
+                      />
+                      <FormFieldError error={testCaseErrors[idx]?.input} />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                        Expected Output <span className="text-rose-500">*</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={tc.expectedOutput}
+                        onChange={(e) => handleTestCaseChange(idx, 'expectedOutput', e.target.value)}
+                        placeholder="e.g. 5"
+                        className={`w-full px-3 py-2 text-xs font-mono font-medium rounded-xl border ${
+                          testCaseErrors[idx]?.expectedOutput
+                            ? 'border-rose-500 bg-rose-50/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                        } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
+                      />
+                      <FormFieldError error={testCaseErrors[idx]?.expectedOutput} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </form>
     </AdminModal>
   );
 };

@@ -120,8 +120,10 @@ export interface Question {
   qpfRefGroupCode: string;
   qpfRefCode: string;
   qpfRefName: string;
+  questionPlatform?: string;
+  platformName?: string;
   questionHints: QuestionHint[];
-  companies: Company[];
+  companies?: Company[] | any[];
   hackerRankUrl?: string;
   leetCodeUrl?: string;
   gfgUrl?: string;
@@ -190,11 +192,14 @@ export interface UserInfoData {
 }
 
 export interface SaveUserInfoPayload {
+  id?: number;
+  userId?: number;
   regNumber: string;
   joinedYear: number;
   passedOutYear: number;
   college: string;
   bio: string;
+  token?: string;
 }
 
 export interface UserProfile {
@@ -242,6 +247,7 @@ export interface ExecutionTestCaseResult {
   input?: string;
   expectedOutput?: string;
   actualOutput?: string;
+  errorMessage?: string;
 }
 
 export interface ExecutionResult {
@@ -367,6 +373,7 @@ export interface McqQueryPayload {
 }
 
 export interface AdminCreateMcqPayload {
+  id?: number;
   subjectGroupCode: string;
   subjectRefCode: string;
   topicGroupCode: string;
@@ -376,11 +383,20 @@ export interface AdminCreateMcqPayload {
   companyId?: number | null;
   question: string;
   explanation?: string;
+  isActive?: boolean;
   options: Array<{
+    id?: number;
+    optionId?: number;
     optionLabel: string;
     optionText: string;
+    optionValue?: string;
+    value?: string;
+    text?: string;
+    option?: string;
     isCorrect: boolean;
+    correct?: boolean;
   }>;
 }
+
 
 

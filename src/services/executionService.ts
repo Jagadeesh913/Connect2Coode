@@ -5,6 +5,7 @@ import type {
   ExecutionResult,
   ExecutionTestCaseResult,
   Language,
+  QuestionTestCase,
 } from '../core/types/domain';
 
 export type { CodeExecutionPayload, ExecutionTestCaseResult };
@@ -208,5 +209,38 @@ export const executionService = {
     const finalPayload = await this.prepareExecutionPayload(payload);
     const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload);
     return res?.data || res;
+  },
+
+  /**
+   * Fetches real live execution test cases for a question directly from backend execution engine
+   */
+  async getProblemTestCases(questionId: number | string): Promise<QuestionTestCase[]> {
+    const qId = Number(questionId);
+    if (!qId) return [];
+
+    try {
+      const res = await this.runCode({
+        questionId: qId,
+        languageId: 5,
+        sourceCode: 'public class Main { public static void main(String[] args) {} }',
+      });
+      const cases = res?.testCases || (res as any)?.data?.testCases;
+      if (Array.isArray(cases) && cases.length > 0) {
+        return cases.map((tc: any, idx: number) => ({
+          id: tc.testCaseId || idx + 1,
+          questionId: qId,
+          input: tc.input || '',
+          expectedOutput: tc.expectedOutput || '',
+          explanation: tc.explanation || '',
+          isHidden: Boolean(tc.isHidden),
+          displayOrder: idx + 1,
+          typeRefGroupCode: 'TESTCASETYPE',
+          typeRefCode: tc.testCaseType?.toLowerCase().includes('sample') ? 'SAMPLE' : 'NECESSARY',
+          typeRefName: tc.testCaseType || 'Visible Sample Test Case',
+        }));
+      }
+    } catch {}
+
+    return [];
   },
 };

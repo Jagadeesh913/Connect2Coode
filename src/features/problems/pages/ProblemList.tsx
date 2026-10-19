@@ -260,10 +260,10 @@ export const ProblemList: React.FC = () => {
                           <i className={`fa-${bookmarked ? 'solid' : 'regular'} fa-star`} />
                         </button>
 
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <Link
                             to={`/problems/${targetSlug}`}
-                            className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block transition-colors"
+                            className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 block transition-colors"
                           >
                             {problem.title}
                           </Link>

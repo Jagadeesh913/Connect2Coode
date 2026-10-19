@@ -2,22 +2,49 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
-import { AdminCard } from '../components/AdminCard';
 import { AdminModal } from '../components/AdminModal';
+import { AdminErrorState } from '../components/AdminErrorState';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
+import { Pagination } from '../../../shared/components/ui/Pagination';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
 import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { companyService } from '../../../services/companyService';
-import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
-import type { McqQuestion, Company } from '../../../core/types/domain';
+import type { McqQuestion, Company, AdminCreateMcqPayload } from '../../../core/types/domain';
+import { cleanQuestionText, synthesizeMcqOptions } from '../../aptitude/utils/mcqUtils';
+import {
+  Plus,
+  RotateCw,
+  Search,
+  Eye,
+  Trash2,
+  HelpCircle,
+  Check,
+  Edit3,
+} from 'lucide-react';
 
 interface OptionFormState {
+  id?: number;
   optionLabel: string;
   optionText: string;
   isCorrect: boolean;
 }
+
+interface SubjectTopicItem {
+  id: number;
+  refCode: string;
+  refName: string;
+}
+
+// Resolves the Reference Library group code for a given subject dynamically from API structure
+const resolveTopicGroupCode = (subjectCode: string): string => {
+  const upper = (subjectCode || '').toUpperCase().trim();
+  if (['APTITUDE', 'REASONING', 'VERBAL', 'PSEUDOCODE'].includes(upper)) {
+    return upper;
+  }
+  return 'TOPIC';
+};
 
 export const AdminMcqs: React.FC = () => {
   const [mcqs, setMcqs] = useState<McqQuestion[]>([]);
@@ -39,19 +66,22 @@ export const AdminMcqs: React.FC = () => {
   // Reference options
   const [subjects, setSubjects] = useState<ReferenceItem[]>([]);
   const [difficulties, setDifficulties] = useState<ReferenceItem[]>([]);
-  const [topics, setTopics] = useState<ReferenceItem[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+
+  // Subject-specific topics for the create/edit form
+  const [subjectTopics, setSubjectTopics] = useState<SubjectTopicItem[]>([]);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [selectedMcq, setSelectedMcq] = useState<McqQuestion | null>(null);
+  const [editingMcq, setEditingMcq] = useState<McqQuestion | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Create Form State
+  // Form State
   const [formSubjectRefCode, setFormSubjectRefCode] = useState<string>('APTITUDE');
-  const [formTopicRefCode, setFormTopicRefCode] = useState<string>('ARRAY');
+  const [formTopicRefCode, setFormTopicRefCode] = useState<string>('');
   const [formDifficultyRefCode, setFormDifficultyRefCode] = useState<string>('EASY');
   const [formCompanyId, setFormCompanyId] = useState<string>('');
   const [formQuestion, setFormQuestion] = useState<string>('');
@@ -74,43 +104,78 @@ export const AdminMcqs: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load filter reference items on mount
+  // Load filter reference items on mount directly from live API
   useEffect(() => {
     let isMounted = true;
     const loadReferences = async () => {
       try {
-        const [subjRes, diffRes, topicRes, compRes] = await Promise.allSettled([
+        const [subjRes, diffRes, compRes] = await Promise.allSettled([
           referenceService.getByGroupCode('SUBJECT'),
           referenceService.getByGroupCode('DIFF'),
-          referenceService.getByGroupCode('TOPIC'),
           companyService.getCompanies(),
         ]);
         if (!isMounted) return;
 
         if (subjRes.status === 'fulfilled' && subjRes.value?.data) {
-          setSubjects(Array.isArray(subjRes.value.data) ? subjRes.value.data : []);
+          const raw = (subjRes.value.data as any)?.data || subjRes.value.data;
+          const list = Array.isArray(raw) ? raw : [];
+          setSubjects(list);
+          if (list.length > 0) {
+            setFormSubjectRefCode((prev) => prev || list[0].refCode);
+          }
         }
         if (diffRes.status === 'fulfilled' && diffRes.value?.data) {
-          setDifficulties(Array.isArray(diffRes.value.data) ? diffRes.value.data : []);
-        }
-        if (topicRes.status === 'fulfilled' && topicRes.value?.data) {
-          setTopics(Array.isArray(topicRes.value.data) ? topicRes.value.data : []);
+          const raw = (diffRes.value.data as any)?.data || diffRes.value.data;
+          setDifficulties(Array.isArray(raw) ? raw : []);
         }
         if (compRes.status === 'fulfilled' && compRes.value?.data) {
-          setCompanies(Array.isArray(compRes.value.data) ? compRes.value.data : []);
+          const raw = (compRes.value.data as any)?.data || compRes.value.data;
+          setCompanies(Array.isArray(raw) ? raw : []);
         }
       } catch (err) {
-        console.warn('Failed to load admin reference items:', err);
+        console.warn('Failed to load MCQ filter references from API:', err);
       }
     };
-
     loadReferences();
     return () => {
       isMounted = false;
     };
   }, []);
 
-  // Fetch MCQs list
+  // Dynamically load subject-specific topics from API whenever formSubjectRefCode changes
+  useEffect(() => {
+    let isMounted = true;
+    const topicGroup = resolveTopicGroupCode(formSubjectRefCode);
+
+    referenceService
+      .getByGroupCode(topicGroup)
+      .then((res) => {
+        if (!isMounted) return;
+        const raw = (res as any)?.data?.data || (res as any)?.data || res;
+        const items = Array.isArray(raw) ? raw : [];
+        const mapped: SubjectTopicItem[] = items.map((it: any) => ({
+          id: Number(it.id),
+          refCode: it.refCode || '',
+          refName: it.refName || it.refCode || '',
+        }));
+        setSubjectTopics(mapped);
+        setFormTopicRefCode((prev) => {
+          const exists = mapped.some((m) => m.refCode.toUpperCase() === prev.toUpperCase());
+          return exists ? prev : (mapped[0]?.refCode || '');
+        });
+      })
+      .catch((err) => {
+        if (!isMounted) return;
+        console.warn(`Failed to fetch topics from API for ${topicGroup}:`, err);
+        setSubjectTopics([]);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [formSubjectRefCode]);
+
+  // Fetch MCQs from POST /api/v1/mcq
   const fetchMcqs = useCallback(async () => {
     searchAbortRef.current?.abort();
     const controller = new AbortController();
@@ -119,7 +184,6 @@ export const AdminMcqs: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Resolve subject filter to numeric ID if selected
     let subjectIds: number[] = [];
     if (selectedSubject) {
       const match = subjects.find(
@@ -128,7 +192,6 @@ export const AdminMcqs: React.FC = () => {
       if (match?.id) subjectIds = [match.id];
     }
 
-    // Resolve difficulty filter to numeric ID if selected
     let difficultyIds: number[] = [];
     if (selectedDifficulty) {
       const diffMatch = difficulties.find(
@@ -144,7 +207,7 @@ export const AdminMcqs: React.FC = () => {
           difficulty: difficultyIds,
           companies: [],
           topic: null,
-          searchText: debouncedSearch,
+          searchText: debouncedSearch || undefined,
           pageRequest: {
             pageNumber,
             pageSize,
@@ -176,12 +239,42 @@ export const AdminMcqs: React.FC = () => {
         ? rawData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
 
-      setMcqs(contentList);
+      setMcqs((prev) => {
+        const existingMap = new Map(prev.map((item) => [item.id, item]));
+        return contentList.map((item) => {
+          const localItem = existingMap.get(item.id);
+          // If the fetched item from catalog has no options but local state has options, preserve local options
+          if ((!item.options || item.options.length === 0) && localItem?.options && localItem.options.length > 0) {
+            return { ...item, options: localItem.options };
+          }
+          // If the fetched item has options, ensure optionText is populated from optionValue if needed
+          if (Array.isArray(item.options) && item.options.length > 0) {
+            const normalizedOpts = item.options.map((opt: any, idx: number) => {
+              const localOpt = localItem?.options?.[idx];
+              const resolvedText = String(
+                opt.optionText ??
+                opt.optionValue ??
+                opt.value ??
+                opt.text ??
+                opt.option ??
+                localOpt?.optionText ??
+                ''
+              );
+              return {
+                ...opt,
+                optionText: resolvedText,
+                optionValue: resolvedText,
+              };
+            });
+            return { ...item, options: normalizedOpts };
+          }
+          return item;
+        });
+      });
       setTotalElements(total);
       setTotalPages(computedPages);
     } catch (err: any) {
       if (controller.signal.aborted) return;
-      console.error('Failed to fetch admin MCQs:', err);
       setError(getActionableErrorMessage(err, 'Failed to fetch MCQ questions'));
       setMcqs([]);
     } finally {
@@ -189,7 +282,7 @@ export const AdminMcqs: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [selectedSubject, selectedDifficulty, debouncedSearch, pageNumber, pageSize, subjects]);
+  }, [selectedSubject, selectedDifficulty, debouncedSearch, pageNumber, pageSize, subjects, difficulties]);
 
   useEffect(() => {
     fetchMcqs();
@@ -198,8 +291,80 @@ export const AdminMcqs: React.FC = () => {
     };
   }, [fetchMcqs]);
 
-  // Handle Create MCQ submission
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  // Open Create Modal
+  const handleOpenCreateModal = () => {
+    setEditingMcq(null);
+    const initialSubject = subjects[0]?.refCode || 'APTITUDE';
+    setFormSubjectRefCode(initialSubject);
+    setFormTopicRefCode('');
+    setFormDifficultyRefCode('EASY');
+    setFormCompanyId('');
+    setFormQuestion('');
+    setFormExplanation('');
+    setFormOptions([
+      { optionLabel: 'A', optionText: '', isCorrect: true },
+      { optionLabel: 'B', optionText: '', isCorrect: false },
+      { optionLabel: 'C', optionText: '', isCorrect: false },
+      { optionLabel: 'D', optionText: '', isCorrect: false },
+    ]);
+    setIsCreateModalOpen(true);
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = async (mcq: McqQuestion) => {
+    setEditingMcq(mcq);
+    const subj = mcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || 'APTITUDE';
+    setFormSubjectRefCode(subj);
+    setFormTopicRefCode(mcq.topicRefCode || '');
+    setFormDifficultyRefCode(mcq.difficultyRefCode || 'EASY');
+    setFormCompanyId(mcq.companyId ? String(mcq.companyId) : '');
+    setFormQuestion(cleanQuestionText(mcq.question) || mcq.question || '');
+    setFormExplanation(mcq.explanation || '');
+
+    let optionsToUse = Array.isArray(mcq.options) && mcq.options.length > 0 ? mcq.options : [];
+
+    // If options are missing on the row item, asynchronously fetch the full MCQ details by ID from the API
+    if (optionsToUse.length === 0) {
+      try {
+        const detailRes = await adminMcqService.getMcqById(mcq.id);
+        const detailData: any = (detailRes?.data as any)?.data || detailRes?.data;
+        if (detailData && Array.isArray(detailData.options) && detailData.options.length > 0) {
+          optionsToUse = detailData.options;
+        }
+      } catch (err) {
+        console.warn('Could not load detailed options for MCQ #' + mcq.id, err);
+      }
+    }
+
+    if (optionsToUse.length > 0) {
+      const hasAnyCorrect = optionsToUse.some(
+        (o: any) => o.isCorrect === true || o.is_correct === true || o.correct === true
+      );
+      setFormOptions(
+        optionsToUse.map((o: any, idx: number) => ({
+          id: o.id || o.optionId ? Number(o.id || o.optionId) : undefined,
+          optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
+          optionText: String(
+            o.optionText ?? o.optionValue ?? o.value ?? o.text ?? o.option ?? ''
+          ),
+          isCorrect: hasAnyCorrect
+            ? Boolean(o.isCorrect || o.is_correct || o.correct)
+            : idx === 0,
+        }))
+      );
+    } else {
+      setFormOptions([
+        { optionLabel: 'A', optionText: '', isCorrect: true },
+        { optionLabel: 'B', optionText: '', isCorrect: false },
+        { optionLabel: 'C', optionText: '', isCorrect: false },
+        { optionLabel: 'D', optionText: '', isCorrect: false },
+      ]);
+    }
+    setIsCreateModalOpen(true);
+  };
+
+  // Handle Create or Update MCQ submission
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formQuestion.trim()) {
@@ -207,7 +372,6 @@ export const AdminMcqs: React.FC = () => {
       return;
     }
 
-    // Verify options
     const filledOptions = formOptions.filter((o) => o.optionText.trim() !== '');
     if (filledOptions.length < 2) {
       toast.error('Please provide at least 2 options for the MCQ');
@@ -222,40 +386,88 @@ export const AdminMcqs: React.FC = () => {
 
     setSubmitting(true);
     try {
-      await adminMcqService.createMcq({
+      const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
+      const mappedOptions = filledOptions.map((o) => {
+        const textVal = o.optionText.trim();
+        return {
+          ...(o.id ? { id: Number(o.id), optionId: Number(o.id) } : {}),
+          optionLabel: o.optionLabel,
+          optionText: textVal,
+          optionValue: textVal,
+          value: textVal,
+          text: textVal,
+          option: textVal,
+          isCorrect: Boolean(o.isCorrect),
+          correct: Boolean(o.isCorrect),
+        };
+      });
+
+      const payload: AdminCreateMcqPayload = {
+        ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
         subjectGroupCode: 'SUBJECT',
         subjectRefCode: formSubjectRefCode,
-        topicGroupCode: 'TOPIC',
+        topicGroupCode,
         topicRefCode: formTopicRefCode,
         difficultyGroupCode: 'DIFF',
         difficultyRefCode: formDifficultyRefCode,
         companyId: formCompanyId ? Number(formCompanyId) : null,
         question: formQuestion.trim(),
         explanation: formExplanation.trim() || undefined,
-        options: filledOptions.map((o) => ({
-          optionLabel: o.optionLabel,
-          optionText: o.optionText.trim(),
-          isCorrect: o.isCorrect,
-        })),
-      });
+        isActive: true,
+        options: mappedOptions,
+      };
 
-      toast.success('MCQ question created successfully');
+      if (editingMcq) {
+        const res = await adminMcqService.updateMcq(editingMcq.id, payload);
+        const updatedRaw: any = (res?.data as any)?.data || res?.data;
+        const targetId =
+          typeof updatedRaw === 'object' && updatedRaw?.id ? updatedRaw.id : editingMcq.id;
+
+        const rawOpts =
+          typeof updatedRaw === 'object' && Array.isArray(updatedRaw?.options) && updatedRaw.options.length > 0
+            ? updatedRaw.options
+            : mappedOptions;
+
+        const normalizedOptions = rawOpts.map((o: any, idx: number) => {
+          const resolvedText = String(
+            o.optionText ?? o.optionValue ?? o.value ?? o.text ?? mappedOptions[idx]?.optionText ?? ''
+          );
+          return {
+            id: o.id || o.optionId || mappedOptions[idx]?.id,
+            optionLabel: o.optionLabel || mappedOptions[idx]?.optionLabel || String.fromCharCode(65 + idx),
+            optionText: resolvedText,
+            optionValue: resolvedText,
+            isCorrect: Boolean(o.isCorrect ?? o.correct ?? mappedOptions[idx]?.isCorrect),
+          };
+        });
+
+        const updatedItem: McqQuestion = {
+          ...editingMcq,
+          ...payload,
+          ...(typeof updatedRaw === 'object' && updatedRaw !== null ? updatedRaw : {}),
+          id: targetId,
+          options: normalizedOptions,
+        };
+
+        setMcqs((prev) =>
+          prev.map((item) => (item.id === editingMcq.id ? { ...item, ...updatedItem } : item))
+        );
+        toast.success('MCQ question updated successfully');
+      } else {
+        await adminMcqService.createMcq(payload);
+        toast.success('MCQ question created successfully');
+      }
+
       setIsCreateModalOpen(false);
-
-      // Reset form
-      setFormQuestion('');
-      setFormExplanation('');
-      setFormCompanyId('');
-      setFormOptions([
-        { optionLabel: 'A', optionText: '', isCorrect: true },
-        { optionLabel: 'B', optionText: '', isCorrect: false },
-        { optionLabel: 'C', optionText: '', isCorrect: false },
-        { optionLabel: 'D', optionText: '', isCorrect: false },
-      ]);
-
-      fetchMcqs();
+      setEditingMcq(null);
+      await fetchMcqs();
     } catch (err: any) {
-      toast.error(getActionableErrorMessage(err, 'Failed to create MCQ question'));
+      toast.error(
+        getActionableErrorMessage(
+          err,
+          editingMcq ? 'Failed to update MCQ question' : 'Failed to create MCQ question'
+        )
+      );
     } finally {
       setSubmitting(false);
     }
@@ -279,547 +491,621 @@ export const AdminMcqs: React.FC = () => {
     }
   };
 
-  // Option handlers for Create Form
-  const handleOptionChange = (idx: number, text: string) => {
-    setFormOptions((prev) =>
-      prev.map((opt, i) => (i === idx ? { ...opt, optionText: text } : opt))
-    );
+  const getDifficultyVariant = (diff?: string | null) => {
+    const d = (diff || '').toUpperCase();
+    if (d.includes('EASY') || d.includes('BASIC')) return 'easy';
+    if (d.includes('MED')) return 'medium';
+    if (d.includes('HARD')) return 'hard';
+    return 'neutral';
   };
 
-  const handleCorrectRadio = (idx: number) => {
-    setFormOptions((prev) =>
-      prev.map((opt, i) => ({ ...opt, isCorrect: i === idx }))
-    );
-  };
-
-  const handleAddOption = () => {
-    const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
-    const nextIdx = formOptions.length;
-    const nextLabel = letters[nextIdx] || String.fromCharCode(65 + nextIdx);
-    setFormOptions((prev) => [
-      ...prev,
-      { optionLabel: nextLabel, optionText: '', isCorrect: false },
-    ]);
-  };
-
-  const handleRemoveOption = (idx: number) => {
-    if (formOptions.length <= 2) {
-      toast.error('An MCQ must have at least 2 options');
-      return;
-    }
-    setFormOptions((prev) => {
-      const filtered = prev.filter((_, i) => i !== idx);
-      // Ensure at least one is correct
-      const stillHasCorrect = filtered.some((o) => o.isCorrect);
-      if (!stillHasCorrect && filtered.length > 0) {
-        filtered[0].isCorrect = true;
-      }
-      return filtered;
-    });
-  };
-
-  // Table Columns
   const columns: Column<McqQuestion>[] = [
     {
-      header: 'ID',
-      cell: (row) => <span className="font-mono text-gray-400 font-bold">#{row.id}</span>,
-      className: 'w-16',
+      header: 'Identifier',
+      accessorKey: 'id',
+      className: 'w-20 font-mono text-slate-400 font-semibold',
+      cell: (row) => <span>#{row.id}</span>,
     },
     {
-      header: 'Question',
-      cell: (row) => (
-        <div className="flex flex-col gap-1 max-w-md">
-          <span className="font-bold text-white line-clamp-2">{row.question}</span>
-          {row.explanation && (
-            <span className="text-[11px] text-gray-400 line-clamp-1 italic">
-              Exp: {row.explanation}
+      header: 'Question Statement',
+      className: 'min-w-[280px]',
+      cell: (row) => {
+        const cleanStatement = cleanQuestionText(row.question);
+        return (
+          <div className="flex flex-col gap-1 max-w-xl">
+            <span className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+              {cleanStatement}
             </span>
-          )}
-        </div>
+            <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+              {row.subjectRefName && (
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {row.subjectRefName}
+                </span>
+              )}
+              {row.topicRefName && (
+                <>
+                  <span>•</span>
+                  <span>{row.topicRefName}</span>
+                </>
+              )}
+              {row.companyName && (
+                <>
+                  <span>•</span>
+                  <span className="text-purple-600 dark:text-purple-400 font-medium">
+                    {row.companyName}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Difficulty',
+      className: 'w-28',
+      cell: (row) => (
+        <AdminBadge variant={getDifficultyVariant(row.difficultyRefName || row.difficultyRefCode)} size="sm">
+          {row.difficultyRefName || row.difficultyRefCode || 'Standard'}
+        </AdminBadge>
       ),
     },
     {
-      header: 'Subject',
+      header: 'Correct Answer',
+      className: 'w-48',
       cell: (row) => {
-        const subj = row.subjectRefName || row.subjectRefCode || 'N/A';
+        const options = synthesizeMcqOptions(row);
+        const correctOpt = options.find((o) => o.isCorrect);
+        if (correctOpt && correctOpt.optionText) {
+          return (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center font-bold text-[10px] shrink-0">
+                {correctOpt.optionLabel}
+              </span>
+              <span className="truncate max-w-[130px]" title={correctOpt.optionText}>
+                {correctOpt.optionText}
+              </span>
+            </div>
+          );
+        }
         return (
-          <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-violet-950/60 text-violet-300 border border-violet-800/60">
-            {subj}
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            No options configured
           </span>
         );
       },
     },
     {
-      header: 'Topic',
-      cell: (row) => (
-        <span className="text-gray-300 font-medium">
-          {row.topicRefName || row.topicRefCode || '—'}
-        </span>
-      ),
-    },
-    {
-      header: 'Difficulty',
-      cell: (row) => {
-        const diff = String(row.difficultyRefName || row.difficultyRefCode || 'Medium').toUpperCase();
-        const variant =
-          diff.includes('EASY') || diff.includes('BASIC')
-            ? 'success'
-            : diff.includes('HARD')
-            ? 'danger'
-            : 'warning';
-        return <AdminBadge variant={variant}>{diff}</AdminBadge>;
-      },
-    },
-    {
-      header: 'Target Company',
-      cell: (row) =>
-        row.companyName ? (
-          <div className="flex items-center gap-1.5">
-            <CompanyBrandLogo name={row.companyName} className="w-4 h-4 inline-block" />
-            <span className="text-gray-300 text-xs font-semibold">{row.companyName}</span>
-          </div>
-        ) : (
-          <span className="text-gray-500">—</span>
-        ),
-    },
-    {
-      header: 'Options',
-      cell: (row) => (
-        <span className="font-semibold text-gray-300">
-          {Array.isArray(row.options) ? `${row.options.length} options` : '0'}
-        </span>
-      ),
-    },
-    {
       header: 'Actions',
+      className: 'w-28 text-right',
       cell: (row) => (
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            type="button"
-            onClick={() => {
+            onClick={async () => {
               setSelectedMcq(row);
               setIsViewModalOpen(true);
+              if (!row.options || row.options.length === 0) {
+                try {
+                  const detailRes = await adminMcqService.getMcqById(row.id);
+                  const detailData: any = (detailRes?.data as any)?.data || detailRes?.data;
+                  if (detailData && Array.isArray(detailData.options) && detailData.options.length > 0) {
+                    setSelectedMcq((prev) => (prev?.id === row.id ? { ...prev, ...detailData } : prev));
+                  }
+                } catch (err) {
+                  console.warn('Failed to load detailed options for viewing MCQ #' + row.id, err);
+                }
+              }
             }}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-colors"
-            title="View Question Details"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            title="View Details"
           >
-            <i className="fa-solid fa-eye text-xs"></i>
+            <Eye className="w-3.5 h-3.5" />
           </button>
           <button
-            type="button"
+            onClick={() => handleOpenEditModal(row)}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            title="Edit MCQ"
+          >
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          <button
             onClick={() => {
               setSelectedMcq(row);
               setIsDeleteModalOpen(true);
             }}
-            className="p-2 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-600 hover:border-rose-400 transition-colors shadow-2xs cursor-pointer"
             title="Delete MCQ"
           >
-            <i className="fa-solid fa-trash text-xs"></i>
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
-      className: 'w-24 text-right',
     },
   ];
 
   return (
-    <div className="space-y-6 font-sans">
-      {/* Header */}
+    <div className="space-y-6 font-sans text-left pb-12">
+      {/* Page Header */}
       <AdminPageHeader
-        title="MCQs & Aptitude Bank"
-        description="Manage Multiple Choice Questions across Aptitude, Pseudocode, Reasoning, Verbal, and technical topics"
+        title="MCQ & Aptitude Bank"
+        description="Manage aptitude questions, technical interview MCQs, and corporate assessment options."
+        badge={
+          <AdminBadge variant="primary">
+            {totalElements} Questions
+          </AdminBadge>
+        }
         actions={
-          <button
-            type="button"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2 bg-white hover:bg-neutral-200 text-neutral-900 font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md shrink-0"
-          >
-            <i className="fa-solid fa-plus text-xs"></i>
-            <span>Create MCQ</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create MCQ</span>
+            </button>
+            <button
+              onClick={fetchMcqs}
+              disabled={loading}
+              className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              title="Refresh"
+            >
+              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+            </button>
+          </div>
         }
       />
 
       {/* Filter Toolbar */}
-      <AdminCard>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          {/* Search Box */}
-          <div className="relative flex-1 w-full">
-            <i className="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-            <input
-              type="text"
-              placeholder="Search by question text or keyword..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-neutral-950 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
+      <div className="p-4 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-xs">
+        {/* Search */}
+        <div className="relative w-full md:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by question text or topic..."
+            className="w-full pl-10 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
+        {/* Dropdowns */}
+        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
           {/* Subject Filter */}
-          <div className="w-full sm:w-48">
-            <select
-              value={selectedSubject}
-              onChange={(e) => {
-                setSelectedSubject(e.target.value);
-                setPageNumber(0);
-              }}
-              className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-violet-500 transition-colors cursor-pointer"
-            >
-              <option value="">All Subjects</option>
-              {subjects.map((s) => (
-                <option key={s.refCode || s.id} value={s.refCode}>
-                  {s.refName || s.refCode}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedSubject}
+            onChange={(e) => {
+              setSelectedSubject(e.target.value);
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.refCode}>
+                {s.refName}
+              </option>
+            ))}
+          </select>
 
           {/* Difficulty Filter */}
-          <div className="w-full sm:w-40">
-            <select
-              value={selectedDifficulty}
-              onChange={(e) => {
-                setSelectedDifficulty(e.target.value);
-                setPageNumber(0);
-              }}
-              className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white outline-none focus:border-violet-500 transition-colors cursor-pointer"
-            >
-              <option value="">All Difficulties</option>
-              {difficulties.map((d) => (
-                <option key={d.refCode || d.id} value={d.refCode}>
-                  {d.refName || d.refCode}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedDifficulty}
+            onChange={(e) => {
+              setSelectedDifficulty(e.target.value);
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Difficulties</option>
+            {difficulties.map((d) => (
+              <option key={d.id} value={d.refCode}>
+                {d.refName}
+              </option>
+            ))}
+          </select>
 
-          {/* Reset button */}
-          {(selectedSubject || selectedDifficulty || searchTerm) && (
+          {/* Page Size */}
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="10">10 / page</option>
+            <option value="20">20 / page</option>
+            <option value="50">50 / page</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Error State */}
+      {error && <AdminErrorState message={error} onRetry={fetchMcqs} />}
+
+      {/* MCQs Table */}
+      {!error && (
+        <div className="space-y-4">
+          <AdminTable<McqQuestion>
+            columns={columns}
+            data={mcqs}
+            loading={loading}
+            keyExtractor={(row) => row.id}
+            onRowClick={(row) => {
+              setSelectedMcq(row);
+              setIsViewModalOpen(true);
+            }}
+            emptyTitle="No MCQs Found"
+            emptyDescription="There are currently no multiple choice questions matching your active filters."
+            emptyAction={
+              <button
+                onClick={handleOpenCreateModal}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create New MCQ</span>
+              </button>
+            }
+          />
+
+          {/* Pagination */}
+          {totalElements > 0 && (
+            <Pagination
+              currentPage={pageNumber + 1}
+              totalPages={totalPages}
+              totalElements={totalElements}
+              pageSize={pageSize}
+              onPageChange={(p) => setPageNumber(p - 1)}
+            />
+          )}
+        </div>
+      )}
+
+      {/* View MCQ Modal */}
+      <AdminModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        title={selectedMcq ? `MCQ #${selectedMcq.id}` : 'Question Details'}
+        subtitle="Question statement, answer options, and explanation"
+        icon={<HelpCircle className="w-5 h-5" />}
+        maxWidth="xl"
+        footer={
+          <div className="flex items-center justify-between w-full">
             <button
               type="button"
               onClick={() => {
-                setSelectedSubject('');
-                setSelectedDifficulty('');
-                setSearchTerm('');
-                setPageNumber(0);
+                const target = selectedMcq;
+                setIsViewModalOpen(false);
+                if (target) {
+                  handleOpenEditModal(target);
+                }
               }}
-              className="px-3 py-2 rounded-xl text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
             >
-              Reset
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Edit Question</span>
             </button>
-          )}
-        </div>
-      </AdminCard>
-
-      {/* Main Table */}
-      <AdminCard>
-        {error && (
-          <div className="p-4 mb-4 rounded-xl bg-rose-950/40 border border-rose-800 text-rose-300 text-xs flex items-center justify-between">
-            <span>{error}</span>
-            <button
-              onClick={() => fetchMcqs()}
-              className="px-3 py-1 bg-rose-700 hover:bg-rose-600 rounded text-white font-bold"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        <AdminTable
-          columns={columns}
-          data={mcqs}
-          loading={loading}
-          keyExtractor={(row) => row.id}
-          emptyTitle="No MCQs found"
-          emptyDescription="There are currently no questions matching your query criteria."
-        />
-
-        {/* Pagination Bar */}
-        {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4 mt-4 border-t border-white/10 text-xs">
-            <div className="text-gray-400">
-              Showing page <span className="font-bold text-white">{pageNumber + 1}</span> of{' '}
-              <span className="font-bold text-white">{totalPages}</span> ({totalElements} total)
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={pageNumber <= 0 || loading}
-                onClick={() => setPageNumber((p) => Math.max(0, p - 1))}
-                className="px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Previous
-              </button>
-
-              <button
-                type="button"
-                disabled={pageNumber >= totalPages - 1 || loading}
-                onClick={() => setPageNumber((p) => Math.min(totalPages - 1, p + 1))}
-                className="px-3 py-1.5 rounded-lg border border-white/10 text-gray-300 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
-      </AdminCard>
-
-      {/* CREATE MCQ MODAL */}
-      <AdminModal
-        isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        title="Create MCQ Question"
-        subtitle="Add a new multiple-choice question to the question bank"
-        maxWidth="2xl"
-      >
-        <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
-          {/* Row 1: Subject & Topic */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-300 font-bold mb-1.5">Subject *</label>
-              <select
-                value={formSubjectRefCode}
-                onChange={(e) => setFormSubjectRefCode(e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-white outline-none focus:border-violet-500"
-                required
-              >
-                {subjects.map((s) => (
-                  <option key={s.refCode || s.id} value={s.refCode}>
-                    {s.refName || s.refCode} ({s.refCode})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-gray-300 font-bold mb-1.5">Topic *</label>
-              <select
-                value={formTopicRefCode}
-                onChange={(e) => setFormTopicRefCode(e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-white outline-none focus:border-violet-500"
-                required
-              >
-                {topics.map((t) => (
-                  <option key={t.refCode || t.id} value={t.refCode}>
-                    {t.refName || t.refCode}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Row 2: Difficulty & Company */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-gray-300 font-bold mb-1.5">Difficulty *</label>
-              <select
-                value={formDifficultyRefCode}
-                onChange={(e) => setFormDifficultyRefCode(e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-white outline-none focus:border-violet-500"
-                required
-              >
-                {difficulties.map((d) => (
-                  <option key={d.refCode || d.id} value={d.refCode}>
-                    {d.refName || d.refCode}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-gray-300 font-bold mb-1.5">Target Company (Optional)</label>
-              <select
-                value={formCompanyId}
-                onChange={(e) => setFormCompanyId(e.target.value)}
-                className="w-full bg-neutral-950 border border-white/10 rounded-xl px-3 py-2.5 text-white outline-none focus:border-violet-500"
-              >
-                <option value="">No Company Tag</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id ?? ''}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Question Text */}
-          <div>
-            <label className="block text-gray-300 font-bold mb-1.5">Question Text *</label>
-            <textarea
-              rows={3}
-              value={formQuestion}
-              onChange={(e) => setFormQuestion(e.target.value)}
-              placeholder="Enter the complete question prompt..."
-              className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500"
-              required
-            />
-          </div>
-
-          {/* Explanation */}
-          <div>
-            <label className="block text-gray-300 font-bold mb-1.5">Explanation & Solution *</label>
-            <textarea
-              rows={2}
-              value={formExplanation}
-              onChange={(e) => setFormExplanation(e.target.value)}
-              placeholder="Explain the step-by-step solution..."
-              className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-white outline-none focus:border-violet-500"
-            />
-          </div>
-
-          {/* Options Builder */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="text-gray-300 font-bold">Options & Correct Answer *</label>
-              <button
-                type="button"
-                onClick={handleAddOption}
-                className="text-violet-400 hover:text-violet-300 font-bold text-xs"
-              >
-                + Add Option
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {formOptions.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-2.5 bg-neutral-950 p-2 rounded-xl border border-white/5">
-                  <input
-                    type="radio"
-                    name="correctOptionRadio"
-                    checked={opt.isCorrect}
-                    onChange={() => handleCorrectRadio(idx)}
-                    title="Mark as correct answer"
-                    className="w-4 h-4 text-violet-600 focus:ring-violet-500 cursor-pointer ml-1"
-                  />
-                  <span className="w-6 font-bold text-gray-400 text-center">{opt.optionLabel}</span>
-                  <input
-                    type="text"
-                    value={opt.optionText}
-                    onChange={(e) => handleOptionChange(idx, e.target.value)}
-                    placeholder={`Option ${opt.optionLabel} text...`}
-                    className="flex-1 bg-transparent border-none text-white text-xs outline-none"
-                    required
-                  />
-                  {formOptions.length > 2 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOption(idx)}
-                      className="text-gray-500 hover:text-rose-400 p-1"
-                    >
-                      <i className="fa-solid fa-times text-xs"></i>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="text-[11px] text-gray-500 mt-1.5">
-              Select the radio button next to the option that is the correct answer.
-            </p>
-          </div>
-
-          {/* Modal Footer Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
             <button
               type="button"
-              onClick={() => setIsCreateModalOpen(false)}
-              className="px-4 py-2 rounded-xl border border-white/10 text-gray-300 hover:bg-white/5 transition-colors"
+              onClick={() => setIsViewModalOpen(false)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-5 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold transition-all shadow-lg disabled:opacity-50"
-            >
-              {submitting ? 'Creating...' : 'Create Question'}
+              Close
             </button>
           </div>
-        </form>
-      </AdminModal>
+        }
+      >
+        {selectedMcq && (
+          <div className="space-y-5 font-sans text-xs">
+            {/* Meta Tags */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <AdminBadge variant="primary">
+                {selectedMcq.subjectRefName || selectedMcq.subjectRefCode || 'Subject'}
+              </AdminBadge>
+              {selectedMcq.topicRefName && (
+                <AdminBadge variant="neutral">
+                  {selectedMcq.topicRefName}
+                </AdminBadge>
+              )}
+              <AdminBadge
+                variant={getDifficultyVariant(selectedMcq.difficultyRefName || selectedMcq.difficultyRefCode)}
+              >
+                {selectedMcq.difficultyRefName || selectedMcq.difficultyRefCode || 'Medium'}
+              </AdminBadge>
+              {selectedMcq.companyName && (
+                <AdminBadge variant="purple">
+                  {selectedMcq.companyName}
+                </AdminBadge>
+              )}
+            </div>
 
-      {/* VIEW MCQ DETAILS MODAL */}
-      {selectedMcq && isViewModalOpen && (
-        <AdminModal
-          isOpen={isViewModalOpen}
-          onClose={() => {
-            setIsViewModalOpen(false);
-            setSelectedMcq(null);
-          }}
-          title={`MCQ Details #${selectedMcq.id}`}
-          subtitle={`${selectedMcq.subjectRefName || selectedMcq.subjectRefCode} • ${selectedMcq.difficultyRefName || selectedMcq.difficultyRefCode || 'Medium'}`}
-          maxWidth="xl"
-        >
-          <div className="space-y-5 text-xs text-left">
-            <div>
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                Question
+            {/* Question Text */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Question Statement
               </span>
-              <p className="text-sm font-bold text-white leading-relaxed bg-neutral-950 p-4 rounded-xl border border-white/10">
-                {selectedMcq.question}
+              <p className="text-sm font-bold text-slate-900 dark:text-white leading-relaxed whitespace-pre-wrap">
+                {cleanQuestionText(selectedMcq.question)}
               </p>
             </div>
 
-            {selectedMcq.options && selectedMcq.options.length > 0 && (
-              <div>
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
-                  Options
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectedMcq.options.map((opt, i) => (
+            {/* Options List */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Answer Options
+              </span>
+              {synthesizeMcqOptions(selectedMcq).length > 0 ? (
+                <div className="grid grid-cols-1 gap-2">
+                  {synthesizeMcqOptions(selectedMcq).map((opt, i) => (
                     <div
-                      key={opt.id || i}
-                      className={`p-3 rounded-xl border flex items-center gap-2.5 ${
+                      key={opt.optionLabel || i}
+                      className={`p-3 rounded-xl border flex items-center justify-between text-xs transition-colors ${
                         opt.isCorrect
-                          ? 'bg-emerald-950/40 border-emerald-500 text-emerald-200 font-bold'
-                          : 'bg-neutral-950 border-white/10 text-gray-300'
+                          ? 'bg-emerald-50 border-emerald-300 dark:bg-emerald-950/30 dark:border-emerald-800/60 text-emerald-900 dark:text-emerald-200'
+                          : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      <span
-                        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                          opt.isCorrect ? 'bg-emerald-500 text-white' : 'bg-white/10 text-gray-400'
-                        }`}
-                      >
-                        {opt.optionLabel || String.fromCharCode(65 + i)}
-                      </span>
-                      <span>{opt.optionText}</span>
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${
+                            opt.isCorrect
+                              ? 'bg-emerald-500 text-white shadow-2xs'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+                          }`}
+                        >
+                          {opt.optionLabel}
+                        </span>
+                        <span className="font-medium">{opt.optionText}</span>
+                      </div>
                       {opt.isCorrect && (
-                        <i className="fa-solid fa-check ml-auto text-emerald-400 text-xs"></i>
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                          <Check className="w-3.5 h-3.5" />
+                          Correct Answer
+                        </span>
                       )}
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-amber-300 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 text-xs">
+                  <p className="font-semibold">No options configured in database for this question.</p>
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                    Click <strong>Edit Question</strong> to configure multiple-choice options (A, B, C, D) and assign the correct answer.
+                  </p>
+                </div>
+              )}
+            </div>
 
+            {/* Explanation */}
             {selectedMcq.explanation && (
-              <div>
-                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-1">
-                  Explanation
+              <div className="p-4 bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-2xl space-y-1">
+                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider block">
+                  Detailed Explanation
                 </span>
-                <p className="text-gray-300 bg-neutral-950 p-3.5 rounded-xl border border-white/10 leading-relaxed">
+                <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
                   {selectedMcq.explanation}
                 </p>
               </div>
             )}
           </div>
-        </AdminModal>
-      )}
+        )}
+      </AdminModal>
 
-      {/* DELETE CONFIRM DIALOG */}
+      {/* Create / Edit MCQ Modal */}
+      <AdminModal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setEditingMcq(null);
+        }}
+        title={editingMcq ? `Edit MCQ #${editingMcq.id}` : 'Create MCQ Assessment Question'}
+        subtitle={
+          editingMcq
+            ? 'Update question statement, multiple choice options, and explanation'
+            : 'Configure question statement, multiple choice options, and explanation'
+        }
+        icon={editingMcq ? <Edit3 className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+        maxWidth="2xl"
+        footer={
+          <div className="flex items-center justify-end gap-3 w-full">
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreateModalOpen(false);
+                setEditingMcq(null);
+              }}
+              disabled={submitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleFormSubmit}
+              disabled={submitting}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
+            >
+              {submitting
+                ? editingMcq
+                  ? 'Updating...'
+                  : 'Creating...'
+                : editingMcq
+                ? 'Update Question'
+                : 'Create Question'}
+            </button>
+          </div>
+        }
+      >
+        <form onSubmit={handleFormSubmit} className="space-y-4 font-sans text-left">
+          {/* Classification Row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Subject <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={formSubjectRefCode}
+                onChange={(e) => setFormSubjectRefCode(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              >
+                {subjects.map((s) => (
+                  <option key={s.id} value={s.refCode}>
+                    {s.refName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Topic <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={formTopicRefCode}
+                onChange={(e) => setFormTopicRefCode(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              >
+                {subjectTopics.map((t) => (
+                  <option key={t.id || t.refCode} value={t.refCode}>
+                    {t.refName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Difficulty <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={formDifficultyRefCode}
+                onChange={(e) => setFormDifficultyRefCode(e.target.value)}
+                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              >
+                {difficulties.map((d) => (
+                  <option key={d.id} value={d.refCode}>
+                    {d.refName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Company Tag */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Associate Hiring Company (Optional)
+            </label>
+            <select
+              value={formCompanyId}
+              onChange={(e) => setFormCompanyId(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">-- None (General Practice) --</option>
+              {companies.map((c) => (
+                <option key={c.id ?? c.name} value={c.id ?? ''}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Question Text */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Question Statement <span className="text-rose-500">*</span>
+            </label>
+            <textarea
+              value={formQuestion}
+              onChange={(e) => setFormQuestion(e.target.value)}
+              rows={3}
+              placeholder="Enter the clean multiple-choice question..."
+              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Options A, B, C, D */}
+          <div className="space-y-2.5 pt-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Options &amp; Correct Answer Selection
+            </label>
+            {formOptions.map((opt, index) => (
+              <div key={opt.optionLabel} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 text-slate-700 dark:text-slate-300">
+                  {opt.optionLabel}
+                </div>
+                <input
+                  type="text"
+                  value={opt.optionText}
+                  onChange={(e) => {
+                    const newOpts = [...formOptions];
+                    newOpts[index].optionText = e.target.value;
+                    setFormOptions(newOpts);
+                  }}
+                  placeholder={`Option ${opt.optionLabel} text...`}
+                  className="flex-1 px-3.5 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newOpts = formOptions.map((o, idx) => ({
+                      ...o,
+                      isCorrect: idx === index,
+                    }));
+                    setFormOptions(newOpts);
+                  }}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                    opt.isCorrect
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100'
+                  }`}
+                >
+                  {opt.isCorrect ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Correct</span>
+                    </>
+                  ) : (
+                    <span>Set Correct</span>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          {/* Explanation */}
+          <div className="space-y-1.5 pt-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Explanation (Optional)
+            </label>
+            <textarea
+              value={formExplanation}
+              onChange={(e) => setFormExplanation(e.target.value)}
+              rows={2}
+              placeholder="Why is this option correct? Include formulas or rationale..."
+              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </form>
+      </AdminModal>
+
+      {/* Delete Confirmation Dialog */}
       <ConfirmDialog
         isOpen={isDeleteModalOpen}
+        title="Delete MCQ Question"
+        message={`Are you sure you want to delete MCQ #${selectedMcq?.id}? This action permanently removes it from user aptitude assessments.`}
+        confirmText={submitting ? 'Deleting...' : 'Delete Question'}
+        cancelText="Cancel"
+        variant="danger"
+        onConfirm={handleDeleteConfirm}
         onClose={() => {
           setIsDeleteModalOpen(false);
           setSelectedMcq(null);
         }}
-        onConfirm={handleDeleteConfirm}
-        title="Delete MCQ Question"
-        message={`Are you sure you want to permanently delete MCQ #${selectedMcq?.id}? This action cannot be undone.`}
-        confirmText={submitting ? 'Deleting...' : 'Delete Question'}
-        variant="danger"
       />
     </div>
   );
 };
+
+export default AdminMcqs;

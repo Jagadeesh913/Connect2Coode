@@ -255,8 +255,25 @@ apiClient.interceptors.request.use(
       } catch {}
     }
 
-    if (token && config.headers && !isPublicAuthEndpoint) {
-      config.headers.Authorization = `Bearer ${token}`;
+    if (token && !isPublicAuthEndpoint) {
+      config.headers = config.headers || {};
+      if (typeof (config.headers as any).set === 'function') {
+        (config.headers as any).set('Authorization', `Bearer ${token}`);
+      }
+      config.headers['Authorization'] = `Bearer ${token}`;
+      config.headers['authorization'] = `Bearer ${token}`;
+
+      // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
+      if (
+        config.data &&
+        typeof config.data === 'object' &&
+        !Array.isArray(config.data) &&
+        !(config.data instanceof FormData)
+      ) {
+        if (!config.data.token && !config.data.jwtToken && !config.data.accessToken) {
+          config.data.token = token;
+        }
+      }
     }
     return config;
   },
@@ -283,7 +300,11 @@ apiClient.interceptors.response.use(
         try {
           const newAccessToken = await executeRefreshToken();
           originalRequest.headers = originalRequest.headers || {};
-          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+          if (typeof (originalRequest.headers as any).set === 'function') {
+            (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
+          }
+          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+          originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
           return apiClient(originalRequest);
         } catch {}
       }
@@ -308,7 +329,11 @@ apiClient.interceptors.response.use(
           try {
             const newAccessToken = await executeRefreshToken();
             originalRequest.headers = originalRequest.headers || {};
-            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+            if (typeof (originalRequest.headers as any).set === 'function') {
+              (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
+            }
+            originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+            originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
             return apiClient(originalRequest);
           } catch (refreshErr: any) {
             return Promise.reject({
@@ -393,7 +418,11 @@ apiClient.interceptors.response.use(
       try {
         const newAccessToken = await executeRefreshToken();
         originalRequest.headers = originalRequest.headers || {};
-        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        if (typeof (originalRequest.headers as any).set === 'function') {
+          (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
+        }
+        originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr: any) {
         return Promise.reject({

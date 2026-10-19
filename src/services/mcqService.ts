@@ -16,6 +16,17 @@ export const mcqService = {
     return apiClient.post(API_ENDPOINTS.MCQ.ADMIN_CREATE, payload);
   },
 
+  async updateMcq(
+    id: string | number,
+    payload: AdminCreateMcqPayload & { id?: number }
+  ): Promise<ApiResponse<McqQuestion>> {
+    const updatePayload = {
+      ...payload,
+      id: Number(id),
+    };
+    return apiClient.post(API_ENDPOINTS.MCQ.ADMIN_CREATE, updatePayload);
+  },
+
   async deleteMcq(id: string | number): Promise<ApiResponse<string>> {
     return apiClient.delete(API_ENDPOINTS.MCQ.ADMIN_DELETE(id));
   },

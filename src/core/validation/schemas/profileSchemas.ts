@@ -34,10 +34,18 @@ export const academicDetailsSchema = z
     regNumber: requiredTextRule('Registration number', 1),
     degree: z.string().trim().optional().or(z.literal('')),
     branch: z.string().trim().optional().or(z.literal('')),
-    joinedYear: yearRule(1990, currentYear + 5, 'Joined year'),
-    passedOutYear: yearRule(1990, currentYear + 10, 'Graduation year'),
+    joinedYear: z.coerce
+      .number({ invalid_type_error: 'Please select a valid joined year' })
+      .int()
+      .min(1990, 'Joined year cannot be earlier than 1990')
+      .max(currentYear + 2, 'Joined year cannot be in the future'),
+    passedOutYear: z.coerce
+      .number({ invalid_type_error: 'Please select a valid graduation year' })
+      .int()
+      .min(1990, 'Graduation year cannot be earlier than 1990')
+      .max(currentYear + 10, 'Graduation year cannot exceed 10 years in the future'),
     college: requiredTextRule('College or university name', 2),
-    bio: z.string().trim().optional().or(z.literal('')),
+    bio: z.string().trim().max(500, 'Bio cannot exceed 500 characters').optional().or(z.literal('')),
   })
   .refine((data) => data.passedOutYear >= data.joinedYear, {
     message: 'Graduation year cannot be earlier than joined year.',

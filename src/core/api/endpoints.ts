@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
     BASE: '/company',
     DETAILS: (id: string | number) => `/company/${id}`,
     PROBLEMS: (id: string | number) => `/company/${id}/problems`,
+    ADMIN_BASE: '/admin/company',
   },
   QUESTION: {
     BASE: '/question',
@@ -68,6 +69,7 @@ export const API_ENDPOINTS = {
     LIST: '/mcq',
     DETAILS: (id: string | number) => `/mcq/${id}`,
     ADMIN_CREATE: '/admin/mcq',
+    ADMIN_UPDATE: (id: string | number) => `/admin/mcq/${id}`,
     ADMIN_DELETE: (id: string | number) => `/admin/mcq/${id}`,
   },
 } as const;

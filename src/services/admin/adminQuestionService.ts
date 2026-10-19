@@ -52,6 +52,14 @@ export const adminQuestionService = {
   },
 
   /**
+   * GET /api/v1/question/:id/testCases
+   * Fetches test cases for a question from backend or fallback.
+   */
+  async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
+    return questionService.getTestCases(id, signal);
+  },
+
+  /**
    * POST /api/v1/question/:id/testCases
    * Attaches test cases to a question in the Java database.
    */

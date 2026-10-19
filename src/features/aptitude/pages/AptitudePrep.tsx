@@ -1,14 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
-import { openAuthModal } from '../../auth/redux/authSlice';
 import { toast } from 'react-hot-toast';
 import { mcqService } from '../../../services/mcqService';
 import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import type { McqQuestion } from '../../../core/types/domain';
 import {
-  SynthesizedOption,
   cleanQuestionText,
   synthesizeMcqOptions,
 } from '../utils/mcqUtils';
@@ -89,11 +85,245 @@ const SUBJECT_CONFIG: Record<
   },
 };
 
+interface AptitudeQuestionCardProps {
+  question: McqQuestion;
+  index: number;
+}
+
+const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, index }) => {
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [showExplanation, setShowExplanation] = useState<boolean>(false);
+
+  const options = useMemo(() => synthesizeMcqOptions(question), [question]);
+  const correctOption = useMemo(() => options.find((o) => o.isCorrect === true), [options]);
+
+  const rawDiff = String(question.difficultyRefName || question.difficultyRefCode || '').toUpperCase();
+  const diffLabel: 'Easy' | 'Medium' | 'Hard' =
+    rawDiff === 'HARD' ? 'Hard' : rawDiff === 'MEDIUM' ? 'Medium' : 'Easy';
+
+  const tags = [question.topicRefName, question.subjectRefName].filter(Boolean) as string[];
+
+  const handleSelectOption = (optionText: string) => {
+    if (isSubmitted) return;
+    setSelectedAnswer(optionText);
+  };
+
+  const handleCheckAnswer = () => {
+    if (!selectedAnswer) return;
+    setIsSubmitted(true);
+    if (correctOption && selectedAnswer === correctOption.optionText) {
+      toast.success('Great job! Correct answer.');
+    } else {
+      toast.error('Incorrect. Check the explanation.');
+      setShowExplanation(true);
+    }
+  };
+
+  const handleReset = () => {
+    setSelectedAnswer(null);
+    setIsSubmitted(false);
+    setShowExplanation(false);
+  };
+
+  const isUserCorrect = isSubmitted && correctOption && selectedAnswer === correctOption.optionText;
+  const isUserIncorrect = isSubmitted && (!correctOption || selectedAnswer !== correctOption?.optionText);
+
+  return (
+    <div className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-2xs hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700/80 transition-all flex flex-col gap-4">
+      {/* Top Header Row: Question number, tags & difficulty */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-sky-400 border border-blue-200/60 dark:border-blue-800/50">
+            Q{index}
+          </span>
+          {tags.map((tag, tIdx) => (
+            <span
+              key={tIdx}
+              className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300"
+            >
+              {tag}
+            </span>
+          ))}
+          {question.companyName && (
+            <span className="px-2.5 py-0.5 rounded-md text-[11px] font-semibold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
+              {question.companyName}
+            </span>
+          )}
+        </div>
+
+        {/* Difficulty Badge */}
+        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <span
+            className={`w-2 h-2 rounded-full ${
+              diffLabel === 'Easy'
+                ? 'bg-emerald-500'
+                : diffLabel === 'Medium'
+                ? 'bg-amber-500'
+                : 'bg-rose-500'
+            }`}
+          />
+          <span>{diffLabel}</span>
+        </div>
+      </div>
+
+      {/* Question Text */}
+      <div className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 leading-relaxed">
+        {cleanQuestionText(question.question)}
+      </div>
+
+      {/* Options Grid */}
+      <div className="flex flex-col gap-2 pt-1">
+        {options.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {options.map((opt) => {
+              const isSelected = selectedAnswer === opt.optionText;
+              const isThisCorrect = isSubmitted && opt.isCorrect;
+              const isThisWrong = isSubmitted && isSelected && !opt.isCorrect;
+              const isOtherOption = isSubmitted && !isSelected && !opt.isCorrect;
+
+              let cardStyles =
+                'bg-slate-50/70 dark:bg-slate-900/60 border-slate-200/80 dark:border-slate-800/80 text-slate-800 dark:text-slate-200 hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-slate-800/60';
+              let badgeStyles =
+                'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700';
+
+              if (isThisCorrect) {
+                cardStyles =
+                  'bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-500 text-emerald-900 dark:text-emerald-100 ring-1 ring-emerald-500/50';
+                badgeStyles = 'bg-emerald-500 text-white border-emerald-500';
+              } else if (isThisWrong) {
+                cardStyles =
+                  'bg-rose-50/90 dark:bg-rose-950/50 border-rose-500 text-rose-900 dark:text-rose-100 ring-1 ring-rose-500/50';
+                badgeStyles = 'bg-rose-500 text-white border-rose-500';
+              } else if (isSelected) {
+                cardStyles =
+                  'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-900 dark:text-blue-100 ring-1 ring-blue-500/50 shadow-2xs';
+                badgeStyles = 'bg-blue-600 text-white border-blue-600';
+              } else if (isOtherOption) {
+                cardStyles =
+                  'bg-slate-50/40 dark:bg-slate-900/30 border-slate-200/50 dark:border-slate-800/50 text-slate-400 dark:text-slate-500 opacity-60';
+                badgeStyles =
+                  'bg-slate-100 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-slate-200/50 dark:border-slate-800/50';
+              }
+
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={isSubmitted}
+                  onClick={() => handleSelectOption(opt.optionText)}
+                  className={`p-3.5 rounded-xl text-left border text-xs sm:text-sm font-medium transition-all flex items-center justify-between gap-3 cursor-pointer disabled:cursor-default ${cardStyles}`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${badgeStyles}`}
+                    >
+                      {opt.optionLabel}
+                    </span>
+                    <span className="leading-snug break-words">{opt.optionText}</span>
+                  </div>
+                  {isThisCorrect && (
+                    <i className="fa-solid fa-check text-emerald-600 dark:text-emerald-400 text-sm font-bold shrink-0"></i>
+                  )}
+                  {isThisWrong && (
+                    <i className="fa-solid fa-xmark text-rose-600 dark:text-rose-400 text-sm font-bold shrink-0"></i>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-500 dark:text-slate-400 text-xs italic">
+            Multiple-choice options have not yet been configured for this question.
+          </div>
+        )}
+      </div>
+
+      {/* Action Row & Feedback */}
+      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/80 flex-wrap gap-2.5">
+        <div className="flex items-center gap-3">
+          {isUserCorrect && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              <i className="fa-solid fa-circle-check"></i>
+              <span>Correct!</span>
+            </span>
+          )}
+          {isUserIncorrect && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600 dark:text-rose-400">
+              <i className="fa-solid fa-circle-xmark"></i>
+              <span>
+                Incorrect. Correct is Option {correctOption?.optionLabel || 'shown'}.
+              </span>
+            </span>
+          )}
+          {!isSubmitted && (
+            <span className="text-[11px] sm:text-xs text-slate-600 dark:text-slate-400">
+              {selectedAnswer ? 'Click "Check Answer" to verify' : 'Select an option to check answer'}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Solution toggle */}
+          <button
+            type="button"
+            onClick={() => setShowExplanation(!showExplanation)}
+            className="text-xs font-bold text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-sky-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+          >
+            <i className="fa-regular fa-lightbulb text-amber-500"></i>
+            <span>{showExplanation ? 'Hide Solution' : 'View Solution'}</span>
+            <i className={`fa-solid fa-chevron-${showExplanation ? 'up' : 'down'} text-[9px]`}></i>
+          </button>
+
+          {!isSubmitted ? (
+            <button
+              type="button"
+              disabled={!selectedAnswer}
+              onClick={handleCheckAnswer}
+              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:hover:bg-blue-600 text-white font-bold text-xs transition-all shadow-2xs hover:shadow-xs cursor-pointer disabled:cursor-not-allowed active:scale-95"
+            >
+              Check Answer
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="px-3.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs transition-all cursor-pointer"
+            >
+              Try Again
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Explanation accordion */}
+      {showExplanation && (
+        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs sm:text-sm leading-relaxed animate-fade-in">
+          <div className="flex items-center gap-2 font-bold text-slate-800 dark:text-slate-200 mb-1">
+            <i className="fa-solid fa-circle-info text-blue-500"></i>
+            <span>
+              Correct Answer:{' '}
+              {correctOption ? `Option ${correctOption.optionLabel}: ${correctOption.optionText}` : 'N/A'}
+            </span>
+          </div>
+          {question.explanation ? (
+            <p className="mt-1 text-slate-600 dark:text-slate-300">
+              <span className="font-semibold text-slate-700 dark:text-slate-200">Explanation: </span>
+              {question.explanation}
+            </p>
+          ) : (
+            <p className="mt-1 text-slate-600 dark:text-slate-400 italic">
+              No detailed explanation provided for this question.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) => {
-  const dispatch = useAppDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { bookmarks } = useAppSelector((state) => state.bookmarks);
-  const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   // Parse category from URL query param
   const parseSubjectCode = (raw: string | null | undefined): AptitudeSubjectCode => {
@@ -108,11 +338,16 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const initialSubject = parseSubjectCode(searchParams.get('category') || defaultCategory);
   const [activeSubject, setActiveSubject] = useState<AptitudeSubjectCode>(initialSubject);
 
-  // Search & Filter State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  // Search & Filter State (Draft vs Applied Architecture)
+  const [draftSearch, setDraftSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [draftDifficulties, setDraftDifficulties] = useState<string[]>([]);
+  const [appliedDifficulties, setAppliedDifficulties] = useState<string[]>([]);
+  const [draftTopicIds, setDraftTopicIds] = useState<number[]>([]);
+  const [appliedTopicIds, setAppliedTopicIds] = useState<number[]>([]);
+  const [topicSearch, setTopicSearch] = useState<string>('');
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+
   const [sortBy, setSortBy] = useState<'default' | 'diff-asc' | 'diff-desc' | 'title-asc'>('default');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 8;
@@ -138,33 +373,40 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     PSEUDOCODE: 31,
   });
 
-  // Solve Modal State
-  const [activeSolveQuestion, setActiveSolveQuestion] = useState<McqQuestion | null>(null);
-  const [activeOptions, setActiveOptions] = useState<SynthesizedOption[]>([]);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
-  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Sync category changes with URL query parameter
+  // Detect unapplied changes between draft and applied filters
+  const hasUnappliedChanges = useMemo(() => {
+    if (draftSearch.trim() !== appliedSearch.trim()) return true;
+    if (draftDifficulties.length !== appliedDifficulties.length) return true;
+    if (!draftDifficulties.every((d) => appliedDifficulties.includes(d))) return true;
+    if (draftTopicIds.length !== appliedTopicIds.length) return true;
+    if (!draftTopicIds.every((id) => appliedTopicIds.includes(id))) return true;
+    return false;
+  }, [draftSearch, appliedSearch, draftDifficulties, appliedDifficulties, draftTopicIds, appliedTopicIds]);
+
+  const draftFilterCount = useMemo(() => {
+    return draftDifficulties.length + draftTopicIds.length + (draftSearch.trim() ? 1 : 0);
+  }, [draftDifficulties, draftTopicIds, draftSearch]);
+
+  const activeFilterCount = useMemo(() => {
+    return appliedDifficulties.length + appliedTopicIds.length + (appliedSearch.trim() ? 1 : 0);
+  }, [appliedDifficulties, appliedTopicIds, appliedSearch]);
+
+  // Sync category changes with URL query parameter & reset all filters
   const handleCategorySwitch = (code: AptitudeSubjectCode) => {
     setActiveSubject(code);
     setSearchParams({ category: SUBJECT_CONFIG[code].urlParam });
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setSelectedDifficulties([]);
-    setSelectedTypes([]);
+    setDraftSearch('');
+    setAppliedSearch('');
+    setDraftDifficulties([]);
+    setAppliedDifficulties([]);
+    setDraftTopicIds([]);
+    setAppliedTopicIds([]);
+    setTopicSearch('');
     setCurrentPage(1);
+    if (isMobileFilterOpen) setIsMobileFilterOpen(false);
   };
-
-  // Debounce search query
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery.trim());
-      setCurrentPage(1);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
 
   // Load subject reference map on initial mount
   useEffect(() => {
@@ -221,23 +463,102 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     };
   }, [activeSubject]);
 
-  // Map selected Question Types to reference item IDs
-  const selectedTopicIds = useMemo(() => {
-    if (selectedTypes.length === 0) return [];
-    return activeQuestionTypes
-      .filter((t) => selectedTypes.includes(t.refName || t.refCode || ''))
-      .map((t) => Number(t.id))
-      .filter((id) => !isNaN(id));
-  }, [selectedTypes, activeQuestionTypes]);
+  // Complete category topics with verified database IDs
+  const allCategoryTopics: QuestionTypeItem[] = useMemo(() => {
+    if (activeQuestionTypes.length > 0) {
+      return activeQuestionTypes.map((t) => ({
+        id: Number(t.id),
+        name: t.refName || t.refCode || '',
+        code: t.refCode || '',
+        count: 0,
+      }));
+    }
 
-  // Map selected Difficulties to DIFF IDs (Easy: 2, Medium: 3, Hard: 4)
+    if (activeSubject === 'APTITUDE') {
+      return [
+        { id: 44, name: 'Time, Speed and Distance', code: 'TIMEDISTANCE', count: 0 },
+        { id: 48, name: 'Compound Interest', code: 'COMPOUNDINTEREST', count: 0 },
+        { id: 57, name: 'Probability', code: 'PROBABILITY', count: 0 },
+        { id: 59, name: 'Permutations and Combinations', code: 'PERMUTATIONSCOMBINATIONS', count: 0 },
+        { id: 62, name: 'Time and Work', code: 'TIMEWORK', count: 0 },
+        { id: 63, name: 'Percentages', code: 'PERCENTAGES', count: 0 },
+        { id: 71, name: 'Averages', code: 'AVERAGES', count: 0 },
+        { id: 72, name: 'Ratio and Proportion', code: 'RATIOPROPORTION', count: 0 },
+        { id: 76, name: 'Number System', code: 'NUMBERSYSTEM', count: 0 },
+        { id: 79, name: 'Simple Interest', code: 'SIMPLEINTEREST', count: 0 },
+        { id: 80, name: 'Profit and Loss', code: 'PROFITLOSS', count: 0 },
+        { id: 85, name: 'Problems on Ages', code: 'AGES', count: 0 },
+      ];
+    } else if (activeSubject === 'REASONING') {
+      return [
+        { id: 47, name: 'Odd One Out', code: 'ODDONEOUT', count: 0 },
+        { id: 52, name: 'Syllogisms', code: 'SYLLOGISMS', count: 0 },
+        { id: 53, name: 'Analogies', code: 'ANALOGIES', count: 0 },
+        { id: 55, name: 'Number Series', code: 'NUMBERSERIES', count: 0 },
+        { id: 58, name: 'Ranking and Ordering', code: 'RANKINGORDERING', count: 0 },
+        { id: 60, name: 'Letter Series', code: 'LETTERSERIES', count: 0 },
+        { id: 61, name: 'Logical Puzzles', code: 'LOGICALPUZZLES', count: 0 },
+        { id: 66, name: 'Direction Sense', code: 'DIRECTIONSENSE', count: 0 },
+        { id: 75, name: 'Coding and Decoding', code: 'CODINGDECODING', count: 0 },
+        { id: 77, name: 'Seating Arrangements', code: 'SEATINGARRANGEMENT', count: 0 },
+        { id: 82, name: 'Statements and Conclusions', code: 'STATEMENTSCONCLUSIONS', count: 0 },
+        { id: 88, name: 'Blood Relations', code: 'BLOODRELATIONS', count: 0 },
+      ];
+    } else if (activeSubject === 'VERBAL') {
+      return [
+        { id: 45, name: 'Sentence Completion', code: 'SENTENCECOMPLETION', count: 0 },
+        { id: 46, name: 'Synonyms and Antonyms', code: 'SYNONYMSANTONYMS', count: 0 },
+        { id: 49, name: 'Reading Comprehension', code: 'READINGCOMPREHENSION', count: 0 },
+        { id: 50, name: 'Para Jumbles', code: 'PARAJUMBLES', count: 0 },
+        { id: 51, name: 'Active and Passive Voice', code: 'ACTIVEPASSIVE', count: 0 },
+        { id: 64, name: 'Prepositions', code: 'PREPOSITIONS', count: 0 },
+        { id: 65, name: 'Grammar', code: 'GRAMMAR', count: 0 },
+        { id: 70, name: 'Error Spotting', code: 'ERRORSPOTTING', count: 0 },
+        { id: 73, name: 'Vocabulary', code: 'VOCABULARY', count: 0 },
+        { id: 74, name: 'Direct and Indirect Speech', code: 'DIRECTINDIRECT', count: 0 },
+        { id: 81, name: 'Sentence Correction', code: 'SENTENCECORRECTION', count: 0 },
+        { id: 84, name: 'Fill in the Blanks', code: 'FILLBLANKS', count: 0 },
+      ];
+    } else {
+      return [
+        { id: 43, name: 'Bitwise Operators', code: 'BITWISEOPERATORS', count: 0 },
+        { id: 54, name: 'Recursion', code: 'RECURSION', count: 0 },
+        { id: 56, name: 'Loops', code: 'LOOPS', count: 0 },
+        { id: 67, name: 'Nested Loops', code: 'NESTEDLOOPS', count: 0 },
+        { id: 68, name: 'Arrays', code: 'ARRAYS', count: 0 },
+        { id: 69, name: 'Strings', code: 'STRINGS', count: 0 },
+        { id: 78, name: 'Conditional Statements', code: 'CONDITIONALS', count: 0 },
+        { id: 83, name: 'Variables and Operators', code: 'VARIABLESOPERATORS', count: 0 },
+        { id: 86, name: 'Output Prediction', code: 'OUTPUTPREDICTION', count: 0 },
+        { id: 87, name: 'Functions', code: 'FUNCTIONS', count: 0 },
+      ];
+    }
+  }, [activeQuestionTypes, activeSubject]);
+
+  // Filter topics by topicSearch input
+  const availableQuestionTypes = useMemo(() => {
+    if (!topicSearch.trim()) return allCategoryTopics;
+    const q = topicSearch.toLowerCase().trim();
+    return allCategoryTopics.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.code.toLowerCase().includes(q)
+    );
+  }, [allCategoryTopics, topicSearch]);
+
+  // Map applied Difficulties to backend DIFF IDs:
+  // In the DB: 1=BASIC, 2=EASY, 3=MEDIUM, 4=HARD
   const selectedDifficultyIds = useMemo(() => {
     const ids: number[] = [];
-    if (selectedDifficulties.includes('Easy')) ids.push(2);
-    if (selectedDifficulties.includes('Medium')) ids.push(3);
-    if (selectedDifficulties.includes('Hard')) ids.push(4);
+    if (appliedDifficulties.includes('Easy')) {
+      ids.push(1, 2);
+    }
+    if (appliedDifficulties.includes('Medium')) {
+      ids.push(3);
+    }
+    if (appliedDifficulties.includes('Hard')) {
+      ids.push(4);
+    }
     return ids;
-  }, [selectedDifficulties]);
+  }, [appliedDifficulties]);
 
   // Fetch Questions from backend API
   const fetchQuestions = useCallback(async () => {
@@ -269,8 +590,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           subject: [activeSubjectId],
           difficulty: selectedDifficultyIds,
           companies: [],
-          topic: selectedTopicIds.length > 0 ? selectedTopicIds : null,
-          searchText: debouncedSearch,
+          topic: appliedTopicIds.length > 0 ? appliedTopicIds : null,
+          searchText: appliedSearch.trim(),
           pageRequest: {
             pageNumber: Math.max(0, currentPage - 1),
             pageSize,
@@ -315,7 +636,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     } finally {
       setLoading(false);
     }
-  }, [activeSubject, subjectRefMap, selectedDifficultyIds, selectedTopicIds, debouncedSearch, currentPage, sortBy]);
+  }, [activeSubject, subjectRefMap, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
 
   useEffect(() => {
     fetchQuestions();
@@ -324,165 +645,64 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     };
   }, [fetchQuestions]);
 
-  // Compute question counts for active Question Types
-  const availableQuestionTypes: QuestionTypeItem[] = useMemo(() => {
-    const countMap: Record<string, number> = {};
-    questions.forEach((q) => {
-      const typeKey = q.topicRefName || q.topicRefCode;
-      if (typeKey) {
-        countMap[typeKey] = (countMap[typeKey] || 0) + 1;
-      }
-    });
-
-    if (activeQuestionTypes.length > 0) {
-      return activeQuestionTypes.map((t) => {
-        const name = t.refName || t.refCode || '';
-        const count = countMap[name] || countMap[t.refCode || ''] || 0;
-        return {
-          id: Number(t.id),
-          name,
-          code: t.refCode || '',
-          count,
-        };
-      });
-    }
-
-    // Default question types for the category
-    if (activeSubject === 'APTITUDE') {
-      return [
-        { id: 63, name: 'Percentages', code: 'PERCENTAGES', count: countMap['Percentages'] || 0 },
-        { id: 80, name: 'Profit and Loss', code: 'PROFITLOSS', count: countMap['Profit and Loss'] || 0 },
-        { id: 72, name: 'Ratio and Proportion', code: 'RATIOPROPORTION', count: countMap['Ratio and Proportion'] || 0 },
-        { id: 76, name: 'Number System', code: 'NUMBERSYSTEM', count: countMap['Number System'] || 0 },
-        { id: 79, name: 'Simple Interest', code: 'SIMPLEINTEREST', count: countMap['Simple Interest'] || 0 },
-        { id: 62, name: 'Time and Work', code: 'TIMEWORK', count: countMap['Time and Work'] || 0 },
-        { id: 71, name: 'Averages', code: 'AVERAGES', count: countMap['Averages'] || 0 },
-      ];
-    } else if (activeSubject === 'REASONING') {
-      return [
-        { id: 58, name: 'Ranking and Ordering', code: 'RANKINGORDERING', count: countMap['Ranking and Ordering'] || 0 },
-        { id: 88, name: 'Blood Relations', code: 'BLOODRELATIONS', count: countMap['Blood Relations'] || 0 },
-        { id: 75, name: 'Coding and Decoding', code: 'CODINGDECODING', count: countMap['Coding and Decoding'] || 0 },
-        { id: 77, name: 'Seating Arrangements', code: 'SEATINGARRANGEMENT', count: countMap['Seating Arrangements'] || 0 },
-        { id: 52, name: 'Syllogisms', code: 'SYLLOGISMS', count: countMap['Syllogisms'] || 0 },
-        { id: 66, name: 'Direction Sense', code: 'DIRECTIONSENSE', count: countMap['Direction Sense'] || 0 },
-        { id: 55, name: 'Number Series', code: 'NUMBERSERIES', count: countMap['Number Series'] || 0 },
-      ];
-    } else if (activeSubject === 'VERBAL') {
-      return [
-        { id: 81, name: 'Sentence Correction', code: 'SENTENCECORRECTION', count: countMap['Sentence Correction'] || 0 },
-        { id: 49, name: 'Reading Comprehension', code: 'READINGCOMPREHENSION', count: countMap['Reading Comprehension'] || 0 },
-        { id: 46, name: 'Synonyms and Antonyms', code: 'SYNONYMSANTONYMS', count: countMap['Synonyms and Antonyms'] || 0 },
-        { id: 50, name: 'Para Jumbles', code: 'PARAJUMBLES', count: countMap['Para Jumbles'] || 0 },
-        { id: 73, name: 'Vocabulary', code: 'VOCABULARY', count: countMap['Vocabulary'] || 0 },
-        { id: 65, name: 'Grammar', code: 'GRAMMAR', count: countMap['Grammar'] || 0 },
-      ];
-    } else {
-      return [
-        { id: 56, name: 'Loops', code: 'LOOPS', count: countMap['Loops'] || 0 },
-        { id: 54, name: 'Recursion', code: 'RECURSION', count: countMap['Recursion'] || 0 },
-        { id: 43, name: 'Bitwise Operators', code: 'BITWISEOPERATORS', count: countMap['Bitwise Operators'] || 0 },
-        { id: 78, name: 'Conditional Statements', code: 'CONDITIONALS', count: countMap['Conditional Statements'] || 0 },
-        { id: 68, name: 'Arrays', code: 'ARRAYS', count: countMap['Arrays'] || 0 },
-        { id: 87, name: 'Functions', code: 'FUNCTIONS', count: countMap['Functions'] || 0 },
-      ];
-    }
-  }, [questions, activeQuestionTypes, activeSubject]);
-
-  // Compute question counts for Easy, Medium, Hard
-  const difficultyCounts = useMemo(() => {
-    let easy = 0;
-    let medium = 0;
-    let hard = 0;
-    questions.forEach((q) => {
-      const code = String(q.difficultyRefCode || q.difficultyRefName || '').toUpperCase();
-      if (code === 'EASY' || code === 'BASIC') easy++;
-      else if (code === 'MEDIUM') medium++;
-      else if (code === 'HARD') hard++;
-    });
-    return {
-      Easy: easy,
-      Medium: medium,
-      Hard: hard,
-      total: totalElements,
-    };
-  }, [questions, totalElements]);
-
   // Handlers for Filters
   const handleDifficultyToggle = (diff: string) => {
-    setSelectedDifficulties((prev) =>
+    setDraftDifficulties((prev) =>
       prev.includes(diff) ? prev.filter((d) => d !== diff) : [...prev, diff]
     );
-    setCurrentPage(1);
   };
 
-  const handleTypeToggle = (typeName: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(typeName) ? prev.filter((t) => t !== typeName) : [...prev, typeName]
+  const handleTopicToggle = (topicId: number) => {
+    setDraftTopicIds((prev) =>
+      prev.includes(topicId) ? prev.filter((id) => id !== topicId) : [...prev, topicId]
     );
+  };
+
+  // APPLY FILTERS: Commits all staged draft filters and triggers backend API call
+  const handleApplyFilters = () => {
+    setAppliedDifficulties([...draftDifficulties]);
+    setAppliedTopicIds([...draftTopicIds]);
+    setAppliedSearch(draftSearch.trim());
     setCurrentPage(1);
+    if (isMobileFilterOpen) {
+      setIsMobileFilterOpen(false);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleApplyFilters();
   };
 
   const handleClearAll = () => {
-    setSearchQuery('');
-    setDebouncedSearch('');
-    setSelectedDifficulties([]);
-    setSelectedTypes([]);
+    setDraftDifficulties([]);
+    setDraftTopicIds([]);
+    setDraftSearch('');
+    setAppliedDifficulties([]);
+    setAppliedTopicIds([]);
+    setAppliedSearch('');
+    setTopicSearch('');
     setSortBy('default');
     setCurrentPage(1);
   };
 
-  // Bookmark Toggle
-  const isItemBookmarked = (id: string | number) => {
-    return Array.isArray(bookmarks) && bookmarks.some((b: any) => String(b.itemId) === String(id));
+  const removeAppliedDifficulty = (diff: string) => {
+    setDraftDifficulties((prev) => prev.filter((d) => d !== diff));
+    setAppliedDifficulties((prev) => prev.filter((d) => d !== diff));
+    setCurrentPage(1);
   };
 
-  const handleBookmarkToggle = (item: McqQuestion, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!isAuthenticated) {
-      dispatch(openAuthModal({ mode: 'login' }));
-      toast.error('Please sign in to bookmark questions');
-      return;
-    }
-    const id = String(item.id);
-    const currentlyBookmarked = isItemBookmarked(id);
-    dispatch(
-      toggleBookmarkItem({
-        itemId: id,
-        type: 'APTITUDE',
-        title: cleanQuestionText(item.question) || `Question #${item.id}`,
-        difficulty: item.difficultyRefName || item.difficultyRefCode || 'Medium',
-        category: item.topicRefName || item.topicRefCode || 'General',
-      })
-    );
-    if (currentlyBookmarked) {
-      toast.success('Question removed from bookmarks');
-    } else {
-      toast.success('Question added to bookmarks');
-    }
+  const removeAppliedTopic = (id: number) => {
+    setDraftTopicIds((prev) => prev.filter((t) => t !== id));
+    setAppliedTopicIds((prev) => prev.filter((t) => t !== id));
+    setCurrentPage(1);
   };
 
-  // Open Solve Modal
-  const handleOpenSolveModal = (item: McqQuestion) => {
-    const opts = synthesizeMcqOptions(item);
-    setActiveSolveQuestion(item);
-    setActiveOptions(opts);
-    setSelectedAnswer(null);
-    setIsSubmitted(false);
+  const removeAppliedSearch = () => {
+    setDraftSearch('');
+    setAppliedSearch('');
+    setCurrentPage(1);
   };
-
-  // Helper to normalize difficulty label
-  const getDifficultyLabel = (q: McqQuestion): 'Easy' | 'Medium' | 'Hard' => {
-    const raw = String(q.difficultyRefName || q.difficultyRefCode || '').toUpperCase();
-    if (raw === 'HARD') return 'Hard';
-    if (raw === 'MEDIUM') return 'Medium';
-    return 'Easy';
-  };
-
-  // Active correct answer text
-  const activeCorrectOption = useMemo(() => {
-    return activeOptions.find((o) => o.isCorrect === true);
-  }, [activeOptions]);
 
   return (
     <div className="w-full flex flex-col items-center pb-24 font-sans bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 overflow-x-hidden">
@@ -541,25 +761,86 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           })}
         </div>
 
+        {/* Mobile Filter Toggle Button Bar (lg:hidden matching Problems page) */}
+        <div className="lg:hidden flex items-center justify-between bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-3.5 mb-6 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+            className="flex items-center gap-2.5 text-xs sm:text-sm font-bold text-slate-900 dark:text-white cursor-pointer"
+          >
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center text-blue-600 dark:text-sky-400">
+              <i className="fa-solid fa-sliders text-xs"></i>
+            </div>
+            <span>Filter Questions</span>
+            {activeFilterCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-600 text-white shadow-2xs">
+                {activeFilterCount} Active
+              </span>
+            )}
+            <i className={`fa-solid fa-chevron-${isMobileFilterOpen ? 'up' : 'down'} text-[11px] text-slate-400 ml-1 transition-transform`}></i>
+          </button>
+
+          {(activeFilterCount > 0 || draftFilterCount > 0) && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="text-xs font-semibold text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+
         {/* 3. MAIN WORKSPACE: FILTERS SIDEBAR (LEFT) + QUESTIONS LIST (RIGHT) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* LEFT COLUMN: FILTERS CARD */}
-          <div className="lg:col-span-3 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex flex-col gap-6">
+          <div className={`${isMobileFilterOpen ? 'flex' : 'hidden'} lg:flex lg:col-span-3 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex-col gap-5`}>
             
-            {/* Header: Filters + Clear All */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                <i className="fa-solid fa-filter text-slate-600 dark:text-slate-400 text-xs"></i>
-                <span>Filters</span>
-              </div>
+            {/* APPLY FILTERS BUTTON AT THE VERY TOP OF THE FILTERS DIV (matching Problems page) */}
+            <div className="w-full pb-3 border-b border-slate-100 dark:border-slate-800/80">
               <button
                 type="button"
-                onClick={handleClearAll}
-                className="text-xs font-bold text-blue-600 dark:text-sky-400 hover:underline cursor-pointer"
+                onClick={handleApplyFilters}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer shadow-md ${
+                  hasUnappliedChanges
+                    ? 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white ring-2 ring-blue-500/30'
+                    : 'bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white'
+                }`}
               >
-                Clear All
+                <i className="fa-solid fa-filter text-xs"></i>
+                <span>Apply Filters</span>
+                {hasUnappliedChanges && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-1" title="Unapplied changes"></span>
+                )}
+                {draftFilterCount > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
+                    {draftFilterCount}
+                  </span>
+                )}
               </button>
+            </div>
+
+            {/* Header: Filters Title + Clear All */}
+            <div className="flex items-center justify-between pb-1">
+              <div className="flex items-center gap-2">
+                <i className="fa-solid fa-sliders text-blue-600 dark:text-sky-400 text-sm"></i>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">Filters</h3>
+                {draftFilterCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 dark:bg-blue-950/70 text-blue-600 dark:text-sky-400">
+                    {draftFilterCount}
+                  </span>
+                )}
+              </div>
+              {(draftFilterCount > 0 || activeFilterCount > 0) && (
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="text-xs font-semibold text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
 
             {/* Filter Group: Difficulty */}
@@ -569,8 +850,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               </span>
               <div className="flex flex-col gap-2 pt-1">
                 {(['Easy', 'Medium', 'Hard'] as const).map((diff) => {
-                  const isChecked = selectedDifficulties.includes(diff);
-                  const count = difficultyCounts[diff] || 0;
+                  const isChecked = draftDifficulties.includes(diff);
                   return (
                     <label
                       key={diff}
@@ -583,12 +863,16 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                         className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                       <span className="flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            diff === 'Easy'
+                              ? 'bg-emerald-500'
+                              : diff === 'Medium'
+                              ? 'bg-amber-500'
+                              : 'bg-rose-500'
+                          }`}
+                        />
                         <span>{diff}</span>
-                        {loading && count === 0 ? (
-                          <span className="inline-block w-5 h-3 bg-slate-200 dark:bg-slate-700/80 rounded animate-pulse" />
-                        ) : (
-                          <span>({count})</span>
-                        )}
                       </span>
                     </label>
                   );
@@ -596,7 +880,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               </div>
             </div>
 
-            {/* Filter Group: Question Type (Collapsible Accordion) */}
+            {/* Filter Group: Question Type (Collapsible Accordion with Search) */}
             <div className="flex flex-col border-t border-slate-100 dark:border-slate-800 pt-4">
               <button
                 type="button"
@@ -608,74 +892,98 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               </button>
 
               {isQuestionTypeOpen && (
-                <div className="flex flex-col gap-2 pt-3 animate-fade-in max-h-64 overflow-y-auto pr-1">
-                  {loading && availableQuestionTypes.length === 0 ? (
-                    <div className="flex flex-col gap-2.5 py-1">
-                      {[1, 2, 3, 4].map((idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                          <Skeleton className="w-4 h-4 rounded" />
-                          <Skeleton className={`h-3 ${idx % 2 === 0 ? 'w-24' : 'w-20'} rounded`} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    availableQuestionTypes.map((t) => {
-                      const isChecked = selectedTypes.includes(t.name);
-                      return (
-                        <label
-                          key={t.name}
-                          className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => handleTypeToggle(t.name)}
-                            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                          />
-                          <span className="truncate">
-                            {t.name} ({t.count})
-                          </span>
-                        </label>
-                      );
-                    })
-                  )}
+                <div className="flex flex-col gap-2 pt-3 animate-fade-in">
+                  {/* Topic search filter input */}
+                  <div className="relative mb-1">
+                    <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400"></i>
+                    <input
+                      type="text"
+                      value={topicSearch}
+                      onChange={(e) => setTopicSearch(e.target.value)}
+                      placeholder="Search topics..."
+                      className="w-full text-xs pl-7 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:border-blue-500 transition-colors"
+                    />
+                    {topicSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setTopicSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-[10px] cursor-pointer"
+                      >
+                        <i className="fa-solid fa-xmark"></i>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Topics List with Max Height */}
+                  <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
+                    {availableQuestionTypes.length === 0 ? (
+                      <div className="text-xs text-slate-400 py-2 text-center">
+                        No matching topics
+                      </div>
+                    ) : (
+                      availableQuestionTypes.map((t) => {
+                        const isChecked = draftTopicIds.includes(t.id);
+                        return (
+                          <label
+                            key={t.id}
+                            className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleTopicToggle(t.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                            />
+                            <span className="truncate">{t.name}</span>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               )}
             </div>
 
           </div>
 
-          {/* RIGHT COLUMN: SEARCH, SORT & QUESTIONS LIST */}
+          {/* RIGHT COLUMN: SEARCH, SORT, ACTIVE FILTERS & QUESTIONS LIST */}
           <div className="lg:col-span-9 w-full flex flex-col gap-4">
             
             {/* Top Bar: Search Input + Sort Dropdown */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
-              {/* Search Box */}
-              <div className="relative flex-1 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 py-2.5 flex items-center gap-3 shadow-2xs">
+              {/* Search Form */}
+              <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-2xl pl-4 pr-2.5 py-2 flex items-center gap-2.5 shadow-2xs focus-within:border-blue-500 transition-colors">
                 <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  placeholder={`Search ${SUBJECT_CONFIG[activeSubject].label} questions by title or keyword...`}
+                  value={draftSearch}
+                  onChange={(e) => setDraftSearch(e.target.value)}
+                  placeholder={`Search ${SUBJECT_CONFIG[activeSubject].label} questions by keyword...`}
                   className="w-full bg-transparent text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none"
                 />
-                {searchQuery && (
+                {draftSearch && (
                   <button
                     type="button"
                     onClick={() => {
-                      setSearchQuery('');
-                      setDebouncedSearch('');
+                      setDraftSearch('');
+                      if (appliedSearch) {
+                        setAppliedSearch('');
+                        setCurrentPage(1);
+                      }
                     }}
-                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-1"
+                    title="Clear search"
                   >
                     <i className="fa-solid fa-xmark"></i>
                   </button>
                 )}
-              </div>
+                <button
+                  type="submit"
+                  className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors cursor-pointer shrink-0"
+                >
+                  Search
+                </button>
+              </form>
 
               {/* Sort Dropdown */}
               <div className="relative shrink-0 w-full sm:w-auto">
@@ -695,6 +1003,71 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
               </div>
             </div>
+
+            {/* Active Filter Pills Bar */}
+            {activeFilterCount > 0 && (
+              <div className="flex flex-wrap items-center gap-2 pt-1 pb-1 animate-fade-in">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mr-1">
+                  <i className="fa-solid fa-sliders text-[11px] text-blue-500"></i> Active Filters:
+                </span>
+                {appliedSearch && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border border-blue-200/60 dark:border-blue-800/60 shadow-2xs">
+                    <span>Search: "{appliedSearch}"</span>
+                    <button
+                      type="button"
+                      onClick={removeAppliedSearch}
+                      className="hover:text-rose-500 transition-colors cursor-pointer"
+                      title="Remove search"
+                    >
+                      <i className="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                  </span>
+                )}
+                {appliedDifficulties.map((diff) => (
+                  <span
+                    key={diff}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                  >
+                    <span>{diff}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAppliedDifficulty(diff)}
+                      className="hover:text-rose-500 transition-colors cursor-pointer"
+                      title={`Remove ${diff}`}
+                    >
+                      <i className="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                  </span>
+                ))}
+                {appliedTopicIds.map((id) => {
+                  const topicObj = allCategoryTopics.find((t) => t.id === id);
+                  const name = topicObj?.name || `Topic #${id}`;
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                    >
+                      <span>{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAppliedTopic(id)}
+                        className="hover:text-rose-500 transition-colors cursor-pointer"
+                        title={`Remove ${name}`}
+                      >
+                        <i className="fa-solid fa-xmark text-[10px]"></i>
+                      </button>
+                    </span>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={handleClearAll}
+                  className="text-xs font-bold text-rose-500 dark:text-rose-400 hover:underline cursor-pointer ml-1"
+                >
+                  Clear All
+                </button>
+              </div>
+            )}
 
             {/* Questions Counter */}
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 pt-1 flex items-center justify-between min-h-[22px]">
@@ -744,74 +1117,13 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                   </button>
                 </div>
               ) : (
-                questions.map((q) => {
-                  const bookmarked = isItemBookmarked(q.id);
-                  const diff = getDifficultyLabel(q);
-                  const tags = [q.topicRefName, q.subjectRefName, q.companyName].filter(Boolean) as string[];
-
-                  return (
-                    <div
-                      key={q.id}
-                      className="bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-sm hover:border-slate-300 dark:hover:border-slate-700 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                    >
-                      {/* Left Details: Title & Tags */}
-                      <div className="flex flex-col items-start gap-2 flex-1 min-w-0 pr-2">
-                        <h4 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
-                          {cleanQuestionText(q.question)}
-                        </h4>
-
-                        {/* Tag badges */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          {tags.map((tag, tIdx) => (
-                            <span
-                              key={tIdx}
-                              className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300"
-                            >
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Right Details: Difficulty + Bookmark + Solve CTA */}
-                      <div className="flex items-center gap-4 sm:gap-6 self-end sm:self-center shrink-0">
-                        {/* Difficulty Indicator matching original design */}
-                        <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              diff === 'Easy'
-                                ? 'bg-emerald-500'
-                                : diff === 'Medium'
-                                ? 'bg-amber-500'
-                                : 'bg-rose-500'
-                            }`}
-                          />
-                          <span>{diff}</span>
-                        </div>
-
-                        {/* Bookmark Icon Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => handleBookmarkToggle(q, e)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors cursor-pointer"
-                          title={bookmarked ? 'Remove Bookmark' : 'Add Bookmark'}
-                        >
-                          <i className={`text-sm ${bookmarked ? 'fa-solid fa-bookmark text-amber-500' : 'fa-regular fa-bookmark'}`}></i>
-                        </button>
-
-                        {/* Solve Button */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenSolveModal(q)}
-                          className="px-5 py-1.5 rounded-full border border-blue-500 hover:bg-blue-600 hover:text-white text-blue-600 dark:text-sky-400 font-bold text-xs transition-all flex items-center gap-1.5 shadow-2xs hover:shadow-xs cursor-pointer active:translate-y-0.5"
-                        >
-                          <span>Solve</span>
-                          <i className="fa-solid fa-arrow-right text-[10px]"></i>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
+                questions.map((q, idx) => (
+                  <AptitudeQuestionCard
+                    key={q.id}
+                    question={q}
+                    index={(currentPage - 1) * pageSize + idx + 1}
+                  />
+                ))
               )}
             </div>
 
@@ -886,211 +1198,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
       </div>
 
-      {/* 4. INTERACTIVE SOLVE QUESTION MODAL */}
-      {activeSolveQuestion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
-          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-sky-400">
-                  {activeSolveQuestion.subjectRefName || SUBJECT_CONFIG[activeSubject].label}
-                </span>
-                {activeSolveQuestion.topicRefName && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                    {activeSolveQuestion.topicRefName}
-                  </span>
-                )}
-                <span className="text-xs text-slate-400 font-medium">Question #{activeSolveQuestion.id}</span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                    getDifficultyLabel(activeSolveQuestion) === 'Easy'
-                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                      : getDifficultyLabel(activeSolveQuestion) === 'Medium'
-                      ? 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60'
-                      : 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/60'
-                  }`}
-                >
-                  {getDifficultyLabel(activeSolveQuestion)}
-                </span>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => handleBookmarkToggle(activeSolveQuestion, e)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors cursor-pointer"
-                  title="Bookmark"
-                >
-                  <i
-                    className={`text-sm ${
-                      isItemBookmarked(activeSolveQuestion.id)
-                        ? 'fa-solid fa-bookmark text-amber-500'
-                        : 'fa-regular fa-bookmark'
-                    }`}
-                  ></i>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveSolveQuestion(null)}
-                  className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
-                >
-                  <i className="fa-solid fa-xmark text-sm"></i>
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="overflow-y-auto py-5 flex flex-col gap-5 pr-1">
-              
-              {/* Question Statement */}
-              <div className="text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
-                {cleanQuestionText(activeSolveQuestion.question)}
-              </div>
-
-              {/* Company reference tag if available */}
-              {activeSolveQuestion.companyName && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400 font-medium">Frequently asked in:</span>
-                  <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/40">
-                    {activeSolveQuestion.companyName}
-                  </span>
-                </div>
-              )}
-
-              {/* Options Section */}
-              <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Select your answer:
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {activeOptions.map((opt) => {
-                    const isSelected = selectedAnswer === opt.optionText;
-                    const isCorrect = isSubmitted && opt.isCorrect;
-                    const isWrong = isSubmitted && isSelected && !opt.isCorrect;
-
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        disabled={isSubmitted}
-                        onClick={() => setSelectedAnswer(opt.optionText)}
-                        className={`p-3.5 rounded-2xl text-left border text-xs sm:text-sm font-semibold transition-all flex items-center gap-3 cursor-pointer ${
-                          isCorrect
-                            ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-500 text-emerald-800 dark:text-emerald-200'
-                            : isWrong
-                            ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-500 text-rose-800 dark:text-rose-200'
-                            : isSelected
-                            ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-800 dark:text-blue-200'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-800 dark:text-slate-200'
-                        }`}
-                      >
-                        <span
-                          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                            isCorrect
-                              ? 'bg-emerald-500 text-white'
-                              : isWrong
-                              ? 'bg-rose-500 text-white'
-                              : isSelected
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-                          }`}
-                        >
-                          {opt.optionLabel}
-                        </span>
-                        <span>{opt.optionText}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Explanation & Feedback (When submitted) */}
-              {isSubmitted && (
-                <div
-                  className={`p-4 rounded-2xl border text-xs sm:text-sm leading-relaxed animate-fade-in ${
-                    activeCorrectOption && selectedAnswer === activeCorrectOption.optionText
-                      ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200'
-                      : 'bg-amber-50/70 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold mb-1.5">
-                    <i
-                      className={`fa-solid ${
-                        activeCorrectOption && selectedAnswer === activeCorrectOption.optionText
-                          ? 'fa-circle-check text-emerald-600'
-                          : 'fa-circle-exclamation text-amber-600'
-                      }`}
-                    ></i>
-                    <span>
-                      {activeCorrectOption && selectedAnswer === activeCorrectOption.optionText
-                        ? 'Correct Answer! Great job.'
-                        : `Incorrect. The correct answer is: ${activeCorrectOption ? `${activeCorrectOption.optionLabel}: ${activeCorrectOption.optionText}` : 'See explanation below'}`}
-                    </span>
-                  </div>
-                  {activeSolveQuestion.explanation && (
-                    <p className="mt-1 text-slate-700 dark:text-slate-300">
-                      <span className="font-bold">Step-by-step Solution: </span>
-                      {activeSolveQuestion.explanation}
-                    </p>
-                  )}
-                </div>
-              )}
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setActiveSolveQuestion(null)}
-                className="px-5 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-
-              <div className="flex items-center gap-2">
-                {!isSubmitted ? (
-                  <button
-                    type="button"
-                    disabled={!selectedAnswer}
-                    onClick={() => {
-                      if (!selectedAnswer) return;
-                      setIsSubmitted(true);
-                      if (activeCorrectOption && selectedAnswer === activeCorrectOption.optionText) {
-                        toast.success('Great job! Correct answer.');
-                      } else {
-                        toast.error('Incorrect. Check the explanation.');
-                      }
-                    }}
-                    className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-xs cursor-pointer"
-                  >
-                    Check Answer
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const currentIndex = questions.findIndex((q) => q.id === activeSolveQuestion.id);
-                      if (currentIndex !== -1 && currentIndex + 1 < questions.length) {
-                        handleOpenSolveModal(questions[currentIndex + 1]);
-                      } else {
-                        setActiveSolveQuestion(null);
-                      }
-                    }}
-                    className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>Next Question</span>
-                    <i className="fa-solid fa-arrow-right text-[10px]"></i>
-                  </button>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      )}
 
     </div>
   );

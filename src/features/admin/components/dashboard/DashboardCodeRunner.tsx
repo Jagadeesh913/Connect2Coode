@@ -4,8 +4,22 @@ import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { adminLanguageService, LanguageDropdownItem } from '../../../../services/admin/adminLanguageService';
-import { ExecutionResultData, ExecutionTestCaseResult } from '../../../../services/executionService';
+import { ExecutionResultData } from '../../../../services/executionService';
+import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
+import {
+  Play,
+  Send,
+  Terminal,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Cpu,
+  Layers,
+  RotateCcw,
+  AlertCircle,
+  Check,
+} from 'lucide-react';
 
 const DEFAULT_STARTER_CODES: Record<string, string> = {
   Java: `import java.util.*;
@@ -59,7 +73,6 @@ int main() {
     return 0;
 }
 `,
-  // Monaco starter template for user solution (standard output for Judge0 execution):
   JavaScript: `const fs = require('fs');
 
 function solve() {
@@ -77,6 +90,8 @@ solve();
 };
 
 export const DashboardCodeRunner: React.FC = () => {
+  const { theme } = useTheme();
+
   // Question options & selection
   const [questions, setQuestions] = useState<Array<{ id: number; title: string; difficulty?: string }>>([]);
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
@@ -97,7 +112,7 @@ export const DashboardCodeRunner: React.FC = () => {
   const [executionMessage, setExecutionMessage] = useState<string>('');
 
   // 1. Fetch live active languages from /api/v1/language/dropdown
-  // and questions list from /api/v1/questions
+  // and real questions list from /api/v1/questions
   useEffect(() => {
     adminLanguageService.getLanguageDropdown().then((list) => {
       if (Array.isArray(list) && list.length > 0) {
@@ -169,7 +184,6 @@ export const DashboardCodeRunner: React.FC = () => {
     }
   };
 
-  // Determine Monaco language mode
   const selectedLangObj = languages.find((l) => l.id === selectedLanguageId) || languages[0];
   const monacoLang =
     selectedLangObj?.name?.toLowerCase() === 'c++'
@@ -183,11 +197,10 @@ export const DashboardCodeRunner: React.FC = () => {
       : 'plaintext';
 
   // 1. Admin TEST CODE (POST /api/v1/admin/testCode)
-  // Executes visible sample test cases only
   const handleRunSampleCases = async () => {
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId) || selectedLanguageId === null || languages.length === 0) {
-      toast.error('Please enter a valid Question ID');
+      toast.error('Please select or enter a valid Question ID');
       return;
     }
 
@@ -205,8 +218,8 @@ export const DashboardCodeRunner: React.FC = () => {
 
       const data = (res as any)?.data || res;
       setResult(data);
-      setExecutionMessage((res as any)?.message || 'Code Executed Successfully (Sample Test Cases)');
-      toast.success((res as any)?.message || 'Admin test completed on sample test cases!');
+      setExecutionMessage((res as any)?.message || 'Executed Sample Test Cases Successfully');
+      toast.success('Sample test cases passed execution!');
     } catch (err: any) {
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Admin testCode execution failed'}: ${detail}` : (err?.message || 'Admin testCode execution failed');
@@ -231,11 +244,10 @@ export const DashboardCodeRunner: React.FC = () => {
   };
 
   // 2. Admin SUBMIT CODE (POST /api/v1/admin/submitCode)
-  // Executes all test cases (visible + mandatory + corner/edge cases)
   const handleSubmitAllCases = async () => {
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId)) {
-      toast.error('Please enter a valid Question ID');
+      toast.error('Please select or enter a valid Question ID');
       return;
     }
 
@@ -247,17 +259,17 @@ export const DashboardCodeRunner: React.FC = () => {
     try {
       const res = await adminQuestionService.adminSubmitCode({
         questionId: qId,
-        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
+        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId || 0,
         sourceCode,
       });
 
       const data = (res as any)?.data || res;
       setResult(data);
-      setExecutionMessage((res as any)?.message || 'Code Submitted Successfully (Full Test Suite)');
-      toast.success((res as any)?.message || 'Admin validation completed across all test cases!');
+      setExecutionMessage((res as any)?.message || 'Validated against All Test Cases');
+      toast.success('Admin submission test completed!');
     } catch (err: any) {
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode validation failed'}: ${detail}` : (err?.message || 'Admin submitCode validation failed');
+      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode execution failed'}: ${detail}` : (err?.message || 'Admin submitCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
       setResult({
@@ -278,266 +290,225 @@ export const DashboardCodeRunner: React.FC = () => {
     }
   };
 
+  const isBusy = isRunning || isSubmitting;
+
   return (
     <AdminCard
-      title="Admin Problem Code Runner & Validator"
-      subtitle="Execute sample cases (POST /api/v1/admin/testCode) or full suite (POST /api/v1/admin/submitCode) directly from the console"
+      title="Admin Code Execution Sandbox"
+      subtitle="Execute solutions against real backend Judge0 test cases in real-time"
+      icon={<Terminal className="w-5 h-5" />}
     >
-      <div className="flex flex-col gap-5 font-sans text-xs">
-        {/* API Pipeline Architecture Notice */}
-        <div className="flex items-center justify-between p-3.5 bg-neutral-900 border border-white/10 rounded-xl flex-wrap gap-2">
-          <div className="flex items-center gap-2.5 text-gray-200">
-            <span className="w-2.5 h-2.5 rounded-full bg-neutral-100 text-neutral-900 animate-pulse"></span>
-            <span className="font-bold text-xs font-heading">Admin Execution Pipeline:</span>
-            <span className="text-[11px] text-gray-400">
-              Sends <code className="text-neutral-300 font-mono">languageId</code> from Table and executes without creating permanent submission records.
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <AdminBadge variant="accent">POST /api/v1/admin/testCode</AdminBadge>
-            <AdminBadge variant="primary">POST /api/v1/admin/submitCode</AdminBadge>
-          </div>
-        </div>
-
-        {/* Control Bar: Question Picker, ID Input, Language Selector & Action Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-neutral-950 p-3 rounded-xl border border-white/10">
-          {/* Question Selector (Select or Type ID) */}
-          <div className="md:col-span-5 flex items-center gap-2">
-            <div className="flex-1">
-              <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-                Select Question:
-              </label>
-              {questions.length > 0 ? (
-                <div className="relative">
-                  <select
-                    value={selectedQuestionId ?? ''}
-                    onChange={handleQuestionSelectChange}
-                    className="w-full appearance-none bg-neutral-900 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-2 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
-                  >
-                    {questions.map((q) => (
-                      <option key={q.id} value={q.id} className="bg-neutral-900 text-white">
-                        #{q.id} {q.title} ({q.difficulty})
-                      </option>
-                    ))}
-                  </select>
-                  <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-              ) : (
-                <span className="text-gray-500 text-xs">No questions available from the backend.</span>
-              )}
-            </div>
-
-            <div className="w-24">
-              <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-                Question ID:
-              </label>
-              <input
-                type="number"
-                value={manualQuestionId}
-                onChange={handleManualQuestionIdChange}
-                placeholder="ID"
-                className="w-full bg-neutral-900 text-gray-200 border border-white/10 rounded-xl px-2.5 py-2 text-xs outline-none focus:border-neutral-500 font-mono text-center transition-colors shadow-2xs"
-              />
-            </div>
-          </div>
-
-          {/* Language Dropdown (GET /api/v1/language/dropdown) */}
-          <div className="md:col-span-3">
-            <label className="block text-[11px] font-semibold text-gray-400 mb-1">
-              Active Language (/api/v1/language/dropdown):
+      <div className="space-y-4 font-sans text-left">
+        {/* Controls Toolbar */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+          {/* Question Select */}
+          <div className="md:col-span-5 space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Select Question
             </label>
-            <div className="relative">
-              <select
-                value={selectedLanguageId ?? ''}
-                onChange={handleLanguageChange}
-                className="w-full appearance-none bg-neutral-900 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-2 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
-              >
-                {languages.map((l) => (
-                  <option key={l.id} value={l.id} className="bg-neutral-900 text-white">
-                    {l.name} (Execution ID: {l.id})
-                  </option>
-                ))}
-              </select>
-              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+            <select
+              value={selectedQuestionId ?? ''}
+              onChange={handleQuestionSelectChange}
+              disabled={isBusy}
+              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            >
+              {questions.map((q) => (
+                <option key={q.id} value={q.id}>
+                  #{q.id} - {q.title} {q.difficulty ? `(${q.difficulty})` : ''}
+                </option>
+              ))}
+              {questions.length === 0 && <option value="">No indexed questions loaded</option>}
+            </select>
           </div>
 
-          {/* Action Execution Buttons */}
-          <div className="md:col-span-4 flex items-center justify-end gap-2 pt-4 md:pt-0">
-            {/* Run Code (Sample Cases) */}
+          {/* Manual ID Input */}
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Question ID
+            </label>
+            <input
+              type="number"
+              value={manualQuestionId}
+              onChange={handleManualQuestionIdChange}
+              placeholder="e.g. 1"
+              disabled={isBusy}
+              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
+            />
+          </div>
+
+          {/* Language Selector */}
+          <div className="md:col-span-2 space-y-1.5">
+            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Compiler Runtime
+            </label>
+            <select
+              value={selectedLanguageId ?? ''}
+              onChange={handleLanguageChange}
+              disabled={isBusy}
+              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            >
+              {languages.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Execution Action Buttons */}
+          <div className="md:col-span-3 flex items-center gap-2">
             <button
               onClick={handleRunSampleCases}
-              disabled={isRunning || isSubmitting || selectedQuestionId === null || selectedLanguageId === null}
-              className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-200 border border-white/15 hover:border-neutral-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
-              title="Runs visible sample test cases only (POST /api/v1/admin/testCode)"
+              disabled={isBusy}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+              title="Execute sample test cases (/api/v1/admin/testCode)"
             >
-              {isRunning ? (
-                <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
-              ) : (
-                <i className="fa-solid fa-play text-neutral-300 text-xs"></i>
-              )}
-              <span>Run Code</span>
+              <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
+              <span>{isRunning ? 'Running...' : 'Run Code'}</span>
             </button>
 
-            {/* Submit Code (All Test Cases) */}
             <button
               onClick={handleSubmitAllCases}
-              disabled={isRunning || isSubmitting || selectedQuestionId === null || selectedLanguageId === null}
-              className="px-4 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md  disabled:opacity-50"
-              title="Runs full suite including corner & hidden cases (POST /api/v1/admin/submitCode)"
+              disabled={isBusy}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+              title="Submit against all test cases (/api/v1/admin/submitCode)"
             >
-              {isSubmitting ? (
-                <i className="fa-solid fa-spinner animate-spin text-black"></i>
-              ) : (
-                <i className="fa-solid fa-cloud-arrow-up text-black text-xs"></i>
-              )}
-              <span>Submit &amp; Validate</span>
+              <Send className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-pulse' : ''}`} />
+              <span>{isSubmitting ? 'Submitting...' : 'Submit'}</span>
             </button>
           </div>
         </div>
 
-        {/* Code Editor Container */}
-        <div className="border border-white/10 rounded-xl overflow-hidden bg-[#1E1E1E] shadow-xl">
-          <div className="px-4 py-2 bg-neutral-900 border-b border-white/10 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-gray-300 font-mono text-[11px]">
-              <i className="fa-solid fa-file-code text-neutral-300"></i>
-              <span>Question #{manualQuestionId || selectedQuestionId} Solution Code</span>
+        {/* Monaco Editor Container */}
+        <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
+          <div className="px-4 py-2.5 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-mono">
+            <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              <span className="font-semibold">{selectedLangObj?.name || 'Code Editor'}</span>
             </div>
-            <span className="text-[10px] text-gray-500 font-mono uppercase tracking-wider">
-              Runtime: {selectedLangObj?.name} (Judge0)
-            </span>
+            <button
+              onClick={() => {
+                if (selectedLangObj && DEFAULT_STARTER_CODES[selectedLangObj.name]) {
+                  setSourceCode(DEFAULT_STARTER_CODES[selectedLangObj.name]);
+                }
+              }}
+              className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset Template</span>
+            </button>
           </div>
-          <Editor
-            height="300px"
-            language={monacoLang}
-            value={sourceCode}
-            onChange={(val) => setSourceCode(val || '')}
-            theme="vs-dark"
-            options={{
-              fontSize: 13,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              automaticLayout: true,
-              tabSize: 4,
-              wordWrap: 'on',
-            }}
-          />
+
+          <div className="h-72 w-full bg-[#1e1e1e]">
+            <Editor
+              height="100%"
+              language={monacoLang}
+              value={sourceCode}
+              onChange={(value) => setSourceCode(value || '')}
+              theme={theme === 'dark' ? 'vs-dark' : 'light'}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 13,
+                scrollBeyondLastLine: false,
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                lineNumbers: 'on',
+                automaticLayout: true,
+                padding: { top: 12, bottom: 12 },
+              }}
+            />
+          </div>
         </div>
 
-        {/* Execution Output Panel */}
+        {/* Results Console Panel */}
         {result && (
-          <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-xl">
-            {/* Header Result Summary */}
-            <div className="flex items-center justify-between pb-3 border-b border-white/10 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-white text-xs font-heading">
-                  {executionMode === 'run' ? 'Test Run Output' : 'Submission Validation Output'}:
-                </span>
-                <span
-                  className={`px-2.5 py-0.5 rounded-lg font-mono font-extrabold text-xs ${
-                    result.failedTestCases === 0
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                  }`}
-                >
-                  {result.failedTestCases === 0 ? '✓ All Test Cases Passed' : `✗ ${result.failedTestCases} Failed`}
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-5 space-y-4 shadow-xs animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Execution Output ({executionMode === 'submit' ? 'All Test Cases' : 'Sample Run'})
                 </span>
               </div>
-
-              <div className="flex items-center gap-3 text-xs font-mono">
-                <span className="text-gray-400">
-                  Total: <strong className="text-white">{result.totalTestCases}</strong>
-                </span>
-                <span className="text-emerald-400">
-                  Passed: <strong>{result.passedTestCases}</strong>
-                </span>
-                <span className="text-rose-400">
-                  Failed: <strong>{result.failedTestCases}</strong>
-                </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <AdminBadge variant="info">
+                  Total: {result.totalTestCases}
+                </AdminBadge>
+                <AdminBadge variant="success">
+                  Passed: {result.passedTestCases}
+                </AdminBadge>
+                {result.failedTestCases > 0 && (
+                  <AdminBadge variant="danger">
+                    Failed: {result.failedTestCases}
+                  </AdminBadge>
+                )}
               </div>
             </div>
 
             {executionMessage && (
-              <p className="text-[11px] text-gray-400 italic">{executionMessage}</p>
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                {executionMessage}
+              </p>
             )}
 
-            {/* Individual Test Cases Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
-              {result.testCases && result.testCases.length > 0 ? (
-                result.testCases.map((tc: ExecutionTestCaseResult, idx: number) => {
-                  const isPassed = tc.status?.toLowerCase() === 'passed';
-                  const isHidden = tc.isHidden === true;
-
+            {/* Test Case Breakdown List */}
+            {result.testCases && result.testCases.length > 0 && (
+              <div className="space-y-2.5">
+                {result.testCases.map((tc, idx) => {
+                  const isPassed = tc.status?.toLowerCase() === 'passed' || tc.status?.toLowerCase() === 'accepted';
                   return (
                     <div
-                      key={tc.testCaseId || idx}
-                      className={`p-3 rounded-xl border font-mono text-[11px] flex flex-col gap-2 ${
+                      key={idx}
+                      className={`p-3.5 rounded-xl border text-xs font-mono transition-colors ${
                         isPassed
-                          ? 'bg-emerald-950/20 border-emerald-500/20'
-                          : 'bg-rose-950/20 border-rose-500/20'
+                          ? 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40'
+                          : 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/40'
                       }`}
                     >
-                      <div className="flex items-center justify-between pb-1 border-b border-white/5">
-                        <span className="font-bold text-gray-200">
-                          Case #{tc.testCaseId || idx + 1}
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] text-gray-400">
-                            {tc.testCaseType || (isHidden ? 'Hidden Case' : 'Visible Sample')}
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2">
+                          {isPassed ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                          )}
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            Test Case #{tc.testCaseId || idx + 1}
                           </span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                              isPassed
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : 'bg-rose-500/20 text-rose-400'
-                            }`}
-                          >
-                            {tc.status || (isPassed ? 'Passed' : 'Failed')}
-                          </span>
+                          {tc.testCaseType && (
+                            <AdminBadge variant="neutral" size="sm">
+                              {tc.testCaseType}
+                            </AdminBadge>
+                          )}
                         </div>
+                        <AdminBadge variant={isPassed ? 'success' : 'danger'} size="sm">
+                          {tc.status || (isPassed ? 'Passed' : 'Failed')}
+                        </AdminBadge>
                       </div>
 
-                      {isHidden || (!tc.input && !tc.expectedOutput && isPassed) ? (
-                        <div className="text-gray-500 italic text-[10px] py-1">
-                          Test case details hidden by evaluator for validation privacy.
-                        </div>
-                      ) : (
-                        <div className="space-y-1 text-[11px]">
-                          {tc.input !== undefined && tc.input !== null && (
-                            <div>
-                              <span className="text-gray-500">Input:</span>{' '}
-                              <span className="text-gray-200 whitespace-pre-wrap">{tc.input}</span>
-                            </div>
-                          )}
-                          {tc.expectedOutput !== undefined && tc.expectedOutput !== null && (
-                            <div>
-                              <span className="text-gray-500">Expected:</span>{' '}
-                              <span className="text-emerald-400 whitespace-pre-wrap">{tc.expectedOutput}</span>
-                            </div>
-                          )}
-                          {tc.actualOutput !== undefined && tc.actualOutput !== null && (
-                            <div>
-                              <span className="text-gray-500">Actual:</span>{' '}
-                              <span
-                                className={`whitespace-pre-wrap ${
-                                  isPassed ? 'text-gray-300' : 'text-rose-400'
-                                }`}
-                              >
-                                {tc.actualOutput}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {/* Details Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-200/50 dark:border-slate-800/50 text-[11px]">
+                        {tc.actualOutput && (
+                          <div>
+                            <span className="text-slate-500 font-semibold block mb-0.5">Output:</span>
+                            <pre className="p-2 bg-white/80 dark:bg-slate-950 rounded-lg border border-slate-200/80 dark:border-slate-800/80 overflow-x-auto whitespace-pre-wrap">
+                              {tc.actualOutput}
+                            </pre>
+                          </div>
+                        )}
+                        {tc.errorMessage && (
+                          <div>
+                            <span className="text-rose-500 font-semibold block mb-0.5">Error:</span>
+                            <pre className="p-2 bg-rose-100/50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 rounded-lg border border-rose-200 dark:border-rose-900/40 overflow-x-auto whitespace-pre-wrap">
+                              {tc.errorMessage}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
-                })
-              ) : (
-                <div className="text-gray-500 text-xs italic p-4 text-center col-span-2">
-                  No individual test cases returned by evaluator.
-                </div>
-              )}
-            </div>
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

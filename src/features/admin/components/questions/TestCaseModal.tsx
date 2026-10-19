@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { AdminModal } from '../AdminModal';
-import { QuestionTestCase } from '../../../../services/questionService';
+import { AdminBadge } from '../AdminBadge';
+import { QuestionPayload, QuestionTestCase } from '../../../../services/questionService';
 import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { getActionableErrorMessage } from '../../../../core/validation';
+import { extractTestCasesFromProblem } from '../../utils/testCaseUtils';
+import { userScopedStorage } from '../../../../core/storage/userScopedStorage';
+import {
+  Layers,
+  Plus,
+  Trash2,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 
 interface TestCaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   questionId: number | string | null;
   questionTitle?: string;
+  question?: QuestionPayload | null;
   onSuccess?: () => void;
 }
 
@@ -20,6 +34,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
   onClose,
   questionId,
   questionTitle,
+  question,
   onSuccess,
 }) => {
   const [testCases, setTestCases] = useState<QuestionTestCase[]>([
@@ -30,7 +45,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       isHidden: false,
       displayOrder: 1,
       typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'NECESSARY',
+      typeRefCode: 'SAMPLE',
     },
   ]);
 
@@ -48,37 +63,34 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
     const initModal = async () => {
       try {
-        // 1. Fetch Reference Library TESTCASETYPE items
-        const refRes = await referenceService.getByGroupCode('TESTCASETYPE');
-        const refList = refRes?.data || (Array.isArray(refRes) ? refRes : []);
-        const validTypes = Array.isArray(refList) ? refList : [];
+        // 1. Fetch Reference Library TESTCASETYPE items dynamically from API
+        let validTypes: ReferenceItem[] = [];
+        try {
+          const refRes = await referenceService.getByGroupCode('TESTCASETYPE');
+          const refList = (refRes as any)?.data || (Array.isArray(refRes) ? refRes : []);
+          if (Array.isArray(refList) && refList.length > 0) {
+            validTypes = refList;
+          }
+        } catch {}
+
         if (isMounted) {
           setTestCaseTypes(validTypes);
         }
 
-        // 2. Fetch existing test cases for the question if questionId is provided
+        // 2. Fetch existing test cases for the question
         let existingCases: QuestionTestCase[] = [];
-        if (questionId) {
+
+        // Check question object first (e.g. from table or parsed from description)
+        if (question) {
+          existingCases = extractTestCasesFromProblem(question);
+        }
+
+        // Fallback to backend or local cache if questionId exists and existingCases is empty
+        if (existingCases.length === 0 && questionId) {
           try {
-            const qRes: any = await adminQuestionService.getQuestionById(questionId);
-            const qData = qRes?.data || qRes;
-            if (Array.isArray(qData?.testCases) && qData.testCases.length > 0) {
-              existingCases = qData.testCases.map((tc: any, idx: number) => {
-                const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
-                const matchedType = validTypes.find((t) => t.refCode === typeCode);
-                return {
-                  id: tc.id,
-                  questionId: tc.questionId || questionId,
-                  input: tc.input || '',
-                  expectedOutput: tc.expectedOutput || '',
-                  explanation: tc.explanation || '',
-                  isHidden: tc.isHidden === true,
-                  displayOrder: tc.displayOrder || idx + 1,
-                  typeRefGroupCode: 'TESTCASETYPE',
-                  typeRefCode: typeCode,
-                  typeRefName: matchedType?.refName || tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
-                };
-              });
+            const fetched = await adminQuestionService.getTestCases(questionId);
+            if (fetched && fetched.length > 0) {
+              existingCases = fetched;
             }
           } catch (qErr) {
             console.warn('Could not load existing test cases for question:', qErr);
@@ -99,13 +111,12 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                 displayOrder: 1,
                 typeRefGroupCode: 'TESTCASETYPE',
                 typeRefCode: defaultType,
-                typeRefName: validTypes.find((t) => t.refCode === defaultType)?.refName || 'Visible Sample Test Case',
               },
             ]);
           }
         }
       } catch (err) {
-        console.warn('Failed to load TESTCASETYPE reference library:', err);
+        console.warn('Failed to load test case reference types:', err);
       } finally {
         if (isMounted) setTypesLoading(false);
       }
@@ -115,11 +126,10 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, questionId]);
+  }, [isOpen, questionId, question]);
 
-  const handleAddRow = () => {
+  const handleAddTestCase = () => {
     const defaultType = testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'SAMPLE';
-    const defaultName = testCaseTypes.find((t) => t.refCode === defaultType)?.refName || 'Visible Sample Test Case';
     setTestCases((prev) => [
       ...prev,
       {
@@ -130,119 +140,103 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
         displayOrder: prev.length + 1,
         typeRefGroupCode: 'TESTCASETYPE',
         typeRefCode: defaultType,
-        typeRefName: defaultName,
       },
     ]);
   };
 
-  const handleRemoveRow = (index: number) => {
-    if (testCases.length === 1) {
-      toast.error('At least one test case is required');
+  const handleRemoveTestCase = (index: number) => {
+    if (testCases.length <= 1) {
+      toast.error('Question must maintain at least one test case.');
       return;
     }
     setTestCases((prev) => prev.filter((_, i) => i !== index));
+    setFieldErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[index];
+      return copy;
+    });
   };
 
   const handleChange = (index: number, field: keyof QuestionTestCase, value: any) => {
     setTestCases((prev) => {
-      const updated = [...prev];
-      const target = { ...updated[index], [field]: value };
-
-      // Synchronize type metadata when typeRefCode changes
-      if (field === 'typeRefCode') {
-        const matched = testCaseTypes.find((t) => t.refCode === value);
-        if (matched) {
-          target.typeRefGroupCode = 'TESTCASETYPE';
-          target.typeRefName = matched.refName;
-        }
-      }
-      // When isHidden changes, auto-suggest type if still at initial default
-      if (field === 'isHidden') {
-        if (value === true && target.typeRefCode === 'SAMPLE') {
-          target.typeRefCode = 'NECESSARY';
-          target.typeRefName = testCaseTypes.find((t) => t.refCode === 'NECESSARY')?.refName || 'Mandatory Test Case';
-        } else if (value === false && target.typeRefCode === 'NECESSARY') {
-          target.typeRefCode = 'SAMPLE';
-          target.typeRefName = testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refName || 'Visible Sample Test Case';
-        }
-      }
-
-      updated[index] = target;
-      return updated;
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
     });
 
-    if (fieldErrors[index]) {
+    if (field === 'input' || field === 'expectedOutput') {
       setFieldErrors((prev) => {
+        if (!prev[index]) return prev;
         const current = { ...prev[index] };
         if (field === 'input' && value.trim()) delete current.input;
         if (field === 'expectedOutput' && value.trim()) delete current.expectedOutput;
-        if (Object.keys(current).length === 0) {
-          const next = { ...prev };
-          delete next[index];
-          return next;
-        }
         return { ...prev, [index]: current };
       });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
     if (!questionId) {
-      toast.error('Question ID is missing.');
+      toast.error('No question targeted for test cases attachment.');
       return;
     }
 
-    // Validate inputs with inline errors
-    const newErrors: Record<number, { input?: string; expectedOutput?: string }> = {};
+    const errors: Record<number, { input?: string; expectedOutput?: string }> = {};
     let hasError = false;
-    for (let i = 0; i < testCases.length; i++) {
-      const tcErrors: { input?: string; expectedOutput?: string } = {};
-      if (!testCases[i].input.trim()) {
-        tcErrors.input = 'Input raw string is required.';
+
+    testCases.forEach((tc, idx) => {
+      const err: { input?: string; expectedOutput?: string } = {};
+      if (!tc.input?.trim()) {
+        err.input = 'Input raw string is required';
         hasError = true;
       }
-      if (!testCases[i].expectedOutput.trim()) {
-        tcErrors.expectedOutput = 'Expected output raw string is required.';
+      if (!tc.expectedOutput?.trim()) {
+        err.expectedOutput = 'Expected output raw string is required';
         hasError = true;
       }
-      if (tcErrors.input || tcErrors.expectedOutput) {
-        newErrors[i] = tcErrors;
+      if (err.input || err.expectedOutput) {
+        errors[idx] = err;
       }
-    }
+    });
 
     if (hasError) {
-      setFieldErrors(newErrors);
-      toast.error('Please enter required inputs and outputs for all test cases.');
+      setFieldErrors(errors);
+      toast.error('Please resolve missing required inputs/expected outputs.');
       return;
     }
 
     setSubmitting(true);
-    try {
-      const payload: QuestionTestCase[] = testCases.map((tc, idx) => {
-        const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
-        const matched = testCaseTypes.find((t) => t.refCode === typeCode);
-        return {
-          ...tc,
-          displayOrder: idx + 1,
-          typeRefGroupCode: 'TESTCASETYPE',
-          typeRefCode: typeCode,
-          typeRefName: matched?.refName || tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
-        };
-      });
+    const payload: QuestionTestCase[] = testCases.map((tc, idx) => ({
+      id: tc.id,
+      questionId: Number(questionId),
+      input: tc.input.trim(),
+      expectedOutput: tc.expectedOutput.trim(),
+      explanation: tc.explanation ? tc.explanation.trim() : '',
+      isHidden: tc.isHidden === true,
+      displayOrder: idx + 1,
+      typeRefGroupCode: 'TESTCASETYPE',
+      typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
+    }));
 
-      const res = await adminQuestionService.addTestCases(questionId, payload);
-      if (res && (res.statusCode === 200 || res.statusCode === 201 || res.data)) {
-        toast.success(`Test cases attached successfully!`);
+    try {
+      await adminQuestionService.addTestCases(questionId, payload);
+      try {
+        userScopedStorage.setItem(`admin_test_cases_${questionId}`, JSON.stringify(payload));
+      } catch {}
+
+      toast.success(`Successfully saved ${payload.length} test cases for Question #${questionId}`);
+      if (onSuccess) onSuccess();
+      onClose();
+    } catch (err: any) {
+      // If network fails, also cache locally so admin work is not lost
+      try {
+        userScopedStorage.setItem(`admin_test_cases_${questionId}`, JSON.stringify(payload));
+        toast.success(`Saved ${payload.length} test cases locally for Question #${questionId}`);
         if (onSuccess) onSuccess();
         onClose();
-      } else {
-        const detail = Array.isArray((res as any)?.errors) && (res as any).errors.length > 0 ? (res as any).errors.join('; ') : '';
-        const msg = detail ? `${res?.message || 'Failed'}: ${detail}` : (res?.message || 'Failed to attach test cases');
-        toast.error(msg);
-      }
-    } catch (err: any) {
-      toast.error(getActionableErrorMessage(err, 'Error attaching test cases to question.'));
+        return;
+      } catch {}
+      toast.error(getActionableErrorMessage(err, 'Failed to save test cases.'));
     } finally {
       setSubmitting(false);
     }
@@ -252,161 +246,170 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     <AdminModal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Add Test Cases — ${questionTitle || `#${questionId}`}`}
-      subtitle="Configure test cases to evaluate user code submissions"
-      maxWidth="2xl"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4 font-sans text-left text-xs">
-        <div className="flex items-center justify-between">
-          <p className="text-gray-400 text-xs">
-            Configure test cases to evaluate user code submissions for Question #{questionId}.
-          </p>
+      title={questionTitle ? `Manage Test Cases — ${questionTitle}` : 'Attach Question Test Cases'}
+      subtitle={`Question ID #${questionId || 'N/A'} • Add visible sample cases and hidden verification test cases`}
+      icon={<Layers className="w-5 h-5" />}
+      maxWidth="4xl"
+      footer={
+        <div className="flex items-center justify-between w-full">
           <button
             type="button"
-            onClick={handleAddRow}
-            className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 font-sans"
+            onClick={handleAddTestCase}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
           >
-            <i className="fa-solid fa-plus text-[10px]"></i> Add Case
+            <Plus className="w-4 h-4" />
+            <span>Add Another Case</span>
           </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
+            >
+              {submitting ? 'Saving Test Cases...' : `Save ${testCases.length} Test Cases`}
+            </button>
+          </div>
         </div>
+      }
+    >
+      <div className="space-y-4 font-sans text-left">
+        {typesLoading ? (
+          <div className="flex items-center justify-center p-8 text-slate-500 gap-2">
+            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+            <span>Loading Test Case Types &amp; Existing Records...</span>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {testCases.map((tc, idx) => (
+              <div
+                key={idx}
+                className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-4 shadow-xs"
+              >
+                {/* Header row: Index, Hidden toggle, Type selector, Delete */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-slate-800/80">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-white text-xs">
+                      Test Case #{idx + 1}
+                    </span>
+                    <AdminBadge variant={tc.isHidden ? 'neutral' : 'success'} size="sm">
+                      {tc.isHidden ? 'Hidden Evaluation' : 'Visible Sample'}
+                    </AdminBadge>
+                  </div>
 
-        <div className="flex flex-col gap-3 max-h-[60vh] overflow-y-auto pr-1">
-          {testCases.map((tc, index) => (
-            <div key={index} className="p-4 bg-neutral-900 border border-white/10 rounded-2xl space-y-3 relative">
-              <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                <span className="font-bold text-neutral-300 font-mono text-xs">
-                  Test Case #{index + 1}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveRow(index)}
-                  className="text-gray-500 hover:text-rose-400 text-xs p-1 transition-colors"
-                  title="Remove Test Case"
-                >
-                  <i className="fa-solid fa-trash-can"></i>
-                </button>
-              </div>
+                  <div className="flex items-center gap-3">
+                    {/* Hidden Toggle */}
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={tc.isHidden}
+                        onChange={(e) => handleChange(idx, 'isHidden', e.target.checked)}
+                        className="w-4 h-4 text-blue-600 rounded-md border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span>Hidden Case</span>
+                    </label>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Input */}
-                <div className="space-y-1">
-                  <label htmlFor={`testcase-input-${index}`} className="block text-xs font-semibold text-gray-300">Input Raw String *</label>
-                  <textarea
-                    id={`testcase-input-${index}`}
-                    rows={2}
-                    placeholder="e.g. 5\n1 2 3 4 5"
-                    value={tc.input}
-                    aria-invalid={fieldErrors[index]?.input ? 'true' : 'false'}
-                    aria-describedby={fieldErrors[index]?.input ? `testcase-input-error-${index}` : undefined}
-                    onChange={(e) => handleChange(index, 'input', e.target.value)}
-                    className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border font-mono transition-colors focus:outline-none ${
-                      fieldErrors[index]?.input ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                    }`}
-                  />
-                  <FormFieldError error={fieldErrors[index]?.input} id={`testcase-input-error-${index}`} />
-                </div>
-
-                {/* Expected Output */}
-                <div className="space-y-1">
-                  <label htmlFor={`testcase-output-${index}`} className="block text-xs font-semibold text-gray-300">Expected Output *</label>
-                  <textarea
-                    id={`testcase-output-${index}`}
-                    rows={2}
-                    placeholder="e.g. 15"
-                    value={tc.expectedOutput}
-                    aria-invalid={fieldErrors[index]?.expectedOutput ? 'true' : 'false'}
-                    aria-describedby={fieldErrors[index]?.expectedOutput ? `testcase-output-error-${index}` : undefined}
-                    onChange={(e) => handleChange(index, 'expectedOutput', e.target.value)}
-                    className={`w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl p-2.5 text-xs border font-mono transition-colors focus:outline-none ${
-                      fieldErrors[index]?.expectedOutput ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                    }`}
-                  />
-                  <FormFieldError error={fieldErrors[index]?.expectedOutput} id={`testcase-output-error-${index}`} />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Test Case Type Dropdown */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-gray-300">Case Type (TESTCASETYPE)</label>
-                  <div className="relative">
+                    {/* Test Case Type */}
                     <select
-                      disabled={typesLoading || testCaseTypes.length === 0}
-                      value={tc.typeRefCode}
-                      onChange={(e) => handleChange(index, 'typeRefCode', e.target.value)}
-                      className="w-full appearance-none bg-neutral-900 text-gray-100 rounded-xl px-3 pr-8 py-2 text-xs border border-white/10 hover:border-white/20 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
+                      value={tc.typeRefCode || ''}
+                      onChange={(e) => handleChange(idx, 'typeRefCode', e.target.value)}
+                      className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     >
-                      {typesLoading ? (
-                        <option value="">Loading types...</option>
-                      ) : testCaseTypes.length === 0 ? (
-                        <option value="NECESSARY">Standard / Necessary</option>
-                      ) : (
-                        testCaseTypes.map((t) => (
-                          <option key={t.id || t.refCode} value={t.refCode}>
-                            {t.refName} ({t.refCode})
-                          </option>
-                        ))
+                      {testCaseTypes.map((t) => (
+                        <option key={t.id} value={t.refCode}>
+                          {t.refName}
+                        </option>
+                      ))}
+                      {testCaseTypes.length === 0 && (
+                        <>
+                          <option value="SAMPLE">Sample Test Case</option>
+                          <option value="NECESSARY">Mandatory Test Case</option>
+                        </>
                       )}
                     </select>
-                    <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+
+                    {/* Remove button */}
+                    {testCases.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTestCase(idx)}
+                        className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-rose-600 hover:border-rose-300 transition-colors cursor-pointer"
+                        title="Remove Test Case"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Raw Input and Expected Output Fields */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Raw Input String <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={tc.input}
+                      onChange={(e) => handleChange(idx, 'input', e.target.value)}
+                      placeholder="e.g. 5\n1 2 3 4 5"
+                      className={`w-full px-3.5 py-2.5 text-xs font-mono font-medium rounded-xl border ${
+                        fieldErrors[idx]?.input
+                          ? 'border-rose-500 bg-rose-50/20'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                      } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
+                    />
+                    <FormFieldError error={fieldErrors[idx]?.input} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                      Expected Output String <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={tc.expectedOutput}
+                      onChange={(e) => handleChange(idx, 'expectedOutput', e.target.value)}
+                      placeholder="e.g. 5"
+                      className={`w-full px-3.5 py-2.5 text-xs font-mono font-medium rounded-xl border ${
+                        fieldErrors[idx]?.expectedOutput
+                          ? 'border-rose-500 bg-rose-50/20'
+                          : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                      } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500`}
+                    />
+                    <FormFieldError error={fieldErrors[idx]?.expectedOutput} />
                   </div>
                 </div>
 
                 {/* Explanation */}
-                <div className="space-y-1 sm:col-span-2">
-                  <label className="block text-xs font-semibold text-gray-300">Explanation</label>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Test Case Explanation (Optional)
+                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Corner case for single element array"
                     value={tc.explanation || ''}
-                    onChange={(e) => handleChange(index, 'explanation', e.target.value)}
-                    className="w-full bg-neutral-900 text-gray-100 placeholder-gray-500 rounded-xl px-3 py-2 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
+                    onChange={(e) => handleChange(idx, 'explanation', e.target.value)}
+                    placeholder="Explanation for user solution walkthrough..."
+                    className="w-full px-3.5 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
-
-              {/* Is Hidden Toggle */}
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id={`hidden-${index}`}
-                  checked={tc.isHidden}
-                  onChange={(e) => handleChange(index, 'isHidden', e.target.checked)}
-                  className="w-3.5 h-3.5 rounded bg-neutral-900 border-white/10 text-neutral-300 focus:ring-neutral-500 cursor-pointer"
-                />
-                <label htmlFor={`hidden-${index}`} className="text-gray-400 text-xs cursor-pointer select-none">
-                  Hidden Case (Used for evaluation only, invisible to users during practice)
-                </label>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Modal Submit Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer font-sans"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-[#b4f043] text-black font-bold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md  disabled:opacity-50 font-sans"
-          >
-            {submitting ? (
-              <>
-                <i className="fa-solid fa-spinner animate-spin text-xs"></i>
-                <span>Saving Test Cases...</span>
-              </>
-            ) : (
-              <span>Submit Test Cases</span>
-            )}
-          </button>
-        </div>
-      </form>
+            ))}
+          </div>
+        )}
+      </div>
     </AdminModal>
   );
 };

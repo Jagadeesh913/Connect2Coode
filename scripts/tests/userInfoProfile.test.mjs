@@ -121,7 +121,9 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
 
       const res = await profileService.saveUserInfo(68, payload);
       assert.equal(capturedUrl, '/userInfo/68');
-      assert.deepEqual(capturedPayload, payload);
+      assert.equal(capturedPayload.userId, 68);
+      assert.equal(capturedPayload.regNumber, '22CS101');
+      assert.equal(capturedPayload.college, 'ABC Engineering College');
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.id, 1);
       assert.equal(res.data.regNumber, '22CS101');

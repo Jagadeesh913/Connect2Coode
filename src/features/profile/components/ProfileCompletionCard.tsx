@@ -17,13 +17,11 @@ export const ProfileCompletionCard: React.FC<ProfileCompletionCardProps> = ({
   onEditSection,
 }) => {
   const hasPersonal = Boolean(profile?.fullName || profile?.firstName || profile?.email);
-  const hasInstitution = Boolean(institution?.name || profile?.institution?.name || profile?.collegeName || userInfo?.college);
-  const hasAcademic = Boolean(userInfo?.regNumber || userInfo?.college || profile?.degree);
+  const hasAcademic = Boolean(userInfo?.regNumber || userInfo?.college || profile?.degree || profile?.collegeName);
   const hasPhoto = Boolean(profile?.avatarUrl);
 
   const items = [
     { id: 'personal', label: 'Personal Information', completed: hasPersonal, actionLabel: 'Edit' },
-    { id: 'institution', label: 'Institution Affiliation', completed: hasInstitution, actionLabel: hasInstitution ? 'Edit' : 'Add' },
     { id: 'academic', label: 'Academic Details', completed: hasAcademic, actionLabel: hasAcademic ? 'Edit' : 'Add' },
     { id: 'photo', label: 'Profile Photo', completed: hasPhoto, actionLabel: hasPhoto ? 'Edit' : 'Add' },
   ];
@@ -96,7 +94,7 @@ export const ProfileCompletionCard: React.FC<ProfileCompletionCardProps> = ({
           <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1 leading-snug">
             {percentage === 100
               ? 'Your profile is completely verified and up to date.'
-              : 'Add your academic details and institution to personalize your platform experience.'}
+              : 'Add your academic and personal details to personalize your platform experience.'}
           </p>
         </div>
       </div>

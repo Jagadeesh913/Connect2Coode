@@ -13,6 +13,17 @@ import { toast } from 'react-hot-toast';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
 import { getActionableErrorMessage } from '../../../core/validation';
+import {
+  Languages,
+  Plus,
+  RotateCw,
+  Edit3,
+  PowerOff,
+  Terminal,
+  Cpu,
+  CheckCircle2,
+  Code2,
+} from 'lucide-react';
 
 export const AdminLanguages: React.FC = () => {
   const [languages, setLanguages] = useState<AdminLanguageItem[]>([]);
@@ -68,7 +79,7 @@ export const AdminLanguages: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setEditingLanguage(null);
-    setFormReferenceId(5);
+    setFormReferenceId(refLanguages[0]?.id || 5);
     setFormJudge0Id(62);
     setFormVersion('Java 17');
     setFormIsActive(true);
@@ -147,90 +158,88 @@ export const AdminLanguages: React.FC = () => {
     }
   };
 
-  const getLanguageIcon = (name?: string) => {
-    const n = (name || '').toLowerCase();
-    if (n.includes('java') && !n.includes('script')) return 'fa-brands fa-java text-orange-400';
-    if (n.includes('python')) return 'fa-brands fa-python text-amber-400';
-    if (n.includes('c++') || n.includes('cpp')) return 'fa-solid fa-c text-blue-400';
-    if (n.includes('javascript') || n.includes('js')) return 'fa-brands fa-js text-yellow-400';
-    return 'fa-solid fa-code text-neutral-300';
-  };
+  const activeCount = languages.filter((l) => l.isActive !== false).length;
 
   const columns: Column<AdminLanguageItem>[] = [
     {
-      header: 'Execution ID',
+      header: 'Identifier',
       accessorKey: 'id',
-      cell: (row) => (
-        <span className="font-mono font-bold text-white bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 text-xs">
-          #{row.id}
-        </span>
-      ),
-      className: 'w-24',
+      className: 'w-24 font-mono font-bold text-slate-400',
+      cell: (row) => <span>#{row.id}</span>,
     },
     {
-      header: 'Language Name',
+      header: 'Compiler Runtime',
+      className: 'min-w-[200px]',
       cell: (row) => (
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-            <i className={`${getLanguageIcon(row.languageName)} text-base`}></i>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+            <Code2 className="w-4 h-4" />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-white font-heading text-sm">{row.languageName || 'Runtime'}</span>
-            <span className="text-[11px] text-gray-400 font-mono">Ref ID: {row.referenceId}</span>
+            <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm">
+              {row.languageName || 'Runtime'}
+            </span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+              Reference ID: {row.referenceId}
+            </span>
           </div>
         </div>
       ),
     },
     {
       header: 'Version',
+      className: 'w-36',
       cell: (row) => (
-        <span className="font-mono text-xs text-gray-300 bg-neutral-950 px-2.5 py-1 rounded-lg border border-white/10">
-          {row.version || 'Default'}
+        <span className="font-mono text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700">
+          {row.version || 'Latest'}
         </span>
       ),
-      className: 'w-36',
     },
     {
-      header: 'Judge0 ID',
+      header: 'Judge0 Runtime ID',
+      className: 'w-36',
       cell: (row) => (
-        <AdminBadge variant="neutral">
+        <AdminBadge variant="neutral" size="sm">
           <span className="font-mono text-[11px]">Judge0 #{row.judge0LanguageId}</span>
         </AdminBadge>
       ),
-      className: 'w-32',
     },
     {
-      header: 'Status',
+      header: 'Execution Status',
+      className: 'w-28',
       cell: (row) => (
-        <AdminBadge variant={row.isActive !== false ? 'accent' : 'neutral'}>
-          {row.isActive !== false ? 'Active' : 'Inactive'}
+        <AdminBadge
+          variant={row.isActive !== false ? 'success' : 'neutral'}
+          dot
+          size="sm"
+        >
+          {row.isActive !== false ? 'Active' : 'Disabled'}
         </AdminBadge>
       ),
-      className: 'w-28',
     },
     {
       header: 'Actions',
+      className: 'w-28 text-right',
       cell: (row) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
             onClick={() => handleOpenEditModal(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
             title="Edit Language"
           >
-            <i className="fa-solid fa-pen-to-square text-xs"></i>
+            <Edit3 className="w-3.5 h-3.5" />
           </button>
           {row.isActive !== false && row.id && (
             <button
               onClick={() => setLanguageToDeactivate(row)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/20 text-gray-400 hover:text-rose-400 transition-colors cursor-pointer"
-              title="Deactivate Language"
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-600 hover:border-rose-400 transition-colors shadow-2xs cursor-pointer"
+              title="Deactivate Runtime"
             >
-              <i className="fa-solid fa-power-off text-xs"></i>
+              <PowerOff className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
       ),
-      className: 'w-24',
     },
   ];
 
@@ -238,72 +247,104 @@ export const AdminLanguages: React.FC = () => {
     <div className="space-y-6 font-sans text-left pb-12">
       {/* Page Header */}
       <AdminPageHeader
-        title="Languages"
-        description="Configure runtime environments, Judge0 language IDs, and compilation settings"
+        title="Execution Languages & Runtimes"
+        description="Configure Judge0 compilation runtimes, language version mappings, and active compiler targets."
+        badge={
+          <AdminBadge variant="primary">
+            {activeCount} Active / {languages.length} Registered
+          </AdminBadge>
+        }
         actions={
-          <button
-            onClick={handleOpenCreateModal}
-            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
-          >
-            <i className="fa-solid fa-plus text-xs"></i>
-            <span>Add New Language</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleOpenCreateModal}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Register Language</span>
+            </button>
+            <button
+              onClick={fetchLanguagesData}
+              disabled={loading}
+              className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              title="Refresh Data"
+            >
+              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+            </button>
+          </div>
         }
       />
 
-      {/* Active Dropdown Status Banner */}
-      <div className="p-4 bg-neutral-900 border border-white/10 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl backdrop-blur-md">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300">
-            <i className="fa-solid fa-terminal text-sm"></i>
+      {/* Runtimes Summary KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 font-sans">
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span>Total Runtimes</span>
+            <Languages className="w-4 h-4 text-blue-500" />
           </div>
-          <div>
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider font-heading">
-              Active Execution Dropdown (/api/v1/language/dropdown)
-            </h4>
-            <p className="text-[11px] text-gray-400">
-              Only active languages are returned for problem execution. Code submission uses the Table ID.
-            </p>
+          <div className="text-2xl font-black text-slate-900 dark:text-white">
+            {languages.length}
           </div>
+          <span className="text-[11px] text-slate-400">Total registered languages</span>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          {activeDropdown.map((lang) => (
-            <span
-              key={lang.id}
-              className="px-2.5 py-1 rounded-lg bg-neutral-950 border border-white/10 text-xs font-mono font-semibold text-gray-200 flex items-center gap-1.5"
-            >
-              <span className="w-2 h-2 rounded-full bg-neutral-100 text-neutral-900"></span>
-              <span>{lang.name}</span>
-              <span className="text-gray-500 text-[10px]">ID: {lang.id}</span>
-            </span>
-          ))}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span>Active in Judge0</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+            {activeCount}
+          </div>
+          <span className="text-[11px] text-slate-400">Live execution endpoints</span>
+        </div>
+
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 shadow-xs space-y-2">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-500 uppercase tracking-wider">
+            <span>Dropdown Mappings</span>
+            <Terminal className="w-4 h-4 text-indigo-500" />
+          </div>
+          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
+            {activeDropdown.length}
+          </div>
+          <span className="text-[11px] text-slate-400">User problem dropdown options</span>
         </div>
       </div>
 
       {/* Languages Table */}
-      <AdminTable
+      <AdminTable<AdminLanguageItem>
         columns={columns}
         data={languages}
         loading={loading}
-        keyExtractor={(row) => row.id || row.referenceId}
-        emptyTitle="No languages registered yet"
-        emptyDescription="Click 'Add New Language' above to register a language runtime."
+        keyExtractor={(row) => row.id || `${row.referenceId}-${row.judge0LanguageId}`}
+        emptyTitle="No Languages Found"
+        emptyDescription="There are currently no languages registered in the platform database."
+        emptyAction={
+          <button
+            onClick={handleOpenCreateModal}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Register First Language</span>
+          </button>
+        }
       />
 
-      {/* Add / Edit Language Modal */}
+      {/* Modal: Create or Edit Language */}
       <AdminModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingLanguage ? `Edit Language: #${editingLanguage.id} ${editingLanguage.languageName || ''}` : 'Register New Language'}
-        subtitle="Configure runtime version and Judge0 execution mapping"
+        title={editingLanguage ? `Edit Language #${editingLanguage.id}` : 'Register Execution Language'}
+        subtitle="Configure compiler details for Judge0 sandbox integration"
+        icon={<Terminal className="w-5 h-5" />}
         maxWidth="md"
         footer={
           <div className="flex items-center justify-end gap-3 w-full">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-gray-300 border border-white/10 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+              disabled={submitting}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
             >
               Cancel
             </button>
@@ -311,133 +352,98 @@ export const AdminLanguages: React.FC = () => {
               type="button"
               onClick={handleSaveLanguage}
               disabled={submitting}
-              className="px-5 py-2 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-md  disabled:opacity-50"
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
-              {submitting ? (
-                <>
-                  <i className="fa-solid fa-spinner animate-spin text-black"></i>
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <span>{editingLanguage ? 'Update Language' : 'Create Language'}</span>
-              )}
+              {submitting ? 'Saving...' : editingLanguage ? 'Update Language' : 'Register'}
             </button>
           </div>
         }
       >
-        <form onSubmit={handleSaveLanguage} className="space-y-4 font-sans text-xs">
-          {/* Reference Library ID */}
-          <div className="space-y-1">
-            <label htmlFor="language-ref-select" className="block text-xs font-semibold text-gray-300">
-              Reference Library ID <span className="text-rose-400">*</span>
+        <form onSubmit={handleSaveLanguage} className="space-y-4 font-sans text-left">
+          {/* Reference Language Select */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Reference Language <span className="text-rose-500">*</span>
             </label>
-            {refLanguages.length > 0 ? (
-              <div className="relative">
-                <select
-                  id="language-ref-select"
-                  value={formReferenceId}
-                  aria-invalid={Boolean(formErrors.referenceId)}
-                  aria-describedby={formErrors.referenceId ? 'language-ref-error' : undefined}
-                  onChange={(e) => {
-                    setFormReferenceId(Number(e.target.value));
-                    if (formErrors.referenceId) setFormErrors((prev) => ({ ...prev, referenceId: undefined }));
-                  }}
-                  className={`w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border transition-colors focus:outline-none cursor-pointer ${
-                    formErrors.referenceId ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 hover:border-white/20 focus:border-blue-500'
-                  }`}
-                >
-                  {refLanguages.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.refName} (ID: {r.id})
-                    </option>
-                  ))}
-                </select>
-                <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-              </div>
-            ) : (
-              <input
-                id="language-ref-input"
-                type="number"
-                value={formReferenceId}
-                aria-invalid={Boolean(formErrors.referenceId)}
-                aria-describedby={formErrors.referenceId ? 'language-ref-error' : undefined}
-                onChange={(e) => {
-                  setFormReferenceId(Number(e.target.value));
-                  if (formErrors.referenceId) setFormErrors((prev) => ({ ...prev, referenceId: undefined }));
-                }}
-                placeholder="e.g. 5 for Java, 6 for Python, 7 for C++, 8 for JavaScript"
-                className={`w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border transition-colors focus:outline-none ${
-                  formErrors.referenceId ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-                }`}
-              />
-            )}
-            <FormFieldError id="language-ref-error" error={formErrors.referenceId} />
-            <span className="text-[10px] text-gray-500">ID from referenceLibrary (Java: 5, Python: 6, C++: 7, JS: 8)</span>
+            <select
+              value={formReferenceId}
+              onChange={(e) => setFormReferenceId(Number(e.target.value))}
+              disabled={submitting}
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            >
+              {refLanguages.map((ref) => (
+                <option key={ref.id} value={ref.id}>
+                  {ref.refName} ({ref.refCode})
+                </option>
+              ))}
+              {refLanguages.length === 0 && <option value="5">Java (5)</option>}
+            </select>
+            <FormFieldError error={formErrors.referenceId} />
           </div>
 
           {/* Judge0 Language ID */}
-          <div className="space-y-1">
-            <label htmlFor="language-judge0-input" className="block text-xs font-semibold text-gray-300">
-              Judge0 Language ID <span className="text-rose-400">*</span>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Judge0 Compiler ID <span className="text-rose-500">*</span>
             </label>
             <input
-              id="language-judge0-input"
               type="number"
               value={formJudge0Id}
-              aria-invalid={Boolean(formErrors.judge0Id)}
-              aria-describedby={formErrors.judge0Id ? 'language-judge0-error' : undefined}
-              onChange={(e) => {
-                setFormJudge0Id(Number(e.target.value));
-                if (formErrors.judge0Id) setFormErrors((prev) => ({ ...prev, judge0Id: undefined }));
-              }}
-              placeholder="e.g. 62 (Java 17), 71 (Python 3), 54 (C++ 17), 63 (Node.js)"
-              className={`w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border transition-colors focus:outline-none ${
-                formErrors.judge0Id ? 'border-rose-500 focus:border-rose-500' : 'border-white/10 focus:border-neutral-600'
-              }`}
+              onChange={(e) => setFormJudge0Id(Number(e.target.value))}
+              placeholder="e.g. 62 for Java 17, 71 for Python 3"
+              disabled={submitting}
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
             />
-            <FormFieldError id="language-judge0-error" error={formErrors.judge0Id} />
-            <span className="text-[10px] text-gray-500">Official Judge0 compiler runtime ID</span>
+            <span className="text-[11px] text-slate-400">
+              Corresponds to Judge0 CE language ID mapping.
+            </span>
+            <FormFieldError error={formErrors.judge0Id} />
           </div>
 
           {/* Version */}
-          <div className="space-y-1">
-            <label htmlFor="language-version-input" className="block text-xs font-semibold text-gray-300">Runtime Version Label</label>
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Display Version
+            </label>
             <input
-              id="language-version-input"
               type="text"
               value={formVersion}
               onChange={(e) => setFormVersion(e.target.value)}
-              placeholder="e.g. Java 17, Java 21, Python 3, C++ 17"
-              className="w-full bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 text-xs border border-white/10 focus:outline-none focus:border-neutral-600"
+              placeholder="e.g. OpenJDK 17, Python 3.10"
+              disabled={submitting}
+              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          {/* Active Status Toggle */}
-          <div className="flex items-center gap-3 pt-2">
+          {/* Active Status */}
+          <div className="pt-2 flex items-center gap-3">
             <input
               type="checkbox"
-              id="isActiveToggle"
+              id="lang-is-active"
               checked={formIsActive}
               onChange={(e) => setFormIsActive(e.target.checked)}
-              className="w-4 h-4 rounded bg-neutral-950 border-white/20 accent-[#a3a3a3] cursor-pointer"
+              className="w-4 h-4 text-blue-600 rounded-md border-slate-300 dark:border-slate-700 focus:ring-blue-500 cursor-pointer"
             />
-            <label htmlFor="isActiveToggle" className="text-xs font-semibold text-gray-300 cursor-pointer">
-              Active for Problem Solving &amp; Code Execution
+            <label
+              htmlFor="lang-is-active"
+              className="text-xs font-semibold text-slate-700 dark:text-slate-300 cursor-pointer"
+            >
+              Active for problem submissions
             </label>
           </div>
         </form>
       </AdminModal>
 
-      {/* Accessible Confirmation Dialog for Deactivation */}
+      {/* Confirmation Dialog: Deactivate */}
       <ConfirmDialog
-        isOpen={languageToDeactivate !== null}
-        onClose={() => setLanguageToDeactivate(null)}
-        onConfirm={confirmDeactivateLanguage}
-        title="Deactivate Language Configuration?"
-        message={`Are you sure you want to deactivate ${languageToDeactivate?.languageName || 'this runtime'} (#${languageToDeactivate?.id})? Students will not be able to execute code using this runtime.`}
-        confirmText="Deactivate Language"
+        isOpen={Boolean(languageToDeactivate)}
+        title="Deactivate Compiler Runtime"
+        message={`Are you sure you want to deactivate ${languageToDeactivate?.languageName || 'this language'}? It will be removed from user dropdown options.`}
+        confirmText={submittingDeactivation ? 'Deactivating...' : 'Deactivate'}
+        cancelText="Cancel"
         variant="danger"
-        isLoading={submittingDeactivation}
+        onConfirm={confirmDeactivateLanguage}
+        onClose={() => setLanguageToDeactivate(null)}
       />
     </div>
   );

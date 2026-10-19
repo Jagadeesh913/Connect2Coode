@@ -3,8 +3,21 @@ import Editor from '@monaco-editor/react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { ExecutionResultData, ExecutionTestCaseResult } from '../../../../services/executionService';
+import { ExecutionResultData } from '../../../../services/executionService';
+import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
+import {
+  Play,
+  Send,
+  Terminal,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  RotateCcw,
+  Loader2,
+} from 'lucide-react';
 
 interface AdminCodeTestModalProps {
   isOpen: boolean;
@@ -50,7 +63,6 @@ int main() {
     return 0;
 }
 `,
-  // Monaco starter template for user solution (standard output for Judge0 execution):
   JavaScript: `const fs = require('fs');
 
 function solve() {
@@ -67,16 +79,18 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   onClose,
   question,
 }) => {
+  const { theme } = useTheme();
+
   const [languages, setLanguages] = useState<Array<{ id: number; name: string }>>([]);
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
   const [sourceCode, setSourceCode] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [result, setResult] = useState<ExecutionResultData | null>(null);
-  const [activeResultTab, setActiveResultTab] = useState<'console' | 'testcases'>('testcases');
   const [questionDetails, setQuestionDetails] = useState<any | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
-  const [isStatementOpen, setIsStatementOpen] = useState<boolean>(true);
+  const [isStatementOpen, setIsStatementOpen] = useState<boolean>(false);
+  const [executionMessage, setExecutionMessage] = useState<string>('');
 
   // Load real languages dropdown from backend
   useEffect(() => {
@@ -100,58 +114,61 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             setQuestionDetails(data);
           })
           .catch((err) => {
-            console.warn('Failed to load question details for test modal:', err);
+            console.warn('Could not load question statement in test modal:', err);
           })
           .finally(() => {
             setLoadingDetails(false);
           });
       }
-    } else {
-      setQuestionDetails(null);
     }
   }, [isOpen, question?.id]);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
     setSelectedLanguageId(newId);
-    const langObj = languages.find((l) => l.id === newId);
-    if (langObj && STARTER_CODES[langObj.name]) {
-      setSourceCode(STARTER_CODES[langObj.name]);
+    const found = languages.find((l) => l.id === newId);
+    if (found && STARTER_CODES[found.name]) {
+      setSourceCode(STARTER_CODES[found.name]);
     }
     setResult(null);
   };
 
-  const selectedLangObj = languages.find((l) => l.id === selectedLanguageId);
-  const selectedLangName = selectedLangObj?.name?.toLowerCase() || '';
+  const selectedLangObj = languages.find((l) => l.id === selectedLanguageId) || languages[0];
   const monacoLang =
-    selectedLangName === 'c++'
+    selectedLangObj?.name?.toLowerCase() === 'c++'
       ? 'cpp'
-      : selectedLangName === 'python'
+      : selectedLangObj?.name?.toLowerCase() === 'python'
       ? 'python'
-      : selectedLangName === 'javascript'
+      : selectedLangObj?.name?.toLowerCase() === 'javascript'
       ? 'javascript'
-      : selectedLangName === 'java'
+      : selectedLangObj?.name?.toLowerCase() === 'java'
       ? 'java'
       : 'plaintext';
 
-  // Admin RUN (Sample / Visible Test Cases)
-  const handleAdminRun = async () => {
-    if (!question?.id || selectedLanguageId === null || !selectedLangObj) return;
+  // 1. Run Sample Cases (POST /api/v1/admin/testCode)
+  const handleRunSampleCases = async () => {
+    if (!question?.id || selectedLanguageId === null) return;
+
     setIsRunning(true);
     setResult(null);
+    setExecutionMessage('');
+
     try {
       const res = await adminQuestionService.adminTestCode({
         questionId: Number(question.id),
-        languageId: (selectedLangObj as any)?.referenceId ?? selectedLanguageId,
+        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
         sourceCode,
       });
+
       const data = (res as any)?.data || res;
       setResult(data);
-      toast.success('Admin: Sample test cases executed');
+      setExecutionMessage((res as any)?.message || 'Executed sample test cases');
+      toast.success('Sample test cases passed execution!');
     } catch (err: any) {
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin run failed'}: ${detail}` : (err?.message || 'Admin run failed');
+      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin testCode failed'}: ${detail}` : (err?.message || 'Admin testCode execution failed');
       toast.error(msg);
+      setExecutionMessage(msg);
       setResult({
         totalTestCases: 0,
         passedTestCases: 0,
@@ -170,24 +187,30 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     }
   };
 
-  // Admin SUBMIT (All Test Cases)
-  const handleAdminSubmit = async () => {
-    if (!question?.id) return;
+  // 2. Submit All Cases (POST /api/v1/admin/submitCode)
+  const handleSubmitAllCases = async () => {
+    if (!question?.id || selectedLanguageId === null) return;
+
     setIsSubmitting(true);
     setResult(null);
+    setExecutionMessage('');
+
     try {
       const res = await adminQuestionService.adminSubmitCode({
         questionId: Number(question.id),
-        languageId: (selectedLangObj as any)?.referenceId ?? selectedLanguageId,
+        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
         sourceCode,
       });
+
       const data = (res as any)?.data || res;
       setResult(data);
-      toast.success('Admin: Full validation submitted');
+      setExecutionMessage((res as any)?.message || 'Executed all test cases');
+      toast.success('Admin validation run completed against all test cases!');
     } catch (err: any) {
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin validation failed'}: ${detail}` : (err?.message || 'Admin validation failed');
+      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode failed'}: ${detail}` : (err?.message || 'Admin submitCode execution failed');
       toast.error(msg);
+      setExecutionMessage(msg);
       setResult({
         totalTestCases: 0,
         passedTestCases: 0,
@@ -206,326 +229,196 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     }
   };
 
-  if (!question) return null;
-
-  const rawCases = questionDetails?.testCases || [];
-  const sampleTestCases = rawCases.filter(
-    (tc: any) => tc.isHidden === false || tc.typeRefCode === 'SAMPLE' || !tc.typeRefCode?.includes('HIDDEN')
-  );
-  const allTestCasesCount = rawCases.length;
+  const isBusy = isRunning || isSubmitting;
 
   return (
     <AdminModal
       isOpen={isOpen}
       onClose={onClose}
-      title={`Admin Code Test: #${question.id} ${question.title}`}
-      subtitle="Validate problem statement with sample tests (POST /api/v1/admin/testCode) or full suite (POST /api/v1/admin/submitCode)"
-      maxWidth="4xl"
-    >
-        <div className="flex flex-col gap-4 font-sans text-xs">
-          {/* Admin Mode Notice */}
-          <div className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-            <div className="flex items-center gap-2 text-amber-400">
-              <i className="fa-solid fa-shield-halved text-sm"></i>
-              <span className="font-semibold text-xs">Admin Execution Mode</span>
-              <span className="text-[11px] text-gray-400">• Non-persisting execution (no student submission record created)</span>
-            </div>
-            <AdminBadge variant="accent">Admin API</AdminBadge>
-          </div>
-
-          {/* Collapsible Problem Statement & Configured Sample Test Cases Panel */}
-          <div className="bg-neutral-900 border border-white/10 rounded-xl overflow-hidden transition-all">
-            <div
-              onClick={() => setIsStatementOpen((prev) => !prev)}
-              className="flex items-center justify-between p-3 cursor-pointer hover:bg-white/5 transition-colors select-none"
+      title={question ? `Runtime Tester — #${question.id}: ${question.title}` : 'Code Tester'}
+      subtitle="Execute real Judge0 compilations against sample and full verification test suites"
+      icon={<Terminal className="w-5 h-5" />}
+      maxWidth="5xl"
+      footer={
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRunSampleCases}
+              disabled={isBusy}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              <div className="flex items-center gap-2">
-                <i className="fa-solid fa-file-lines text-neutral-300"></i>
-                <span className="font-bold text-white text-xs">Problem Statement &amp; Configured Sample Test Cases</span>
-                {loadingDetails ? (
-                  <span className="text-[10px] text-gray-400 flex items-center gap-1 font-mono">
-                    <i className="fa-solid fa-spinner animate-spin"></i> Loading...
-                  </span>
-                ) : (
-                  <span className="text-[10px] bg-neutral-800 text-neutral-300 px-2 py-0.5 rounded-full font-mono font-semibold">
-                    {sampleTestCases.length} Sample Case{sampleTestCases.length !== 1 ? 's' : ''} (of {allTestCasesCount || sampleTestCases.length} total)
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-gray-400 text-xs">
-                <span>{isStatementOpen ? 'Hide' : 'View'} Statement &amp; Test Cases</span>
-                <i className={`fa-solid fa-chevron-${isStatementOpen ? 'up' : 'down'} text-[10px]`}></i>
-              </div>
+              <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
+              <span>{isRunning ? 'Running Sample Cases...' : 'Run Sample Cases'}</span>
+            </button>
+            <button
+              onClick={handleSubmitAllCases}
+              disabled={isBusy}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <Send className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-pulse' : ''}`} />
+              <span>{isSubmitting ? 'Submitting All...' : 'Submit All Test Cases'}</span>
+            </button>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+          >
+            Close Sandbox
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4 font-sans text-left">
+        {/* Collapsible Statement Drawer */}
+        <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setIsStatementOpen((prev) => !prev)}
+            className="w-full px-4 py-3 flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-600" />
+              <span>Problem Statement &amp; Constraints</span>
             </div>
+            {isStatementOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
 
-            {isStatementOpen && (
-              <div className="p-4 pt-1 border-t border-white/5 flex flex-col gap-3 text-xs bg-neutral-950">
-                {/* Problem Description */}
-                {questionDetails?.description && (
-                  <div>
-                    <span className="text-gray-400 font-semibold block text-[11px] mb-1 uppercase tracking-wider">
-                      Description:
-                    </span>
-                    <p className="text-gray-200 leading-relaxed whitespace-pre-wrap bg-neutral-900 p-3 rounded-lg border border-white/5 font-sans">
-                      {questionDetails.description}
-                    </p>
-                  </div>
-                )}
-
-                {/* Constraints if present */}
-                {questionDetails?.constraints && (
-                  <div>
-                    <span className="text-gray-400 font-semibold block text-[11px] mb-1 uppercase tracking-wider">
-                      Constraints:
-                    </span>
-                    <div className="font-mono text-gray-300 bg-neutral-900 p-2.5 rounded-lg border border-white/5">
+          {isStatementOpen && (
+            <div className="p-4 pt-0 border-t border-slate-200/60 dark:border-slate-800/60 space-y-3 text-xs leading-relaxed">
+              {loadingDetails ? (
+                <div className="flex items-center gap-2 text-slate-400 py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Loading statement details...</span>
+                </div>
+              ) : questionDetails ? (
+                <>
+                  <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
+                    {questionDetails.description}
+                  </p>
+                  {questionDetails.constraints && (
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 font-mono text-[11px] text-slate-600 dark:text-slate-300">
+                      <span className="font-bold text-slate-400 block mb-1">Constraints:</span>
                       {questionDetails.constraints}
                     </div>
-                  </div>
-                )}
-
-                {/* Configured Sample Test Cases */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400 font-semibold text-[11px] uppercase tracking-wider">
-                      Configured Sample Test Cases (Evaluated by "Run Code"):
-                    </span>
-                    <span className="text-[10px] text-gray-400 font-mono">
-                      POST /api/v1/admin/testCode runs these
-                    </span>
-                  </div>
-
-                  {sampleTestCases.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                      {sampleTestCases.map((stc: any, sIdx: number) => (
-                        <div
-                          key={stc.id || sIdx}
-                          className="bg-neutral-900 p-2.5 rounded-lg border border-white/10 flex flex-col gap-1.5"
-                        >
-                          <div className="flex items-center justify-between text-[11px]">
-                            <span className="font-bold text-gray-200">
-                              Sample #{sIdx + 1}
-                            </span>
-                            <span className="text-[10px] text-neutral-300 bg-neutral-800 px-1.5 py-0.5 rounded font-mono">
-                              {stc.typeRefName || 'Sample'}
-                            </span>
-                          </div>
-                          <div className="font-mono text-[11px]">
-                            <span className="text-gray-500 text-[10px] block">Input:</span>
-                            <div className="bg-neutral-950 p-1.5 rounded border border-white/5 text-gray-300 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
-                              {stc.input || '(empty)'}
-                            </div>
-                          </div>
-                          <div className="font-mono text-[11px]">
-                            <span className="text-gray-500 text-[10px] block">Expected Output:</span>
-                            <div className="bg-neutral-950 p-1.5 rounded border border-white/5 text-emerald-400 font-mono whitespace-pre-wrap break-all max-h-16 overflow-y-auto">
-                              {stc.expectedOutput || '(empty)'}
-                            </div>
-                          </div>
-                          {stc.explanation && (
-                            <p className="text-[10px] text-gray-400 italic" title={stc.explanation}>
-                              {stc.explanation}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic text-[11px] p-2 bg-neutral-900 rounded-lg">
-                      {loadingDetails ? 'Fetching sample test cases...' : 'No visible sample test cases found.'}
-                    </p>
                   )}
-                </div>
-              </div>
-            )}
-          </div>
-
-        {/* Top Control Bar: Language Dropdown + Action Buttons */}
-        <div className="flex items-center justify-between gap-3 flex-wrap bg-neutral-900 p-2.5 rounded-xl border border-white/10">
-          <div className="flex items-center gap-2">
-            <label className="text-gray-300 font-semibold text-xs flex items-center gap-1.5">
-              <i className="fa-solid fa-code text-neutral-300"></i>
-              <span>Language:</span>
-            </label>
-            <div className="relative">
-              <select
-                value={selectedLanguageId ?? ''}
-                onChange={handleLanguageChange}
-                className="appearance-none bg-neutral-950 text-gray-200 border border-white/10 rounded-xl pl-3 pr-8 py-1.5 text-xs outline-none focus:border-neutral-500 cursor-pointer transition-colors shadow-2xs"
-              >
-                {languages.map((lang) => (
-                  <option key={lang.id} value={lang.id} className="bg-neutral-900 text-white">
-                    {lang.name} (Table ID: {lang.id})
-                  </option>
-                ))}
-              </select>
-              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </>
+              ) : (
+                <p className="text-slate-400 italic">No statement available.</p>
+              )}
             </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* Run Code Button */}
-            <button
-              onClick={handleAdminRun}
-              disabled={isRunning || isSubmitting || selectedLanguageId === null || languages.length === 0}
-              className="px-3.5 py-1.5 bg-neutral-900 hover:bg-neutral-800 text-gray-200 border border-white/10 hover:border-neutral-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Executes visible sample test cases only (POST /api/v1/admin/testCode)"
-            >
-              {isRunning ? (
-                <i className="fa-solid fa-spinner animate-spin text-neutral-300"></i>
-              ) : (
-                <i className="fa-solid fa-play text-neutral-300 text-[10px]"></i>
-              )}
-              <span>Run Code (Sample)</span>
-            </button>
-
-            {/* Submit Code Button */}
-            <button
-              onClick={handleAdminSubmit}
-              disabled={isRunning || isSubmitting}
-              className="px-4 py-1.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-md  disabled:opacity-50"
-              title="Executes all test cases including hidden (POST /api/v1/admin/submitCode)"
-            >
-              {isSubmitting ? (
-                <i className="fa-solid fa-spinner animate-spin text-black"></i>
-              ) : (
-                <i className="fa-solid fa-cloud-arrow-up text-black text-[11px]"></i>
-              )}
-              <span>Submit & Validate (All)</span>
-            </button>
-          </div>
+          )}
         </div>
 
-        {/* Monaco Editor Container */}
-        <div className="border border-white/10 rounded-xl overflow-hidden bg-[#1E1E1E] shadow-inner">
+        {/* Toolbar: Language selector and Reset */}
+        <div className="flex items-center justify-between gap-4 p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+              Runtime:
+            </span>
+            <select
+              value={selectedLanguageId ?? ''}
+              onChange={handleLanguageChange}
+              disabled={isBusy}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            >
+              {languages.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => {
+              if (selectedLangObj && STARTER_CODES[selectedLangObj.name]) {
+                setSourceCode(STARTER_CODES[selectedLangObj.name]);
+              }
+            }}
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Boilerplate</span>
+          </button>
+        </div>
+
+        {/* Monaco Editor */}
+        <div className="h-72 w-full rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs bg-[#1e1e1e]">
           <Editor
-            height="320px"
+            height="100%"
             language={monacoLang}
             value={sourceCode}
             onChange={(val) => setSourceCode(val || '')}
-            theme="vs-dark"
+            theme={theme === 'dark' ? 'vs-dark' : 'light'}
             options={{
-              fontSize: 13,
               minimap: { enabled: false },
+              fontSize: 13,
+              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
               scrollBeyondLastLine: false,
               automaticLayout: true,
-              tabSize: 4,
-              formatOnPaste: true,
-              wordWrap: 'on',
+              padding: { top: 12, bottom: 12 },
             }}
           />
         </div>
 
-        {/* Execution Results Section */}
+        {/* Execution Results */}
         {result && (
-          <div className="bg-neutral-900 border border-white/10 rounded-xl p-4 flex flex-col gap-3 shadow-lg">
-            {/* Header Summary */}
-            <div className="flex items-center justify-between pb-2 border-b border-white/10 flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-white text-xs">Validation Result:</span>
-                <span
-                  className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
-                    result.failedTestCases === 0
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
-                  }`}
-                >
-                  {result.failedTestCases === 0 ? 'All Passed' : `${result.failedTestCases} Failed`}
-                </span>
-                <span className="text-gray-400 text-xs font-mono">
-                  Passed: {result.passedTestCases} / {result.totalTestCases}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setActiveResultTab('testcases')}
-                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
-                    activeResultTab === 'testcases' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  Test Cases ({result.testCases?.length || 0})
-                </button>
+          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                <Terminal className="w-4 h-4 text-blue-600" />
+                Execution Results
+              </span>
+              <div className="flex items-center gap-2">
+                <AdminBadge variant="info">
+                  Total: {result.totalTestCases}
+                </AdminBadge>
+                <AdminBadge variant="success">
+                  Passed: {result.passedTestCases}
+                </AdminBadge>
+                {result.failedTestCases > 0 && (
+                  <AdminBadge variant="danger">
+                    Failed: {result.failedTestCases}
+                  </AdminBadge>
+                )}
               </div>
             </div>
 
-            {/* Test Cases List */}
-            {activeResultTab === 'testcases' && (
-              <div className="flex flex-col gap-2 max-h-56 overflow-y-auto pr-1">
-                {result.testCases && result.testCases.length > 0 ? (
-                  result.testCases.map((tc: ExecutionTestCaseResult, idx: number) => {
-                    const isPassed = tc.status?.toLowerCase() === 'passed';
-                    const isHidden = tc.isHidden === true;
+            {executionMessage && (
+              <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                {executionMessage}
+              </p>
+            )}
 
-                    return (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-lg border flex flex-col gap-1.5 ${
-                          isPassed
-                            ? 'bg-emerald-500/5 border-emerald-500/20'
-                            : 'bg-rose-500/5 border-rose-500/20'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-200 flex items-center gap-1.5">
-                            <i
-                              className={`fa-solid ${
-                                isPassed ? 'fa-check text-emerald-400' : 'fa-xmark text-rose-400'
-                              }`}
-                            ></i>
-                            <span>Test Case #{idx + 1}</span>
-                            <span className="text-gray-500 font-mono text-[10px]">
-                              ({tc.testCaseType || (isHidden ? 'Hidden Test Case' : 'Visible Sample Test Case')})
-                            </span>
-                          </span>
-
-                          <div className="flex items-center gap-2">
-                            {isHidden && (
-                              <span className="text-[10px] bg-white/5 border border-white/10 text-gray-400 px-2 py-0.5 rounded font-mono">
-                                Hidden
-                              </span>
-                            )}
-                            <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                                isPassed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
-                              }`}
-                            >
-                              {tc.status}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Visible Test Case Details (Only when not hidden) */}
-                        {!isHidden && (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-[11px] font-mono">
-                            {tc.input && (
-                              <div className="bg-neutral-950 p-2 rounded border border-white/5">
-                                <span className="text-gray-500 block text-[10px]">Input:</span>
-                                <span className="text-gray-300">{tc.input}</span>
-                              </div>
-                            )}
-                            {tc.expectedOutput && (
-                              <div className="bg-neutral-950 p-2 rounded border border-white/5">
-                                <span className="text-gray-500 block text-[10px]">Expected:</span>
-                                <span className="text-emerald-400">{tc.expectedOutput}</span>
-                              </div>
-                            )}
-                            {tc.actualOutput && (
-                              <div className="bg-neutral-950 p-2 rounded border border-white/5 sm:col-span-2">
-                                <span className="text-gray-500 block text-[10px]">Actual Output:</span>
-                                <span className={isPassed ? 'text-gray-300' : 'text-rose-400'}>
-                                  {tc.actualOutput}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
+            {result.testCases && result.testCases.length > 0 && (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {result.testCases.map((tc, idx) => {
+                  const isPassed = tc.status?.toLowerCase() === 'passed' || tc.status?.toLowerCase() === 'accepted';
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-xl border text-xs font-mono ${
+                        isPassed
+                          ? 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40'
+                          : 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          Test Case #{tc.testCaseId || idx + 1}
+                        </span>
+                        <AdminBadge variant={isPassed ? 'success' : 'danger'} size="sm">
+                          {tc.status || (isPassed ? 'Passed' : 'Failed')}
+                        </AdminBadge>
                       </div>
-                    );
-                  })
-                ) : (
-                  <p className="text-gray-400 text-xs italic">No individual test cases returned</p>
-                )}
+                      {tc.actualOutput && (
+                        <pre className="p-2 bg-white/80 dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800 text-[11px] overflow-x-auto whitespace-pre-wrap">
+                          {tc.actualOutput}
+                        </pre>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

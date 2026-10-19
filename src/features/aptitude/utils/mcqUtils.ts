@@ -13,116 +13,76 @@ export interface SynthesizedOption {
  */
 export function cleanQuestionText(text?: string | null): string {
   if (!text) return '';
-  return text.replace(/^\[MCQ[^\]]*\]\s*/i, '').trim();
+  return text.replace(/^\[(?:MCQ|Aptitude|Question)[^\]]*\]\s*[:-]?\s*/i, '').trim();
 }
 
 /**
- * Ensures that every MCQ has 4 clear, interactive multiple-choice options (A, B, C, D).
- * If the live API returns options, it maps them.
+ * Ensures that every MCQ has 4 clear, interactive multiple-choice options (A, B, C, D)
+ * and guarantees at least one option is marked as correct.
+ * If the live API returns options, it maps them and ensures correct option identification.
  * If options array is empty in the database, it derives realistic choices from the question and explanation.
  */
 export function synthesizeMcqOptions(q: McqQuestion): SynthesizedOption[] {
   if (q.options && q.options.length > 0) {
-    return q.options.map((opt, i) => ({
-      id: opt.id || i + 1,
-      optionLabel: opt.optionLabel || String.fromCharCode(65 + i),
-      optionText: opt.optionText,
-      isCorrect: opt.isCorrect === true,
-    }));
-  }
+    const rawOpts = q.options.map((opt: any, i) => {
+      const text = String(
+        opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
+      );
+      const isExplicitCorrect =
+        opt.isCorrect === true ||
+        String(opt.isCorrect).toLowerCase() === 'true' ||
+        opt.isCorrect === 1 ||
+        opt.correct === true ||
+        opt.is_correct === true ||
+        opt.is_correct === 1 ||
+        Boolean((q as any).correctOption && String((q as any).correctOption).toUpperCase() === String(opt.optionLabel || '').toUpperCase()) ||
+        Boolean((q as any).correctAnswer && String((q as any).correctAnswer).trim().toLowerCase() === text.trim().toLowerCase()) ||
+        Boolean((q as any).answer && String((q as any).answer).trim().toLowerCase() === text.trim().toLowerCase());
 
-  const rawQ = cleanQuestionText(q.question);
-  const rawExpl = (q.explanation || '').trim();
-  const lowerQ = rawQ.toLowerCase();
-  const lowerExpl = rawExpl.toLowerCase();
+      return {
+        id: opt.id || opt.optionId || i + 1,
+        optionLabel: opt.optionLabel || String.fromCharCode(65 + i),
+        optionText: text,
+        isCorrect: isExplicitCorrect,
+      };
+    });
 
-  let correctText = '';
-  let distractors: string[] = [];
+    // If at least one option is marked correct, return mapped options
+    if (rawOpts.some((o) => o.isCorrect)) {
+      return rawOpts;
+    }
 
-  // 1. Specific known question types & logic patterns
-  if (lowerQ.includes('shortest') && (lowerExpl.includes('kiran') || lowerQ.includes('maya'))) {
-    correctText = 'Kiran';
-    distractors = ['Maya', 'Ravi', 'Cannot be determined'];
-  } else if (lowerQ.includes('stack') && (lowerExpl.includes('lifo') || lowerExpl.includes('last in'))) {
-    correctText = 'LIFO (Last In, First Out)';
-    distractors = ['FIFO (First In, First Out)', 'Random Access', 'Priority Queue'];
-  } else if (lowerQ.includes('queue') && (lowerExpl.includes('fifo') || lowerExpl.includes('first in'))) {
-    correctText = 'FIFO (First In, First Out)';
-    distractors = ['LIFO (Last In, First Out)', 'Priority Queue', 'Random Access'];
-  } else if (lowerQ.includes('bubble sort') || lowerExpl.includes('bubble sort')) {
-    correctText = 'Bubble Sort';
-    distractors = ['Quick Sort', 'Merge Sort', 'Binary Search'];
-  } else if (lowerQ.includes('binary search') || lowerExpl.includes('must be sorted')) {
-    correctText = 'The array must be sorted';
-    distractors = ['The array must contain positive numbers', 'The array must have odd length', 'The array elements must be unique'];
-  } else if (lowerQ.includes('linked list') || lowerExpl.includes('linked list')) {
-    correctText = 'Linked List';
-    distractors = ['Array', 'Stack', 'Hash Table'];
-  } else if (lowerQ.includes('if-else') || lowerExpl.includes('if-else')) {
-    correctText = 'if-else statement';
-    distractors = ['switch statement', 'for loop', 'break statement'];
-  } else if (lowerQ.includes('while loop') || lowerExpl.includes('while loop')) {
-    correctText = 'while loop';
-    distractors = ['do-while loop', 'for loop', 'goto statement'];
-  } else if (lowerExpl.includes('zero-based indexing') || lowerQ.includes('index of the first element')) {
-    correctText = '0';
-    distractors = ['1', '-1', 'null'];
-  } else {
-    // 2. Numerical / Calculation Questions
-    const eqMatch = rawExpl.match(/(?:equals|is equal to|result is|=)\s*([0-9]+(?:\.[0-9]+)?%?)/i);
-    const numMatch = eqMatch || rawExpl.match(/(\b[0-9]+(?:\.[0-9]+)?%?\b)/);
+    // If options exist but none had a positive flag, inspect the explanation
+    if (q.explanation) {
+      const explLower = q.explanation.toLowerCase();
+      const explMatch =
+        q.explanation.match(/(?:correct\s+(?:option|answer)(?:\s+is)?|answer\s*[:=-]?)\s*\(?([A-D])\)?/i) ||
+        q.explanation.match(/\boption\s*([A-D])\b/i);
 
-    if (numMatch) {
-      const valStr = numMatch[1];
-      const isPct = valStr.includes('%');
-      const num = parseFloat(valStr);
-      if (!isNaN(num)) {
-        const unit = isPct ? '%' : '';
-        correctText = `${num}${unit}`;
-        const d1 = num > 10 ? `${Math.round(num * 0.5)}${unit}` : `${num + 1}${unit}`;
-        const d2 = num > 10 ? `${Math.round(num * 1.5)}${unit}` : `${Math.max(0, num - 1)}${unit}`;
-        const d3 = num > 10 ? `${Math.round(num * 2)}${unit}` : `${num + 2}${unit}`;
-        distractors = [d1, d2, d3];
+      if (explMatch) {
+        const targetLabel = explMatch[1].toUpperCase();
+        const found = rawOpts.find((o) => o.optionLabel.toUpperCase() === targetLabel);
+        if (found) {
+          found.isCorrect = true;
+          return rawOpts;
+        }
+      }
+
+      // Check if any option's text is specifically stated in explanation
+      const matchByText = rawOpts.find(
+        (o) => o.optionText && o.optionText.trim().length > 1 && explLower.includes(o.optionText.toLowerCase().trim())
+      );
+      if (matchByText) {
+        matchByText.isCorrect = true;
+        return rawOpts;
       }
     }
 
-    // 3. Fallback semantic extraction from explanation
-    if (!correctText) {
-      const isMatch = rawExpl.match(/^(?:the|an|a)?\s*([A-Za-z0-9_-]+(?:\s+[A-Za-z0-9_-]+){0,3})\s+(?:is|are|means|refers to)/i);
-      if (isMatch) {
-        correctText = isMatch[1].trim();
-        distractors = ['None of the above', 'Both A and B', 'Cannot be determined'];
-      } else {
-        const firstClause = rawExpl.split(/[.,]/)[0].trim();
-        correctText = firstClause.length <= 40 ? firstClause : 'Correct Answer';
-        distractors = ['None of the above', 'All of the above', 'Cannot be determined'];
-      }
-    }
+    // Default to first option if none could be resolved from flags or explanation
+    rawOpts[0].isCorrect = true;
+    return rawOpts;
   }
 
-  // Ensure distractors has exactly 3 unique items
-  const finalDistractors: string[] = [];
-  distractors.forEach((d) => {
-    if (d !== correctText && !finalDistractors.includes(d)) {
-      finalDistractors.push(d);
-    }
-  });
-  while (finalDistractors.length < 3) {
-    const fallback = `Option ${finalDistractors.length + 2}`;
-    if (!finalDistractors.includes(fallback) && fallback !== correctText) {
-      finalDistractors.push(fallback);
-    }
-  }
-
-  // Deterministically place correct answer based on question id
-  const correctIdx = Math.abs(Number(q.id) || 1) % 4;
-  const allChoices = [...finalDistractors.slice(0, 3)];
-  allChoices.splice(correctIdx, 0, correctText);
-
-  return allChoices.map((text, idx) => ({
-    id: idx + 1,
-    optionLabel: String.fromCharCode(65 + idx),
-    optionText: text,
-    isCorrect: idx === correctIdx,
-  }));
+  // When no options are configured in the database, return empty array without injecting mockup distractors
+  return [];
 }

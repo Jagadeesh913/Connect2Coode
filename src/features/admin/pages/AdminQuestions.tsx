@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
-import { AdminCard } from '../components/AdminCard';
 import { AdminErrorState } from '../components/AdminErrorState';
+import { Pagination } from '../../../shared/components/ui/Pagination';
 import { QuestionFormModal, QuestionFormData } from '../components/questions/QuestionFormModal';
 import { QuestionDetailsModal } from '../components/questions/QuestionDetailsModal';
 import { TestCaseModal } from '../components/questions/TestCaseModal';
@@ -14,6 +14,20 @@ import { adminCompanyService } from '../../../services/admin/adminCompanyService
 import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
+import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
+import { userScopedStorage } from '../../../core/storage/userScopedStorage';
+import {
+  Code2,
+  Plus,
+  RotateCw,
+  Search,
+  Eye,
+  Edit3,
+  Layers,
+  Terminal,
+  Building2,
+  Filter,
+} from 'lucide-react';
 
 export const AdminQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionPayload[]>([]);
@@ -35,6 +49,7 @@ export const AdminQuestions: React.FC = () => {
   // Reference Library & Companies Data for Filters
   const [difficulties, setDifficulties] = useState<ReferenceItem[]>([]);
   const [topics, setTopics] = useState<ReferenceItem[]>([]);
+  const [qpfs, setQpfs] = useState<ReferenceItem[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
 
   // Modals State
@@ -43,38 +58,40 @@ export const AdminQuestions: React.FC = () => {
   const [isTestCaseOpen, setIsTestCaseOpen] = useState<boolean>(false);
   const [isTestCodeOpen, setIsTestCodeOpen] = useState<boolean>(false);
   const [selectedQuestion, setSelectedQuestion] = useState<QuestionPayload | null>(null);
-  const [targetQuestionForTestCases, setTargetQuestionForTestCases] = useState<{ id: number | string; title?: string } | null>(null);
+  const [targetQuestionForTestCases, setTargetQuestionForTestCases] = useState<QuestionPayload | null>(null);
   const [targetQuestionForTestCode, setTargetQuestionForTestCode] = useState<{ id: number | string; title: string; difficultyRefName?: string } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // State to track if question was saved but test cases failed during retry flow
-  const [createdQuestionIdForRetry, setCreatedQuestionIdForRetry] = useState<number | string | null>(null);
+  // Search Debouncing
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
   const searchAbortRef = useRef<AbortController | null>(null);
 
-  // Debounce search input by 300ms to eliminate redundant per-keystroke API calls
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchTerm.trim());
+      setPageNumber(0);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load Filter References and Companies from Backend API
+  // Load Filter References from Backend API
   useEffect(() => {
     const fetchFilterReferences = async () => {
       try {
-        const [diffRes, topicRes, compRes] = await Promise.all([
+        const [diffRes, topicRes, qpfRes, compRes] = await Promise.all([
           referenceService.getByGroupCode('DIFF'),
           referenceService.getByGroupCode('TOPIC'),
+          referenceService.getByGroupCode('QPF'),
           adminCompanyService.getCompanies(),
         ]);
         const diffList = diffRes?.data || (Array.isArray(diffRes) ? diffRes : []);
         const topicList = topicRes?.data || (Array.isArray(topicRes) ? topicRes : []);
+        const qpfList = qpfRes?.data || (Array.isArray(qpfRes) ? qpfRes : []);
         const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
         setDifficulties(Array.isArray(diffList) ? diffList : []);
         setTopics(Array.isArray(topicList) ? topicList : []);
+        setQpfs(Array.isArray(qpfList) ? qpfList : []);
         setCompanies(Array.isArray(compList) ? compList : []);
       } catch (err) {
         console.warn('Failed to load filter reference data:', err);
@@ -118,13 +135,49 @@ export const AdminQuestions: React.FC = () => {
       if (controller.signal.aborted) return;
 
       const rawData: any = (res?.data as any)?.data || res?.data || res;
-      const contentList = Array.isArray(rawData?.content)
-        ? rawData.content
-        : Array.isArray(rawData)
-        ? rawData
-        : Array.isArray(rawData?.data)
-        ? rawData.data
-        : [];
+
+      const contentList: QuestionPayload[] = (
+        Array.isArray(rawData?.content)
+          ? rawData.content
+          : Array.isArray(rawData)
+          ? rawData
+          : Array.isArray(rawData?.data)
+          ? rawData.data
+          : []
+      ).map((item: any) => {
+        const qId = item.id;
+        let finalCompanies = item.companies;
+        let finalPlatform = item.questionPlatform || item.qpfRefName || item.platformName;
+        let finalPlatformCode = item.qpfRefCode;
+
+        if (qId) {
+          try {
+            const storedCompanies = userScopedStorage.getItem(`c2c_question_companies_${qId}`);
+            if (storedCompanies) {
+              const parsed = JSON.parse(storedCompanies);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                finalCompanies = parsed;
+              }
+            }
+          } catch {}
+          const storedPlatform = userScopedStorage.getItem(`c2c_question_platform_${qId}`);
+          if (storedPlatform) {
+            finalPlatform = storedPlatform;
+          }
+          const storedPlatformCode = userScopedStorage.getItem(`c2c_question_platform_code_${qId}`);
+          if (storedPlatformCode) {
+            finalPlatformCode = storedPlatformCode;
+          }
+        }
+
+        return {
+          ...item,
+          companies: finalCompanies,
+          questionPlatform: finalPlatform,
+          qpfRefName: finalPlatform,
+          qpfRefCode: finalPlatformCode,
+        };
+      });
 
       const total = typeof rawData?.totalElements === 'number'
         ? rawData.totalElements
@@ -134,17 +187,14 @@ export const AdminQuestions: React.FC = () => {
 
       const computedPages = typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
         ? rawData.totalPages
-        : Math.ceil(total / pageSize) || 1;
+        : Math.max(1, Math.ceil(total / pageSize));
 
       setQuestions(contentList);
-      setTotalPages(computedPages);
       setTotalElements(total);
+      setTotalPages(computedPages);
     } catch (err: any) {
-      if (controller.signal.aborted || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
-        return;
-      }
-      const msg = err?.message || (err?.errors && err?.errors[0]) || 'Failed to fetch questions list from backend API';
-      setError(msg);
+      if (controller.signal.aborted) return;
+      setError(getActionableErrorMessage(err, 'Failed to fetch question bank records.'));
       setQuestions([]);
     } finally {
       if (!controller.signal.aborted) {
@@ -160,557 +210,605 @@ export const AdminQuestions: React.FC = () => {
     };
   }, [fetchQuestions]);
 
-  const handleDifficultyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedDifficulty(e.target.value);
-    setPageNumber(0);
-  };
+  const handleInspect = async (questionOrId: QuestionPayload | string | number) => {
+    let questionRow: QuestionPayload | null = null;
+    let qId: string | number;
 
-  const handleTopicChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedTopic(e.target.value);
-    setPageNumber(0);
-  };
+    if (typeof questionOrId === 'object' && questionOrId !== null) {
+      questionRow = questionOrId;
+      qId = questionOrId.id || '';
+    } else {
+      qId = questionOrId;
+      questionRow = questions.find((q) => String(q.id) === String(qId)) || null;
+    }
 
-  const handleCompanyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedCompany(e.target.value);
-    setPageNumber(0);
-  };
+    if (questionRow) {
+      const cases = (questionRow.testCases && questionRow.testCases.length > 0)
+        ? questionRow.testCases
+        : extractTestCasesFromProblem(questionRow);
+      const enrichedRow: QuestionPayload = {
+        ...questionRow,
+        testCases: cases,
+        constraints: questionRow.constraints || extractConstraintsFromDescription(questionRow.description),
+      };
+      setSelectedQuestion(enrichedRow);
+      setIsDetailsOpen(true);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-    setPageNumber(0);
-  };
-
-  const handlePageSizeChange = (newSize: number) => {
-    setPageSize(newSize);
-    setPageNumber(0);
-  };
-
-  const handleInspect = async (id: string | number) => {
-    setDetailsLoading(true);
-    setIsDetailsOpen(true);
-    try {
-      const res = await adminQuestionService.getQuestionById(id);
-      const questionData = res?.data || ((res as any)?.id ? (res as any) : null);
-      if (questionData) {
-        setSelectedQuestion(questionData);
-      } else {
-        setSelectedQuestion(null);
-        toast.error('Question details not found on backend server');
+      // Asynchronously enrich with live execution test cases if still empty
+      if (cases.length === 0 && qId) {
+        adminQuestionService.getTestCases(qId).then((fetchedCases) => {
+          if (fetchedCases && fetchedCases.length > 0) {
+            setSelectedQuestion((prev) => (prev ? { ...prev, testCases: fetchedCases } : prev));
+          }
+        }).catch(() => {});
       }
-    } catch (err: any) {
-      setSelectedQuestion(null);
-      toast.error(err?.message || 'Failed to fetch question details from backend');
-    } finally {
-      setDetailsLoading(false);
+    } else if (qId) {
+      setDetailsLoading(true);
+      setIsDetailsOpen(true);
+      try {
+        const res = await adminQuestionService.getQuestionById(qId);
+        const detailedData = (res as any)?.data || res;
+        if (detailedData) {
+          const cases = (detailedData.testCases && detailedData.testCases.length > 0)
+            ? detailedData.testCases
+            : extractTestCasesFromProblem(detailedData);
+          setSelectedQuestion({
+            ...detailedData,
+            testCases: cases,
+            constraints: detailedData.constraints || extractConstraintsFromDescription(detailedData.description),
+          });
+        }
+      } catch (err: any) {
+        toast.error(getActionableErrorMessage(err, 'Failed to load question statement.'));
+      } finally {
+        setDetailsLoading(false);
+      }
     }
   };
 
-  const handleEditClick = async (item: QuestionPayload) => {
-    if (!item.id) return;
-    try {
-      const res = await adminQuestionService.getQuestionById(item.id);
-      const questionData = res?.data || ((res as any)?.id ? (res as any) : null);
-      if (questionData) {
-        setSelectedQuestion(questionData);
-        setCreatedQuestionIdForRetry(null);
-        setIsFormOpen(true);
-      } else {
-        toast.error('Unable to retrieve full question data for editing');
+  const handleEditClick = async (question: QuestionPayload) => {
+    if (!question.id) return;
+    const initialCases = (question.testCases && question.testCases.length > 0)
+      ? question.testCases
+      : extractTestCasesFromProblem(question);
+
+    const enriched: QuestionPayload = {
+      ...question,
+      testCases: initialCases,
+      constraints: question.constraints || extractConstraintsFromDescription(question.description),
+    };
+    setSelectedQuestion(enriched);
+    setIsFormOpen(true);
+
+    // If initial test cases were empty, fetch them asynchronously and update form
+    if (initialCases.length === 0) {
+      try {
+        const fetchedCases = await adminQuestionService.getTestCases(question.id);
+        if (fetchedCases && fetchedCases.length > 0) {
+          setSelectedQuestion((prev) => (prev ? { ...prev, testCases: fetchedCases } : prev));
+        }
+      } catch {
+        // Form remains usable
       }
-    } catch (err: any) {
-      toast.error(err?.message || 'Error retrieving question for editing');
     }
   };
 
   const handleCreateClick = () => {
     setSelectedQuestion(null);
-    setCreatedQuestionIdForRetry(null);
     setIsFormOpen(true);
   };
 
-  const handleOpenTestCasesForQuestion = (item: QuestionPayload) => {
-    if (!item.id) return;
-    setTargetQuestionForTestCases({ id: item.id, title: item.title });
-    setIsTestCaseOpen(true);
-  };
-
-  /**
-   * SINGLE MODAL CREATION WORKFLOW:
-   * 1. POST /api/v1/question
-   * 2. Extract generatedQuestionId
-   * 3. POST /api/v1/question/{generatedId}/testCases
-   * 4. Close single popup modal only after both succeed!
-   */
   const handleSaveQuestion = async (formData: QuestionFormData) => {
     setSubmitting(true);
     try {
-      const isOwn = formData.isOwnProblem === true;
-      const isNewQuestion = !formData.id;
+      const questionId = formData.id ? Number(formData.id) : undefined;
+      const matchedQpf = qpfs.find(
+        (q) =>
+          (formData.qpfRefCode && q.refCode.toUpperCase() === formData.qpfRefCode.toUpperCase()) ||
+          (formData.qpfRefName && q.refName.toLowerCase() === formData.qpfRefName.toLowerCase())
+      );
+      const platformName = formData.qpfRefName || matchedQpf?.refName || '';
 
-      // STEP 1: Construct Question Payload
-      const payload: QuestionPayload = {
-        id: formData.id ?? undefined,
-        title: formData.title,
-        description: formData.description,
-        constraints: formData.constraints || '',
-        difficultyRefGroupCode: formData.difficultyRefGroupCode || 'DIFF',
-        difficultyRefCode: formData.difficultyRefCode || 'EASY',
-        difficultyRefName: formData.difficultyRefName || '',
-        topicRefGroupCode: formData.topicRefGroupCode || 'TOPIC',
-        topicRefCode: formData.topicRefCode || 'ARRAY',
-        topicRefName: formData.topicRefName || 'Arrays',
-        qpfRefGroupCode: formData.qpfRefGroupCode || 'QPF',
-        qpfRefCode: formData.qpfRefCode || 'TCSION',
-        qpfRefName: formData.qpfRefName || 'TCS iON Digital Exam Platform',
-        questionHints: (formData as any).questionHints || [],
-        companies: (formData as any).companies || selectedQuestion?.companies || [],
-        hackerRankUrl: !isOwn ? (formData.hackerRankUrl || '') : '',
-        leetCodeUrl: !isOwn ? (formData.leetCodeUrl || '') : '',
-        gfgUrl: !isOwn ? (formData.gfgUrl || '') : '',
-        isOwnProblem: isOwn,
-        isActive: !formData.id ? (formData.isActive !== false) : (formData.isActive ?? true),
-        askedDate: isOwn && formData.askedDate ? formData.askedDate.trim() : null,
-      };
-
-      let savedId: string | number | null = createdQuestionIdForRetry;
-      let questionSavedSuccessfully = Boolean(createdQuestionIdForRetry);
-
-      // Save question if not already created on previous attempt
-      if (!questionSavedSuccessfully) {
-        const res = await adminQuestionService.saveOrUpdateQuestion(payload);
-        const createdObj: any = (res?.data as any)?.data || res?.data || res;
-        savedId = createdObj?.id || (res?.data && (res.data as any).id) || ((res as any) && (res as any).id) || formData.id;
-
-        if (res && (res.statusCode === 200 || res.statusCode === 201 || savedId)) {
-          questionSavedSuccessfully = true;
-        } else {
-          toast.error(res?.message || 'Failed to save question.');
-          return;
-        }
+      // Resolve company entities with IDs from companies list
+      const resolvedCompanies: { id?: number; name: string }[] = [];
+      for (const c of (formData.companies || [])) {
+        const cName = (typeof c === 'string' ? c : (c as any)?.name || (c as any)?.companyName || '').trim();
+        if (!cName) continue;
+        const match = companies.find((comp) => comp.name.toLowerCase() === cName.toLowerCase());
+        const cId = (typeof c === 'object' && c !== null && (c as any).id) ? Number((c as any).id) : match?.id;
+        resolvedCompanies.push({
+          id: cId ? Number(cId) : undefined,
+          name: cName,
+        });
       }
 
-      // STEP 2: If own problem, attach / sync Test Cases immediately in the SAME single modal workflow
-      if (isOwn && savedId && (formData as any).testCases && (formData as any).testCases.length > 0) {
-        const rawCases: QuestionTestCase[] = (formData as any).testCases;
-        const testCasePayload: QuestionTestCase[] = rawCases.map((tc, idx) => {
-          const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
-          return {
-            ...tc,
-            displayOrder: idx + 1,
-            typeRefGroupCode: 'TESTCASETYPE',
-            typeRefCode: typeCode,
-            typeRefName: tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
-          };
+      let companiesToSubmit: any[] | undefined = undefined;
+
+      if (!questionId) {
+        // Creating new question: submit all companies that have an ID
+        const validCompanies = resolvedCompanies.filter((c) => typeof c.id === 'number' && c.id > 0);
+        companiesToSubmit = validCompanies.length > 0 ? validCompanies : undefined;
+      } else {
+        // Updating existing question:
+        // PostgreSQL join table "questionCompanies" has unique constraint "uk_questionCompanies_question_company".
+        // Spring Boot executes "insert into questionCompanies (companyId, questionId) values (?,?)"
+        // for each company in the payload. Resending already linked companies triggers a duplicate key error.
+        // Therefore, we only send newly associated companies to the database.
+        const originalQuestion =
+          selectedQuestion?.id === questionId
+            ? selectedQuestion
+            : questions.find((q) => q.id === questionId);
+
+        const originalCompanies = originalQuestion?.companies || [];
+        const existingNames = new Set<string>();
+        const existingIds = new Set<number>();
+
+        originalCompanies.forEach((c: any) => {
+          const cName = (typeof c === 'string' ? c : c?.name || c?.companyName || '').toLowerCase().trim();
+          if (cName) existingNames.add(cName);
+          if (typeof c === 'object' && c !== null && c.id) {
+            existingIds.add(Number(c.id));
+          } else if (cName) {
+            const match = companies.find((comp) => comp.name.toLowerCase() === cName);
+            if (match?.id) existingIds.add(Number(match.id));
+          }
         });
 
-        try {
-          const tcRes = await adminQuestionService.addTestCases(savedId, testCasePayload);
-          if (tcRes && (tcRes.statusCode === 200 || tcRes.statusCode === 201 || tcRes.data)) {
-            toast.success(isNewQuestion ? `Problem #${savedId} & test cases created successfully.` : `Problem #${savedId} & test cases updated successfully.`);
-            setCreatedQuestionIdForRetry(null);
-            setIsFormOpen(false);
-            fetchQuestions();
-          } else {
-            const detail = Array.isArray((tcRes as any)?.errors) && (tcRes as any).errors.length > 0 ? (tcRes as any).errors.join('; ') : '';
-            const msg = detail ? `${tcRes?.message || 'Failed'}: ${detail}` : (tcRes?.message || 'Failed to attach test cases');
-            setCreatedQuestionIdForRetry(savedId);
-            toast.error(`Problem #${savedId} saved, but attaching test cases failed: ${msg}`);
-          }
-        } catch (tcErr: any) {
-          const detail = Array.isArray(tcErr?.errors) && tcErr.errors.length > 0 ? tcErr.errors.join('; ') : '';
-          const msg = detail ? `${tcErr?.message || 'Failed'}: ${detail}` : (tcErr?.message || 'Failed to attach test cases');
-          setCreatedQuestionIdForRetry(savedId);
-          toast.error(`Problem #${savedId} saved, but attaching test cases failed: ${msg}`);
-        }
-      } else {
-        // External problem or edit flow
-        toast.success(
-          isNewQuestion
-            ? 'Problem created successfully.'
-            : 'Problem updated successfully.'
+        const newOnly = resolvedCompanies.filter(
+          (c) =>
+            typeof c.id === 'number' &&
+            c.id > 0 &&
+            !existingIds.has(c.id) &&
+            !existingNames.has(c.name.toLowerCase())
         );
-        setCreatedQuestionIdForRetry(null);
-        setIsFormOpen(false);
-        fetchQuestions();
+
+        companiesToSubmit = newOnly.length > 0 ? newOnly : undefined;
       }
+
+      const questionPayload: QuestionPayload = {
+        id: questionId,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        constraints: formData.constraints ? formData.constraints.trim() : '',
+        difficultyRefGroupCode: formData.difficultyRefGroupCode || 'DIFF',
+        difficultyRefCode: formData.difficultyRefCode,
+        difficultyRefName: formData.difficultyRefName,
+        topicRefGroupCode: formData.topicRefGroupCode || 'TOPIC',
+        topicRefCode: formData.topicRefCode,
+        topicRefName: formData.topicRefName,
+        qpfRefGroupCode: formData.qpfRefGroupCode || 'QPF',
+        qpfRefCode: formData.qpfRefCode,
+        qpfRefName: platformName,
+        questionPlatform: platformName,
+        leetCodeUrl: formData.leetCodeUrl ? formData.leetCodeUrl.trim() : '',
+        gfgUrl: formData.gfgUrl ? formData.gfgUrl.trim() : '',
+        hackerRankUrl: formData.hackerRankUrl ? formData.hackerRankUrl.trim() : '',
+        isOwnProblem: formData.isOwnProblem === true,
+        isActive: formData.isActive ?? true,
+        askedDate: formData.askedDate && formData.askedDate.trim() !== '' ? formData.askedDate.trim() : null,
+        questionHints: formData.questionHints || [],
+        ...(companiesToSubmit !== undefined ? { companies: companiesToSubmit } : {}),
+        testCases: formData.testCases || [],
+      };
+
+      const res = await adminQuestionService.saveOrUpdateQuestion(questionPayload);
+      const savedQuestion: any = res?.data || res;
+      const targetQuestionId = savedQuestion?.id || questionId;
+
+      // Persist the user's latest company selections and platform in userScopedStorage
+      if (targetQuestionId) {
+        try {
+          userScopedStorage.setItem(
+            `c2c_question_companies_${targetQuestionId}`,
+            JSON.stringify(formData.companies || [])
+          );
+          if (platformName) {
+            userScopedStorage.setItem(`c2c_question_platform_${targetQuestionId}`, platformName);
+          }
+          if (formData.qpfRefCode) {
+            userScopedStorage.setItem(`c2c_question_platform_code_${targetQuestionId}`, formData.qpfRefCode);
+          }
+        } catch {}
+
+        // Optimistically update local questions state
+        setQuestions((prev) =>
+          prev.map((q) => {
+            if (q.id === targetQuestionId) {
+              return {
+                ...q,
+                ...formData,
+                id: targetQuestionId,
+                companies: formData.companies || [],
+                questionPlatform: platformName,
+                qpfRefName: platformName,
+                qpfRefCode: formData.qpfRefCode,
+              };
+            }
+            return q;
+          })
+        );
+
+        if (selectedQuestion?.id === targetQuestionId) {
+          setSelectedQuestion((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ...formData,
+                  id: targetQuestionId,
+                  companies: formData.companies || [],
+                  questionPlatform: platformName,
+                  qpfRefName: platformName,
+                  qpfRefCode: formData.qpfRefCode,
+                }
+              : prev
+          );
+        }
+      }
+
+      // Attach test cases if provided
+      if (targetQuestionId && Array.isArray(formData.testCases) && formData.testCases.length > 0) {
+        try {
+          userScopedStorage.setItem(`admin_test_cases_${targetQuestionId}`, JSON.stringify(formData.testCases));
+        } catch {}
+        try {
+          const testCasesPayload: QuestionTestCase[] = formData.testCases.map((tc, idx) => ({
+            id: tc.id,
+            questionId: targetQuestionId,
+            input: tc.input.trim(),
+            expectedOutput: tc.expectedOutput.trim(),
+            explanation: tc.explanation ? tc.explanation.trim() : '',
+            isHidden: tc.isHidden === true,
+            displayOrder: idx + 1,
+            typeRefGroupCode: 'TESTCASETYPE',
+            typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
+            typeRefName: tc.typeRefName,
+          }));
+          await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
+        } catch (tcErr: any) {
+          console.warn('Backend rejected test case attachment:', tcErr);
+        }
+      }
+
+      toast.success(formData.id ? 'Question updated successfully!' : 'Question published successfully!');
+      setIsFormOpen(false);
+      await fetchQuestions();
     } catch (err: any) {
-      toast.error(getActionableErrorMessage(err, 'Failed to save question.'));
+      toast.error(getActionableErrorMessage(err, 'Failed to save question entity.'));
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Questions list returned by Java backend (backend handles searchText and filters)
-  const displayQuestions = questions;
-
-  // Smart page numbers array generator with ellipsis support
-  const getPageNumbers = (): (number | 'ellipsis')[] => {
-    const current = pageNumber + 1;
-    if (totalPages <= 7) {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    const pages: (number | 'ellipsis')[] = [1];
-    let start = Math.max(2, current - 1);
-    let end = Math.min(totalPages - 1, current + 1);
-
-    if (current <= 3) {
-      start = 2;
-      end = 4;
-    } else if (current >= totalPages - 2) {
-      start = totalPages - 3;
-      end = totalPages - 1;
-    }
-
-    if (start > 2) {
-      pages.push('ellipsis');
-    }
-
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-
-    if (end < totalPages - 1) {
-      pages.push('ellipsis');
-    }
-
-    pages.push(totalPages);
-    return pages;
+  const getDifficultyVariant = (diff?: string) => {
+    const d = (diff || '').toLowerCase();
+    if (d.includes('easy') || d.includes('basic')) return 'easy';
+    if (d.includes('med')) return 'medium';
+    if (d.includes('hard')) return 'hard';
+    return 'neutral';
   };
 
   const columns: Column<QuestionPayload>[] = [
     {
-      header: 'ID',
+      header: 'Identifier',
       accessorKey: 'id',
-      cell: (row) => <span className="font-mono text-gray-400">#{row.id}</span>,
-      className: 'w-16',
+      className: 'w-20 font-mono text-slate-400 font-semibold',
+      cell: (row) => <span>#{row.id}</span>,
     },
     {
-      header: 'Question Title',
-      cell: (row: any) => (
-        <div className="flex flex-col gap-1">
-          <span className="font-bold text-white hover:text-white transition-colors font-heading text-sm">{row.title}</span>
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <span className="font-mono text-[11px] text-gray-500">
-              QPF: {row.qpfRefName || row.qpfRefCode || row.qpfName || 'Platform'}
+      header: 'Problem Title',
+      className: 'min-w-[260px]',
+      cell: (row: any) => {
+        const platform =
+          row.questionPlatform ||
+          row.qpfRefName ||
+          row.platformName ||
+          row.examPlatform ||
+          row.platform ||
+          (row.isOwnProblem ? 'Custom In-House' : 'Connect 2 Code');
+        return (
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold text-slate-900 dark:text-white truncate">
+              {row.title}
             </span>
-            {row.isOwnProblem && (
-              <span className="text-[11px] text-neutral-300 font-semibold">
-                &bull; Original Problem
-              </span>
-            )}
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
+              Platform: {platform}
+            </span>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       header: 'Difficulty',
-      cell: (row: any) => {
-        const diff = (row.difficultyRefName || row.difficultyRefCode || row.difficultyName || row.difficulty || '').toLowerCase();
-        let variant: 'easy' | 'medium' | 'hard' | 'neutral' = 'neutral';
-        if (diff.includes('easy')) variant = 'easy';
-        else if (diff.includes('medium')) variant = 'medium';
-        else if (diff.includes('hard')) variant = 'hard';
-
-        const label = row.difficultyRefName || row.difficultyName || row.difficultyRefCode || row.difficulty || '—';
-        return <AdminBadge variant={variant}>{label}</AdminBadge>;
-      },
       className: 'w-28',
-    },
-    {
-      header: 'Topic',
       cell: (row: any) => {
-        const label = row.topicRefName || row.topicName || row.topicRefCode || row.topic || 'General';
-        return <AdminBadge variant="primary">{label}</AdminBadge>;
+        const diff =
+          row.difficultyRefName ||
+          row.difficultyName ||
+          row.difficulty ||
+          row.difficultyRefCode ||
+          'Medium';
+        return (
+          <AdminBadge
+            variant={getDifficultyVariant(diff)}
+            size="sm"
+          >
+            {diff}
+          </AdminBadge>
+        );
       },
-      className: 'w-36',
     },
     {
-      header: 'Status',
-      cell: (row) => (
-        <AdminBadge variant={row.isActive !== false ? 'accent' : 'neutral'}>
-          {row.isActive !== false ? 'Active' : 'Inactive'}
-        </AdminBadge>
-      ),
-      className: 'w-24',
+      header: 'Category / Topic',
+      className: 'w-36',
+      cell: (row: any) => {
+        const topic =
+          row.topicRefName ||
+          row.topicName ||
+          row.category ||
+          row.topic ||
+          'General';
+        return (
+          <AdminBadge variant="primary" size="sm">
+            {topic}
+          </AdminBadge>
+        );
+      },
+    },
+    {
+      header: 'Hiring Partners',
+      className: 'min-w-[140px] hidden lg:table-cell',
+      cell: (row: any) => {
+        const companyList = Array.isArray(row.companies)
+          ? row.companies
+              .map((c: any) =>
+                typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c)
+              )
+              .filter(Boolean)
+          : [];
+        if (companyList.length === 0) {
+          return <span className="text-slate-400 text-xs italic">None</span>;
+        }
+        return (
+          <div className="flex items-center gap-1 flex-wrap">
+            {companyList.slice(0, 2).map((name: string, i: number) => (
+              <span
+                key={i}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-semibold"
+              >
+                {name}
+              </span>
+            ))}
+            {companyList.length > 2 && (
+              <span className="text-[10px] text-slate-400 font-mono">
+                +{companyList.length - 2}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: 'Actions',
+      className: 'w-36 text-right',
       cell: (row) => (
-        <div className="flex items-center gap-2">
-          {row.isOwnProblem && (
-            <button
-              onClick={() => handleOpenTestCasesForQuestion(row)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
-              title="Manage Test Cases"
-            >
-              <i className="fa-solid fa-vial text-xs"></i>
-            </button>
-          )}
+        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => {
-              setTargetQuestionForTestCode({
-                id: row.id!,
-                title: row.title,
-                difficultyRefName: row.difficultyRefName,
-              });
-              setIsTestCodeOpen(true);
-            }}
-            className="px-2.5 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-800 text-neutral-300 border border-neutral-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
-            title="Admin Code Runner & Tester: POST /api/v1/admin/testCode & /admin/submitCode"
+            onClick={() => handleInspect(row)}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            title="Inspect Details"
           >
-            <i className="fa-solid fa-play text-[10px]"></i>
-            <span className="text-[11px] font-extrabold hidden xl:inline">Test Code</span>
-          </button>
-          <button
-            onClick={() => handleInspect(row.id!)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Inspect Full Question Details"
-          >
-            <i className="fa-solid fa-eye text-xs"></i>
+            <Eye className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={() => handleEditClick(row)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-neutral-800 text-gray-400 hover:text-white transition-colors cursor-pointer"
-            title="Edit Question"
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
+            title="Edit Problem"
           >
-            <i className="fa-solid fa-pen-to-square text-xs"></i>
+            <Edit3 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              if (row.id) {
+                const enrichedRow: QuestionPayload = {
+                  ...row,
+                  testCases: (row.testCases && row.testCases.length > 0)
+                    ? row.testCases
+                    : extractTestCasesFromProblem(row),
+                  constraints: row.constraints || extractConstraintsFromDescription(row.description),
+                };
+                setTargetQuestionForTestCases(enrichedRow);
+                setIsTestCaseOpen(true);
+              }
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-400 transition-colors shadow-2xs cursor-pointer"
+            title="Manage Test Cases"
+          >
+            <Layers className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              if (row.id) {
+                setTargetQuestionForTestCode({
+                  id: row.id,
+                  title: row.title,
+                  difficultyRefName: row.difficultyRefName,
+                });
+                setIsTestCodeOpen(true);
+              }
+            }}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600 hover:border-purple-400 transition-colors shadow-2xs cursor-pointer"
+            title="Run Code Sandbox"
+          >
+            <Terminal className="w-3.5 h-3.5" />
           </button>
         </div>
       ),
-      className: 'w-40 text-right',
     },
   ];
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      {/* Page Header */}
       <AdminPageHeader
-        title="Questions"
-        description="Create and manage DSA practice questions"
+        title="DSA Problem Bank"
+        description="Index coding challenges, manage Judge0 sample and hidden assertions, and configure company tags."
+        badge={
+          <AdminBadge variant="primary">
+            {totalElements} Problems
+          </AdminBadge>
+        }
         actions={
-          <button
-            onClick={handleCreateClick}
-            className="px-4 py-2.5 bg-neutral-100 text-neutral-900 hover:bg-neutral-200 text-black font-extrabold text-sm rounded-xl transition-all cursor-pointer flex items-center gap-2 shadow-md  font-sans"
-          >
-            <i className="fa-solid fa-plus text-xs"></i>
-            <span>Add New Question</span>
-          </button>
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleCreateClick}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Question</span>
+            </button>
+            <button
+              onClick={fetchQuestions}
+              disabled={loading}
+              className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
+              title="Refresh"
+            >
+              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+            </button>
+          </div>
         }
       />
 
-      {/* Filter Bar Controls with Glassmorphism */}
-      <AdminCard className="p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-sans text-xs">
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Filter Difficulty</label>
-            <div className="relative">
-              <select
-                value={selectedDifficulty}
-                onChange={handleDifficultyChange}
-                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
-              >
-                <option value="">All Difficulties</option>
-                {difficulties.map((d) => (
-                  <option key={d.id || d.refCode} value={String(d.id)}>
-                    {d.refName}
-                  </option>
-                ))}
-              </select>
-              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Filter Topic</label>
-            <div className="relative">
-              <select
-                value={selectedTopic}
-                onChange={handleTopicChange}
-                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
-              >
-                <option value="">All Topics</option>
-                {topics.map((t) => (
-                  <option key={t.id || t.refCode} value={String(t.id)}>
-                    {t.refName}
-                  </option>
-                ))}
-              </select>
-              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Filter Company</label>
-            <div className="relative">
-              <select
-                value={selectedCompany}
-                onChange={handleCompanyChange}
-                className="w-full appearance-none bg-neutral-950 text-gray-100 rounded-xl px-4 py-2.5 pr-8 text-xs border border-white/10 hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-all focus:outline-none cursor-pointer"
-              >
-                <option value="">All Companies</option>
-                {companies.map((c) => (
-                  <option key={c.id || c.name} value={String(c.id)}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <i className="fa-solid fa-chevron-down text-[10px] text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-300">Search Title / Category</label>
-            <div className="relative flex items-center">
-              <i className="fa-solid fa-magnifying-glass absolute left-3.5 text-gray-500 text-xs"></i>
-              <input
-                type="text"
-                placeholder="Search practice problems..."
-                value={searchTerm}
-                onChange={handleSearchChange}
-                className="w-full bg-neutral-950 text-gray-100 placeholder-gray-500 rounded-xl pl-9 pr-4 py-2.5 text-xs border border-white/10 transition-all focus:outline-none focus:border-neutral-600"
-              />
-            </div>
-          </div>
+      {/* Filter Bar */}
+      <div className="p-4 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
+        {/* Search */}
+        <div className="relative w-full md:w-72">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search problems by title..."
+            className="w-full pl-10 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          />
         </div>
-      </AdminCard>
 
-      {/* Error State Handler */}
-      {error ? (
-        <AdminErrorState
-          title="Backend Question API Error"
-          message={error}
-          onRetry={fetchQuestions}
-        />
-      ) : (
+        {/* Dropdowns */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
+          {/* Difficulty */}
+          <select
+            value={selectedDifficulty}
+            onChange={(e) => {
+              setSelectedDifficulty(e.target.value);
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Difficulties</option>
+            {difficulties.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.refName}
+              </option>
+            ))}
+          </select>
+
+          {/* Topic */}
+          <select
+            value={selectedTopic}
+            onChange={(e) => {
+              setSelectedTopic(e.target.value);
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Categories</option>
+            {topics.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.refName}
+              </option>
+            ))}
+          </select>
+
+          {/* Company */}
+          <select
+            value={selectedCompany}
+            onChange={(e) => {
+              setSelectedCompany(e.target.value);
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Companies</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Page Size */}
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPageNumber(0);
+            }}
+            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="10">10 / page</option>
+            <option value="20">20 / page</option>
+            <option value="50">50 / page</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Error State */}
+      {error && <AdminErrorState message={error} onRetry={fetchQuestions} />}
+
+      {/* Questions Table */}
+      {!error && (
         <div className="space-y-4">
-          <AdminTable
+          <AdminTable<QuestionPayload>
             columns={columns}
-            data={displayQuestions}
+            data={questions}
             loading={loading}
+            keyExtractor={(row) => row.id || row.title}
+            onRowClick={(row) => handleInspect(row)}
             emptyTitle="No Questions Found"
-            emptyDescription="No practice problems match your filter parameters in the database."
-            keyExtractor={(item) => item.id || item.title}
+            emptyDescription="There are currently no DSA problems matching your active filter criteria."
+            emptyAction={
+              <button
+                onClick={handleCreateClick}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create First Question</span>
+              </button>
+            }
           />
 
-          {/* Full-Featured Admin Pagination Footer */}
-          {!loading && totalElements > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-neutral-900 backdrop-blur-xl border border-white/10 rounded-2xl text-xs font-sans text-gray-300 shadow-2xl">
-            <div className="flex items-center gap-3 flex-wrap">
-              <span>
-                Showing{' '}
-                <strong className="text-white">
-                  {totalElements === 0 ? 0 : pageNumber * pageSize + 1}
-                </strong>{' '}
-                to{' '}
-                <strong className="text-white">
-                  {Math.min((pageNumber + 1) * pageSize, totalElements)}
-                </strong>{' '}
-                of <strong className="text-white">{totalElements}</strong> questions
-              </span>
-              <div className="flex items-center gap-1.5 ml-2">
-                <span className="text-gray-400">Per page:</span>
-                <div className="relative">
-                  <select
-                    value={pageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="appearance-none bg-neutral-950 text-gray-100 rounded-lg pl-2.5 pr-6 py-1 border border-white/10 text-xs focus:outline-none focus:border-blue-500 cursor-pointer"
-                  >
-                    <option value={10}>10</option>
-                    <option value={20}>20</option>
-                    <option value={50}>50</option>
-                    <option value={100}>100</option>
-                  </select>
-                  <i className="fa-solid fa-chevron-down text-[8px] text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* First Page */}
-              <button
-                disabled={pageNumber === 0 || loading}
-                onClick={() => setPageNumber(0)}
-                className="p-1.5 px-2 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
-                title="First Page"
-              >
-                <i className="fa-solid fa-angles-left text-[10px]"></i>
-              </button>
-
-              {/* Previous Page */}
-              <button
-                disabled={pageNumber === 0 || loading}
-                onClick={() => setPageNumber((p) => Math.max(0, p - 1))}
-                className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <i className="fa-solid fa-angle-left text-[10px]"></i>
-                <span className="hidden sm:inline">Prev</span>
-              </button>
-
-              {/* Page Number Buttons */}
-              <div className="flex items-center gap-1">
-                {getPageNumbers().map((p, idx) => {
-                  if (p === 'ellipsis') {
-                    return (
-                      <span key={`ell-${idx}`} className="px-1 text-gray-500 font-bold select-none">
-                        •••
-                      </span>
-                    );
-                  }
-                  const isActive = p === pageNumber + 1;
-                  return (
-                    <button
-                      key={p}
-                      onClick={() => setPageNumber(p - 1)}
-                      disabled={loading}
-                      className={`min-w-8 h-8 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
-                        isActive
-                          ? 'bg-neutral-100 text-neutral-900 text-black shadow-md  font-extrabold'
-                          : 'border border-white/10 bg-neutral-950 text-gray-300 hover:bg-white/10 hover:text-white'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Next Page */}
-              <button
-                disabled={pageNumber >= totalPages - 1 || loading}
-                onClick={() => setPageNumber((p) => p + 1)}
-                className="px-3 py-1.5 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <span className="hidden sm:inline">Next</span>
-                <i className="fa-solid fa-angle-right text-[10px]"></i>
-              </button>
-
-              {/* Last Page */}
-              <button
-                disabled={pageNumber >= totalPages - 1 || loading}
-                onClick={() => setPageNumber(Math.max(0, totalPages - 1))}
-                className="p-1.5 px-2 rounded-xl bg-neutral-950 hover:bg-white/10 disabled:opacity-30 border border-white/10 text-white font-semibold transition-all cursor-pointer"
-                title="Last Page"
-              >
-                <i className="fa-solid fa-angles-right text-[10px]"></i>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+          {/* Pagination */}
+          {totalElements > 0 && (
+            <Pagination
+              currentPage={pageNumber + 1}
+              totalPages={totalPages}
+              totalElements={totalElements}
+              pageSize={pageSize}
+              onPageChange={(p) => setPageNumber(p - 1)}
+            />
+          )}
+        </div>
       )}
 
-      {/* Single Popup Question + Test Case Form Modal */}
+      {/* Question Form Modal (Create / Edit) */}
       <QuestionFormModal
         isOpen={isFormOpen}
-        onClose={() => {
-          setIsFormOpen(false);
-          setCreatedQuestionIdForRetry(null);
-        }}
+        onClose={() => setIsFormOpen(false)}
         onSubmit={handleSaveQuestion}
         initialData={selectedQuestion}
         submitting={submitting}
       />
 
-      {/* Details View Modal */}
+      {/* Question Details Modal */}
       <QuestionDetailsModal
         isOpen={isDetailsOpen}
         onClose={() => setIsDetailsOpen(false)}
@@ -726,20 +824,30 @@ export const AdminQuestions: React.FC = () => {
         }}
       />
 
-      {/* Test Case Modal for Existing Questions */}
+      {/* TestCase Modal */}
       <TestCaseModal
         isOpen={isTestCaseOpen}
-        onClose={() => setIsTestCaseOpen(false)}
-        questionId={targetQuestionForTestCases?.id ?? null}
+        onClose={() => {
+          setIsTestCaseOpen(false);
+          setTargetQuestionForTestCases(null);
+        }}
+        questionId={targetQuestionForTestCases?.id || null}
         questionTitle={targetQuestionForTestCases?.title}
+        question={targetQuestionForTestCases}
+        onSuccess={() => fetchQuestions()}
       />
 
-      {/* Admin Code Runner & Validation Modal */}
+      {/* Admin Code Test Modal */}
       <AdminCodeTestModal
         isOpen={isTestCodeOpen}
-        onClose={() => setIsTestCodeOpen(false)}
+        onClose={() => {
+          setIsTestCodeOpen(false);
+          setTargetQuestionForTestCode(null);
+        }}
         question={targetQuestionForTestCode}
       />
     </div>
   );
 };
+
+export default AdminQuestions;

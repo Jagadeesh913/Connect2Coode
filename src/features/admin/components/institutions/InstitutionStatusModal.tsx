@@ -1,6 +1,7 @@
 import React from 'react';
 import { AdminModal } from '../AdminModal';
 import type { Institution } from '../../../../core/types/domain';
+import { AlertCircle, CheckCircle2, PowerOff, Check, Loader2 } from 'lucide-react';
 
 interface InstitutionStatusModalProps {
   isOpen: boolean;
@@ -28,28 +29,35 @@ export const InstitutionStatusModal: React.FC<InstitutionStatusModalProps> = ({
       onClose={onClose}
       title={isDeactivating ? 'Deactivate Institution' : 'Activate Institution'}
       subtitle={`Institution #${institution.id} • ${institution.name}`}
+      icon={
+        isDeactivating ? (
+          <AlertCircle className="w-5 h-5 text-rose-500" />
+        ) : (
+          <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+        )
+      }
       maxWidth="md"
     >
       <div className="space-y-4 font-sans text-left">
         <div
-          className={`p-4 rounded-xl border flex items-start gap-3 ${
+          className={`p-4 rounded-2xl border flex items-start gap-3.5 ${
             isDeactivating
-              ? 'bg-rose-500/10 border-rose-500/30 text-rose-200'
-              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-200'
+              ? 'bg-rose-50/70 border-rose-200 dark:bg-rose-950/20 dark:border-rose-900/40 text-rose-700 dark:text-rose-300'
+              : 'bg-emerald-50/70 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40 text-emerald-700 dark:text-emerald-300'
           }`}
         >
-          <i
-            className={`fa-solid ${
-              isDeactivating ? 'fa-triangle-exclamation text-rose-400' : 'fa-circle-check text-emerald-400'
-            } text-base mt-0.5 shrink-0`}
-          ></i>
+          {isDeactivating ? (
+            <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+          )}
           <div className="text-xs">
-            <p className="font-semibold text-white">
+            <p className="font-bold text-slate-900 dark:text-white">
               {isDeactivating
                 ? 'Are you sure you want to deactivate this institution?'
                 : 'Confirm institution reactivation'}
             </p>
-            <p className="mt-1 text-gray-300 leading-relaxed">
+            <p className="mt-1 leading-relaxed opacity-90">
               {isDeactivating
                 ? 'Deactivating will immediately hide this institution from public student searches and registration autocomplete. Historical records will be preserved.'
                 : 'Activating will immediately make this institution visible in student registration searches and dropdowns.'}
@@ -57,20 +65,24 @@ export const InstitutionStatusModal: React.FC<InstitutionStatusModalProps> = ({
           </div>
         </div>
 
-        <div className="p-3 bg-neutral-950 rounded-xl border border-white/5 text-xs text-gray-300">
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500">Institution:</span>
-            <span className="font-medium text-white text-right">{institution.name}</span>
+        <div className="p-4 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+          <div className="flex justify-between py-0.5">
+            <span className="text-slate-400 font-semibold">Institution Name:</span>
+            <span className="font-bold text-slate-900 dark:text-white text-right">
+              {institution.name}
+            </span>
           </div>
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500">AISHE Code:</span>
-            <span className="font-mono text-gray-300">{institution.aisheCode}</span>
+          <div className="flex justify-between py-0.5">
+            <span className="text-slate-400 font-semibold">AISHE Code:</span>
+            <span className="font-mono text-slate-700 dark:text-slate-300">
+              {institution.aisheCode}
+            </span>
           </div>
-          <div className="flex justify-between py-1">
-            <span className="text-gray-500">New Status:</span>
+          <div className="flex justify-between py-0.5">
+            <span className="text-slate-400 font-semibold">New Status:</span>
             <span
-              className={`font-bold ${
-                nextStatus ? 'text-emerald-400' : 'text-rose-400'
+              className={`font-black ${
+                nextStatus ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
               }`}
             >
               {nextStatus ? 'ACTIVE' : 'INACTIVE'}
@@ -78,12 +90,12 @@ export const InstitutionStatusModal: React.FC<InstitutionStatusModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200/80 dark:border-slate-800/80">
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="px-4 py-2 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
@@ -91,24 +103,24 @@ export const InstitutionStatusModal: React.FC<InstitutionStatusModalProps> = ({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className={`flex items-center gap-2 px-5 py-2 text-white text-xs font-bold rounded-xl shadow-lg transition-all disabled:opacity-50 ${
+            className={`flex items-center gap-2 px-5 py-2 text-white text-xs font-bold rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50 ${
               isDeactivating
-                ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
-                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
+                ? 'bg-rose-600 hover:bg-rose-700'
+                : 'bg-emerald-600 hover:bg-emerald-700'
             }`}
           >
             {submitting ? (
               <>
-                <i className="fa-solid fa-spinner fa-spin text-xs"></i>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 <span>Updating status...</span>
               </>
             ) : (
               <>
-                <i
-                  className={`fa-solid ${
-                    isDeactivating ? 'fa-ban' : 'fa-check'
-                  } text-xs`}
-                ></i>
+                {isDeactivating ? (
+                  <PowerOff className="w-3.5 h-3.5" />
+                ) : (
+                  <Check className="w-3.5 h-3.5" />
+                )}
                 <span>{isDeactivating ? 'Deactivate Institution' : 'Activate Institution'}</span>
               </>
             )}
