@@ -16,9 +16,15 @@ export const API_ENDPOINTS = {
   },
   COMPANY: {
     BASE: '/company',
+    LIST: '/company/list',
     DETAILS: (id: string | number) => `/company/${id}`,
     PROBLEMS: (id: string | number) => `/company/${id}/problems`,
+    EXAMS: (companyId: string | number) => `/company/${companyId}/exams/list`,
+    EXAM_DETAILS: (examId: string | number) => `/company/exams/${examId}`,
     ADMIN_BASE: '/admin/company',
+    ADMIN_ROLE: '/admin/companyRole',
+    ADMIN_EXAM_SECTION: '/admin/examSection',
+    ADMIN_EXAM: '/admin/companyExam',
   },
   QUESTION: {
     BASE: '/question',

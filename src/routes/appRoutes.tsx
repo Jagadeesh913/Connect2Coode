@@ -23,6 +23,7 @@ const ProblemList = lazy(() => import('../features/problems/pages/ProblemList').
 const ProblemDetails = lazy(() => import('../features/problems/pages/ProblemDetails').then((m: any) => ({ default: m.ProblemDetails || m.default })));
 const CompanyList = lazy(() => import('../features/companies/pages/CompanyList').then((m: any) => ({ default: m.CompanyList || m.default })));
 const CompanyDetails = lazy(() => import('../features/companies/pages/CompanyDetails').then((m: any) => ({ default: m.CompanyDetails || m.default })));
+const CompanyExamDetails = lazy(() => import('../features/companies/pages/CompanyExamDetails').then((m: any) => ({ default: m.CompanyExamDetails || m.default })));
 const CompanyPatterns = lazy(() => import('../features/companies/pages/CompanyPatterns').then((m: any) => ({ default: m.CompanyPatterns || m.default })));
 const CompanyPatternDetails = lazy(() => import('../features/companies/pages/CompanyPatternDetails').then((m: any) => ({ default: m.CompanyPatternDetails || m.default })));
 
@@ -109,7 +110,15 @@ const appRoutes = [
   {
     element: <MainLayout />,
     children: [
-      // All app features require authentication except the Home landing page
+      // Company Prep Pages (Publicly accessible with in-app tracking for logged-in users)
+      { path: '/companies', element: withSuspense(CompanyList) },
+      { path: '/companies/:slug', element: withSuspense(CompanyDetails) },
+      { path: '/companies/:companyId/exams/:examId', element: withSuspense(CompanyExamDetails) },
+      { path: '/companies/exams/:examId', element: withSuspense(CompanyExamDetails) },
+      { path: '/company-patterns', element: <Navigate to="/companies" replace /> },
+      { path: '/company-patterns/:slug', element: withSuspense(CompanyDetails) },
+
+      // All app features require authentication except the Home landing page & Company Prep
       {
         element: <ProtectedRoute />,
         children: [
@@ -118,12 +127,6 @@ const appRoutes = [
           { path: '/practice', element: withSuspense(PracticePage) },
           { path: '/problems', element: <Navigate to="/practice" replace /> },
           { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
-
-          // Companies Pages
-          { path: '/companies', element: withSuspense(CompanyList) },
-          { path: '/companies/:slug', element: withSuspense(CompanyDetails) },
-          { path: '/company-patterns', element: renderFeature(CompanyPatterns, 'Company Exam Patterns') },
-          { path: '/company-patterns/:slug', element: renderFeature(CompanyPatternDetails, 'Company Exam Patterns') },
 
           // Aptitude Practice Pages
           { path: '/aptitude', element: withSuspense(AptitudePrep) },

@@ -97,12 +97,14 @@ export const tokenStorage = {
       inMemoryAccessToken ||
       getCookie(ACCESS_TOKEN_KEY) ||
       getCookie('token') ||
+      getCookie('access_token') ||
       getCookie('accessToken') ||
       getCookie('jwt') ||
       getCookie('jwtToken') ||
       getCookie('authToken') ||
       getLocalItem(ACCESS_TOKEN_KEY) ||
       getLocalItem('token') ||
+      getLocalItem('access_token') ||
       getLocalItem('accessToken') ||
       getLocalItem('jwt') ||
       getLocalItem('jwtToken') ||
@@ -114,16 +116,20 @@ export const tokenStorage = {
     inMemoryAccessToken = token;
     setCookie(ACCESS_TOKEN_KEY, token, maxAgeSeconds);
     setCookie('token', token, maxAgeSeconds);
+    setCookie('access_token', token, maxAgeSeconds);
     setLocalItem(ACCESS_TOKEN_KEY, token);
     setLocalItem('token', token);
+    setLocalItem('access_token', token);
   },
 
   removeAccessToken(): void {
     inMemoryAccessToken = null;
     removeCookie(ACCESS_TOKEN_KEY);
     removeCookie('token');
+    removeCookie('access_token');
     removeLocalItem(ACCESS_TOKEN_KEY);
     removeLocalItem('token');
+    removeLocalItem('access_token');
   },
 
   getRefreshToken(): string | null {
@@ -158,7 +164,11 @@ export const tokenStorage = {
 
   // User profile is UI/session metadata, not an authentication credential (F-013).
   getUser(): User | null {
-    const raw = getCookie(USER_PROFILE_KEY) || getLocalItem(USER_PROFILE_KEY);
+    const raw =
+      getCookie(USER_PROFILE_KEY) ||
+      getCookie('user') ||
+      getLocalItem(USER_PROFILE_KEY) ||
+      getLocalItem('user');
     if (raw) {
       try {
         return JSON.parse(raw) as User;
@@ -170,12 +180,16 @@ export const tokenStorage = {
   setUser(user: User, maxAgeSeconds: number = 604800): void {
     const serialized = JSON.stringify(user);
     setCookie(USER_PROFILE_KEY, serialized, maxAgeSeconds);
+    setCookie('user', serialized, maxAgeSeconds);
     setLocalItem(USER_PROFILE_KEY, serialized);
+    setLocalItem('user', serialized);
   },
 
   removeUser(): void {
     removeCookie(USER_PROFILE_KEY);
+    removeCookie('user');
     removeLocalItem(USER_PROFILE_KEY);
+    removeLocalItem('user');
   },
 
   clearTokens(): void {

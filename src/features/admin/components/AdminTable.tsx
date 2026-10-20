@@ -67,7 +67,7 @@ export function AdminTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/60">
             {data.map((row) => (
               <tr
                 key={keyExtractor(row)}

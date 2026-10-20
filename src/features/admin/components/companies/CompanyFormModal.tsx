@@ -5,6 +5,7 @@ import { AdminModal } from '../AdminModal';
 import { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { adminCompanySchema, AdminCompanyFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { CompanyBrandLogo } from '../../../companies/components/CompanyBrandLogo';
 import { Building2, Globe, Image, FileText, CheckCircle2 } from 'lucide-react';
 
 export type CompanyFormData = AdminCompanyFormData;
@@ -85,6 +86,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
   };
 
   const currentLogoUrl = watch('logoUrl');
+  const currentName = watch('name');
+  const currentWebsite = watch('websiteUrl');
 
   return (
     <AdminModal
@@ -187,20 +190,16 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             Brand Logo URL
           </label>
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 flex items-center justify-center shrink-0 shadow-xs">
-              {currentLogoUrl ? (
-                <img
-                  src={currentLogoUrl}
-                  alt="Preview"
+            <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
+              {currentLogoUrl || currentName ? (
+                <CompanyBrandLogo
+                  name={currentName || 'Company'}
+                  logo={currentLogoUrl}
+                  website={currentWebsite}
                   className="w-full h-full object-contain"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.onerror = null;
-                    target.src = '/logo-mark-transparent.png';
-                  }}
                 />
               ) : (
-                <Image className="w-5 h-5 text-slate-400" />
+                <Building2 className="w-5 h-5 text-slate-400" />
               )}
             </div>
             <div className="flex-1">

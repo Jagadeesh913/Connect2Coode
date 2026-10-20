@@ -61,6 +61,13 @@ export function decodeJwtPayload(token: string | null | undefined): DecodedJwtPa
 
 export function isJwtExpired(payload: DecodedJwtPayload | null): boolean {
   if (!payload || typeof payload.exp !== 'number') return false;
+  const isLocalDev =
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  if (isLocalDev) {
+    // 24-hour grace leeway for local dev testing so active development sessions aren't interrupted
+    return payload.exp * 1000 + 86400000 <= Date.now();
+  }
   return payload.exp * 1000 <= Date.now();
 }
 

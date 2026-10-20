@@ -6,6 +6,7 @@ import { AdminCard } from '../components/AdminCard';
 import { AdminErrorState } from '../components/AdminErrorState';
 import { CompanyFormModal, CompanyFormData } from '../components/companies/CompanyFormModal';
 import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal';
+import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { adminCompanyService, CompanyItem } from '../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
@@ -20,6 +21,7 @@ import {
   Edit3,
   Eye,
   Globe,
+  GraduationCap,
 } from 'lucide-react';
 
 export const AdminCompanies: React.FC = () => {
@@ -34,6 +36,7 @@ export const AdminCompanies: React.FC = () => {
   // Modals State
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState<boolean>(false);
+  const [detailsTab, setDetailsTab] = useState<'overview' | 'exams'>('overview');
   const [selectedCompany, setSelectedCompany] = useState<CompanyItem | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -62,7 +65,8 @@ export const AdminCompanies: React.FC = () => {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  const handleInspect = async (id: string | number) => {
+  const handleInspect = async (id: string | number, tab: 'overview' | 'exams' = 'overview') => {
+    setDetailsTab(tab);
     setDetailsLoading(true);
     setIsDetailsOpen(true);
     try {
@@ -147,19 +151,14 @@ export const AdminCompanies: React.FC = () => {
       header: 'Company Profile',
       className: 'min-w-[220px]',
       cell: (row) => {
-        const logoUrl = row.logoUrl || '/logo-mark-transparent.png';
         return (
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs">
-              <img
-                src={logoUrl}
-                alt={row.name}
+            <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
+              <CompanyBrandLogo
+                name={row.name}
+                logo={row.logoUrl}
+                website={row.websiteUrl}
                 className="w-full h-full object-contain"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.onerror = null;
-                  target.src = '/logo-mark-transparent.png';
-                }}
               />
             </div>
             <div className="flex flex-col min-w-0">
@@ -209,13 +208,20 @@ export const AdminCompanies: React.FC = () => {
     },
     {
       header: 'Actions',
-      className: 'w-28 text-right',
+      className: 'w-36 text-right',
       cell: (row) => (
         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={() => handleInspect(row.id!)}
+            onClick={() => handleInspect(row.id!, 'exams')}
+            className="p-1.5 rounded-lg border border-purple-200 dark:border-purple-800/60 bg-purple-50/50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:border-purple-400 dark:hover:border-purple-700 transition-colors shadow-2xs cursor-pointer"
+            title="Manage Recruitment Exams & Patterns"
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => handleInspect(row.id!, 'overview')}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
-            title="Inspect Company"
+            title="Inspect Company Overview"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
@@ -334,7 +340,6 @@ export const AdminCompanies: React.FC = () => {
       {!error && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCompanies.map((c) => {
-            const logoUrl = c.logoUrl || '/logo-mark-transparent.png';
             return (
               <div
                 key={c.id || c.name}
@@ -342,16 +347,12 @@ export const AdminCompanies: React.FC = () => {
                 className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 space-y-3.5 shadow-xs hover:shadow-md hover:border-blue-400/50 transition-all cursor-pointer group text-left"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs">
-                    <img
-                      src={logoUrl}
-                      alt={c.name}
+                  <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
+                    <CompanyBrandLogo
+                      name={c.name}
+                      logo={c.logoUrl}
+                      website={c.websiteUrl}
                       className="w-full h-full object-contain"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.onerror = null;
-                        target.src = '/logo-mark-transparent.png';
-                      }}
                     />
                   </div>
                   <AdminBadge
@@ -378,7 +379,7 @@ export const AdminCompanies: React.FC = () => {
                   </p>
                 )}
 
-                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs">
                   {c.websiteUrl ? (
                     <a
                       href={c.websiteUrl}
@@ -397,9 +398,19 @@ export const AdminCompanies: React.FC = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleInspect(c.id!, 'exams');
+                      }}
+                      className="p-1.5 rounded-lg border border-purple-200 dark:border-purple-800/60 bg-purple-50/50 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:border-purple-400 dark:hover:border-purple-700 transition-colors shadow-2xs cursor-pointer"
+                      title="Manage Recruitment Exams & Patterns"
+                    >
+                      <GraduationCap className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleEditClick(c);
                       }}
-                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
                       title="Edit"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
@@ -428,6 +439,7 @@ export const AdminCompanies: React.FC = () => {
         onClose={() => setIsDetailsOpen(false)}
         company={selectedCompany}
         loading={detailsLoading}
+        initialTab={detailsTab}
       />
     </div>
   );

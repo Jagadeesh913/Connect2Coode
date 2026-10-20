@@ -263,15 +263,29 @@ apiClient.interceptors.request.use(
       config.headers['Authorization'] = `Bearer ${token}`;
       config.headers['authorization'] = `Bearer ${token}`;
 
+      // Ensure token is NEVER sent in URL query parameters
+      if (config.params && 'token' in config.params) {
+        delete config.params.token;
+      }
+
       // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
-      if (
-        config.data &&
-        typeof config.data === 'object' &&
-        !Array.isArray(config.data) &&
-        !(config.data instanceof FormData)
-      ) {
-        if (!config.data.token && !config.data.jwtToken && !config.data.accessToken) {
-          config.data.token = token;
+      const method = (config.method || 'get').toLowerCase();
+      if (['post', 'put', 'patch', 'delete'].includes(method)) {
+        if (!config.data && method !== 'delete') {
+          config.data = {};
+        }
+        if (
+          config.data &&
+          typeof config.data === 'object' &&
+          !Array.isArray(config.data) &&
+          !(config.data instanceof FormData)
+        ) {
+          if (!config.data.token) {
+            config.data.token = token;
+          }
+          if (!config.data.jwtToken) {
+            config.data.jwtToken = token;
+          }
         }
       }
     }

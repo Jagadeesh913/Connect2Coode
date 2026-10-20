@@ -14,6 +14,11 @@ import {
   cleanQuestionText,
   synthesizeMcqOptions,
 } from '../../aptitude/utils/mcqUtils';
+import { companyService } from '../../../services/companyService';
+import type { CompanyExamItem } from '../types/companyExam';
+import { CompanyExamCard } from '../components/CompanyExamCard';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { GraduationCap, Code2 } from 'lucide-react';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -101,6 +106,12 @@ export const CompanyDetails: React.FC = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
+  // Tab State: Recruitment Exams (Default) vs Practice Questions
+  const [activeTab, setActiveTab] = useState<'exams' | 'practice'>('exams');
+  const [exams, setExams] = useState<CompanyExamItem[]>([]);
+  const [examsLoading, setExamsLoading] = useState<boolean>(true);
+  const [examsError, setExamsError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!slug) return;
     setLoadedCompanyKey(null);
@@ -114,6 +125,47 @@ export const CompanyDetails: React.FC = () => {
 
   const companyId = company?.id;
   const companyName = company?.name;
+
+  // Fetch Company Related Exams (API driven)
+  useEffect(() => {
+    const targetId = companyId ?? slug;
+    if (targetId === undefined || targetId === null || targetId === '') return;
+    const safeTargetId: string | number = targetId;
+
+    let isMounted = true;
+    const controller = new AbortController();
+
+    async function loadCompanyExams() {
+      setExamsLoading(true);
+      setExamsError(null);
+      try {
+        const res = await companyService.getCompanyExamsList(
+          safeTargetId,
+          { pageNumber: 0, pageSize: 20, sortBy: 'year', sortDirection: 'DESC' },
+          controller.signal
+        );
+        if (isMounted) {
+          setExams(res.data.content || []);
+        }
+      } catch (err: any) {
+        if (isMounted && err?.name !== 'CanceledError') {
+          setExamsError(err?.message || 'Failed to fetch company exams');
+          setExams([]);
+        }
+      } finally {
+        if (isMounted) {
+          setExamsLoading(false);
+        }
+      }
+    }
+
+    loadCompanyExams();
+
+    return () => {
+      isMounted = false;
+      controller.abort();
+    };
+  }, [companyId, slug]);
 
   useEffect(() => {
     if (companyId === undefined && !companyName) return;
@@ -478,8 +530,99 @@ export const CompanyDetails: React.FC = () => {
           </div>
         </section>
 
-        {/* 3. SECTION SELECTION BELOW COMPANY HEADER/BANNER */}
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+        {/* 3. PRIMARY TAB SWITCHER: Recruitment Exams (Default) vs Practice Questions */}
+        <div className="flex items-center gap-3 p-1.5 bg-slate-100 dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl w-full sm:w-auto mb-6 max-w-md">
+          <button
+            type="button"
+            onClick={() => setActiveTab('exams')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'exams'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            <span>Recruitment Exams</span>
+            {exams.length > 0 && (
+              <span
+                className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+                  activeTab === 'exams'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                }`}
+              >
+                {exams.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('practice')}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === 'practice'
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Code2 className="w-4 h-4" />
+            <span>Practice Questions</span>
+          </button>
+        </div>
+
+        {/* 4. RECRUITMENT EXAMS VIEW */}
+        {activeTab === 'exams' && (
+          <section className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                  Official Recruitment Exams &amp; Patterns
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
+                  Explore active hiring drives, syllabus, section timings, and role compensation for {company.name}
+                </p>
+              </div>
+            </div>
+
+            {examsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-64 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 animate-pulse p-6"
+                  />
+                ))}
+              </div>
+            ) : exams.length === 0 ? (
+              <div className="my-8">
+                <EmptyState
+                  title={`No recruitment exams published yet for ${company.name}`}
+                  description="There are currently no active placement exams listed for this company. You can practice curated coding and aptitude questions instead."
+                  actionText="Practice Questions"
+                  onAction={() => setActiveTab('practice')}
+                  icon={<GraduationCap className="w-12 h-12 text-slate-400" />}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {exams.map((exam) => (
+                  <CompanyExamCard
+                    key={exam.id}
+                    exam={exam}
+                    companyId={company.id ?? slug ?? ''}
+                    companyName={company.name}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* 5. PRACTICE QUESTIONS VIEW */}
+        {activeTab === 'practice' && (
+          <>
+            {/* Section Selection Buttons */}
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
           {SECTIONS.map((sec) => {
             const isActive = activeSection === sec.id;
             const count =
@@ -500,7 +643,7 @@ export const CompanyDetails: React.FC = () => {
                 className={`flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0 cursor-pointer ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20 scale-[1.02]'
-                    : 'bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
+                    : 'bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 shadow-2xs'
                 }`}
               >
                 <i className={`${sec.icon} ${isActive ? 'text-white' : 'text-slate-400'}`}></i>
@@ -512,7 +655,7 @@ export const CompanyDetails: React.FC = () => {
                     className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                       isActive
                         ? 'bg-white/20 text-white'
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold'
                     }`}
                   >
                     {count}
@@ -524,7 +667,7 @@ export const CompanyDetails: React.FC = () => {
         </div>
 
         {/* 4. QUESTIONS SECTION CONTAINER */}
-        <section className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs">
+        <section className="bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xs">
           
           {/* Search & Filters Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-6">
@@ -537,7 +680,7 @@ export const CompanyDetails: React.FC = () => {
                 placeholder={`Search ${currentSectionConfig.label} questions by title, tags or keywords...`}
                 value={questionSearch}
                 onChange={(e) => setQuestionSearch(e.target.value)}
-                className="w-full bg-transparent pl-7 pr-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                className="w-full bg-transparent pl-7 pr-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
               />
             </div>
 
@@ -548,12 +691,12 @@ export const CompanyDetails: React.FC = () => {
                 <select
                   value={selectedDifficulty}
                   onChange={(e) => setSelectedDifficulty(e.target.value as any)}
-                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-200 dark:border-slate-700/80 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
+                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
                 >
-                  <option value="All" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty: All</option>
-                  <option value="Easy" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Easy</option>
-                  <option value="Medium" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Medium</option>
-                  <option value="Hard" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Hard</option>
+                  <option value="All" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty: All</option>
+                  <option value="Easy" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Easy</option>
+                  <option value="Medium" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Medium</option>
+                  <option value="Hard" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Hard</option>
                 </select>
                 <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               </div>
@@ -563,11 +706,11 @@ export const CompanyDetails: React.FC = () => {
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-200 dark:border-slate-700/80 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
+                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
                 >
-                  <option value="default" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Sort by: Default</option>
-                  <option value="difficulty-asc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty (Easy to Hard)</option>
-                  <option value="difficulty-desc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty (Hard to Easy)</option>
+                  <option value="default" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Sort by: Default</option>
+                  <option value="difficulty-asc" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty (Easy to Hard)</option>
+                  <option value="difficulty-desc" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty (Hard to Easy)</option>
                 </select>
                 <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               </div>
@@ -577,10 +720,10 @@ export const CompanyDetails: React.FC = () => {
 
           {/* VIEW 1: CODING PROBLEMS TABLE */}
           {activeSection === 'coding' ? (
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-100 dark:border-slate-800/80 rounded-2xl">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-[#0A101D]">
                     <th className="py-3.5 px-4 w-12 text-center">#</th>
                     <th className="py-3.5 px-4">Title</th>
                     <th className="py-3.5 px-4 w-32">Difficulty</th>
@@ -590,7 +733,7 @@ export const CompanyDetails: React.FC = () => {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs sm:text-sm">
+                <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-xs sm:text-sm">
                   {isQuestionsLoading ? (
                     <TableRowSkeleton rows={8} />
                   ) : !isAuthenticated && companyProblems.length === 0 ? (
@@ -719,7 +862,7 @@ export const CompanyDetails: React.FC = () => {
                           <td className="py-3.5 px-4 text-right">
                             <Link
                               to={`/problems/${problem.slug || problem.id}`}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 dark:text-blue-400 font-semibold text-xs transition-colors"
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white font-semibold text-xs transition-colors"
                             >
                               <span>Solve</span>
                               <i className="fa-solid fa-arrow-right text-[10px]"></i>
@@ -734,10 +877,10 @@ export const CompanyDetails: React.FC = () => {
             </div>
           ) : (
             /* VIEW 2: MCQ SECTIONS TABLE (Aptitude, Reasoning, Verbal, Pseudocode) */
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-100 dark:border-slate-800/80 rounded-2xl">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
-                  <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-[#0A101D]">
                     <th className="py-3.5 px-4 w-12 text-center">#</th>
                     <th className="py-3.5 px-4">Question</th>
                     <th className="py-3.5 px-4 w-44">Topic</th>
@@ -747,7 +890,7 @@ export const CompanyDetails: React.FC = () => {
                   </tr>
                 </thead>
 
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs sm:text-sm">
+                <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-xs sm:text-sm">
                   {isMcqSectionLoading ? (
                     <TableRowSkeleton rows={6} showExamPlatform={false} showCompanies={false} />
                   ) : filteredMcqs.length === 0 ? (
@@ -770,7 +913,7 @@ export const CompanyDetails: React.FC = () => {
                       return (
                         <tr
                           key={mcq.id}
-                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
+                          className="hover:bg-slate-50 dark:hover:bg-[#111A2E]/60 transition-colors"
                         >
                           {/* # Index */}
                           <td className="py-3.5 px-4 text-center font-mono text-xs font-semibold text-slate-400">
@@ -791,7 +934,7 @@ export const CompanyDetails: React.FC = () => {
                           {/* Topic / Question Type */}
                           <td className="py-3.5 px-4">
                             {mcq.topicRefName || mcq.topicRefCode ? (
-                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-700/60">
                                 {mcq.topicRefName || mcq.topicRefCode}
                               </span>
                             ) : (
@@ -846,7 +989,7 @@ export const CompanyDetails: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => handleOpenSolveModal(mcq)}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 dark:text-blue-400 font-semibold text-xs transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white font-semibold text-xs transition-colors cursor-pointer"
                             >
                               <span>Solve</span>
                               <i className="fa-solid fa-arrow-right text-[10px]"></i>
@@ -862,6 +1005,8 @@ export const CompanyDetails: React.FC = () => {
           )}
 
         </section>
+          </>
+        )}
 
       </div>
 
@@ -871,7 +1016,7 @@ export const CompanyDetails: React.FC = () => {
           <div className="relative w-full max-w-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2.5 flex-wrap">
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-sky-400">
                   {activeSolveMcq.subjectRefName || currentSectionConfig.label}
@@ -924,7 +1069,7 @@ export const CompanyDetails: React.FC = () => {
             <div className="overflow-y-auto py-5 flex flex-col gap-5 pr-1">
               
               {/* Question Statement */}
-              <div className="text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-200 leading-relaxed bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800/80">
+              <div className="text-sm sm:text-base font-semibold text-slate-900 dark:text-slate-100 leading-relaxed bg-slate-50 dark:bg-[#111A2E] p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
                 {cleanQuestionText(activeSolveMcq.question)}
               </div>
 
@@ -938,7 +1083,7 @@ export const CompanyDetails: React.FC = () => {
 
               {/* Options Section */}
               <div className="flex flex-col gap-2.5">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Select your answer:
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -960,7 +1105,7 @@ export const CompanyDetails: React.FC = () => {
                             ? 'bg-rose-50 dark:bg-rose-950/50 border-rose-500 text-rose-800 dark:text-rose-200'
                             : isSelected
                             ? 'bg-blue-50 dark:bg-blue-950/50 border-blue-500 text-blue-800 dark:text-blue-200'
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-800 dark:text-slate-200'
+                            : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-slate-600 text-slate-800 dark:text-slate-200'
                         }`}
                       >
                         <span
@@ -1018,7 +1163,7 @@ export const CompanyDetails: React.FC = () => {
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3">
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
               <button
                 type="button"
                 onClick={() => setActiveSolveMcq(null)}

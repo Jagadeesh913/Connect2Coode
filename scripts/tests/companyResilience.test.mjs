@@ -139,6 +139,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
 
     it('falls back to getCompanies directory search ONLY when slug returns genuine 404 Not Found', async () => {
       const originalGet = apiClient.get;
+      const originalPost = apiClient.post;
       let fallbackInvoked = false;
 
       apiClient.get = async (url) => {
@@ -158,6 +159,20 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         return { data: {} };
       };
 
+      apiClient.post = async (url) => {
+        if (url.includes('/company/list') || url.includes('/company')) {
+          fallbackInvoked = true;
+          return {
+            data: {
+              content: [
+                { id: 99, name: 'Target Corp', slug: 'target-corp' }
+              ]
+            }
+          };
+        }
+        return { data: {} };
+      };
+
       try {
         const res = await companyService.getCompanyBySlug('target-corp');
         assert.equal(fallbackInvoked, true, 'Fallback getCompanies should be called on genuine 404');
@@ -165,6 +180,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         assert.equal(res.data.id, 99);
       } finally {
         apiClient.get = originalGet;
+        apiClient.post = originalPost;
       }
     });
 
