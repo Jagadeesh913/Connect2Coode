@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { tokenStorage } from '../security/tokenStorage';
+import { isTokenValid } from '../security/jwt';
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 
 const GuardLoader: React.FC = () => (
@@ -23,7 +24,9 @@ export const ProtectedRoute: React.FC = () => {
     return <GuardLoader />;
   }
 
-  if (!isAuthenticated && !token) {
+  const hasValidAuth = isAuthenticated && isTokenValid(token);
+
+  if (!hasValidAuth) {
     try {
       const fullPath = location.pathname + location.search + location.hash;
       if (

@@ -65,6 +65,18 @@ export function isJwtExpired(payload: DecodedJwtPayload | null): boolean {
 }
 
 /**
+ * Checks whether a token is a non-empty, well-formed JWT and has not expired.
+ */
+export function isTokenValid(token: string | null | undefined): boolean {
+  if (!token || typeof token !== 'string' || token.trim() === '' || token === 'null' || token === 'undefined') {
+    return false;
+  }
+  const payload = decodeJwtPayload(token);
+  if (!payload) return false;
+  return !isJwtExpired(payload);
+}
+
+/**
  * Checks whether the JWT contains claims indicating an admin role.
  * Used for client-side UI navigation gating only.
  * Checks role, Role, roles, Roles, authorities, and scope claims.

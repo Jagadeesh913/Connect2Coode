@@ -701,7 +701,7 @@ export const AdminQuestions: React.FC = () => {
               setSelectedDifficulty(e.target.value);
               setPageNumber(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Difficulties</option>
             {difficulties.map((d) => (
@@ -718,7 +718,7 @@ export const AdminQuestions: React.FC = () => {
               setSelectedTopic(e.target.value);
               setPageNumber(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Categories</option>
             {topics.map((t) => (
@@ -735,7 +735,7 @@ export const AdminQuestions: React.FC = () => {
               setSelectedCompany(e.target.value);
               setPageNumber(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="">All Companies</option>
             {companies.map((c) => (
@@ -752,7 +752,7 @@ export const AdminQuestions: React.FC = () => {
               setPageSize(Number(e.target.value));
               setPageNumber(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="10">10 / page</option>
             <option value="20">20 / page</option>

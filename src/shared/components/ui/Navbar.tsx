@@ -71,11 +71,13 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white/90 dark:bg-[#070A13]/90 border-b border-slate-200/80 dark:border-slate-800/80 backdrop-blur-md transition-colors duration-200 font-sans">
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex h-16 sm:h-20 items-center justify-between gap-4">
+      <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex h-16 sm:h-20 items-center justify-between gap-2 sm:gap-4">
           
           {/* BRAND LOGO */}
-          <BrandLogo size="md" />
+          <div className="shrink-0 min-w-0">
+            <BrandLogo size="md" />
+          </div>
 
           {/* DESKTOP NAVIGATION LINKS */}
           <nav className="hidden md:flex items-center gap-7 lg:gap-9">
@@ -109,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </nav>
 
           {/* RIGHT SIDE: SEARCH + THEME + AUTH BUTTONS */}
-          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             {/* Search Icon Button */}
             <button
               type="button"
@@ -135,7 +137,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isAdmin && (
               <Link
                 to="/admin/dashboard"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-xs font-bold shadow-xs"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-xs font-bold shadow-xs"
                 title="Switch to Admin Dashboard"
               >
                 <i className="fa-solid fa-shield-halved text-purple-600 dark:text-purple-400 text-xs"></i>
@@ -150,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     e.stopPropagation();
                     setIsProfileDropdownOpen((prev) => !prev);
                   }}
-                  className="flex items-center gap-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 sm:gap-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   aria-label="User menu"
                 >
                   <div className="relative">
@@ -158,14 +160,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <img
                         src={currentUser.avatarUrl}
                         alt={userDisplayName}
-                        className="w-8 h-8 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 shadow-xs"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 shadow-xs"
                       />
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center ring-2 ring-slate-200 dark:ring-slate-700 shadow-xs">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center ring-2 ring-slate-200 dark:ring-slate-700 shadow-xs">
                         {userInitials}
                       </div>
                     )}
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-[#0B0F19]"></span>
+                    <span className="absolute bottom-0 right-0 w-2 sm:w-2.5 h-2 sm:h-2.5 bg-emerald-500 rounded-full ring-2 ring-white dark:ring-[#0B0F19]"></span>
                   </div>
                   <i className={`fa-solid fa-chevron-down text-[10px] text-slate-400 transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-180' : ''}`}></i>
                 </button>
@@ -241,12 +243,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2 sm:gap-2.5">
+              <div className="flex items-center gap-1.5 sm:gap-2.5">
                 {/* Login Pill Button */}
                 <button
                   type="button"
                   onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                  className="rounded-full border border-slate-200 dark:border-slate-700 px-4 sm:px-5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs"
+                  className="rounded-full border border-slate-200 dark:border-slate-700 px-2.5 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                 >
                   Login
                 </button>
@@ -255,7 +257,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => dispatch(openAuthModal({ mode: 'signup' }))}
-                  className="rounded-full px-4 sm:px-5 py-1.5 text-xs sm:text-sm font-semibold text-white bg-[#0B0F19] hover:bg-slate-800 dark:bg-gradient-to-r dark:from-[#6366F1] dark:to-[#8B5CF6] dark:hover:opacity-90 shadow-sm transition-all cursor-pointer"
+                  className="rounded-full px-2.5 sm:px-5 py-1 sm:py-1.5 text-xs sm:text-sm font-semibold text-white bg-[#0B0F19] hover:bg-slate-800 dark:bg-gradient-to-r dark:from-[#6366F1] dark:to-[#8B5CF6] dark:hover:opacity-90 shadow-sm transition-all cursor-pointer whitespace-nowrap"
                 >
                   Sign Up
                 </button>
@@ -289,7 +291,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   key={item.to}
                   to={item.to}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold transition-all min-h-[44px] ${
                     isActive
                       ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 font-bold'
                       : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
@@ -300,16 +302,101 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </NavLink>
               );
             })}
+            
             {isAdmin && (
               <Link
                 to="/admin/dashboard"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 mt-1"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border border-purple-200 dark:border-purple-800/50 mt-1 min-h-[44px]"
               >
                 <i className="fa-solid fa-shield-halved text-xs text-purple-600 dark:text-purple-400"></i>
                 <span>Admin Portal</span>
               </Link>
             )}
+
+            {/* Mobile Drawer Auth & Profile Quick Links */}
+            <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              {isLoggedIn ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl mb-1">
+                    {currentUser?.avatarUrl ? (
+                      <img
+                        src={currentUser.avatarUrl}
+                        alt={userDisplayName}
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                        {userInitials}
+                      </div>
+                    )}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                        {userDisplayName}
+                      </span>
+                      {userDisplayEmail && (
+                        <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {userDisplayEmail}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <Link
+                    to="/profile"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 min-h-[44px]"
+                  >
+                    <i className="fa-regular fa-user text-xs text-slate-500 w-4 text-center"></i>
+                    <span>User Profile</span>
+                  </Link>
+
+                  <Link
+                    to="/bookmarks"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 min-h-[44px]"
+                  >
+                    <i className="fa-regular fa-bookmark text-xs text-amber-500 w-4 text-center"></i>
+                    <span>My Bookmarks</span>
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 w-full text-left min-h-[44px] cursor-pointer"
+                  >
+                    <i className="fa-solid fa-right-from-bracket text-xs text-rose-500 w-4 text-center"></i>
+                    <span>Log out</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      dispatch(openAuthModal({ mode: 'login' }));
+                    }}
+                    className="flex items-center justify-center py-2.5 px-4 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-semibold text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 min-h-[44px]"
+                  >
+                    Login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      dispatch(openAuthModal({ mode: 'signup' }));
+                    }}
+                    className="flex items-center justify-center py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 dark:bg-purple-600 dark:hover:bg-purple-700 min-h-[44px]"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       )}

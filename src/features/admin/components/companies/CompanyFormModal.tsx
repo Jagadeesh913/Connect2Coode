@@ -95,7 +95,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
       icon={<Building2 className="w-5 h-5" />}
       maxWidth="lg"
       footer={
-        <div className="flex items-center gap-3 w-full justify-end">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:justify-end">
           <button
             type="button"
             onClick={onClose}

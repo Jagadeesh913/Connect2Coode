@@ -43,17 +43,17 @@ export const AppSettings: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-3 text-xs font-mono">
-            <div className="flex justify-between items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl gap-1 sm:gap-2">
               <span className="text-slate-500 dark:text-slate-400 font-sans font-medium">Backend Base URL</span>
-              <span className="text-slate-800 dark:text-slate-200 font-bold">{apiBase}</span>
+              <span className="text-slate-800 dark:text-slate-200 font-bold break-all">{apiBase}</span>
             </div>
 
-            <div className="flex justify-between items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl gap-1 sm:gap-2">
               <span className="text-slate-500 dark:text-slate-400 font-sans font-medium">Auth Token Strategy</span>
               <span className="text-slate-800 dark:text-slate-200 font-bold">JWT Bearer Cookie & Header</span>
             </div>
 
-            <div className="flex justify-between items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center p-3.5 bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 rounded-2xl gap-1 sm:gap-2">
               <span className="text-slate-500 dark:text-slate-400 font-sans font-medium">Protocol</span>
               <span className="text-slate-800 dark:text-slate-200 font-bold">REST JSON</span>
             </div>

@@ -479,7 +479,7 @@ export const CompanyDetails: React.FC = () => {
         </section>
 
         {/* 3. SECTION SELECTION BELOW COMPANY HEADER/BANNER */}
-        <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 scrollbar-none">
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-3 mb-6 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
           {SECTIONS.map((sec) => {
             const isActive = activeSection === sec.id;
             const count =
@@ -577,8 +577,8 @@ export const CompanyDetails: React.FC = () => {
 
           {/* VIEW 1: CODING PROBLEMS TABLE */}
           {activeSection === 'coding' ? (
-            <div className="overflow-x-auto border border-slate-100 dark:border-slate-800/80 rounded-2xl">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-100 dark:border-slate-800/80 rounded-2xl">
+              <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
                     <th className="py-3.5 px-4 w-12 text-center">#</th>
@@ -734,8 +734,8 @@ export const CompanyDetails: React.FC = () => {
             </div>
           ) : (
             /* VIEW 2: MCQ SECTIONS TABLE (Aptitude, Reasoning, Verbal, Pseudocode) */
-            <div className="overflow-x-auto border border-slate-100 dark:border-slate-800/80 rounded-2xl">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-100 dark:border-slate-800/80 rounded-2xl">
+              <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
                     <th className="py-3.5 px-4 w-12 text-center">#</th>
@@ -867,8 +867,8 @@ export const CompanyDetails: React.FC = () => {
 
       {/* 5. INTERACTIVE SOLVE MODAL FOR MCQS */}
       {activeSolveMcq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
-          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
+          <div className="relative w-full max-w-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">

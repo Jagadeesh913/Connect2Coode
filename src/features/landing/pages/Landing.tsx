@@ -386,11 +386,11 @@ export const Landing: React.FC = () => {
 
       {/* 3. UNIFIED FLOATING STATS BAR */}
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16 sm:mb-20">
-        <div className="bg-white dark:bg-[#0D1322] border border-slate-100 dark:border-slate-800/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] p-4 sm:p-5 grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 divide-y sm:divide-y-0 sm:divide-x divide-slate-100 dark:divide-slate-800/80">
+        <div className="bg-white dark:bg-[#0D1322] border border-slate-100 dark:border-slate-800/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] p-3 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           
           {/* Stat 1: 10K+ Aspiring Developers */}
-          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
-            <div className="w-12 h-12 rounded-2xl bg-blue-100/70 dark:bg-blue-600/15 text-blue-600 dark:text-sky-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+          <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-100/70 dark:bg-blue-600/15 text-blue-600 dark:text-sky-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-users"></i>
             </div>
             <div>
@@ -400,8 +400,8 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Stat 2: 5K+ Practice Problems */}
-          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+          <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-file-lines"></i>
             </div>
             <div>
@@ -411,8 +411,8 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Stat 3: 100+ Company Questions */}
-          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-600/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+          <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-600/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-city"></i>
             </div>
             <div>
@@ -422,8 +422,8 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Stat 4: Track Your Progress */}
-          <div className="flex items-center gap-3.5 pt-2 sm:pt-0 sm:px-4">
-            <div className="w-12 h-12 rounded-2xl bg-rose-100/70 dark:bg-rose-600/15 text-rose-500 dark:text-rose-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
+          <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
+            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-100/70 dark:bg-rose-600/15 text-rose-500 dark:text-rose-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-chart-simple"></i>
             </div>
             <div>
@@ -755,7 +755,7 @@ export const Landing: React.FC = () => {
                 <i className="fa-solid fa-chevron-left text-[10px]"></i>
               </button>
 
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5 w-full">
+              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5 w-full">
                 {topicChips.map((chip) => (
                   <Link
                     key={chip.name}
@@ -812,7 +812,7 @@ export const Landing: React.FC = () => {
               </svg>
             </div>
 
-            <div className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl">
+            <div className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-4 sm:p-7 shadow-xl">
               {/* Header: Two Sum | Easy | Language dropdown */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2.5">
@@ -852,7 +852,7 @@ export const Landing: React.FC = () => {
               </div>
 
               {/* Tab Runner bar */}
-              <div className="mt-5 flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <button
                     type="button"

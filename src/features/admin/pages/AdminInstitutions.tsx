@@ -391,7 +391,7 @@ export const AdminInstitutions: React.FC = () => {
               setTypeFilter(e.target.value as any);
               setPage(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="ALL">All Types</option>
             <option value="COLLEGE">Colleges</option>
@@ -404,7 +404,7 @@ export const AdminInstitutions: React.FC = () => {
             value={stateFilter}
             onChange={(e) => setStateFilter(e.target.value)}
             placeholder="Filter State..."
-            className="w-32 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-32 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
 
           {/* Status Filter */}
@@ -414,7 +414,7 @@ export const AdminInstitutions: React.FC = () => {
               setActiveFilter(e.target.value as any);
               setPage(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="ALL">All Status</option>
             <option value="ACTIVE">Active Only</option>
@@ -428,7 +428,7 @@ export const AdminInstitutions: React.FC = () => {
               setSize(Number(e.target.value));
               setPage(0);
             }}
-            className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="10">10 / page</option>
             <option value="20">20 / page</option>

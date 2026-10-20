@@ -35,20 +35,20 @@ export const NotFound: React.FC<NotFoundProps> = ({
   const content = (
     <div className="w-full max-w-4xl mx-auto px-4 py-8 sm:py-12 flex flex-col items-center text-center relative z-10 animate-fade-in">
       {/* Animated Status Pill */}
-      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 text-blue-600 dark:text-blue-400 text-xs font-semibold tracking-wide mb-6 shadow-xs backdrop-blur-xs">
-        <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
-        <span className="font-mono">HTTP 404 · ERROR_ROUTE_UNRESOLVED</span>
+      <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/80 text-blue-600 dark:text-blue-400 text-[10px] sm:text-xs font-semibold tracking-wide mb-6 shadow-xs backdrop-blur-xs max-w-full">
+        <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping shrink-0"></span>
+        <span className="font-mono truncate">HTTP 404 · ERROR_ROUTE_UNRESOLVED</span>
       </div>
 
       {/* Hero 404 Display with Holographic Glowing Background */}
       <div className="relative mb-6 select-none flex items-center justify-center">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-purple-500/20 blur-3xl rounded-full scale-110 pointer-events-none" />
-        <h1 className="text-8xl sm:text-9xl md:text-[13rem] font-black tracking-tighter bg-gradient-to-b from-slate-900 via-indigo-700 to-blue-600 dark:from-white dark:via-slate-200 dark:to-indigo-500 bg-clip-text text-transparent drop-shadow-sm font-mono leading-none">
+        <h1 className="text-6xl sm:text-9xl md:text-[13rem] font-black tracking-tighter bg-gradient-to-b from-slate-900 via-indigo-700 to-blue-600 dark:from-white dark:via-slate-200 dark:to-indigo-500 bg-clip-text text-transparent drop-shadow-sm font-mono leading-none">
           404
         </h1>
-        <div className="absolute -bottom-2 sm:-bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1 rounded-lg bg-white/90 dark:bg-[#0F172A]/90 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-md">
-          <Compass className="w-4 h-4 text-indigo-500 animate-spin" style={{ animationDuration: '8s' }} />
-          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Target Disconnected</span>
+        <div className="absolute -bottom-2 sm:-bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg bg-white/90 dark:bg-[#0F172A]/90 border border-slate-200 dark:border-slate-800 shadow-md backdrop-blur-md whitespace-nowrap">
+          <Compass className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-500 animate-spin shrink-0" style={{ animationDuration: '8s' }} />
+          <span className="text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-300">Target Disconnected</span>
         </div>
       </div>
 

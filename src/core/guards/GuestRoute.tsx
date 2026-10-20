@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { tokenStorage } from '../security/tokenStorage';
-import { isJwtAdmin } from '../security/jwt';
+import { isJwtAdmin, isTokenValid } from '../security/jwt';
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 
 const GuardLoader: React.FC = () => (
@@ -24,7 +24,9 @@ export const GuestRoute: React.FC = () => {
     return <GuardLoader />;
   }
 
-  if (isAuthenticated || Boolean(token)) {
+  const isAuthed = isAuthenticated && isTokenValid(token);
+
+  if (isAuthed) {
     const role = String(currentUser?.role || '').toUpperCase();
     const isAdmin = role === 'ADMIN' || role === 'ROLE_ADMIN' || role.includes('ADMIN') || isJwtAdmin(token);
     if (isAdmin) {

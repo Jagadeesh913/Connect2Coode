@@ -837,7 +837,7 @@ export const PracticePage: React.FC = () => {
           <div className="lg:col-span-9 flex flex-col gap-4">
             
             <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto overflow-y-hidden no-scrollbar">
+              <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
                 <table className="w-full text-left border-collapse min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">

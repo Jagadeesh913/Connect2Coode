@@ -121,6 +121,7 @@ export const ProblemDetails: React.FC = () => {
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'problem' | 'editor'>('problem');
 
   // Native Fullscreen Toggle with safe browser fallback
   const toggleFullscreen = useCallback(async () => {
@@ -473,6 +474,7 @@ export const ProblemDetails: React.FC = () => {
     setLastExecutionMode('run');
     setExecutionError(null);
     setBottomTab('results');
+    setMobileWorkspaceTab('editor');
     if (consoleHeight === 'collapsed') setConsoleHeight('normal');
 
     const payload = {
@@ -522,6 +524,7 @@ export const ProblemDetails: React.FC = () => {
     setLastExecutionMode('submit');
     setExecutionError(null);
     setBottomTab('results');
+    setMobileWorkspaceTab('editor');
     if (consoleHeight === 'collapsed') setConsoleHeight('normal');
 
     const payload = {
@@ -719,27 +722,27 @@ export const ProblemDetails: React.FC = () => {
       {/* Main Container constrained to Home page max-w-7xl width and padding */}
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 flex flex-col flex-1">
         {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (Matching Reference Image 5) */}
-      <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
+      <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
         
         {/* Left: Back button & Breadcrumbs */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
           <Link
             to="/practice"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-3.5 py-1.5 rounded-full transition-colors shadow-2xs"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2.5 sm:px-3.5 py-1.5 rounded-full transition-colors shadow-2xs whitespace-nowrap"
             title="Back to Problems"
           >
             <i className="fa-solid fa-arrow-left text-[11px]"></i>
-            <span>Back to Problems</span>
+            <span><span className="hidden sm:inline">Back to </span>Problems</span>
           </Link>
 
-          <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
+          <span className="text-slate-300 dark:text-slate-700 hidden md:inline">|</span>
 
           {/* Breadcrumb Hierarchy */}
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 hidden sm:flex">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 hidden md:flex min-w-0">
             {(problem?.topicRefName || problem?.topic) && (
               <>
-                <span>{problem.topicRefName || problem.topic}</span>
-                <i className="fa-solid fa-chevron-right text-[9px] text-slate-400"></i>
+                <span className="truncate">{problem.topicRefName || problem.topic}</span>
+                <i className="fa-solid fa-chevron-right text-[9px] text-slate-400 shrink-0"></i>
               </>
             )}
             <span className="font-bold text-slate-900 dark:text-white truncate max-w-xs">
@@ -749,7 +752,7 @@ export const ProblemDetails: React.FC = () => {
         </div>
 
         {/* Right: Previous / Next Problem Quick Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
@@ -760,10 +763,10 @@ export const ProblemDetails: React.FC = () => {
                 navigate('/practice');
               }
             }}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
           >
             <i className="fa-solid fa-chevron-left text-[10px]"></i>
-            <span>Previous</span>
+            <span className="hidden sm:inline">Previous</span>
           </button>
 
           <button
@@ -776,24 +779,49 @@ export const ProblemDetails: React.FC = () => {
                 navigate('/practice');
               }
             }}
-            className="px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
           >
-            <span>Next</span>
+            <span className="hidden sm:inline">Next</span>
             <i className="fa-solid fa-chevron-right text-[10px]"></i>
           </button>
         </div>
       </header>
 
+      {/* Mobile Tab Switcher (< lg) */}
+      <div className="lg:hidden flex items-center p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-4 w-full">
+        <button
+          type="button"
+          onClick={() => setMobileWorkspaceTab('problem')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            mobileWorkspaceTab === 'problem'
+              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <i className="fa-solid fa-file-lines text-xs"></i>
+          <span>Problem Details</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileWorkspaceTab('editor')}
+          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            mobileWorkspaceTab === 'editor'
+              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <i className="fa-solid fa-code text-xs"></i>
+          <span>Code & Console</span>
+        </button>
+      </div>
+
       {/* 2. MAIN WORKSPACE (2-COLUMN SPLIT PANE) */}
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start">
+      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start w-full">
         
         {/* ========================================================
             LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
            ======================================================== */}
-        {/* ========================================================
-            LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
-           ======================================================== */}
-        <div className="lg:col-span-5 flex flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs h-[780px] overflow-hidden">
+        <div className={`${mobileWorkspaceTab === 'problem' ? 'flex' : 'hidden'} lg:flex lg:col-span-5 flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs h-[520px] sm:h-[650px] lg:h-[780px] overflow-hidden w-full`}>
           
           {/* Tab Bar: Description | Submissions | Companies | Hints */}
           <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-3 py-2 overflow-x-auto no-scrollbar gap-1.5 shrink-0">
@@ -1177,16 +1205,13 @@ export const ProblemDetails: React.FC = () => {
         {/* ========================================================
             RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
            ======================================================== */}
-        {/* ========================================================
-            RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
-           ======================================================== */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
+        <div className={`${mobileWorkspaceTab === 'editor' ? 'flex' : 'hidden'} lg:flex lg:col-span-7 flex-col gap-4 min-w-0 w-full`}>
           
           {/* EDITOR CARD CONTAINER */}
-          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden flex flex-col">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden flex flex-col w-full">
             
             {/* Editor Action Bar (Matching Reference Image 5) */}
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
               
               {/* Language Selector Pill */}
               <div className="flex items-center gap-2">
@@ -1224,7 +1249,7 @@ export const ProblemDetails: React.FC = () => {
               </div>
 
               {/* Editor Actions: Reset, Run, Submit, Fullscreen */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={handleResetCode}

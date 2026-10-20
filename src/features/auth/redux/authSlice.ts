@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
 import { authService, type LoginPayload } from '../../../services/authService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { decodeJwtPayload, isJwtExpired } from '../../../core/security/jwt';
+import { decodeJwtPayload, isJwtExpired, isTokenValid } from '../../../core/security/jwt';
 
 export type AuthStatus = 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
 
@@ -117,16 +117,18 @@ const authSlice = createSlice({
     initializeAuth(state) {
       const token = tokenStorage.getAccessToken();
       const savedUser = tokenStorage.getUser();
-      const isTokenValid = Boolean(token && !isJwtExpired(decodeJwtPayload(token)));
-      if (isTokenValid) {
+      const hasValidToken = isTokenValid(token);
+      if (hasValidToken && token) {
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.user = savedUser;
         state.token = token;
         state.loading = false;
-      } else if (!token) {
+      } else {
+        tokenStorage.clearTokens();
         state.status = 'UNAUTHENTICATED';
         state.isAuthenticated = false;
+        state.user = null;
         state.token = null;
         state.loading = false;
       }

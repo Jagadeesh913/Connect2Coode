@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { tokenStorage } from '../security/tokenStorage';
-import { isJwtAdmin } from '../security/jwt';
+import { isJwtAdmin, isTokenValid } from '../security/jwt';
 import { Skeleton } from '../../shared/components/ui/Skeleton';
 
 const GuardLoader: React.FC = () => (
@@ -33,7 +33,8 @@ export const AdminRoute: React.FC = () => {
   }
 
   // 2. Check Authentication Status
-  if (!isAuthenticated && !token) {
+  const isAuthed = isAuthenticated && isTokenValid(token);
+  if (!isAuthed) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

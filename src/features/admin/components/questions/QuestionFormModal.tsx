@@ -496,12 +496,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       icon={<Code2 className="w-5 h-5" />}
       maxWidth="4xl"
       footer={
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-3">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl w-full sm:w-auto">
             <button
               type="button"
               onClick={() => setActiveTab('METADATA')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
                 activeTab === 'METADATA'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -512,7 +512,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('TESTCASES')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`flex-1 sm:flex-initial px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
                 activeTab === 'TESTCASES'
                   ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-2xs'
                   : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
@@ -522,12 +522,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-end gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+              className="flex-1 sm:flex-initial px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
             >
               Cancel
             </button>
@@ -535,7 +535,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               type="button"
               onClick={handleSubmit(handleFormSubmit)}
               disabled={submitting}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
+              className="flex-1 sm:flex-initial px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-center"
             >
               {submitting ? 'Saving Problem...' : isEditing ? 'Update Problem' : 'Create Problem'}
             </button>

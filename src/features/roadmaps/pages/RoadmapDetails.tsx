@@ -446,7 +446,7 @@ export const RoadmapDetails: React.FC = () => {
               </div>
 
               {/* 5 Column Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
                 {roadmapData.phases.map((phase, pIdx) => {
                   const phaseColors = ['#a3a3a3', '#38BDF8', '#818CF8', '#C084FC', '#F97316'];
                   const curColor = phase.color || phaseColors[pIdx % phaseColors.length];

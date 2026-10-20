@@ -97,7 +97,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         </span>
         {showTagline && (
           <span
-            className={`font-semibold tracking-[0.16em] uppercase text-slate-500 dark:text-slate-400 mt-0.5 leading-none ${taglineSizes[size]}`}
+            className={`hidden sm:inline-block font-semibold tracking-[0.16em] uppercase text-slate-500 dark:text-slate-400 mt-0.5 leading-none ${taglineSizes[size]}`}
           >
             CODE TOGETHER CONNECT FOREVER
           </span>

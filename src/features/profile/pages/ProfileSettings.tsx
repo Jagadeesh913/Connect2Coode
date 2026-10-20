@@ -786,39 +786,39 @@ export const UserProfilePage: React.FC = () => {
 
             {/* Key-Value Rows (Only real verified session/API fields) */}
             <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Full Name</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Full Name</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-words">
                   {fullName || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Username</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Username</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0 break-words">
                   @{userName}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Email Address</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left truncate">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Email Address</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-all">
                   {email || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Platform Role</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Platform Role</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
                   {roleName}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">User Account ID</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">User Account ID</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0">
                   #{effectiveUserId || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5 pt-0.5">About / Bio</span>
-                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0 pt-0.5">About / Bio</span>
+                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed min-w-0 break-words">
                   {bio || 'No bio provided yet.'}
                 </span>
               </div>
@@ -854,33 +854,33 @@ export const UserProfilePage: React.FC = () => {
 
             {/* Key-Value Rows (Only real fields in /userInfo/{userId}) */}
             <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Registration Number</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono font-bold flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Registration Number</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono font-bold flex-1 text-left min-w-0 break-words">
                   {regNumber || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">College / Institute</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left truncate">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">College / Institute</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-words">
                   {collegeName || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Joined Year</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Joined Year</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
                   {joinedYear || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5">Graduation Year</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Graduation Year</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
                   {passedOutYear || '—'}
                 </span>
               </div>
-              <div className="py-2.5 flex items-start justify-between">
-                <span className="text-slate-500 dark:text-slate-400 w-2/5 pt-0.5">Academic Bio</span>
-                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed">
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0 pt-0.5">Academic Bio</span>
+                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed min-w-0 break-words">
                   {bio || '—'}
                 </span>
               </div>

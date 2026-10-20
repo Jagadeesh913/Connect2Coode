@@ -39,7 +39,7 @@ export const CompanyPatternDetails: React.FC = () => {
       <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 pt-8">
         
         {/* NAV & BREADCRUMB */}
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <Link
             to="/company-patterns"
             className="inline-flex items-center gap-2 text-xs font-semibold text-gray-300 hover:text-white transition-all bg-neutral-800 border border-white/10 hover:border-white/30 px-4 py-2 rounded-lg shadow-md"
@@ -111,7 +111,7 @@ export const CompanyPatternDetails: React.FC = () => {
         </div>
 
         {/* SEGMENTED TAB NAVIGATION */}
-        <div className="flex items-center gap-2 bg-neutral-800 p-1.5 rounded-lg border border-white/10 shadow-md mb-8 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-2 bg-neutral-800 p-1.5 rounded-lg border border-white/10 shadow-md mb-8 overflow-x-auto scrollbar-thin scrollbar-thumb-neutral-700">
           {(
             [
               { id: 'breakdown', label: 'Section Breakdown', icon: 'fa-solid fa-list-check' },

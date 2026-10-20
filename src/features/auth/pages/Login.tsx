@@ -147,8 +147,6 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   const handleClose = () => {
     if (onCloseModal) {
       onCloseModal();
-    } else if (window.history.length > 1) {
-      navigate(-1);
     } else {
       navigate('/');
     }
@@ -386,18 +384,19 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans">
-      <div className="relative w-full max-w-md bg-neutral-900 border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white my-auto max-h-[90vh] overflow-y-auto animate-scale-up">
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={handleClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white w-8 h-8 rounded-full bg-neutral-950 border border-white/15 hover:border-white/40 flex items-center justify-center transition-colors cursor-pointer z-10"
-          aria-label="Close modal"
-        >
-          <i className="fa-solid fa-xmark text-sm"></i>
-        </button>
+  const isModal = Boolean(onCloseModal);
+
+  const cardElement = (
+    <div className={`relative w-full max-w-md bg-neutral-900 border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white ${isModal ? 'my-auto max-h-[90vh] overflow-y-auto' : ''} animate-scale-up`}>
+      {/* Close Button */}
+      <button
+        type="button"
+        onClick={handleClose}
+        className="absolute top-4 right-4 text-gray-400 hover:text-white w-8 h-8 rounded-full bg-neutral-950 border border-white/15 hover:border-white/40 flex items-center justify-center transition-colors cursor-pointer z-10"
+        aria-label={isModal ? 'Close modal' : 'Back to Home'}
+      >
+        <i className="fa-solid fa-xmark text-sm"></i>
+      </button>
 
         {/* ================================================================= */}
         {/* 1. LOG IN MODE                                                    */}
@@ -915,6 +914,19 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
           </div>
         )}
       </div>
+  );
+
+  if (isModal) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans">
+        {cardElement}
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full flex items-center justify-center font-sans">
+      {cardElement}
     </div>
   );
 };

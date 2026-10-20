@@ -64,7 +64,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         className={`relative w-full bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] z-10 text-left font-sans ${widthClasses[maxWidth]} transition-all animate-in fade-in zoom-in-95 duration-150`}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#070A13]/50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#070A13]/50">
           <div className="flex items-center gap-3 min-w-0">
             {icon && (
               <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -92,13 +92,13 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 text-sm text-slate-700 dark:text-slate-300">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 text-sm text-slate-700 dark:text-slate-300">
           {children}
         </div>
 
         {/* Modal Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50/80 dark:bg-[#070A13]/80 border-t border-slate-200/80 dark:border-slate-800/80">
+          <div className="flex flex-wrap items-center justify-end gap-2.5 sm:gap-3 px-4 sm:px-6 py-3 sm:py-4 bg-slate-50/80 dark:bg-[#070A13]/80 border-t border-slate-200/80 dark:border-slate-800/80">
             {footer}
           </div>
         )}

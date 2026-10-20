@@ -339,7 +339,7 @@ export const AdminLanguages: React.FC = () => {
         icon={<Terminal className="w-5 h-5" />}
         maxWidth="md"
         footer={
-          <div className="flex items-center justify-end gap-3 w-full">
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:justify-end">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}

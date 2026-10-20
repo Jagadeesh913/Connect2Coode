@@ -51,8 +51,8 @@ export function AdminTable<T>({
     <div
       className={`w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0D1322] shadow-xs font-sans transition-colors ${className}`}
     >
-      <div className="w-full overflow-x-auto">
-        <table className="w-full text-left border-collapse text-xs sm:text-sm">
+      <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+        <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/70 dark:bg-[#070A13]/70">
               {columns.map((col, i) => (

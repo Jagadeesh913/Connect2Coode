@@ -83,14 +83,14 @@ export const Pagination: React.FC<PaginationProps> = ({
       </div>
 
       {/* Pagination Controls matching reference images */}
-      <div className="flex items-center gap-1.5 flex-wrap justify-center">
+      <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
         {/* First Page */}
         <button
           onClick={() => onPageChange(1)}
           disabled={safeCurrentPage === 1}
           aria-label="First page"
           title="First Page"
-          className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="hidden sm:flex p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer items-center justify-center min-w-[36px] min-h-[36px]"
         >
           <ChevronsLeft className="w-4 h-4" />
         </button>
@@ -101,18 +101,18 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={safeCurrentPage === 1}
           aria-label="Previous page"
           title="Previous Page"
-          className="p-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1 cursor-pointer font-semibold text-xs"
+          className="p-1.5 sm:p-2 px-2.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold text-xs min-h-[36px]"
         >
           <ChevronLeft className="w-4 h-4" />
           <span className="hidden sm:inline">Prev</span>
         </button>
 
         {/* Numbered Page Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-wrap justify-center">
           {pageNumbers.map((p, idx) => {
             if (p === 'ellipsis') {
               return (
-                <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 font-bold select-none">
+                <span key={`ellipsis-${idx}`} className="px-1.5 text-slate-400 font-bold select-none text-xs">
                   •••
                 </span>
               );
@@ -122,7 +122,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               <button
                 key={p}
                 onClick={() => onPageChange(p)}
-                className={`min-w-9 h-9 px-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center ${
+                className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-2 sm:px-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-xs font-extrabold ring-2 ring-blue-600/30'
                     : 'border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -140,7 +140,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={safeCurrentPage >= safeTotalPages}
           aria-label="Next page"
           title="Next Page"
-          className="p-2 px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center gap-1 cursor-pointer font-semibold text-xs"
+          className="p-1.5 sm:p-2 px-2.5 sm:px-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1 cursor-pointer font-semibold text-xs min-h-[36px]"
         >
           <span className="hidden sm:inline">Next</span>
           <ChevronRight className="w-4 h-4" />
@@ -152,7 +152,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           disabled={safeCurrentPage >= safeTotalPages}
           aria-label="Last page"
           title="Last Page"
-          className="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+          className="hidden sm:flex p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer items-center justify-center min-w-[36px] min-h-[36px]"
         >
           <ChevronsRight className="w-4 h-4" />
         </button>
