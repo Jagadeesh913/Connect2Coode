@@ -109,98 +109,105 @@ export const problemService = {
     id: string | number,
     signal?: AbortSignal
   ): Promise<ApiResponse<ProblemItem | null>> {
+    // 1. Direct Catalog Fetch:
+    // The backend GET /api/v1/question/{id} endpoint throws HTTP 500 ("Question Fetch Unsuccessfull").
+    // Querying the questions catalog (POST /api/v1/questions) retrieves the complete problem metadata
+    // cleanly and reliably, avoiding the HTTP 500 error in the browser.
     try {
-      const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(id), { signal });
-      const data = res?.data || res;
+      const numericId = Number(id);
+      const isNum = Number.isFinite(numericId) && numericId > 0;
+      const pageNumber = isNum ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 
-      if (!data || (!data.id && !data.title)) {
-        throw new Error('Problem details response did not contain a problem');
-      }
-
-      return {
-        statusCode: 200,
-        message: 'Problem details fetched',
-        data: mapProblemDto(data),
+      const payload: Record<string, any> = {
+        level: null,
+        companies: null,
+        topic: null,
+        searchText: null,
+        pageRequest: {
+          pageNumber,
+          pageSize: 50,
+          sortBy: 'id',
+          sortDirection: 'ASC' as const,
+        },
       };
-    } catch (err: any) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
 
-      // Resilient Catalog Recovery:
-      // When the backend returns HTTP 500 ("Question Fetch Unsuccessfull") or fails
-      // for a question (e.g. /question/4), query the questions catalog to retrieve
-      // the problem metadata (title, description, topic, difficulty, companies, platform).
-      try {
-        const numericId = Number(id);
-        const isNum = Number.isFinite(numericId) && numericId > 0;
-        const pageNumber = isNum ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
+      const resList: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+      const rawList = resList?.data || resList;
+      const items = Array.isArray(rawList?.content)
+        ? rawList.content
+        : Array.isArray(rawList)
+        ? rawList
+        : Array.isArray(rawList?.data)
+        ? rawList.data
+        : [];
 
-        const payload: Record<string, any> = {
-          pageRequest: {
-            pageNumber,
-            pageSize: 50,
-            sortBy: 'id',
-            sortDirection: 'ASC' as const,
+      const targetStr = String(id).trim().toLowerCase();
+      let matched = items.find((item: any) => {
+        const itemId = String(item.id ?? item._id ?? '').trim().toLowerCase();
+        const itemSlug = String(item.slug || '').trim().toLowerCase();
+        const itemTitle = String(item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return itemId === targetStr || itemSlug === targetStr || itemTitle === targetStr;
+      });
+
+      if (!matched && pageNumber !== 0) {
+        const res0: any = await apiClient.post(
+          API_ENDPOINTS.PROBLEMS.LIST,
+          {
+            level: null,
+            companies: null,
+            topic: null,
+            searchText: null,
+            pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' as const },
           },
-        };
-
-        const resList: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
-        const rawList = resList?.data || resList;
-        const items = Array.isArray(rawList?.content)
-          ? rawList.content
-          : Array.isArray(rawList)
-          ? rawList
-          : Array.isArray(rawList?.data)
-          ? rawList.data
+          { signal }
+        );
+        const items0 = Array.isArray(res0?.data?.content)
+          ? res0.data.content
+          : Array.isArray(res0?.content)
+          ? res0.content
+          : Array.isArray(res0?.data)
+          ? res0.data
           : [];
 
-        const targetStr = String(id).trim().toLowerCase();
-        let matched = items.find((item: any) => {
+        matched = items0.find((item: any) => {
           const itemId = String(item.id ?? item._id ?? '').trim().toLowerCase();
           const itemSlug = String(item.slug || '').trim().toLowerCase();
           const itemTitle = String(item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
           return itemId === targetStr || itemSlug === targetStr || itemTitle === targetStr;
         });
-
-        if (!matched && pageNumber !== 0) {
-          const page0Payload = {
-            pageRequest: {
-              pageNumber: 0,
-              pageSize: 50,
-              sortBy: 'id',
-              sortDirection: 'ASC' as const,
-            },
-          };
-          const res0: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, page0Payload, { signal });
-          const items0 = Array.isArray(res0?.data?.content)
-            ? res0.data.content
-            : Array.isArray(res0?.content)
-            ? res0.content
-            : Array.isArray(res0?.data)
-            ? res0.data
-            : [];
-
-          matched = items0.find((item: any) => {
-            const itemId = String(item.id ?? item._id ?? '').trim().toLowerCase();
-            const itemSlug = String(item.slug || '').trim().toLowerCase();
-            const itemTitle = String(item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            return itemId === targetStr || itemSlug === targetStr || itemTitle === targetStr;
-          });
-        }
-
-        if (matched) {
-          return {
-            statusCode: 200,
-            message: 'Problem details recovered from questions catalog',
-            data: mapProblemDto(matched),
-          };
-        }
-      } catch {
-        // Fallback search failed; re-throw original error
       }
 
+      if (matched) {
+        return {
+          statusCode: 200,
+          message: 'Problem details fetched',
+          data: mapProblemDto(matched),
+        };
+      }
+    } catch (catalogErr: any) {
+      if (isRequestCanceled(catalogErr)) {
+        throw catalogErr;
+      }
+    }
+
+    // 2. Direct Details Fallback (only attempted if catalog didn't have the question)
+    try {
+      const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(id), { signal });
+      const data = res?.data || res;
+      if (data && (data.id || data.title)) {
+        return {
+          statusCode: 200,
+          message: 'Problem details fetched',
+          data: mapProblemDto(data),
+        };
+      }
+    } catch (err: any) {
+      if (isRequestCanceled(err)) {
+        throw err;
+      }
       throw err;
     }
+
+    throw new Error(`Problem #${id} not found`);
   },
 };

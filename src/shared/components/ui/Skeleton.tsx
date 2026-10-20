@@ -26,6 +26,8 @@ export interface TableRowSkeletonProps {
   rows?: number;
   showExamPlatform?: boolean;
   showCompanies?: boolean;
+  showTopic?: boolean;
+  showDifficulty?: boolean;
 }
 
 /**
@@ -35,6 +37,8 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
   rows = 6,
   showExamPlatform = true,
   showCompanies = true,
+  showTopic = true,
+  showDifficulty = true,
 }) => {
   return (
     <>
@@ -49,7 +53,7 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
           </td>
 
           {/* Title */}
-          <td className="py-3.5 px-4 min-w-[340px] xl:min-w-[420px]">
+          <td className="py-3.5 px-4 min-w-[200px]">
             <div className="flex flex-col gap-1.5">
               <Skeleton className={`h-4 ${i % 3 === 0 ? 'w-72' : i % 3 === 1 ? 'w-96' : 'w-80'} rounded-md`} />
               <Skeleton className="h-2.5 w-32 rounded-sm opacity-60" />
@@ -57,14 +61,18 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
           </td>
 
           {/* Topic */}
-          <td className="py-3.5 px-4">
-            <Skeleton className="h-5 w-20 rounded-full" />
-          </td>
+          {showTopic && (
+            <td className="py-3.5 px-4">
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </td>
+          )}
 
           {/* Difficulty Badge */}
-          <td className="py-3.5 px-4 text-center">
-            <Skeleton className="h-5 w-16 mx-auto rounded-full" />
-          </td>
+          {showDifficulty && (
+            <td className="py-3.5 px-4 text-center">
+              <Skeleton className="h-5 w-16 mx-auto rounded-full" />
+            </td>
+          )}
 
           {/* Exam Platform / Acceptance */}
           {showExamPlatform && (
@@ -75,8 +83,11 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
 
           {/* Companies / Status */}
           {showCompanies && (
-            <td className="py-3.5 px-4">
-              <Skeleton className="h-5 w-16 rounded-full" />
+            <td className="py-3.5 px-4 whitespace-nowrap">
+              <div className="flex items-center gap-1.5">
+                <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+                <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+              </div>
             </td>
           )}
 

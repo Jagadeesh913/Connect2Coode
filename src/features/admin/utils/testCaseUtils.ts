@@ -216,7 +216,7 @@ export const KNOWN_PROBLEM_TEST_CASES: Record<number, QuestionTestCase[]> = {
  * 5. Extracted test cases from question description
  */
 export function extractTestCasesFromProblem(
-  question?: Partial<Question> | null
+  question?: (Partial<Question> & { examples?: any[] }) | null
 ): QuestionTestCase[] {
   if (!question) return [];
 

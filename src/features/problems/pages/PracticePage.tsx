@@ -6,10 +6,11 @@ import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 import { Pagination } from '../../../shared/components/ui/Pagination';
-import type { Problem, ReferenceItem } from '../../../core/types/domain';
+import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
 import { KNOWN_QUESTION_PLATFORMS } from '../../../core/mappers/problemMapper';
 import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies } from '../../companies/redux/companySlice';
+import { CompanyBrandLogo, CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
 import { toast } from 'react-hot-toast';
 import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
 
@@ -387,37 +388,33 @@ export const PracticePage: React.FC = () => {
     });
   }, [apiProblems, selectedPlatform, apiPlatforms]);
 
-  const getDifficultyBadge = (difficulty: string) => {
-    if (!difficulty) {
-      return <span className="text-slate-400 text-xs">—</span>;
-    }
-    const d = difficulty.toLowerCase();
+  // Company lookup map for retrieving authentic logos and websites
+  const companyMap = useMemo(() => {
+    const map = new Map<string, CompanyItem>();
+    serverCompanies.forEach((c) => {
+      if (c.name) map.set(c.name.toLowerCase().trim(), c);
+      if (c.slug) map.set(c.slug.toLowerCase().trim(), c);
+    });
+    return map;
+  }, [serverCompanies]);
+
+  // Difficulty color styling for the question number (#)
+  const getDifficultyNumberColor = (difficulty: string) => {
+    if (!difficulty) return 'text-slate-400 dark:text-slate-500';
+    const d = difficulty.toLowerCase().trim();
     if (d.includes('easy')) {
-      return (
-        <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80">
-          Easy
-        </span>
-      );
-    }
-    if (d.includes('hard')) {
-      return (
-        <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-800/80">
-          Hard
-        </span>
-      );
+      return 'text-emerald-600 dark:text-emerald-400 font-bold';
     }
     if (d.includes('medium')) {
-      return (
-        <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-200 dark:border-amber-800/80">
-          Medium
-        </span>
-      );
+      return 'text-amber-500 dark:text-orange-400 font-bold';
     }
-    return (
-      <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-        {difficulty}
-      </span>
-    );
+    if (d.includes('hard')) {
+      return 'text-rose-600 dark:text-rose-400 font-bold';
+    }
+    if (d.includes('basic') || d.includes('school')) {
+      return 'text-sky-500 dark:text-sky-400 font-bold';
+    }
+    return 'text-slate-500 dark:text-slate-400 font-bold';
   };
 
   const getPlatformBadge = (prob: Problem) => {
@@ -840,28 +837,25 @@ export const PracticePage: React.FC = () => {
           <div className="lg:col-span-9 flex flex-col gap-4">
             
             <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[960px]">
+              <div className="overflow-x-auto overflow-y-hidden no-scrollbar">
+                <table className="w-full text-left border-collapse min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
                       <th className="py-3 px-4 w-12 text-center shrink-0">#</th>
-                      <th className="py-3 px-4 min-w-[340px] xl:min-w-[420px] w-[40%]">Title</th>
-                      <th className="py-3 px-4 w-32 whitespace-nowrap">Topic</th>
-                      <th className="py-3 px-4 w-28 text-center whitespace-nowrap">Difficulty</th>
+                      <th className="py-3 px-4 min-w-[200px]">Title</th>
                       <th className="py-3 px-4 w-28 whitespace-nowrap">Platform</th>
-                      <th className="py-3 px-4 w-40 whitespace-nowrap">Companies</th>
-                      <th className="py-3 px-4 w-24 text-center whitespace-nowrap">Status</th>
+                      <th className="py-3 px-4 w-28 whitespace-nowrap">Companies</th>
                       <th className="py-3 px-2 w-10 text-center shrink-0"></th>
-                      <th className="py-3 px-4 w-24 text-right whitespace-nowrap">Action</th>
+                      <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
 
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
                     {isProblemsLoading ? (
-                      <TableRowSkeleton rows={20} />
+                      <TableRowSkeleton rows={20} showTopic={false} showDifficulty={false} />
                     ) : !isAuthenticated && displayedProblems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-14 text-center text-slate-500 dark:text-slate-400">
+                        <td colSpan={6} className="py-14 text-center text-slate-500 dark:text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
                             <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-xs">
                               <i className="fa-solid fa-lock"></i>
@@ -882,7 +876,7 @@ export const PracticePage: React.FC = () => {
                       </tr>
                     ) : displayedProblems.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                        <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <i className="fa-solid fa-code text-2xl text-slate-300 dark:text-slate-600"></i>
                             <span className="font-medium text-sm">No problems found</span>
@@ -894,7 +888,6 @@ export const PracticePage: React.FC = () => {
                       displayedProblems.map((prob, idx) => {
                         const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(prob.id));
                         const isSolved = Boolean(solvedByProblemId[String(prob.id)]);
-                        const isAttempted = Boolean(attemptedByProblemId?.[String(prob.id)]);
                         const rowNumber = String((currentPage - 1) * pageSize + idx + 1).padStart(2, '0');
 
                         return (
@@ -902,13 +895,16 @@ export const PracticePage: React.FC = () => {
                             key={prob.id}
                             className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                           >
-                            {/* Row Number */}
-                            <td className="py-3 px-4 text-center font-mono font-bold text-slate-400 text-xs shrink-0">
+                            {/* 1. Row Number (Colored by difficulty) */}
+                            <td
+                              className={`py-3 px-4 text-center font-mono text-xs shrink-0 ${getDifficultyNumberColor(prob.difficulty)}`}
+                              title={`Difficulty: ${prob.difficulty || 'Unknown'}`}
+                            >
                               {rowNumber}
                             </td>
 
-                            {/* Title */}
-                            <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[340px] xl:min-w-[420px] text-sm">
+                            {/* 2. Title */}
+                            <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm">
                               <Link
                                 to={`/problems/${prob.slug || prob.id}`}
                                 className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-block leading-snug"
@@ -917,80 +913,41 @@ export const PracticePage: React.FC = () => {
                               </Link>
                             </td>
 
-                            {/* Topic */}
-                            <td className="py-3 px-4">
-                              {prob.topic || prob.category ? (
-                                <span className="px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60">
-                                  {prob.topic || prob.category}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 text-xs">—</span>
-                              )}
-                            </td>
-
-                            {/* Difficulty */}
-                            <td className="py-3 px-4 text-center">
-                              {getDifficultyBadge(prob.difficulty)}
-                            </td>
-
-                            {/* Question Platform from QPF */}
+                            {/* 3. Platform */}
                             <td className="py-3 px-4">
                               {getPlatformBadge(prob)}
                             </td>
 
-                            {/* Companies from API */}
-                            <td className="py-3 px-4">
+                            {/* 4. Companies (Display only 2 company icons) */}
+                            <td className="py-3 px-4 whitespace-nowrap">
                               {prob.companies && prob.companies.length > 0 ? (
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {prob.companies.slice(0, 3).map((comp, cIdx) => (
-                                    <span
-                                      key={cIdx}
-                                      className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/60"
-                                    >
-                                      {comp}
-                                    </span>
-                                  ))}
-                                  {prob.companies.length > 3 && (
-                                    <span className="text-[10px] font-bold text-slate-400">
-                                      +{prob.companies.length - 3}
-                                    </span>
-                                  )}
+                                <div
+                                  className="flex items-center gap-1.5 flex-nowrap"
+                                  title={
+                                    prob.companies.length > 2
+                                      ? `Companies: ${prob.companies.join(', ')}`
+                                      : undefined
+                                  }
+                                >
+                                  {prob.companies.slice(0, 2).map((compName, cIdx) => {
+                                    const compData = companyMap.get(compName.toLowerCase().trim());
+                                    return (
+                                      <CompanyCircleBadge
+                                        key={cIdx}
+                                        name={compName}
+                                        logoUrl={compData?.logoUrl}
+                                        website={compData?.websiteUrl}
+                                      />
+                                    );
+                                  })}
                                 </div>
                               ) : (
                                 <span className="text-slate-400 text-xs">—</span>
                               )}
                             </td>
 
-                              {/* Status (Read-only, derived from user submissions) */}
-                              <td className="py-3 px-4 text-center">
-                                {isSolved ? (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 select-none"
-                                    title="Solved via verified code submission"
-                                  >
-                                    <i className="fa-solid fa-check text-[10px]"></i>
-                                    <span>Solved</span>
-                                  </span>
-                                ) : isAttempted ? (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 select-none"
-                                    title="Attempted but not yet solved"
-                                  >
-                                    <i className="fa-solid fa-clock-rotate-left text-[10px]"></i>
-                                    <span>Attempted</span>
-                                  </span>
-                                ) : (
-                                  <span
-                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700/60 select-none"
-                                    title="Not yet solved"
-                                  >
-                                    <span>Todo</span>
-                                  </span>
-                                )}
-                              </td>
-
-                              {/* Bookmark Ribbon */}
-                              <td className="py-3 px-2 text-center">
+                            {/* 5. Bookmark Ribbon */}
+                            <td className="py-3 px-2 text-center">
                               <button
                                 type="button"
                                 onClick={(e) =>
@@ -1013,15 +970,26 @@ export const PracticePage: React.FC = () => {
                               </button>
                             </td>
 
-                            {/* Solve Button */}
+                            {/* 6. Action (Solved vs Solve) */}
                             <td className="py-3 px-4 text-right">
-                              <Link
-                                to={`/problems/${prob.slug || prob.id}`}
-                                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors border border-blue-200 dark:border-blue-800/60 no-underline shadow-2xs"
-                              >
-                                <span>Solve</span>
-                                <i className="fa-solid fa-arrow-right text-[9px]"></i>
-                              </Link>
+                              {isSolved ? (
+                                <Link
+                                  to={`/problems/${prob.slug || prob.id}`}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors no-underline shadow-2xs"
+                                  title="Solved - Click to review or solve again"
+                                >
+                                  <i className="fa-solid fa-check text-[9px]"></i>
+                                  <span>Solved</span>
+                                </Link>
+                              ) : (
+                                <Link
+                                  to={`/problems/${prob.slug || prob.id}`}
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors border border-blue-200 dark:border-blue-800/60 no-underline shadow-2xs"
+                                >
+                                  <span>Solve</span>
+                                  <i className="fa-solid fa-arrow-right text-[9px]"></i>
+                                </Link>
+                              )}
                             </td>
                           </tr>
                         );

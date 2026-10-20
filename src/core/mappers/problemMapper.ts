@@ -1,4 +1,5 @@
-import type { Problem } from '../types/domain';
+import type { Problem, QuestionTestCase } from '../types/domain';
+import { extractTestCasesFromProblem } from '../../features/admin/utils/testCaseUtils';
 
 type ProblemDto = Record<string, unknown> | Problem;
 
@@ -131,7 +132,17 @@ export const mapProblemDto = (
     examPlatform: rawValue.examPlatform ? String(rawValue.examPlatform) : qpfRefName,
     questionHints: Array.isArray(rawValue.questionHints) ? rawValue.questionHints : undefined,
     hints: Array.isArray(rawValue.hints) ? rawValue.hints.map(String) : undefined,
-    testCases: Array.isArray(rawValue.testCases) ? rawValue.testCases : undefined,
+    testCases: (() => {
+      const explicit = Array.isArray(rawValue.testCases) ? (rawValue.testCases as QuestionTestCase[]) : undefined;
+      if (explicit && explicit.length > 0) return explicit;
+      const extracted = extractTestCasesFromProblem({
+        id: Number(rawId) || undefined,
+        description: rawValue.description ? String(rawValue.description) : '',
+        testCases: explicit,
+        examples: Array.isArray(rawValue.examples) ? rawValue.examples : undefined,
+      });
+      return extracted.length > 0 ? extracted : undefined;
+    })(),
     codeSnippets:
       rawValue.codeSnippets && typeof rawValue.codeSnippets === 'object'
         ? (rawValue.codeSnippets as Record<string, string>)

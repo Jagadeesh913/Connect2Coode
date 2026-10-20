@@ -24,6 +24,7 @@ import { userQuestionService } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
+import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
 
 interface QuestionTestCase {
   id?: number;
@@ -605,8 +606,17 @@ export const ProblemDetails: React.FC = () => {
 
   // Sample visible test cases from problem statement
   const sampleTestCases: QuestionTestCase[] = useMemo(() => {
-    if (problem?.testCases && problem.testCases.length > 0) {
-      return problem.testCases.filter((tc) => !tc.isHidden);
+    let cases = problem?.testCases;
+    if (!cases || cases.length === 0) {
+      cases = extractTestCasesFromProblem({
+        id: problem?.id ? Number(problem.id) : (activeQuestionId ?? undefined),
+        description: problem?.description,
+        testCases: problem?.testCases,
+        examples: problem?.examples,
+      });
+    }
+    if (cases && cases.length > 0) {
+      return cases.filter((tc) => !tc.isHidden);
     }
     if (problem?.examples && problem.examples.length > 0) {
       return problem.examples.map((ex, i) => ({
@@ -618,7 +628,14 @@ export const ProblemDetails: React.FC = () => {
       }));
     }
     return [];
-  }, [problem]);
+  }, [problem, activeQuestionId]);
+
+  // Keep active test case index within valid bounds when test cases change
+  useEffect(() => {
+    if (selectedTestCaseIdx >= sampleTestCases.length && sampleTestCases.length > 0) {
+      setSelectedTestCaseIdx(0);
+    }
+  }, [sampleTestCases.length, selectedTestCaseIdx]);
 
   if (loadingProblem || (!isProblemLoadedForRoute && !problemError)) {
     return (
