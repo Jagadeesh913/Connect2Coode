@@ -71,7 +71,8 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setLoading(true);
     setSearchFeedback(null);
@@ -79,8 +80,9 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
     try {
       const res = await institutionService.searchInstitutions(
         trimmed,
-        abortControllerRef.current.signal
+        controller.signal
       );
+      if (controller.signal.aborted) return;
       const data = res?.data || (Array.isArray(res) ? res : []);
       const results = Array.isArray(data) ? data.slice(0, 15) : [];
       setOptions(results);
@@ -96,11 +98,15 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
       setOptions([]);
       setSearchFeedback('Unable to load institutions. Try again.');
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    abortControllerRef.current?.abort();
+    setOptions([]);
+    setActiveIndex(-1);
+    setLoading(e.target.value.trim().length >= 3);
     const newValue = e.target.value;
     setInputValue(newValue);
     onChange(newValue, null);
@@ -117,7 +123,18 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
 
   const cleanName = (val: string) => (val ? val.replace(/^"+|"+$/g, '').trim() : '');
 
+  const cancelSearch = () => {
+    abortControllerRef.current?.abort();
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    setLoading(false);
+  };
+  useEffect(() => () => {
+    abortControllerRef.current?.abort();
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+  }, []);
+
   const handleSelectOption = (option: InstitutionOptionDTO) => {
+    cancelSearch();
     const cleaned = cleanName(option.name);
     setInputValue(cleaned);
     onChange(cleaned, { ...option, name: cleaned });
@@ -130,6 +147,7 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
   };
 
   const handleClear = () => {
+    cancelSearch();
     setInputValue('');
     setOptions([]);
     setSearchFeedback(null);

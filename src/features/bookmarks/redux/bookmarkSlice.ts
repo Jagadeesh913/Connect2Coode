@@ -68,7 +68,7 @@ export const fetchBookmarks = createAsyncThunk<
   { force?: boolean } | boolean | void
 >(
   'bookmarks/fetchList',
-  async (_, { getState }) => {
+  async (_, { getState, rejectWithValue }) => {
     const local = loadBookmarksFromStorage();
     const state = getState() as RootState;
     const userId = state.auth?.user?.id;
@@ -96,8 +96,8 @@ export const fetchBookmarks = createAsyncThunk<
             bookmarks: merged,
           };
         }
-      } catch (err) {
-        console.warn('Failed to load bookmarks from server; falling back to local storage', err);
+      } catch {
+        return rejectWithValue('Could not refresh bookmarks. Your saved data is still shown.');
       }
     }
 
@@ -250,6 +250,7 @@ const bookmarkSlice = createSlice({
 
         state.loading = false;
         state.currentRequestId = null;
+        if (action.meta.aborted) return;
         state.error = (action.payload as string) || action.error.message || 'Failed to fetch bookmarks';
       })
       .addCase(toggleBookmarkItem.fulfilled, (state, action) => {

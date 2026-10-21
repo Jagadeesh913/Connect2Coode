@@ -1,3 +1,4 @@
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect } from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
@@ -13,11 +14,7 @@ import {
   Layers,
   Plus,
   Trash2,
-  Eye,
-  EyeOff,
-  CheckCircle2,
   Loader2,
-  AlertCircle,
 } from 'lucide-react';
 
 interface TestCaseModalProps {
@@ -54,12 +51,16 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
   const [typesLoading, setTypesLoading] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
+
   // Fetch existing test cases & TESTCASETYPE Reference Library from backend on modal open
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
     setTypesLoading(true);
+    setLoadError(null);
 
     const initModal = async () => {
       try {
@@ -71,7 +72,9 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           if (Array.isArray(refList) && refList.length > 0) {
             validTypes = refList;
           }
-        } catch {}
+        } catch {
+          if (isMounted) setLoadError('Unable to load test case types. Retry before saving.');
+        }
 
         if (isMounted) {
           setTestCaseTypes(validTypes);
@@ -92,8 +95,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             if (fetched && fetched.length > 0) {
               existingCases = fetched;
             }
-          } catch (qErr) {
-            console.warn('Could not load existing test cases for question:', qErr);
+          } catch {
+            if (isMounted) setLoadError('Unable to load existing test cases. Retry before saving.');
           }
         }
 
@@ -126,7 +129,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, questionId, question]);
+  }, [isOpen, questionId, question, retry]);
 
   const handleAddTestCase = () => {
     const defaultType = testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'SAMPLE';
@@ -264,7 +267,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={submitting}
+              disabled={submitting || typesLoading || Boolean(loadError)}
               className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
             >
               Cancel
@@ -282,6 +285,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       }
     >
       <div className="space-y-4 font-sans text-left">
+        <RequestStatus pending={typesLoading} error={loadError} onRetry={() => setRetry((value) => value + 1)} label="Loading test cases…" />
         {typesLoading ? (
           <div className="flex items-center justify-center p-8 text-slate-500 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-blue-600" />

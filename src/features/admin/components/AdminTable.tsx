@@ -1,5 +1,6 @@
 import React from 'react';
-import { AdminLoading } from './AdminLoading';
+import { Skeleton } from '../../../shared/components/ui/Skeleton';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { AdminEmptyState } from './AdminEmptyState';
 
 export interface Column<T> {
@@ -33,11 +34,7 @@ export function AdminTable<T>({
   keyExtractor,
   className = '',
 }: AdminTableProps<T>) {
-  if (loading) {
-    return <AdminLoading message="Fetching table records..." />;
-  }
-
-  if (!data || data.length === 0) {
+  if (!loading && (!data || data.length === 0)) {
     return (
       <AdminEmptyState
         title={emptyTitle}
@@ -49,8 +46,10 @@ export function AdminTable<T>({
 
   return (
     <div
+      aria-busy={loading}
       className={`w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0D1322] shadow-xs font-sans transition-colors ${className}`}
     >
+      <RequestStatus pending={loading} label={data.length ? 'Updating records…' : 'Loading records…'} />
       <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
         <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[640px]">
           <thead>
@@ -68,7 +67,11 @@ export function AdminTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/60">
-            {data.map((row) => (
+            {loading && data.length === 0 ? Array.from({ length: 10 }, (_, row) => (
+              <tr key={row} aria-hidden="true">
+                {columns.map((col, index) => <td key={index} className={`px-4 py-3.5 ${col.className || ''}`}><Skeleton className="h-7 w-full" /></td>)}
+              </tr>
+            )) : data.map((row) => (
               <tr
                 key={keyExtractor(row)}
                 onClick={() => onRowClick && onRowClick(row)}

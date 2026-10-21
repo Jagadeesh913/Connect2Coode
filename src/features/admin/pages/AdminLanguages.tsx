@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminBadge } from '../components/AdminBadge';
 import { AdminModal } from '../components/AdminModal';
@@ -20,7 +21,6 @@ import {
   Edit3,
   PowerOff,
   Terminal,
-  Cpu,
   CheckCircle2,
   Code2,
 } from 'lucide-react';
@@ -29,6 +29,7 @@ export const AdminLanguages: React.FC = () => {
   const [languages, setLanguages] = useState<AdminLanguageItem[]>([]);
   const [activeDropdown, setActiveDropdown] = useState<LanguageDropdownItem[]>([]);
   const [refLanguages, setRefLanguages] = useState<ReferenceItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   // Modal State
@@ -45,8 +46,11 @@ export const AdminLanguages: React.FC = () => {
   const [languageToDeactivate, setLanguageToDeactivate] = useState<AdminLanguageItem | null>(null);
   const [submittingDeactivation, setSubmittingDeactivation] = useState<boolean>(false);
 
+  const requestSequence = useRef(0);
   const fetchLanguagesData = useCallback(async () => {
+    const requestId = ++requestSequence.current;
     setLoading(true);
+    setError(null);
     try {
       const [langs, drop, refs] = await Promise.allSettled([
         adminLanguageService.getLanguages(),
@@ -54,6 +58,8 @@ export const AdminLanguages: React.FC = () => {
         referenceService.getByGroupCode('LANG'),
       ]);
 
+      if (requestId !== requestSequence.current) return;
+      if ([langs, drop, refs].some((result) => result.status === 'rejected')) setError('Some language data could not be loaded. Retry to refresh the registry and options.');
       if (langs.status === 'fulfilled') {
         const list = Array.isArray(langs.value) ? langs.value : [];
         setLanguages(list);
@@ -69,13 +75,18 @@ export const AdminLanguages: React.FC = () => {
     } catch {
       toast.error('Failed to load language data.');
     } finally {
-      setLoading(false);
+      if (requestId === requestSequence.current) setLoading(false);
     }
+  }, []);
+
+  const invalidateLanguageRequests = useCallback(() => {
+    requestSequence.current += 1;
   }, []);
 
   useEffect(() => {
     fetchLanguagesData();
-  }, [fetchLanguagesData]);
+    return invalidateLanguageRequests;
+  }, [fetchLanguagesData, invalidateLanguageRequests]);
 
   const handleOpenCreateModal = () => {
     setEditingLanguage(null);
@@ -312,6 +323,7 @@ export const AdminLanguages: React.FC = () => {
       </div>
 
       {/* Languages Table */}
+      <RequestStatus pending={loading} error={error} onRetry={fetchLanguagesData} label="Loading language registry…" />
       <AdminTable<AdminLanguageItem>
         columns={columns}
         data={languages}

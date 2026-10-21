@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchBookmarks, toggleBookmarkItem } from '../redux/bookmarkSlice';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Badge } from '../../../shared/components/ui/Badge';
 import { BookmarkItemSkeleton } from '../../../shared/components/ui/Skeleton';
@@ -9,7 +10,7 @@ import { toast } from 'react-hot-toast';
 
 export const BookmarksList: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { bookmarks, loading } = useAppSelector((state) => state.bookmarks);
+  const { bookmarks, loading, error } = useAppSelector((state) => state.bookmarks);
   const [filterType, setFilterType] = useState<'ALL' | 'PROBLEM' | 'APTITUDE' | 'COMPANY'>('ALL');
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
@@ -21,12 +22,10 @@ export const BookmarksList: React.FC = () => {
       .finally(() => {
         setHasFetchedOnce(true);
       });
-    return () => {
-      req.abort();
-    };
+    // The root shell also consumes this shared request; it owns its lifetime.
   }, [dispatch]);
 
-  const isBookmarksLoading = loading || !hasFetchedOnce;
+  const isBookmarksLoading = (loading || !hasFetchedOnce) && bookmarks.length === 0;
 
   const handleRemove = (itemId: string) => {
     dispatch(toggleBookmarkItem({ itemId }))
@@ -97,8 +96,11 @@ export const BookmarksList: React.FC = () => {
 
       {/* Bookmarks List Container */}
       <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 mt-2">
+        <RequestStatus pending={loading} error={error} onRetry={() => dispatch(fetchBookmarks({ force: true }))} />
         {isBookmarksLoading ? (
           <BookmarkItemSkeleton count={4} />
+        ) : error && bookmarks.length === 0 ? (
+          <EmptyState title="Unable to load bookmarks" description={error} actionText="Retry" onAction={() => dispatch(fetchBookmarks({ force: true }))} />
         ) : filteredBookmarks.length === 0 ? (
           <EmptyState
             title="No bookmarks saved"

@@ -1,3 +1,5 @@
+import { useExecutionRequest } from '../hooks/useExecutionRequest';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
@@ -21,7 +23,6 @@ import {
 import { toast } from 'react-hot-toast';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
-import { tokenStorage } from '../../../core/security/tokenStorage';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
@@ -109,8 +110,8 @@ export const ProblemDetails: React.FC = () => {
   const { theme } = useTheme();
 
   // Server state owned by Redux; only editor/execution/UI state stays local.
-  const { selectedProblem: problem, loading: loadingProblem, error: problemError } = useAppSelector((state) => state.problems);
-  const { languages: serverLanguages, loading: loadingLanguages } = useAppSelector((state) => state.languages);
+  const { selectedProblem: problem, detailLoading: loadingProblem, detailError: problemError } = useAppSelector((state) => state.problems);
+  const { languages: serverLanguages, loading: loadingLanguages, error: languagesError } = useAppSelector((state) => state.languages);
 
   const languages = serverLanguages;
 
@@ -219,6 +220,8 @@ export const ProblemDetails: React.FC = () => {
 
   // Submissions history scoped to active question ID
   const [submissionsHistory, setSubmissionsHistory] = useState<SubmissionRecord[]>([]);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
+  const [submissionsRetry, setSubmissionsRetry] = useState(0);
   const [loadingSubmissions, setLoadingSubmissions] = useState<boolean>(false);
   const [expandedSubmissionId, setExpandedSubmissionId] = useState<string | null>(null);
 
@@ -227,7 +230,10 @@ export const ProblemDetails: React.FC = () => {
 
   useEffect(() => {
     let isMounted = true;
+    setSubmissionsHistory([]);
+    setLoadingSubmissions(false);
 
+    setSubmissionsError(null);
     const loadSubmissions = async () => {
       if (!activeQuestionId) {
         setSubmissionsHistory([]);
@@ -250,7 +256,7 @@ export const ProblemDetails: React.FC = () => {
             user.id,
             activeQuestionId
           );
-          if (isMounted && Array.isArray(serverSubs) && serverSubs.length > 0) {
+          if (isMounted && Array.isArray(serverSubs)) {
             const mappedRecords: SubmissionRecord[] = serverSubs.map((sub) => {
               const langObj = languagesRef.current.find((l) => l.id === sub.languageId);
               const langName =
@@ -293,7 +299,7 @@ export const ProblemDetails: React.FC = () => {
             );
           }
         } catch {
-          // Keep local cache if network request fails
+          if (isMounted) setSubmissionsError('Unable to refresh submissions. Cached records are shown if available.');
         } finally {
           if (isMounted) setLoadingSubmissions(false);
         }
@@ -305,7 +311,7 @@ export const ProblemDetails: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [activeQuestionId, user?.id]);
+  }, [activeQuestionId, user?.id, submissionsRetry]);
 
   // Map language name to Monaco language
   const monacoLang = useMemo(() => {
@@ -452,6 +458,13 @@ export const ProblemDetails: React.FC = () => {
     }
   };
 
+  const executionRequest = useExecutionRequest(String(problemIdentifier));
+  useEffect(() => {
+    setIsExecuting(false);
+    setExecutionResult(null);
+    setExecutionError(null);
+  }, [problemIdentifier]);
+
   // RUN CODE (Visible Sample Test Cases only)
   const handleRunCode = useCallback(async () => {
     if (!isExecutionReady || !activeQuestionId || !selectedLanguage) {
@@ -470,6 +483,8 @@ export const ProblemDetails: React.FC = () => {
       return;
     }
 
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsExecuting(true);
     setLastExecutionMode('run');
     setExecutionError(null);
@@ -484,7 +499,8 @@ export const ProblemDetails: React.FC = () => {
     };
 
     try {
-      const result: ExecutionResultData = await executionService.runCode(payload);
+      const result: ExecutionResultData = await executionService.runCode(payload, controller.signal);
+      if (controller.signal.aborted) return;
       if (result.failedTestCases === 0 && result.passedTestCases > 0) {
         toast.success('Sample test cases passed!');
       } else {
@@ -493,14 +509,15 @@ export const ProblemDetails: React.FC = () => {
       setExecutionResult(result);
       setSelectedTestCaseIdx(0);
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Failed to execute code'}: ${detail}` : (err?.message || 'Failed to execute code');
       setExecutionError(msg);
       toast.error(msg);
     } finally {
-      setIsExecuting(false);
+      if (executionRequest.finish(controller)) setIsExecuting(false);
     }
-  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight]);
+  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, executionRequest]);
 
   // SUBMIT CODE (Evaluation across all test cases - TEST CASES ARE HIDDEN)
   const handleSubmitCode = useCallback(async () => {
@@ -520,6 +537,8 @@ export const ProblemDetails: React.FC = () => {
       return;
     }
 
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsExecuting(true);
     setLastExecutionMode('submit');
     setExecutionError(null);
@@ -534,7 +553,8 @@ export const ProblemDetails: React.FC = () => {
     };
 
     try {
-      const result: ExecutionResultData = await executionService.submitCode(payload);
+      const result: ExecutionResultData = await executionService.submitCode(payload, controller.signal);
+      if (controller.signal.aborted) return;
       const isAccepted =
         (result.failedTestCases === 0 || !result.failedTestCases) &&
         result.passedTestCases > 0 &&
@@ -571,14 +591,15 @@ export const ProblemDetails: React.FC = () => {
         return updated;
       });
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Failed to submit code'}: ${detail}` : (err?.message || 'Failed to submit code');
       setExecutionError(msg);
       toast.error(msg);
     } finally {
-      setIsExecuting(false);
+      if (executionRequest.finish(controller)) setIsExecuting(false);
     }
-  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch]);
+  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch, executionRequest]);
 
   // Keyboard Shortcuts (Ctrl+' or Cmd+' to Run, Ctrl+Enter or Cmd+Enter to Submit)
   useEffect(() => {
@@ -640,7 +661,7 @@ export const ProblemDetails: React.FC = () => {
     }
   }, [sampleTestCases.length, selectedTestCaseIdx]);
 
-  if (loadingProblem || (!isProblemLoadedForRoute && !problemError)) {
+  if (!isProblemLoadedForRoute && (loadingProblem || !problemError)) {
     return (
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 font-sans">
         <Skeleton className="h-10 w-80 rounded-xl" />
@@ -688,14 +709,15 @@ export const ProblemDetails: React.FC = () => {
     );
   }
 
-  if (!isProblemLoadedForRoute || problemError) {
+  if (!isProblemLoadedForRoute) {
     return (
       <div className="relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-16">
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col items-center justify-center flex-1">
+          <RequestStatus error={problemError} onRetry={() => dispatch(fetchProblemById(problemIdentifier!))} />
           <NotFound
             embedded
-            title="Problem Not Found"
-            description="The requested coding problem could not be found or loaded from the platform repository."
+            title={problemError ? "Unable to load problem" : "Problem Not Found"}
+            description={problemError || "The requested coding problem could not be found."}
           />
         </div>
       </div>
@@ -1053,7 +1075,8 @@ export const ProblemDetails: React.FC = () => {
                   </span>
                 </div>
 
-                {submissionsHistory.length === 0 ? (
+                <RequestStatus pending={loadingSubmissions} error={submissionsError} onRetry={() => setSubmissionsRetry((value) => value + 1)} label="Loading submissions…" />
+                {loadingSubmissions && submissionsHistory.length === 0 ? <Skeleton className="h-20 w-full" count={3} /> : submissionsError && submissionsHistory.length === 0 ? null : submissionsHistory.length === 0 ? (
                   <div className="p-8 text-center text-slate-500 dark:text-slate-400 text-xs font-mono space-y-2 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl">
                     <i className="fa-solid fa-clock-rotate-left text-2xl text-slate-400 block mb-1"></i>
                     <span>No submissions yet in this session.</span>
@@ -1220,6 +1243,7 @@ export const ProblemDetails: React.FC = () => {
                     id="languageSelect"
                     value={selectedLanguage?.id ?? ''}
                     onChange={handleLanguageChange}
+                    aria-busy={loadingLanguages}
                     disabled={loadingLanguages || isExecuting || languages.length === 0}
                     className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-xs rounded-full pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
                   >
@@ -1294,9 +1318,13 @@ export const ProblemDetails: React.FC = () => {
               </div>
             </div>
 
+              <RequestStatus pending={isExecuting || loadingLanguages} error={languagesError} onRetry={() => dispatch(fetchLanguages())} label={isExecuting ? (lastExecutionMode === "submit" ? "Submitting code…" : "Running code…") : "Loading languages…"} />
+            <RequestStatus pending={loadingProblem} error={problemError} onRetry={() => dispatch(fetchProblemById(problemIdentifier!))} label="Refreshing problem…" />
             {/* Monaco Editor Container */}
             <div className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 ${consoleHeight === 'expanded' ? 'h-[240px]' : consoleHeight === 'collapsed' ? 'h-[620px]' : 'h-[380px]'}`}>
-              <Editor
+
+                    <Editor
+                      loading={<div role="status" className="p-6 w-full"><Skeleton className="h-5 w-3/4" count={8} /><span className="sr-only">Loading code editor</span></div>}
                 height="100%"
                 language={monacoLang}
                 value={currentCode}

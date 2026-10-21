@@ -28,7 +28,12 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 // Import real modules after loader registration
 const { sanitizeProblemFilters } = await import('../../src/features/problems/redux/problemSlice.ts');
 const { parseToIdList } = await import('../../src/services/problemService.ts');
-const { default: companyReducer, fetchCompanies, fetchCompanyBySlug } = await import('../../src/features/companies/redux/companySlice.ts');
+const {
+  default: companyReducer,
+  fetchCompanies,
+  fetchCompanyBySlug,
+  fetchCompanyProblems,
+} = await import('../../src/features/companies/redux/companySlice.ts');
 
 describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
 
@@ -130,6 +135,7 @@ describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
         detailsLoading: true,
         loading: true,
         companiesRequestKey: '',
+        companiesRequestId: 'req-list-1',
       };
 
       const fulfilledState = companyReducer(pendingState, {
@@ -141,6 +147,51 @@ describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
       assert.equal(fulfilledState.listLoading, false, 'listLoading must reset to false');
       assert.equal(fulfilledState.detailsLoading, true, 'detailsLoading must remain true');
       assert.equal(fulfilledState.loading, true, 'combined loading remains true because details is loading');
+    });
+
+    it('ignores late company detail responses after a newer route owns the request', () => {
+      const initial = companyReducer(undefined, { type: '@@INIT' });
+      const firstPending = companyReducer(initial, {
+        type: fetchCompanyBySlug.pending.type,
+        meta: { arg: 'company-a', requestId: 'detail-a' },
+      });
+      const secondPending = companyReducer(firstPending, {
+        type: fetchCompanyBySlug.pending.type,
+        meta: { arg: 'company-b', requestId: 'detail-b' },
+      });
+      const staleFulfilled = companyReducer(secondPending, {
+        type: fetchCompanyBySlug.fulfilled.type,
+        payload: { key: 'company-a', company: { id: 1, name: 'Company A' }, fetchedAt: Date.now() },
+        meta: { arg: 'company-a', requestId: 'detail-a' },
+      });
+
+      assert.equal(staleFulfilled.selectedCompany, null);
+      assert.equal(staleFulfilled.detailsLoading, true);
+      assert.equal(staleFulfilled.companyDetailRequestId, 'detail-b');
+    });
+
+    it('keeps existing company problems visible during same-company refresh failure', () => {
+      const initial = companyReducer(undefined, { type: '@@INIT' });
+      const existingProblems = [{ id: 1, title: 'Two Sum' }];
+      const seeded = {
+        ...initial,
+        companyProblems: existingProblems,
+        companyProblemsRequestKey: 'id:7|name:acme',
+      };
+      const pending = companyReducer(seeded, {
+        type: fetchCompanyProblems.pending.type,
+        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-refresh' },
+      });
+      const rejected = companyReducer(pending, {
+        type: fetchCompanyProblems.rejected.type,
+        payload: 'Refresh failed',
+        error: {},
+        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-refresh', aborted: false },
+      });
+
+      assert.deepEqual(rejected.companyProblems, existingProblems);
+      assert.equal(rejected.companyProblemsLoading, false);
+      assert.equal(rejected.problemsError, 'Refresh failed');
     });
   });
 

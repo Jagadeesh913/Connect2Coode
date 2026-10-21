@@ -1,3 +1,6 @@
+import { useExecutionRequest } from '../../../problems/hooks/useExecutionRequest';
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
@@ -13,12 +16,7 @@ import {
   Terminal,
   CheckCircle2,
   XCircle,
-  Clock,
-  Cpu,
-  Layers,
   RotateCcw,
-  AlertCircle,
-  Check,
 } from 'lucide-react';
 
 const DEFAULT_STARTER_CODES: Record<string, string> = {
@@ -88,7 +86,6 @@ function solve() {
 solve();
 `,
 };
-
 export const DashboardCodeRunner: React.FC = () => {
   const { theme } = useTheme();
 
@@ -111,52 +108,37 @@ export const DashboardCodeRunner: React.FC = () => {
   const [result, setResult] = useState<ExecutionResultData | null>(null);
   const [executionMessage, setExecutionMessage] = useState<string>('');
 
-  // 1. Fetch live active languages from /api/v1/language/dropdown
-  // and real questions list from /api/v1/questions
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [resourcesRetry, setResourcesRetry] = useState(0);
   useEffect(() => {
-    adminLanguageService.getLanguageDropdown().then((list) => {
-      if (Array.isArray(list) && list.length > 0) {
+    let active = true;
+    setResourcesLoading(true);
+    setResourcesError(null);
+    Promise.allSettled([
+      adminLanguageService.getLanguageDropdown(),
+      adminQuestionService.getQuestions({ level: null, companies: null, topic: null, searchText: null, pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' } }),
+    ]).then(([languageResult, questionResult]) => {
+      if (!active) return;
+      const failures: string[] = [];
+      if (languageResult.status === 'fulfilled') {
+        const list = languageResult.value;
         setLanguages(list);
-        setSelectedLanguageId(list[0].id);
-        const langName = list[0].name;
-        if (DEFAULT_STARTER_CODES[langName]) {
-          setSourceCode(DEFAULT_STARTER_CODES[langName]);
-        }
-      }
+        setSelectedLanguageId((previous) => list.some((language) => language.id === previous) ? previous : list[0]?.id ?? null);
+        setSourceCode((code) => code || DEFAULT_STARTER_CODES[list[0]?.name] || '');
+        if (!list.length) failures.push('No execution languages are configured.');
+      } else failures.push('Unable to load execution languages.');
+      if (questionResult.status === 'fulfilled') {
+        const raw: any = questionResult.value?.data || questionResult.value;
+        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
+        setQuestions(list);
+        if (list[0]) { setSelectedQuestionId(list[0].id); setManualQuestionId(String(list[0].id)); }
+      } else failures.push('Unable to load question options.');
+      setResourcesError(failures.join(' ') || null);
+      setResourcesLoading(false);
     });
-
-    adminQuestionService
-      .getQuestions({
-        level: null,
-        companies: null,
-        topic: null,
-        searchText: null,
-        pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
-      })
-      .then((res: any) => {
-        const raw = res?.data || res;
-        const list = Array.isArray(raw?.content)
-          ? raw.content
-          : Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : [];
-        if (list.length > 0) {
-          const mapped = list.map((q: any) => ({
-            id: q.id,
-            title: q.title || `Question #${q.id}`,
-            difficulty: q.difficultyRefName || q.difficultyName || '',
-          }));
-          setQuestions(mapped);
-          setSelectedQuestionId(mapped[0].id);
-          setManualQuestionId(String(mapped[0].id));
-        }
-      })
-      .catch((err) => {
-        console.warn('Dashboard questions fetch failed:', err);
-      });
-  }, []);
+    return () => { active = false; };
+  }, [resourcesRetry]);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
@@ -196,14 +178,19 @@ export const DashboardCodeRunner: React.FC = () => {
       ? 'java'
       : 'plaintext';
 
+  const executionRequest = useExecutionRequest('dashboard');
+  useEffect(() => { setIsRunning(false); setIsSubmitting(false); setResult(null); setExecutionMessage(''); }, []);
+
   // 1. Admin TEST CODE (POST /api/v1/admin/testCode)
   const handleRunSampleCases = async () => {
+    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId) || selectedLanguageId === null || languages.length === 0) {
       toast.error('Please select or enter a valid Question ID');
       return;
-    }
-
+}
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsRunning(true);
     setExecutionMode('run');
     setResult(null);
@@ -214,43 +201,36 @@ export const DashboardCodeRunner: React.FC = () => {
         questionId: qId,
         languageId: selectedLangObj?.referenceId ?? selectedLanguageId,
         sourceCode,
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
 
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed Sample Test Cases Successfully');
       toast.success('Sample test cases passed execution!');
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Admin testCode execution failed'}: ${detail}` : (err?.message || 'Admin testCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
-      setResult({
-        totalTestCases: 0,
-        passedTestCases: 0,
-        failedTestCases: 0,
-        testCases: [
-          {
-            testCaseId: 0,
-            testCaseType: 'Error',
-            status: 'Failed',
-            actualOutput: msg,
-          },
-        ],
-      });
+      setResult(null);
     } finally {
-      setIsRunning(false);
+      if (executionRequest.finish(controller)) setIsRunning(false);
     }
   };
 
   // 2. Admin SUBMIT CODE (POST /api/v1/admin/submitCode)
   const handleSubmitAllCases = async () => {
+    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId)) {
       toast.error('Please select or enter a valid Question ID');
       return;
     }
 
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsSubmitting(true);
     setExecutionMode('submit');
     setResult(null);
@@ -261,32 +241,22 @@ export const DashboardCodeRunner: React.FC = () => {
         questionId: qId,
         languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId || 0,
         sourceCode,
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
 
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Validated against All Test Cases');
       toast.success('Admin submission test completed!');
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode execution failed'}: ${detail}` : (err?.message || 'Admin submitCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
-      setResult({
-        totalTestCases: 0,
-        passedTestCases: 0,
-        failedTestCases: 0,
-        testCases: [
-          {
-            testCaseId: 0,
-            testCaseType: 'Error',
-            status: 'Failed',
-            actualOutput: msg,
-          },
-        ],
-      });
+      setResult(null);
     } finally {
-      setIsSubmitting(false);
+      if (executionRequest.finish(controller)) setIsSubmitting(false);
     }
   };
 
@@ -299,6 +269,7 @@ export const DashboardCodeRunner: React.FC = () => {
       icon={<Terminal className="w-5 h-5" />}
     >
       <div className="space-y-4 font-sans text-left">
+        <RequestStatus pending={resourcesLoading} error={resourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
         {/* Controls Toolbar */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
           {/* Question Select */}
@@ -309,7 +280,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <select
               value={selectedQuestionId ?? ''}
               onChange={handleQuestionSelectChange}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {questions.map((q) => (
@@ -331,7 +302,7 @@ export const DashboardCodeRunner: React.FC = () => {
               value={manualQuestionId}
               onChange={handleManualQuestionIdChange}
               placeholder="e.g. 1"
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
             />
           </div>
@@ -344,7 +315,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <select
               value={selectedLanguageId ?? ''}
               onChange={handleLanguageChange}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {languages.map((l) => (
@@ -359,7 +330,7 @@ export const DashboardCodeRunner: React.FC = () => {
           <div className="md:col-span-3 flex items-center gap-2">
             <button
               onClick={handleRunSampleCases}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
               title="Execute sample test cases (/api/v1/admin/testCode)"
             >
@@ -369,7 +340,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
             <button
               onClick={handleSubmitAllCases}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
               title="Submit against all test cases (/api/v1/admin/submitCode)"
             >
@@ -379,6 +350,7 @@ export const DashboardCodeRunner: React.FC = () => {
           </div>
         </div>
 
+                    <RequestStatus pending={isRunning || isSubmitting} error={!result ? executionMessage : null} label={isSubmitting ? "Submitting code…" : "Running code…"} />
         {/* Monaco Editor Container */}
         <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs">
           <div className="px-4 py-2.5 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between text-xs font-mono">
@@ -400,7 +372,9 @@ export const DashboardCodeRunner: React.FC = () => {
           </div>
 
           <div className="h-72 w-full bg-[#1e1e1e]">
-            <Editor
+
+                  <Editor
+                    loading={<div role="status" className="w-full p-6"><Skeleton className="h-5 w-3/4" count={8} /><span className="sr-only">Loading code editor</span></div>}
               height="100%"
               language={monacoLang}
               value={sourceCode}

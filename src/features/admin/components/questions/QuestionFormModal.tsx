@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AdminModal } from '../AdminModal';
@@ -66,6 +67,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     handleSubmit,
     reset,
     setValue,
+    getValues,
     watch,
     formState: { errors },
   } = useForm<QuestionFormData>({
@@ -89,11 +91,17 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     },
   });
 
+  const [referenceLoading, setReferenceLoading] = useState(true);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [referenceRetry, setReferenceRetry] = useState(0);
+
   // Fetch Reference Libraries and Companies from REAL backend API
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
+    setReferenceLoading(true);
+    setReferenceError(null);
     const loadReferenceData = async () => {
       try {
         const [diffRes, topicRes, qpfRes, tcTypeRes, compRes] = await Promise.all([
@@ -117,8 +125,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         setQpfs(Array.isArray(qpfList) ? qpfList : []);
         setTestCaseTypes(Array.isArray(tcTypeList) ? tcTypeList : []);
         setAllCompanies(Array.isArray(compList) ? compList : []);
-      } catch (err) {
-        console.warn('Failed to load reference metadata:', err);
+      } catch {
+        if (isMounted) setReferenceError('Unable to load form options. Retry before saving.');
+      } finally {
+        if (isMounted) setReferenceLoading(false);
       }
     };
 
@@ -126,11 +136,19 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen]);
+  }, [isOpen, referenceRetry]);
 
-  // Sync Form Values when initialData or references change
+  const initializedFormIdentity = useRef<string | null>(null);
+
+  // Initialize once per modal session. Reference retries must never reset dirty fields.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      initializedFormIdentity.current = null;
+      return;
+    }
+    const formIdentity = initialData?.id == null ? 'create' : `edit:${initialData.id}`;
+    if (initializedFormIdentity.current === formIdentity) return;
+    initializedFormIdentity.current = formIdentity;
 
     if (initialData) {
       const diffName = (
@@ -282,6 +300,67 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     }
     setActiveTab('METADATA');
   }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, reset]);
+
+  // Fill unresolved reference fields after options arrive without touching user-entered content.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const resolveReference = (
+      options: ReferenceItem[],
+      codeField: 'difficultyRefCode' | 'topicRefCode' | 'qpfRefCode',
+      groupField: 'difficultyRefGroupCode' | 'topicRefGroupCode' | 'qpfRefGroupCode',
+      nameField: 'difficultyRefName' | 'topicRefName' | 'qpfRefName',
+      fallbackName: string,
+      defaultGroup: string
+    ) => {
+      if (getValues(codeField) || options.length === 0) return;
+      const normalized = fallbackName.toLowerCase().trim();
+      const match = options.find((item) =>
+        normalized && (item.refName.toLowerCase() === normalized || item.refCode.toLowerCase() === normalized)
+      ) || (!initialData ? options[0] : undefined);
+      if (!match) return;
+      setValue(groupField, match.refGroupCode || defaultGroup, { shouldDirty: false });
+      setValue(codeField, match.refCode, { shouldDirty: false });
+      setValue(nameField, match.refName, { shouldDirty: false });
+    };
+
+    resolveReference(
+      difficulties,
+      'difficultyRefCode',
+      'difficultyRefGroupCode',
+      'difficultyRefName',
+      initialData?.difficultyRefName || (initialData as any)?.difficultyName || (initialData as any)?.difficulty || '',
+      'DIFF'
+    );
+    resolveReference(
+      topics,
+      'topicRefCode',
+      'topicRefGroupCode',
+      'topicRefName',
+      initialData?.topicRefName || (initialData as any)?.topicName || (initialData as any)?.topic || '',
+      'TOPIC'
+    );
+    resolveReference(
+      qpfs,
+      'qpfRefCode',
+      'qpfRefGroupCode',
+      'qpfRefName',
+      initialData?.qpfRefName || (initialData as any)?.questionPlatform || (initialData as any)?.platformName || '',
+      'QPF'
+    );
+
+    if (allCompanies.length > 0) {
+      setSelectedCompanies((current) => current.map((selected) =>
+        allCompanies.find((company) => company.name.toLowerCase() === selected.name.toLowerCase()) || selected
+      ));
+    }
+    if (testCaseTypes.length > 0) {
+      setTestCases((current) => current.map((testCase) => testCase.typeRefCode ? testCase : {
+        ...testCase,
+        typeRefCode: testCaseTypes[0].refCode,
+      }));
+    }
+  }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, getValues, setValue]);
 
   const handleDifficultySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedCode = e.target.value;
@@ -526,7 +605,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={submitting}
+              disabled={submitting || referenceLoading || Boolean(referenceError)}
               className="flex-1 sm:flex-initial px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
             >
               Cancel
@@ -543,7 +622,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         </div>
       }
     >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5 font-sans text-left">
+      <form aria-busy={referenceLoading || submitting} onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5 font-sans text-left">
+        <RequestStatus pending={referenceLoading} error={referenceError} onRetry={() => setReferenceRetry((value) => value + 1)} label="Loading form options…" />
         {activeTab === 'METADATA' && (
           <div className="space-y-4">
             {/* Title */}

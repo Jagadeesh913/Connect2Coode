@@ -8,6 +8,7 @@ import {
   cleanQuestionText,
   synthesizeMcqOptions,
 } from '../utils/mcqUtils';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { Skeleton, AptitudeQuestionSkeleton } from '../../../shared/components/ui/Skeleton';
 
 export type AptitudeItem = McqQuestion;
@@ -356,6 +357,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const [isQuestionTypeOpen, setIsQuestionTypeOpen] = useState(true);
 
   // Data States
+  const [committedPage, setCommittedPage] = useState(1);
   const [questions, setQuestions] = useState<McqQuestion[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -395,6 +397,11 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
   // Sync category changes with URL query parameter & reset all filters
   const handleCategorySwitch = (code: AptitudeSubjectCode) => {
+    abortControllerRef.current?.abort();
+    setQuestions([]);
+    setTotalElements(0);
+    setLoading(true);
+    setError(null);
     setActiveSubject(code);
     setSearchParams({ category: SUBJECT_CONFIG[code].urlParam });
     setDraftSearch('');
@@ -441,9 +448,16 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     };
   }, []);
 
+  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [topicsError, setTopicsError] = useState<string | null>(null);
+  const [topicsRetry, setTopicsRetry] = useState(0);
+
   // Load Question Types for the active category (APTITUDE, REASONING, VERBAL, PSEUDOCODE)
   useEffect(() => {
     let isMounted = true;
+    setActiveQuestionTypes([]);
+    setTopicsLoading(true);
+    setTopicsError(null);
     referenceService.getByGroupCode(activeSubject).then((res) => {
       if (!isMounted) return;
       const items = Array.isArray((res as any)?.data)
@@ -454,14 +468,16 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
         ? res
         : [];
       setActiveQuestionTypes(items);
-    }).catch((err) => {
-      console.warn(`Could not load question types for ${activeSubject}:`, err);
+    }).catch(() => {
+      if (isMounted) setTopicsError("Unable to load topic filters.");
+    }).finally(() => {
+      if (isMounted) setTopicsLoading(false);
     });
 
     return () => {
       isMounted = false;
     };
-  }, [activeSubject]);
+  }, [activeSubject, topicsRetry]);
 
   // Complete category topics with verified database IDs
   const allCategoryTopics: QuestionTypeItem[] = useMemo(() => {
@@ -474,66 +490,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       }));
     }
 
-    if (activeSubject === 'APTITUDE') {
-      return [
-        { id: 44, name: 'Time, Speed and Distance', code: 'TIMEDISTANCE', count: 0 },
-        { id: 48, name: 'Compound Interest', code: 'COMPOUNDINTEREST', count: 0 },
-        { id: 57, name: 'Probability', code: 'PROBABILITY', count: 0 },
-        { id: 59, name: 'Permutations and Combinations', code: 'PERMUTATIONSCOMBINATIONS', count: 0 },
-        { id: 62, name: 'Time and Work', code: 'TIMEWORK', count: 0 },
-        { id: 63, name: 'Percentages', code: 'PERCENTAGES', count: 0 },
-        { id: 71, name: 'Averages', code: 'AVERAGES', count: 0 },
-        { id: 72, name: 'Ratio and Proportion', code: 'RATIOPROPORTION', count: 0 },
-        { id: 76, name: 'Number System', code: 'NUMBERSYSTEM', count: 0 },
-        { id: 79, name: 'Simple Interest', code: 'SIMPLEINTEREST', count: 0 },
-        { id: 80, name: 'Profit and Loss', code: 'PROFITLOSS', count: 0 },
-        { id: 85, name: 'Problems on Ages', code: 'AGES', count: 0 },
-      ];
-    } else if (activeSubject === 'REASONING') {
-      return [
-        { id: 47, name: 'Odd One Out', code: 'ODDONEOUT', count: 0 },
-        { id: 52, name: 'Syllogisms', code: 'SYLLOGISMS', count: 0 },
-        { id: 53, name: 'Analogies', code: 'ANALOGIES', count: 0 },
-        { id: 55, name: 'Number Series', code: 'NUMBERSERIES', count: 0 },
-        { id: 58, name: 'Ranking and Ordering', code: 'RANKINGORDERING', count: 0 },
-        { id: 60, name: 'Letter Series', code: 'LETTERSERIES', count: 0 },
-        { id: 61, name: 'Logical Puzzles', code: 'LOGICALPUZZLES', count: 0 },
-        { id: 66, name: 'Direction Sense', code: 'DIRECTIONSENSE', count: 0 },
-        { id: 75, name: 'Coding and Decoding', code: 'CODINGDECODING', count: 0 },
-        { id: 77, name: 'Seating Arrangements', code: 'SEATINGARRANGEMENT', count: 0 },
-        { id: 82, name: 'Statements and Conclusions', code: 'STATEMENTSCONCLUSIONS', count: 0 },
-        { id: 88, name: 'Blood Relations', code: 'BLOODRELATIONS', count: 0 },
-      ];
-    } else if (activeSubject === 'VERBAL') {
-      return [
-        { id: 45, name: 'Sentence Completion', code: 'SENTENCECOMPLETION', count: 0 },
-        { id: 46, name: 'Synonyms and Antonyms', code: 'SYNONYMSANTONYMS', count: 0 },
-        { id: 49, name: 'Reading Comprehension', code: 'READINGCOMPREHENSION', count: 0 },
-        { id: 50, name: 'Para Jumbles', code: 'PARAJUMBLES', count: 0 },
-        { id: 51, name: 'Active and Passive Voice', code: 'ACTIVEPASSIVE', count: 0 },
-        { id: 64, name: 'Prepositions', code: 'PREPOSITIONS', count: 0 },
-        { id: 65, name: 'Grammar', code: 'GRAMMAR', count: 0 },
-        { id: 70, name: 'Error Spotting', code: 'ERRORSPOTTING', count: 0 },
-        { id: 73, name: 'Vocabulary', code: 'VOCABULARY', count: 0 },
-        { id: 74, name: 'Direct and Indirect Speech', code: 'DIRECTINDIRECT', count: 0 },
-        { id: 81, name: 'Sentence Correction', code: 'SENTENCECORRECTION', count: 0 },
-        { id: 84, name: 'Fill in the Blanks', code: 'FILLBLANKS', count: 0 },
-      ];
-    } else {
-      return [
-        { id: 43, name: 'Bitwise Operators', code: 'BITWISEOPERATORS', count: 0 },
-        { id: 54, name: 'Recursion', code: 'RECURSION', count: 0 },
-        { id: 56, name: 'Loops', code: 'LOOPS', count: 0 },
-        { id: 67, name: 'Nested Loops', code: 'NESTEDLOOPS', count: 0 },
-        { id: 68, name: 'Arrays', code: 'ARRAYS', count: 0 },
-        { id: 69, name: 'Strings', code: 'STRINGS', count: 0 },
-        { id: 78, name: 'Conditional Statements', code: 'CONDITIONALS', count: 0 },
-        { id: 83, name: 'Variables and Operators', code: 'VARIABLESOPERATORS', count: 0 },
-        { id: 86, name: 'Output Prediction', code: 'OUTPUTPREDICTION', count: 0 },
-        { id: 87, name: 'Functions', code: 'FUNCTIONS', count: 0 },
-      ];
-    }
-  }, [activeQuestionTypes, activeSubject]);
+    return [];
+  }, [activeQuestionTypes]);
 
   // Filter topics by topicSearch input
   const availableQuestionTypes = useMemo(() => {
@@ -626,15 +584,16 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           : Math.max(1, Math.ceil(total / pageSize));
 
       setQuestions(contentList);
+      setCommittedPage(currentPage);
       setTotalElements(total);
       setTotalPages(computedPages);
     } catch (err: any) {
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
+      if (controller.signal.aborted || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
       console.error('Error fetching questions for Aptitude:', err);
       setError('Unable to load questions. Please try again.');
-      setQuestions([]);
+
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, [activeSubject, subjectRefMap, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
 
@@ -1085,9 +1044,11 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
             {/* Questions List */}
             <div className="flex flex-col gap-3">
-              {loading ? (
+              <RequestStatus pending={topicsLoading} error={topicsError} onRetry={() => setTopicsRetry((value) => value + 1)} label="Loading topic filters…" />
+              <RequestStatus pending={loading} error={questions.length && error ? `${error} Showing previous results.` : null} onRetry={fetchQuestions} />
+              {loading && questions.length === 0 ? (
                 <AptitudeQuestionSkeleton count={6} />
-              ) : error ? (
+              ) : error && questions.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6">
                   <i className="fa-solid fa-triangle-exclamation text-amber-500 text-3xl mb-3"></i>
                   <h4 className="text-base font-bold text-slate-800 dark:text-slate-200 mb-1">{error}</h4>
@@ -1121,14 +1082,14 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                   <AptitudeQuestionCard
                     key={q.id}
                     question={q}
-                    index={(currentPage - 1) * pageSize + idx + 1}
+                    index={(committedPage - 1) * pageSize + idx + 1}
                   />
                 ))
               )}
             </div>
 
             {/* Pagination Matching Reference Layout */}
-            {!loading && totalPages > 1 && (
+            {totalPages > 1 && (
               <div className="flex items-center justify-center gap-1.5 pt-6 pb-2">
                 <button
                   type="button"

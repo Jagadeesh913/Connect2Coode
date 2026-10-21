@@ -180,6 +180,7 @@ export const executeRefreshToken = async (): Promise<string> => {
           refreshUrl,
           payload,
           {
+            timeout: 30_000,
             withCredentials: true,
             headers: {
               'Content-Type': 'application/json',
@@ -193,7 +194,8 @@ export const executeRefreshToken = async (): Promise<string> => {
             `${BASE_URL}/auth/refresh`,
             payload,
             {
-              withCredentials: true,
+              timeout: 30_000,
+            withCredentials: true,
               headers: {
                 'Content-Type': 'application/json',
                 Accept: 'application/json',

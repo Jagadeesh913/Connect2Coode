@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- route modules intentionally define lazy components beside the router */
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
@@ -7,7 +8,7 @@ import { ProtectedRoute } from '../core/guards/ProtectedRoute';
 import { GuestRoute } from '../core/guards/GuestRoute';
 import { AdminRoute } from '../core/guards/AdminRoute';
 import { AdminLayout } from '../features/admin/components/AdminLayout';
-import { Skeleton } from '../shared/components/ui/Skeleton';
+import { PageLoading } from '../shared/components/ui/PageLoading';
 
 // Static imports for Auth (already shared via MainLayout)
 import { Login } from '../features/auth/pages/Login';
@@ -24,15 +25,9 @@ const ProblemDetails = lazy(() => import('../features/problems/pages/ProblemDeta
 const CompanyList = lazy(() => import('../features/companies/pages/CompanyList').then((m: any) => ({ default: m.CompanyList || m.default })));
 const CompanyDetails = lazy(() => import('../features/companies/pages/CompanyDetails').then((m: any) => ({ default: m.CompanyDetails || m.default })));
 const CompanyExamDetails = lazy(() => import('../features/companies/pages/CompanyExamDetails').then((m: any) => ({ default: m.CompanyExamDetails || m.default })));
-const CompanyPatterns = lazy(() => import('../features/companies/pages/CompanyPatterns').then((m: any) => ({ default: m.CompanyPatterns || m.default })));
-const CompanyPatternDetails = lazy(() => import('../features/companies/pages/CompanyPatternDetails').then((m: any) => ({ default: m.CompanyPatternDetails || m.default })));
-
-const RoadmapList = lazy(() => import('../features/roadmaps/pages/RoadmapList').then((m: any) => ({ default: m.RoadmapList || m.default })));
 const RoadmapDetails = lazy(() => import('../features/roadmaps/pages/RoadmapDetails').then((m: any) => ({ default: m.RoadmapDetails || m.default })));
 
 const AptitudePrep = lazy(() => import('../features/aptitude/pages/AptitudePrep').then((m: any) => ({ default: m.AptitudePrep || m.default })));
-const LogicalPrep = lazy(() => import('../features/logical/pages/LogicalPrep').then((m: any) => ({ default: m.LogicalPrep || m.default })));
-const VerbalPrep = lazy(() => import('../features/verbal/pages/VerbalPrep').then((m: any) => ({ default: m.VerbalPrep || m.default })));
 const InterviewPrep = lazy(() => import('../features/interviews/pages/InterviewPrep').then((m: any) => ({ default: m.InterviewPrep || m.default })));
 
 const BookmarksList = lazy(() => import('../features/bookmarks/pages/BookmarksList').then((m: any) => ({ default: m.BookmarksList || m.default })));
@@ -51,18 +46,7 @@ const NotFound = lazy(() => import('../shared/components/errors/NotFound').then(
 const ServerError = lazy(() => import('../shared/components/errors/ServerError').then((m: any) => ({ default: m.ServerError || m.default })));
 const ComingSoon = lazy<React.ComponentType<any>>(() => import('../shared/components/ComingSoon').then((m: any) => ({ default: m.ComingSoon || m.default })));
 
-const PageLoader: React.FC = () => (
-  <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col gap-6 font-sans animate-fade-in">
-    <div className="flex items-center justify-between">
-      <Skeleton className="h-10 w-48 rounded-xl" />
-      <Skeleton className="h-8 w-24 rounded-full" />
-    </div>
-    <Skeleton className="h-56 w-full rounded-3xl" />
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-2">
-      <Skeleton className="h-44 w-full rounded-2xl" count={4} />
-    </div>
-  </div>
-);
+const PageLoader = PageLoading;
 
 const withSuspense = (Component: React.LazyExoticComponent<React.FC>) => (
   <Suspense fallback={<PageLoader />}>

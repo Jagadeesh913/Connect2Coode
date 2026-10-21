@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { CompanyItem, adminCompanyService } from '../../../../services/admin/adminCompanyService';
@@ -41,9 +42,6 @@ import {
   ListTree,
   ChevronDown,
   ChevronUp,
-  CheckCircle2,
-  Layers,
-  Calendar,
   IndianRupee,
   RotateCw,
 } from 'lucide-react';
@@ -98,57 +96,80 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
     }
   }, [isOpen, initialTab]);
 
+  const readEpoch = useRef(0);
+  const invalidateReads = useCallback(() => {
+    readEpoch.current += 1;
+  }, []);
+  const [problemsError, setProblemsError] = useState<string | null>(null);
+  const [examsError, setExamsError] = useState<string | null>(null);
+  const [examErrors, setExamErrors] = useState<Record<number, string>>({});
+
   // Load tagged DSA problems
   const fetchProblems = useCallback(async () => {
     if (!company?.id) return;
+    const epoch = readEpoch.current;
     setProblemsLoading(true);
+    setProblemsError(null);
     try {
       const res = await adminCompanyService.getCompanyProblems(company.id);
+      if (epoch !== readEpoch.current) return;
       const list = res?.data || (Array.isArray(res) ? res : []);
       if (Array.isArray(list)) {
         setProblems(list);
       }
-    } catch (err) {
-      console.warn('Failed to load company problems:', err);
+    } catch {
+      if (epoch === readEpoch.current) setProblemsError('Unable to load tagged questions.');
     } finally {
-      setProblemsLoading(false);
+      if (epoch === readEpoch.current) setProblemsLoading(false);
     }
   }, [company?.id]);
 
   // Load recruitment exams
   const fetchExams = useCallback(async () => {
     if (!company?.id) return;
+    const epoch = readEpoch.current;
     setExamsLoading(true);
+    setExamsError(null);
     try {
       const res = await companyService.getCompanyExamsList(company.id, {
         pageSize: 50,
         pageNumber: 0,
       });
+      if (epoch !== readEpoch.current) return;
       const content = res?.data?.content || (Array.isArray(res?.data) ? res.data : []);
       setExams(content);
-    } catch (err) {
-      console.warn('Failed to load company exams:', err);
+    } catch {
+      if (epoch === readEpoch.current) setExamsError('Unable to load company exams.');
     } finally {
-      setExamsLoading(false);
+      if (epoch === readEpoch.current) setExamsLoading(false);
     }
   }, [company?.id]);
 
   // Load specific exam details (roles & pattern sections)
   const fetchExamDetails = useCallback(async (examId: number) => {
+    const epoch = readEpoch.current;
+    setExamErrors((prev) => ({ ...prev, [examId]: '' }));
     setExamDetailsLoadingMap((prev) => ({ ...prev, [examId]: true }));
     try {
       const res = await companyService.getCompanyExamDetails(examId);
+      if (epoch !== readEpoch.current) return;
       if (res?.data) {
         setExamDetailsMap((prev) => ({ ...prev, [examId]: res.data }));
       }
-    } catch (err) {
-      console.warn(`Failed to load details for exam #${examId}:`, err);
+    } catch {
+      if (epoch === readEpoch.current) setExamErrors((prev) => ({ ...prev, [examId]: 'Unable to load exam details.' }));
     } finally {
-      setExamDetailsLoadingMap((prev) => ({ ...prev, [examId]: false }));
+      if (epoch === readEpoch.current) setExamDetailsLoadingMap((prev) => ({ ...prev, [examId]: false }));
     }
   }, []);
 
   useEffect(() => {
+    readEpoch.current++;
+    setExamDetailsMap({});
+    setExamDetailsLoadingMap({});
+    setExamErrors({});
+    setProblems([]);
+    setExams([]);
     if (!isOpen || !company?.id) {
       setProblems([]);
       setExams([]);
@@ -158,7 +179,8 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
 
     fetchProblems();
     fetchExams();
-  }, [isOpen, company?.id, fetchProblems, fetchExams]);
+    return invalidateReads;
+  }, [isOpen, company?.id, fetchProblems, fetchExams, invalidateReads]);
 
   const toggleExpandExam = (examId: number) => {
     if (expandedExamId === examId) {
@@ -449,6 +471,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                       <Code2 className="w-3.5 h-3.5 text-blue-600" />
                       <span>Tagged DSA Questions ({problems.length})</span>
                     </div>
+                    <RequestStatus error={problemsError} onRetry={fetchProblems} />
                     {problemsLoading && (
                       <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
                         <Loader2 className="w-3 h-3 animate-spin text-blue-600" /> Loading...
@@ -456,7 +479,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                     )}
                   </div>
 
-                  {problems.length === 0 ? (
+                  {problems.length === 0 && !problemsError ? (
                     <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl text-slate-500 italic text-xs text-center">
                       {problemsLoading
                         ? 'Fetching tagged questions...'
@@ -531,12 +554,13 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                 </div>
 
                 {/* Exams List */}
+                <RequestStatus error={examsError} onRetry={fetchExams} />
                 {examsLoading && exams.length === 0 ? (
                   <div className="flex items-center justify-center p-8 text-slate-500 gap-2 font-sans">
                     <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
                     <span>Loading company exams...</span>
                   </div>
-                ) : exams.length === 0 ? (
+                ) : examsError && exams.length === 0 ? null : exams.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
                     <GraduationCap className="w-8 h-8 text-slate-400 mx-auto" />
                     <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">
@@ -634,12 +658,13 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                           {/* Expanded Nested Manager: Roles & Sections */}
                           {isExpanded && (
                             <div className="p-4 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 space-y-5">
+                              <RequestStatus error={examErrors[exam.id]} onRetry={() => fetchExamDetails(exam.id)} />
                               {detailsLoading ? (
                                 <div className="flex items-center justify-center p-6 text-slate-500 gap-2 font-sans">
                                   <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                                   <span>Loading exam roles & pattern...</span>
                                 </div>
-                              ) : (
+                              ) : examErrors[exam.id] && !details ? null : (
                                 <>
                                   {/* 1. ROLES MANAGER */}
                                   <div className="space-y-2.5">

@@ -12,8 +12,6 @@ import {
   ExternalLink,
   LogOut,
   ChevronDown,
-  Activity,
-  UserCheck,
 } from 'lucide-react';
 
 interface AdminHeaderProps {

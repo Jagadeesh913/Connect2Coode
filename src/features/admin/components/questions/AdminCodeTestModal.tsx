@@ -1,3 +1,6 @@
+import { useExecutionRequest } from '../../../problems/hooks/useExecutionRequest';
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import React, { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { AdminModal } from '../AdminModal';
@@ -10,8 +13,6 @@ import {
   Play,
   Send,
   Terminal,
-  CheckCircle2,
-  XCircle,
   FileText,
   ChevronDown,
   ChevronUp,
@@ -92,36 +93,38 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   const [isStatementOpen, setIsStatementOpen] = useState<boolean>(false);
   const [executionMessage, setExecutionMessage] = useState<string>('');
 
-  // Load real languages dropdown from backend
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [resourcesRetry, setResourcesRetry] = useState(0);
   useEffect(() => {
-    if (isOpen) {
-      adminQuestionService.getLanguagesDropdown().then((list) => {
-        if (Array.isArray(list) && list.length > 0) {
-          setLanguages(list);
-          setSelectedLanguageId(list[0].id);
-          const langName = list[0].name;
-          setSourceCode(STARTER_CODES[langName] || '');
-        }
-      });
-      setResult(null);
-
-      if (question?.id) {
-        setLoadingDetails(true);
-        adminQuestionService
-          .getQuestionById(question.id)
-          .then((res: any) => {
-            const data = res?.data || res;
-            setQuestionDetails(data);
-          })
-          .catch((err) => {
-            console.warn('Could not load question statement in test modal:', err);
-          })
-          .finally(() => {
-            setLoadingDetails(false);
-          });
-      }
-    }
-  }, [isOpen, question?.id]);
+    if (!isOpen) return;
+    let active = true;
+    setResourcesLoading(true);
+    setResourcesError(null);
+    setQuestionDetails(null); setLoadingDetails(true);
+    Promise.allSettled([
+      adminQuestionService.getLanguagesDropdown(),
+      question?.id ? adminQuestionService.getQuestionById(question.id) : Promise.resolve(null),
+    ]).then(([languageResult, questionResult]) => {
+      if (!active) return;
+      const failures: string[] = [];
+      if (languageResult.status === 'fulfilled') {
+        const list = languageResult.value;
+        setLanguages(list);
+        setSelectedLanguageId((previous) => list.some((language) => language.id === previous) ? previous : list[0]?.id ?? null);
+        setSourceCode((code) => code || STARTER_CODES[list[0]?.name] || '');
+        if (!list.length) failures.push('No execution languages are configured.');
+      } else failures.push('Unable to load execution languages.');
+      if (questionResult.status === 'fulfilled') {
+        const raw: any = questionResult.value?.data || questionResult.value;
+        setQuestionDetails(raw);
+      } else failures.push('Unable to load the problem statement.');
+      setResourcesError(failures.join(' ') || null);
+      setResourcesLoading(false);
+      setLoadingDetails(false);
+    });
+    return () => { active = false; };
+  }, [resourcesRetry, isOpen, question?.id]);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
@@ -145,10 +148,17 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       ? 'java'
       : 'plaintext';
 
+  const executionScope = `${isOpen}-${question?.id}`;
+  const executionRequest = useExecutionRequest(executionScope);
+  useEffect(() => { setIsRunning(false); setIsSubmitting(false); setResult(null); setExecutionMessage(''); }, [executionScope]);
+
   // 1. Run Sample Cases (POST /api/v1/admin/testCode)
   const handleRunSampleCases = async () => {
+    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
     if (!question?.id || selectedLanguageId === null) return;
 
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsRunning(true);
     setResult(null);
     setExecutionMessage('');
@@ -158,39 +168,32 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
         questionId: Number(question.id),
         languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
         sourceCode,
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
 
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed sample test cases');
       toast.success('Sample test cases passed execution!');
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Admin testCode failed'}: ${detail}` : (err?.message || 'Admin testCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
-      setResult({
-        totalTestCases: 0,
-        passedTestCases: 0,
-        failedTestCases: 0,
-        testCases: [
-          {
-            testCaseId: 0,
-            testCaseType: 'Error',
-            status: 'Failed',
-            actualOutput: msg,
-          },
-        ],
-      });
+      setResult(null);
     } finally {
-      setIsRunning(false);
+      if (executionRequest.finish(controller)) setIsRunning(false);
     }
   };
 
   // 2. Submit All Cases (POST /api/v1/admin/submitCode)
   const handleSubmitAllCases = async () => {
+    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
     if (!question?.id || selectedLanguageId === null) return;
 
+    const controller = executionRequest.begin();
+    if (!controller) return;
     setIsSubmitting(true);
     setResult(null);
     setExecutionMessage('');
@@ -200,32 +203,22 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
         questionId: Number(question.id),
         languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
         sourceCode,
-      });
+      }, controller.signal);
+      if (controller.signal.aborted) return;
 
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed all test cases');
       toast.success('Admin validation run completed against all test cases!');
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
       const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode failed'}: ${detail}` : (err?.message || 'Admin submitCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
-      setResult({
-        totalTestCases: 0,
-        passedTestCases: 0,
-        failedTestCases: 0,
-        testCases: [
-          {
-            testCaseId: 0,
-            testCaseType: 'Error',
-            status: 'Failed',
-            actualOutput: msg,
-          },
-        ],
-      });
+      setResult(null);
     } finally {
-      setIsSubmitting(false);
+      if (executionRequest.finish(controller)) setIsSubmitting(false);
     }
   };
 
@@ -244,7 +237,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleRunSampleCases}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
@@ -252,7 +245,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             </button>
             <button
               onClick={handleSubmitAllCases}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Send className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-pulse' : ''}`} />
@@ -269,6 +262,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       }
     >
       <div className="space-y-4 font-sans text-left">
+        <RequestStatus pending={resourcesLoading} error={resourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
         {/* Collapsible Statement Drawer */}
         <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 overflow-hidden">
           <button
@@ -318,7 +312,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             <select
               value={selectedLanguageId ?? ''}
               onChange={handleLanguageChange}
-              disabled={isBusy}
+              disabled={isBusy || resourcesLoading || !languages.length}
               className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {languages.map((l) => (
@@ -343,8 +337,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
         </div>
 
         {/* Monaco Editor */}
+          <RequestStatus pending={isRunning || isSubmitting} error={!result ? executionMessage : null} label={isSubmitting ? "Submitting code…" : "Running code…"} />
         <div className="h-72 w-full rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs bg-[#1e1e1e]">
-          <Editor
+
+                  <Editor
+                    loading={<div role="status" className="w-full p-6"><Skeleton className="h-5 w-3/4" count={8} /><span className="sr-only">Loading code editor</span></div>}
             height="100%"
             language={monacoLang}
             value={sourceCode}

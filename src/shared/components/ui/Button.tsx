@@ -41,19 +41,17 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
+      className={`relative ${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || isLoading}
+      aria-busy={isLoading}
       {...props}
     >
-      {isLoading ? (
-        <i className="fa-solid fa-circle-notch fa-spin text-current text-sm"></i>
-      ) : (
-        <>
+      <span className={`inline-flex items-center gap-2 ${isLoading ? 'opacity-0' : ''}`}>
           {leftIcon && <span className="inline-flex shrink-0 items-center">{leftIcon}</span>}
           {children}
           {rightIcon && <span className="inline-flex shrink-0 items-center">{rightIcon}</span>}
-        </>
-      )}
+      </span>
+      {isLoading && <span aria-hidden="true" className="absolute inset-0 flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-current text-sm" /></span>}
     </button>
   );
 };

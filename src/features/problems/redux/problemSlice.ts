@@ -30,6 +30,12 @@ export interface ProblemState {
   problems: Problem[];
   selectedProblem: Problem | null;
   loading: boolean;
+  listLoading: boolean;
+  detailLoading: boolean;
+  listError: string | null;
+  detailError: string | null;
+  listRequestId: string | null;
+  detailRequestId: string | null;
   error: string | null;
   filters: ProblemFilter;
   pagination: ProblemPagination;
@@ -44,6 +50,12 @@ const initialState: ProblemState = {
   problems: [],
   selectedProblem: null,
   loading: false,
+  listLoading: false,
+  detailLoading: false,
+  listError: null,
+  detailError: null,
+  listRequestId: null,
+  detailRequestId: null,
   error: null,
   filters: {
     search: '',
@@ -76,6 +88,7 @@ const normalizeFilterValue = (value: unknown): unknown => {
 
 const getProblemListKey = (params?: ProblemFilter): string =>
   JSON.stringify({
+    category: normalizeFilterValue(params?.category),
     search: normalizeFilterValue(params?.searchText ?? params?.search),
     difficulty: normalizeFilterValue(params?.difficulty ?? params?.level),
     topic: normalizeFilterValue(params?.topic),
@@ -198,10 +211,10 @@ export const fetchProblems = createAsyncThunk(
   {
     condition: (params, { getState }) => {
       const state = getState() as { problems: ProblemState };
-      const key = getProblemListKey(params);
+      const key = getProblemListKey(sanitizeProblemFilters(params));
       const cached = state.problems.listCache[key];
 
-      if (state.problems.loading && state.problems.activeListKey === key) {
+      if (state.problems.listLoading && state.problems.activeListKey === key) {
         if (activeListSignal && activeListSignal.aborted) {
           return true;
         }
@@ -240,18 +253,6 @@ export const fetchProblemById = createAsyncThunk(
       if (isRequestCanceled(err)) {
         throw err;
       }
-      const existingInList = state.problems.problems.find(
-        (p) =>
-          String(p.id).trim().toLowerCase() === key ||
-          (p.slug && String(p.slug).trim().toLowerCase() === key)
-      );
-      if (existingInList) {
-        return {
-          key,
-          problem: existingInList,
-          fetchedAt: Date.now(),
-        };
-      }
       return rejectWithValue(err?.message || 'Failed to fetch problem detail');
     }
   },
@@ -261,7 +262,7 @@ export const fetchProblemById = createAsyncThunk(
       const key = getProblemDetailKey(id);
       const cached = state.problems.detailCache[key];
 
-      if (state.problems.loading && state.problems.activeDetailKey === key) {
+      if (state.problems.detailLoading && state.problems.activeDetailKey === key) {
         if (activeDetailSignal && activeDetailSignal.aborted) {
           return true;
         }
@@ -304,10 +305,13 @@ const problemSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchProblems.pending, (state, action) => {
+        state.listLoading = true;
         state.loading = true;
+        state.listRequestId = action.meta.requestId;
         state.currentRequestId = action.meta.requestId;
         state.error = null;
-        state.activeListKey = getProblemListKey(action.meta.arg);
+        state.listError = null;
+        state.activeListKey = getProblemListKey(sanitizeProblemFilters(action.meta.arg));
       })
       .addCase(fetchProblems.fulfilled, (state, action) => {
         const { key, problems, pagination, fetchedAt } = action.payload;
@@ -319,13 +323,19 @@ const problemSlice = createSlice({
           MAX_LIST_CACHE_ENTRIES
         );
 
-        const isCurrent = state.currentRequestId === action.meta.requestId;
+        // A superseded response may warm the cache, but must never replace the
+        // visible query or release the newer request's loading ownership.
+        if (state.listRequestId !== action.meta.requestId) return;
+
+        const isCurrent = state.listRequestId === action.meta.requestId;
         if (isCurrent) {
-          state.loading = false;
-          state.currentRequestId = null;
+          state.listLoading = false;
+          state.listRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
         }
 
-        if (state.activeListKey !== key) {
+        if (!isCurrent || state.activeListKey !== key) {
           return;
         }
 
@@ -333,13 +343,15 @@ const problemSlice = createSlice({
         state.pagination = pagination;
       })
       .addCase(fetchProblems.rejected, (state, action) => {
-        const isCurrent = state.currentRequestId === action.meta.requestId;
-        const key = getProblemListKey(action.meta.arg);
+        const isCurrent = state.listRequestId === action.meta.requestId;
+        const key = getProblemListKey(sanitizeProblemFilters(action.meta.arg));
 
         if (action.meta.aborted) {
           if (isCurrent) {
-            state.loading = false;
-            state.currentRequestId = null;
+            state.listLoading = false;
+          state.listRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+            if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
             if (state.activeListKey === key) {
               state.activeListKey = null;
             }
@@ -348,23 +360,28 @@ const problemSlice = createSlice({
         }
 
         if (isCurrent) {
-          state.loading = false;
-          state.currentRequestId = null;
+          state.listLoading = false;
+          state.listRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
         }
 
-        if (state.activeListKey !== key) {
+        if (!isCurrent || state.activeListKey !== key) {
           return;
         }
 
-        state.error = (action.payload as string) || action.error.message || 'Failed to fetch problems';
-        state.problems = [];
+        state.listError = state.error = (action.payload as string) || action.error.message || 'Failed to fetch problems';
+
       })
       .addCase(fetchProblemById.pending, (state, action) => {
+        state.detailLoading = true;
         state.loading = true;
+        state.detailRequestId = action.meta.requestId;
         state.currentRequestId = action.meta.requestId;
         state.error = null;
+        state.detailError = null;
         state.activeDetailKey = getProblemDetailKey(action.meta.arg);
-        state.selectedProblem = null;
+        if (state.selectedProblem && getProblemDetailKey(state.selectedProblem.id) !== state.activeDetailKey && getProblemDetailKey(state.selectedProblem.slug || "") !== state.activeDetailKey) state.selectedProblem = null;
       })
       .addCase(fetchProblemById.fulfilled, (state, action) => {
         const { key, problem, fetchedAt } = action.payload;
@@ -376,26 +393,32 @@ const problemSlice = createSlice({
           MAX_DETAIL_CACHE_ENTRIES
         );
 
-        const isCurrent = state.currentRequestId === action.meta.requestId;
+        if (state.detailRequestId !== action.meta.requestId) return;
+
+        const isCurrent = state.detailRequestId === action.meta.requestId;
         if (isCurrent) {
-          state.loading = false;
-          state.currentRequestId = null;
+          state.detailLoading = false;
+          state.detailRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
         }
 
-        if (state.activeDetailKey !== key) {
+        if (!isCurrent || state.activeDetailKey !== key) {
           return;
         }
 
         state.selectedProblem = problem || null;
       })
       .addCase(fetchProblemById.rejected, (state, action) => {
-        const isCurrent = state.currentRequestId === action.meta.requestId;
+        const isCurrent = state.detailRequestId === action.meta.requestId;
         const key = getProblemDetailKey(action.meta.arg);
 
         if (action.meta.aborted) {
           if (isCurrent) {
-            state.loading = false;
-            state.currentRequestId = null;
+            state.detailLoading = false;
+          state.detailRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+            if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
             if (state.activeDetailKey === key) {
               state.activeDetailKey = null;
             }
@@ -404,16 +427,17 @@ const problemSlice = createSlice({
         }
 
         if (isCurrent) {
-          state.loading = false;
-          state.currentRequestId = null;
+          state.detailLoading = false;
+          state.detailRequestId = null;
+          state.loading = state.listLoading || state.detailLoading;
+          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
         }
 
-        if (state.activeDetailKey !== key) {
+        if (!isCurrent || state.activeDetailKey !== key) {
           return;
         }
 
-        state.error = (action.payload as string) || action.error.message || 'Failed to fetch problem detail';
-        state.selectedProblem = null;
+        state.detailError = state.error = (action.payload as string) || action.error.message || 'Failed to fetch problem detail';
       });
   },
 });

@@ -3,15 +3,9 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { tokenStorage } from '../security/tokenStorage';
 import { isTokenValid } from '../security/jwt';
-import { Skeleton } from '../../shared/components/ui/Skeleton';
+import { PageLoading } from '../../shared/components/ui/PageLoading';
 
-const GuardLoader: React.FC = () => (
-  <div className="p-8 flex flex-col gap-4 max-w-5xl mx-auto font-sans">
-    <Skeleton className="h-10 w-64" />
-    <Skeleton className="h-48 w-full" />
-    <Skeleton className="h-64 w-full" />
-  </div>
-);
+const GuardLoader = PageLoading;
 
 export const ProtectedRoute: React.FC = () => {
   const location = useLocation();

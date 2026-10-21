@@ -10,7 +10,6 @@ import {
   Calendar,
   ExternalLink,
   Loader2,
-  Hash,
 } from 'lucide-react';
 
 interface InstitutionDetailsModalProps {

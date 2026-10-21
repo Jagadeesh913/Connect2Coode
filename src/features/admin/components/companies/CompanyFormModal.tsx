@@ -6,7 +6,7 @@ import { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { adminCompanySchema, AdminCompanyFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { CompanyBrandLogo } from '../../../companies/components/CompanyBrandLogo';
-import { Building2, Globe, Image, FileText, CheckCircle2 } from 'lucide-react';
+import { Building2, Globe } from 'lucide-react';
 
 export type CompanyFormData = AdminCompanyFormData;
 

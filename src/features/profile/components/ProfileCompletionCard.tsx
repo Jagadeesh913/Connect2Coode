@@ -17,7 +17,7 @@ export const ProfileCompletionCard: React.FC<ProfileCompletionCardProps> = ({
   onEditSection,
 }) => {
   const hasPersonal = Boolean(profile?.fullName || profile?.firstName || profile?.email);
-  const hasAcademic = Boolean(userInfo?.regNumber || userInfo?.college || profile?.degree || profile?.collegeName);
+  const hasAcademic = Boolean(userInfo?.regNumber || userInfo?.college || institution?.name || profile?.degree || profile?.collegeName);
   const hasPhoto = Boolean(profile?.avatarUrl);
 
   const items = [

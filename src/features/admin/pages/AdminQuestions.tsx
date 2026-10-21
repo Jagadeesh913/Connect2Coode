@@ -1,3 +1,4 @@
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -17,7 +18,6 @@ import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import {
-  Code2,
   Plus,
   RotateCw,
   Search,
@@ -25,8 +25,6 @@ import {
   Edit3,
   Layers,
   Terminal,
-  Building2,
-  Filter,
 } from 'lucide-react';
 
 export const AdminQuestions: React.FC = () => {
@@ -195,7 +193,7 @@ export const AdminQuestions: React.FC = () => {
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch question bank records.'));
-      setQuestions([]);
+
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
@@ -238,7 +236,7 @@ export const AdminQuestions: React.FC = () => {
       if (cases.length === 0 && qId) {
         adminQuestionService.getTestCases(qId).then((fetchedCases) => {
           if (fetchedCases && fetchedCases.length > 0) {
-            setSelectedQuestion((prev) => (prev ? { ...prev, testCases: fetchedCases } : prev));
+            setSelectedQuestion((prev) => (String(prev?.id) === String(qId) ? { ...prev!, testCases: fetchedCases } : prev));
           }
         }).catch(() => {});
       }
@@ -648,6 +646,7 @@ export const AdminQuestions: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      <RequestStatus error={questions.length ? error : null} onRetry={fetchQuestions} />
       {/* Page Header */}
       <AdminPageHeader
         title="DSA Problem Bank"
@@ -762,10 +761,10 @@ export const AdminQuestions: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && <AdminErrorState message={error} onRetry={fetchQuestions} />}
+      {error && questions.length === 0 && <AdminErrorState message={error} onRetry={fetchQuestions} />}
 
       {/* Questions Table */}
-      {!error && (
+      {(!error || questions.length > 0) && (
         <div className="space-y-4">
           <AdminTable<QuestionPayload>
             columns={columns}

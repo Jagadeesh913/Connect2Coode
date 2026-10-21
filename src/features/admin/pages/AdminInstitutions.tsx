@@ -1,3 +1,4 @@
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -19,11 +20,7 @@ import {
   Eye,
   Edit3,
   PowerOff,
-  CheckCircle2,
-  Building2,
   MapPin,
-  Globe,
-  SlidersHorizontal,
 } from 'lucide-react';
 
 export const AdminInstitutions: React.FC = () => {
@@ -41,7 +38,7 @@ export const AdminInstitutions: React.FC = () => {
   const [query, setQuery] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<InstitutionType | 'ALL'>('ALL');
   const [stateFilter, setStateFilter] = useState<string>('');
-  const [districtFilter, setDistrictFilter] = useState<string>('');
+  const districtFilter = '';
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
   // Debounced Filter Values
@@ -116,7 +113,7 @@ export const AdminInstitutions: React.FC = () => {
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch institutions.'));
-      setInstitutions([]);
+
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
@@ -136,16 +133,23 @@ export const AdminInstitutions: React.FC = () => {
     return institutions.filter((inst) => inst.institutionType === 'UNIVERSITY');
   }, [institutions]);
 
+  const inspectionId = useRef(0);
+  useEffect(() => () => { inspectionId.current++; }, []);
   const handleInspect = async (id: number | string) => {
+    const requestId = ++inspectionId.current;
+    setSelectedInstitution(null);
     setDetailsLoading(true);
     setIsDetailsOpen(true);
     try {
       const res = await adminInstitutionService.getInstitutionById(id);
+      if (requestId !== inspectionId.current) return;
       setSelectedInstitution(res.data);
     } catch (err: any) {
+      if (requestId !== inspectionId.current) return;
+      setIsDetailsOpen(false);
       toast.error(getActionableErrorMessage(err, 'Could not retrieve full institution details.'));
     } finally {
-      setDetailsLoading(false);
+      if (requestId === inspectionId.current) setDetailsLoading(false);
     }
   };
 
@@ -338,6 +342,7 @@ export const AdminInstitutions: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      <RequestStatus error={institutions.length ? error : null} onRetry={fetchInstitutions} />
       {/* Page Header */}
       <AdminPageHeader
         title="Partner Institutions & Colleges"
@@ -438,10 +443,10 @@ export const AdminInstitutions: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && <AdminErrorState message={error} onRetry={fetchInstitutions} />}
+      {error && institutions.length === 0 && <AdminErrorState message={error} onRetry={fetchInstitutions} />}
 
       {/* Main Table */}
-      {!error && (
+      {(!error || institutions.length > 0) && (
         <div className="space-y-4">
           <AdminTable<InstitutionItem>
             columns={columns}

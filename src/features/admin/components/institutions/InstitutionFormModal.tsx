@@ -5,7 +5,7 @@ import { AdminModal } from '../AdminModal';
 import type { Institution } from '../../../../core/types/domain';
 import { adminInstitutionSchema, AdminInstitutionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
-import { GraduationCap, Building2, MapPin, Globe } from 'lucide-react';
+import { GraduationCap } from 'lucide-react';
 
 export type InstitutionFormValues = AdminInstitutionFormData;
 

@@ -12,7 +12,7 @@ export const AdminLoading: React.FC<AdminLoadingProps> = ({
   rows = 5,
 }) => {
   return (
-    <div className="w-full flex flex-col gap-4 p-6 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-xs font-sans">
+    <div role="status" aria-label={message} aria-busy="true" className="w-full flex flex-col gap-4 p-6 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl shadow-xs font-sans">
       <div className="flex items-center gap-3">
         <Loader2 className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
         <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">

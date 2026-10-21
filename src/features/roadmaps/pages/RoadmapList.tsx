@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- roadmap metadata is colocated with its page */
 import React from 'react';
 import { Link } from 'react-router-dom';
 

@@ -173,9 +173,10 @@ export const executionService = {
    * POST /api/v1/runCode
    * Normal user RUN: executes sample / visible test cases only.
    */
-  async runCode(payload: CodeExecutionPayload): Promise<ExecutionResultData> {
+  async runCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_RUN, finalPayload);
+    signal?.throwIfAborted();
+    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_RUN, finalPayload, { signal });
     return res?.data || res;
   },
 
@@ -183,9 +184,10 @@ export const executionService = {
    * POST /api/v1/submitCode
    * Normal user SUBMIT: executes all test cases (visible, mandatory, edge, hidden).
    */
-  async submitCode(payload: CodeExecutionPayload): Promise<ExecutionResultData> {
+  async submitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_SUBMIT, finalPayload);
+    signal?.throwIfAborted();
+    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_SUBMIT, finalPayload, { signal });
     return res?.data || res;
   },
 
@@ -194,9 +196,10 @@ export const executionService = {
    * Admin user RUN: executes sample / visible test cases for testing without persistence.
    * Backend authorization remains authoritative; no privileged-to-user endpoint fallback.
    */
-  async adminTestCode(payload: CodeExecutionPayload): Promise<ExecutionResultData> {
+  async adminTestCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_RUN, finalPayload);
+    signal?.throwIfAborted();
+    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_RUN, finalPayload, { signal });
     return res?.data || res;
   },
 
@@ -205,9 +208,10 @@ export const executionService = {
    * Admin user SUBMIT: executes all test cases for validation without persistence.
    * Backend authorization remains authoritative; no privileged-to-user endpoint fallback.
    */
-  async adminSubmitCode(payload: CodeExecutionPayload): Promise<ExecutionResultData> {
+  async adminSubmitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload);
+    signal?.throwIfAborted();
+    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload, { signal });
     return res?.data || res;
   },
 

@@ -3,7 +3,6 @@ import {
   nameRule,
   emailRule,
   optionalPhoneRule,
-  yearRule,
   requiredTextRule,
   optionalUrlRule,
 } from '../commonRules';

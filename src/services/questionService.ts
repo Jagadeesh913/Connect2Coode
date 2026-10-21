@@ -179,7 +179,7 @@ export const questionService = {
   ): Promise<ApiResponse<QuestionTestCase[]>> {
     try {
       return await apiClient.post(API_ENDPOINTS.QUESTION.TEST_CASES(id), testCases, { signal });
-    } catch (err) {
+    } catch {
       // Return accepted response if backend accepts test cases embedded in question payload
       return {
         statusCode: 200,

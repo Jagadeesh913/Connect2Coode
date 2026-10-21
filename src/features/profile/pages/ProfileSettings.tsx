@@ -23,6 +23,7 @@ import { toast } from 'react-hot-toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload } from '../../../core/security/jwt';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
 import { useTheme } from '../../../shared/context/ThemeContext';
 
@@ -44,15 +45,13 @@ import {
   Globe,
   AtSign,
   Hash,
-  Calendar,
-  Sparkles,
 } from 'lucide-react';
 
 export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
 
-  const { profile, loading: profileLoading } = useAppSelector((state) => state.profile);
+  const { profile, loading: profileLoading, error: profileError } = useAppSelector((state) => state.profile);
   const reduxUserInfo = useAppSelector((state) => state.profile.userInfo);
   const authUser = useAppSelector((state) => state.auth.user);
 
@@ -171,15 +170,24 @@ export const UserProfilePage: React.FC = () => {
     return streak;
   };
 
+  const [academicLoading, setAcademicLoading] = useState(false);
+  const [academicError, setAcademicError] = useState<string | null>(null);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [sectionRetry, setSectionRetry] = useState(0);
+
   // Initial Data Fetching from real API
   useEffect(() => {
+    let active = true;
     if (!hasFetchedProfileRef.current) {
       hasFetchedProfileRef.current = true;
       void dispatch(fetchUserProfile());
     }
 
-    if (effectiveUserId && fetchedUserIdRef.current !== effectiveUserId) {
+    if (effectiveUserId) {
       fetchedUserIdRef.current = effectiveUserId;
+      setAcademicLoading(true);
+      setAcademicError(null);
       void (async () => {
         let cachedAcademic: any = null;
         try {
@@ -189,6 +197,7 @@ export const UserProfilePage: React.FC = () => {
 
         try {
           const res = await profileService.getUserInfo(effectiveUserId);
+          if (!active) return;
           if (res?.data) {
             setUserInfo({
               ...res.data,
@@ -197,15 +206,18 @@ export const UserProfilePage: React.FC = () => {
             return;
           }
         } catch {
-          // Silently handle if unauthenticated or new profile
+          if (active) setAcademicError('Unable to refresh academic details.');
+        } finally {
+          if (active) setAcademicLoading(false);
         }
 
-        if (cachedAcademic) {
+        if (active && cachedAcademic) {
           setUserInfo(cachedAcademic);
         }
       })();
     }
-  }, [dispatch, effectiveUserId]);
+    return () => { active = false; };
+  }, [dispatch, effectiveUserId, sectionRetry]);
 
   // Fetch real question statistics from live backend APIs
   useEffect(() => {
@@ -214,10 +226,12 @@ export const UserProfilePage: React.FC = () => {
     let isMounted = true;
 
     const fetchLiveStats = async () => {
+      setActivityLoading(true);
+      setActivityError(null);
       try {
         const [solvedList, attemptedList] = await Promise.all([
-          userQuestionService.getSolvedQuestions(effectiveUserId).catch(() => []),
-          userQuestionService.getAttemptedQuestions(effectiveUserId).catch(() => []),
+          userQuestionService.getSolvedQuestions(effectiveUserId),
+          userQuestionService.getAttemptedQuestions(effectiveUserId),
         ]);
 
         if (!isMounted) return;
@@ -243,7 +257,9 @@ export const UserProfilePage: React.FC = () => {
           setCurrentStreak(streak);
         }
       } catch {
-        // Fall back gracefully
+        if (isMounted) setActivityError('Unable to refresh activity. Previously saved progress is shown.');
+      } finally {
+        if (isMounted) setActivityLoading(false);
       }
     };
 
@@ -252,7 +268,7 @@ export const UserProfilePage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [effectiveUserId]);
+  }, [effectiveUserId, sectionRetry]);
 
   // Synchronize Redux User Info when updated
   useEffect(() => {
@@ -598,7 +614,7 @@ export const UserProfilePage: React.FC = () => {
     );
   }
 
-  if (profileLoading && !profile) {
+  if ((profileLoading || !profileError) && !profile) {
     return (
       <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
         <ProfilePageSkeleton />
@@ -609,6 +625,8 @@ export const UserProfilePage: React.FC = () => {
   return (
     <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <RequestStatus pending={profileLoading} error={profileError} onRetry={() => dispatch(fetchUserProfile({ force: true }))} label="Loading profile…" />
+        <RequestStatus pending={academicLoading || activityLoading} error={academicError || activityError} onRetry={() => setSectionRetry((value) => value + 1)} label="Loading academic details and activity…" />
         {/* Top Profile Banner Card */}
         <div className="relative bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 sm:p-8 shadow-xs overflow-hidden">
           {/* Right Decorative Pastel Gradient Wave */}

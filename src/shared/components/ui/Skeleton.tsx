@@ -15,7 +15,8 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className = '', count = 1 })
       {Array.from({ length: count }).map((_, idx) => (
         <div
           key={`skeleton-${idx}`}
-          className={`shimmer-wave rounded-md ${className}`}
+          aria-hidden="true"
+          className={`shimmer-wave max-w-full rounded-md ${className}`}
         />
       ))}
     </>
@@ -45,6 +46,7 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
       {Array.from({ length: rows }).map((_, i) => (
         <tr
           key={`table-skeleton-row-${i}`}
+          aria-hidden="true"
           className="border-b border-slate-100 dark:border-slate-800/60"
         >
           {/* Row # */}
@@ -171,7 +173,7 @@ export const CompanyDetailsSkeleton: React.FC = () => {
           <div className="flex flex-col gap-2.5 w-full max-w-xl">
             <Skeleton className="h-8 sm:h-9 w-56 rounded-xl" />
             <Skeleton className="h-4 w-full max-w-md rounded-md" />
-            <div className="flex items-center gap-2.5 mt-2">
+            <div className="flex flex-wrap items-center gap-2.5 mt-2">
               <Skeleton className="h-6 w-28 rounded-full" />
               <Skeleton className="h-6 w-28 rounded-full" />
               <Skeleton className="h-6 w-20 rounded-full" />
@@ -184,7 +186,7 @@ export const CompanyDetailsSkeleton: React.FC = () => {
       </div>
 
       {/* Tabs Row Skeleton */}
-      <div className="border-b border-slate-200/80 dark:border-slate-800 flex items-center gap-8 pb-3">
+      <div className="border-b border-slate-200/80 dark:border-slate-800 flex flex-wrap items-center gap-4 pb-3">
         <Skeleton className="h-7 w-24 rounded-lg" />
         <Skeleton className="h-7 w-28 rounded-lg" />
         <Skeleton className="h-7 w-36 rounded-lg" />
@@ -321,7 +323,7 @@ export const BookmarkItemSkeleton: React.FC<BookmarkItemSkeletonProps> = ({ coun
         >
           <div className="flex items-center gap-3.5 min-w-0 flex-1">
             <Skeleton className="w-9 h-9 rounded-xl shrink-0" />
-            <div className="flex flex-col gap-2 flex-1">
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
               <Skeleton className={`h-4 ${i % 2 === 0 ? 'w-64' : 'w-48'} rounded-md`} />
               <div className="flex items-center gap-2">
                 <Skeleton className="h-4 w-16 rounded-full" />
@@ -342,57 +344,16 @@ export const BookmarkItemSkeleton: React.FC<BookmarkItemSkeletonProps> = ({ coun
 /**
  * Realistic Profile Page Skeleton matching ProfileSettings
  */
-export const ProfilePageSkeleton: React.FC = () => {
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-      {/* Breadcrumb Skeleton */}
-      <div className="flex items-center gap-2">
-        <Skeleton className="h-4 w-12 rounded" />
-        <span className="text-slate-300 dark:text-slate-700">&gt;</span>
-        <Skeleton className="h-4 w-20 rounded" />
-      </div>
-
-      {/* Hero Banner Skeleton */}
-      <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          <Skeleton className="w-20 h-20 rounded-2xl shrink-0" />
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-7 w-48 rounded-xl" />
-            <Skeleton className="h-4 w-36 rounded-md" />
-            <Skeleton className="h-4 w-28 rounded-md mt-1" />
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-16 w-28 rounded-2xl" />
-          <Skeleton className="h-16 w-28 rounded-2xl" />
-        </div>
-      </div>
-
-      {/* Tabs Skeleton */}
-      <div className="flex items-center gap-3">
-        <Skeleton className="h-10 w-28 rounded-xl" />
-        <Skeleton className="h-10 w-28 rounded-xl" />
-        <Skeleton className="h-10 w-32 rounded-xl" />
-      </div>
-
-      {/* Grid Content Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl p-6 flex flex-col gap-4">
-            <Skeleton className="h-6 w-40 rounded-lg" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Skeleton className="h-12 w-full rounded-xl" />
-              <Skeleton className="h-12 w-full rounded-xl" />
-              <Skeleton className="h-12 w-full rounded-xl" />
-              <Skeleton className="h-12 w-full rounded-xl" />
-            </div>
-          </div>
-        </div>
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <Skeleton className="h-48 w-full rounded-3xl" />
-        </div>
-      </div>
+export const ProfilePageSkeleton: React.FC = () => (
+  <div role="status" aria-label="Loading profile" aria-busy="true" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-900 p-6 sm:p-8 flex flex-wrap gap-5 items-center min-h-48">
+      <Skeleton className="w-20 h-20 rounded-full shrink-0" />
+      <div className="space-y-3 min-w-0 flex-1"><Skeleton className="h-8 w-48" /><Skeleton className="h-4 w-36" /><Skeleton className="h-4 w-28" /></div>
+      <Skeleton className="h-10 w-36" />
     </div>
-  );
-};
-
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><Skeleton className="h-40 w-full rounded-2xl" count={4} /></div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {Array.from({ length: 4 }, (_, index) => <div key={index} className="p-6 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-neutral-900 space-y-6"><Skeleton className="h-6 w-40" /><Skeleton className="h-8 w-full" count={4} /></div>)}
+    </div>
+  </div>
+);

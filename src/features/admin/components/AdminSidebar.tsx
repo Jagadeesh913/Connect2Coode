@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- navigation metadata is colocated with the sidebar */
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { BrandLogo } from '../../../shared/components/ui/BrandLogo';

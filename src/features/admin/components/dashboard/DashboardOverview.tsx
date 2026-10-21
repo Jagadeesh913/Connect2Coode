@@ -1,7 +1,7 @@
 import React from 'react';
 import { AdminBadge } from '../AdminBadge';
 import { useAppSelector } from '../../../../app/hooks';
-import { ShieldCheck, Activity } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export const DashboardOverview: React.FC = () => {
   const { user } = useAppSelector((state) => state.auth);

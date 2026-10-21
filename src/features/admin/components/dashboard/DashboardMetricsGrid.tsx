@@ -11,13 +11,13 @@ import {
 } from 'lucide-react';
 
 export interface DashboardStats {
-  totalProblems: number;
-  easyCount: number;
-  mediumCount: number;
-  hardCount: number;
-  totalCompanies: number;
-  totalInstitutions?: number;
-  totalMcqs?: number;
+  totalProblems: number | null;
+  easyCount: number | null;
+  mediumCount: number | null;
+  hardCount: number | null;
+  totalCompanies: number | null;
+  totalInstitutions?: number | null;
+  totalMcqs?: number | null;
 }
 
 interface DashboardMetricsGridProps {
@@ -32,7 +32,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
   const metricCards = [
     {
       label: 'DSA Problem Bank',
-      value: stats?.totalProblems ?? 0,
+      value: stats?.totalProblems ?? null,
       description: 'Total indexed challenges',
       icon: Code2,
       color: 'text-blue-600 dark:text-blue-400',
@@ -40,7 +40,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'Easy Tier',
-      value: stats?.easyCount ?? 0,
+      value: stats?.easyCount ?? null,
       description: 'Foundational problems',
       icon: ShieldCheck,
       color: 'text-emerald-600 dark:text-emerald-400',
@@ -48,7 +48,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'Medium Tier',
-      value: stats?.mediumCount ?? 0,
+      value: stats?.mediumCount ?? null,
       description: 'Intermediate challenges',
       icon: Zap,
       color: 'text-amber-600 dark:text-amber-400',
@@ -56,7 +56,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'Hard Tier',
-      value: stats?.hardCount ?? 0,
+      value: stats?.hardCount ?? null,
       description: 'Advanced algorithms',
       icon: Flame,
       color: 'text-rose-600 dark:text-rose-400',
@@ -64,7 +64,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'Target Companies',
-      value: stats?.totalCompanies ?? 0,
+      value: stats?.totalCompanies ?? null,
       description: 'Active hiring partners',
       icon: Building2,
       color: 'text-indigo-600 dark:text-indigo-400',
@@ -72,7 +72,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'Institutions',
-      value: stats?.totalInstitutions ?? 0,
+      value: stats?.totalInstitutions ?? null,
       description: 'Colleges & Universities',
       icon: GraduationCap,
       color: 'text-cyan-600 dark:text-cyan-400',
@@ -80,7 +80,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
     },
     {
       label: 'MCQs & Aptitude',
-      value: stats?.totalMcqs ?? 0,
+      value: stats?.totalMcqs ?? null,
       description: 'Interview assessments',
       icon: ListChecks,
       color: 'text-violet-600 dark:text-violet-400',
@@ -111,7 +111,7 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
               <Skeleton className="h-8 w-20 rounded-lg" />
             ) : (
               <div className={`text-3xl font-extrabold tracking-tight ${card.color}`}>
-                {card.value.toLocaleString()}
+                {card.value === null ? 'Unavailable' : card.value.toLocaleString()}
               </div>
             )}
             <div className="text-[11px] text-slate-400 dark:text-slate-500 font-medium">

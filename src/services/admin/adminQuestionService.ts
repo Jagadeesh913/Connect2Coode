@@ -80,8 +80,8 @@ export const adminQuestionService = {
    * Admin RUN: executes sample / visible test cases for testing without persistence.
    * Auto-resolves the backend referenceId and uses the dedicated admin endpoint.
    */
-  async adminTestCode(payload: CodeExecutionPayload): Promise<ExecutionResult> {
-    return executionService.adminTestCode(payload);
+  async adminTestCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResult> {
+    return executionService.adminTestCode(payload, signal);
   },
 
   /**
@@ -89,7 +89,7 @@ export const adminQuestionService = {
    * Admin SUBMIT: executes all test cases (visible + hidden) for validation without persistence.
    * Auto-resolves referenceId and falls back seamlessly if token role is not admin on Render.
    */
-  async adminSubmitCode(payload: CodeExecutionPayload): Promise<ExecutionResult> {
-    return executionService.adminSubmitCode(payload);
+  async adminSubmitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResult> {
+    return executionService.adminSubmitCode(payload, signal);
   },
 };

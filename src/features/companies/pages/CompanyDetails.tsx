@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchCompanyBySlug, fetchCompanyProblems } from '../redux/companySlice';
@@ -17,6 +17,7 @@ import {
 import { companyService } from '../../../services/companyService';
 import type { CompanyExamItem } from '../types/companyExam';
 import { CompanyExamCard } from '../components/CompanyExamCard';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { GraduationCap, Code2 } from 'lucide-react';
 
@@ -77,14 +78,18 @@ export const CompanyDetails: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const dispatch = useAppDispatch();
   const {
-    selectedCompany: company,
+    selectedCompany,
+    companyDetailRequestKey,
     companyProblems,
     detailsLoading,
     loading,
     companyProblemsLoading,
-    error: companyError,
+    detailError: companyError,
+    problemsError,
   } = useAppSelector((state) => state.companies);
-  const isDetailsLoading = detailsLoading ?? loading;
+  const routeMatches = companyDetailRequestKey === slug?.trim().toLowerCase();
+  const company = routeMatches ? selectedCompany : null;
+  const isDetailsLoading = !routeMatches || (detailsLoading ?? loading);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
@@ -92,7 +97,10 @@ export const CompanyDetails: React.FC = () => {
   // Section Selection (Coding, Aptitude, Reasoning, Verbal, Pseudocode)
   const [activeSection, setActiveSection] = useState<CompanySection>('coding');
   const [mcqsBySection, setMcqsBySection] = useState<Partial<Record<CompanySection, McqQuestion[]>>>({});
-  const [mcqsLoading, setMcqsLoading] = useState<boolean>(true);
+  const [mcqsLoading, setMcqsLoading] = useState<boolean>(false);
+  const [mcqError, setMcqError] = useState<string | null>(null);
+  const [mcqRetry, setMcqRetry] = useState(0);
+  const [examsRetry, setExamsRetry] = useState(0);
 
   // Filters matching Image 1
   const [questionSearch, setQuestionSearch] = useState('');
@@ -165,7 +173,7 @@ export const CompanyDetails: React.FC = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [companyId, slug]);
+  }, [companyId, slug, examsRetry]);
 
   useEffect(() => {
     if (companyId === undefined && !companyName) return;
@@ -188,66 +196,29 @@ export const CompanyDetails: React.FC = () => {
     };
   }, [dispatch, companyId, companyName]);
 
-  // Load MCQs for Aptitude, Reasoning, Verbal, Pseudocode for this company
+  // Load only the selected section; errors settle independently and are retryable.
   useEffect(() => {
-    if (!companyId) return;
-    let isSubscribed = true;
-
-    const loadAllSectionMcqs = async () => {
-      setMcqsLoading(true);
-      const subjectConfigs: { id: CompanySection; subjectId: number }[] = [
-        { id: 'aptitude', subjectId: 30 },
-        { id: 'reasoning', subjectId: 32 },
-        { id: 'verbal', subjectId: 33 },
-        { id: 'pseudocode', subjectId: 31 },
-      ];
-
-      for (const item of subjectConfigs) {
-        try {
-          // 1. Try company-specific MCQs first
-          let res = await mcqService.getMcqList({
-            subject: [item.subjectId],
-            companies: [Number(companyId)],
-            difficulty: [],
-            topic: [],
-            searchText: '',
-            pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
-          });
-          let rawData: any = (res?.data as any)?.data || res?.data || res;
-          let list: McqQuestion[] = Array.isArray(rawData?.content) ? rawData.content : [];
-
-          // 2. Fallback to general category questions if company doesn't have tagged questions yet
-          if (list.length === 0) {
-            res = await mcqService.getMcqList({
-              subject: [item.subjectId],
-              companies: [],
-              difficulty: [],
-              topic: [],
-              searchText: '',
-              pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
-            });
-            rawData = (res?.data as any)?.data || res?.data || res;
-            list = Array.isArray(rawData?.content) ? rawData.content : [];
-          }
-
-          if (isSubscribed) {
-            setMcqsBySection((prev) => ({ ...prev, [item.id]: list }));
-          }
-        } catch (e) {
-          console.warn(`Could not load MCQs for ${item.id}`, e);
-        }
-      }
-      if (isSubscribed) {
-        setMcqsLoading(false);
-      }
-    };
-
-    loadAllSectionMcqs();
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [companyId]);
+    if (!companyId || activeSection === 'coding') return;
+    const controller = new AbortController();
+    const subjectIds = { aptitude: 30, reasoning: 32, verbal: 33, pseudocode: 31 };
+    setMcqsLoading(true);
+    setMcqError(null);
+    mcqService.getMcqList({
+      subject: [subjectIds[activeSection]], companies: [Number(companyId)],
+      difficulty: [], topic: [], searchText: '',
+      pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
+    }, controller.signal).then((res) => {
+      if (controller.signal.aborted) return;
+      const raw = (res?.data as any)?.data || res?.data || res;
+      const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
+      setMcqsBySection((prev) => ({ ...prev, [activeSection]: list }));
+    }).catch((err) => {
+      if (!controller.signal.aborted) setMcqError(err?.message || 'Unable to load questions.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setMcqsLoading(false);
+    });
+    return () => controller.abort();
+  }, [companyId, activeSection, mcqRetry]);
 
   const currentKey = company ? `${company.id ?? ''}-${company.name ?? ''}` : null;
   const isQuestionsLoading =
@@ -294,8 +265,11 @@ export const CompanyDetails: React.FC = () => {
   };
 
   // MCQ Filter for active section
-  const isMcqSectionLoading = mcqsLoading || mcqsBySection[activeSection] === undefined;
-  const currentMcqList = mcqsBySection[activeSection] || [];
+  const isMcqSectionLoading = mcqsLoading && mcqsBySection[activeSection] === undefined;
+  const currentMcqList = useMemo(
+    () => mcqsBySection[activeSection] || [],
+    [activeSection, mcqsBySection]
+  );
   const filteredMcqs = useMemo(() => {
     let list = [...currentMcqList];
 
@@ -584,6 +558,7 @@ export const CompanyDetails: React.FC = () => {
               </div>
             </div>
 
+            <RequestStatus pending={examsLoading} error={examsError} onRetry={() => setExamsRetry((value) => value + 1)} />
             {examsLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3].map((i) => (
@@ -593,6 +568,8 @@ export const CompanyDetails: React.FC = () => {
                   />
                 ))}
               </div>
+            ) : examsError ? (
+              <EmptyState title="Unable to load recruitment exams" description={examsError} actionText="Retry" onAction={() => setExamsRetry((value) => value + 1)} />
             ) : exams.length === 0 ? (
               <div className="my-8">
                 <EmptyState
@@ -757,6 +734,8 @@ export const CompanyDetails: React.FC = () => {
                         </div>
                       </td>
                     </tr>
+                  ) : problemsError ? (
+                    <tr><td colSpan={8}><RequestStatus error={problemsError} onRetry={() => dispatch(fetchCompanyProblems({ id: companyId ?? undefined, name: companyName }))} /></td></tr>
                   ) : filteredProblems.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -877,6 +856,13 @@ export const CompanyDetails: React.FC = () => {
             </div>
           ) : (
             /* VIEW 2: MCQ SECTIONS TABLE (Aptitude, Reasoning, Verbal, Pseudocode) */
+            <>
+            <RequestStatus
+              pending={mcqsLoading && mcqsBySection[activeSection] !== undefined}
+              error={mcqsBySection[activeSection] !== undefined ? mcqError : null}
+              onRetry={() => setMcqRetry((value) => value + 1)}
+              label={`Updating ${currentSectionConfig.label.toLowerCase()} questions…`}
+            />
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
@@ -893,6 +879,8 @@ export const CompanyDetails: React.FC = () => {
                 <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-xs sm:text-sm">
                   {isMcqSectionLoading ? (
                     <TableRowSkeleton rows={6} showExamPlatform={false} showCompanies={false} />
+                  ) : mcqError && mcqsBySection[activeSection] === undefined ? (
+                    <tr><td colSpan={6}><RequestStatus error={mcqError} onRetry={() => setMcqRetry((value) => value + 1)} /></td></tr>
                   ) : filteredMcqs.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -1002,6 +990,7 @@ export const CompanyDetails: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
 
         </section>

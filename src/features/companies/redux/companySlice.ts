@@ -33,6 +33,8 @@ export interface CompanyState {
   detailsLoading: boolean;
   companyProblemsLoading: boolean;
   error: string | null;
+  detailError: string | null;
+  problemsError: string | null;
   companiesRequestKey: string | null;
   companyDetailRequestKey: string | null;
   companyProblemsRequestKey: string | null;
@@ -53,6 +55,8 @@ const initialState: CompanyState = {
   detailsLoading: false,
   companyProblemsLoading: false,
   error: null,
+  detailError: null,
+  problemsError: null,
   companiesRequestKey: null,
   companyDetailRequestKey: null,
   companyProblemsRequestKey: null,
@@ -274,9 +278,10 @@ const companySlice = createSlice({
         state.companiesRequestId = action.meta.requestId;
       })
       .addCase(fetchCompanies.fulfilled, (state, action) => {
+        if (state.companiesRequestId !== action.meta.requestId) return;
         const { key, companies, fetchedAt } = action.payload;
         state.listCache[key] = { companies, fetchedAt };
-        if (state.companiesRequestId === action.meta.requestId || state.companiesRequestKey === key) {
+        if (state.companiesRequestId === action.meta.requestId) {
           state.companies = companies;
           state.listLoading = false;
           state.loading = state.detailsLoading || state.companyProblemsLoading;
@@ -284,8 +289,7 @@ const companySlice = createSlice({
         }
       })
       .addCase(fetchCompanies.rejected, (state, action) => {
-        const key = getCompanyListKey(action.meta.arg);
-        if (state.companiesRequestId === action.meta.requestId || state.companiesRequestKey === key) {
+        if (state.companiesRequestId === action.meta.requestId) {
           state.listLoading = false;
           state.loading = state.detailsLoading || state.companyProblemsLoading;
           state.companiesRequestId = null;
@@ -295,18 +299,22 @@ const companySlice = createSlice({
         }
       })
       .addCase(fetchCompanyBySlug.pending, (state, action) => {
+        state.detailError = null;
+        if (state.companyDetailRequestKey !== getCompanyDetailKey(action.meta.arg)) {
+          state.selectedCompany = null;
+          state.companyProblems = [];
+        }
         state.detailsLoading = true;
         state.loading = true;
         state.error = null;
         state.companyDetailRequestKey = getCompanyDetailKey(action.meta.arg);
         state.companyDetailRequestId = action.meta.requestId;
-        state.selectedCompany = null;
-        state.companyProblems = [];
       })
       .addCase(fetchCompanyBySlug.fulfilled, (state, action) => {
+        if (state.companyDetailRequestId !== action.meta.requestId) return;
         const { key, company, fetchedAt } = action.payload;
         state.detailCache[key] = { company, fetchedAt };
-        if (state.companyDetailRequestId === action.meta.requestId || state.companyDetailRequestKey === key) {
+        if (state.companyDetailRequestId === action.meta.requestId) {
           state.selectedCompany = company;
           state.detailsLoading = false;
           state.loading = state.listLoading || state.companyProblemsLoading;
@@ -314,39 +322,39 @@ const companySlice = createSlice({
         }
       })
       .addCase(fetchCompanyBySlug.rejected, (state, action) => {
-        const key = getCompanyDetailKey(action.meta.arg);
-        if (state.companyDetailRequestId === action.meta.requestId || state.companyDetailRequestKey === key) {
+        if (state.companyDetailRequestId === action.meta.requestId) {
           state.detailsLoading = false;
           state.loading = state.listLoading || state.companyProblemsLoading;
           state.companyDetailRequestId = null;
           if (!action.meta.aborted) {
-            state.error = (action.payload as string) || action.error.message || 'Failed to fetch company detail';
+            state.detailError = state.error = (action.payload as string) || action.error.message || 'Failed to fetch company detail';
           }
         }
       })
       .addCase(fetchCompanyProblems.pending, (state, action) => {
+        state.problemsError = null;
+        if (state.companyProblemsRequestKey !== normalizeProblemLookup(action.meta.arg).key) state.companyProblems = [];
         state.error = null;
         state.companyProblemsLoading = true;
         state.companyProblemsRequestKey = normalizeProblemLookup(action.meta.arg).key;
         state.companyProblemsRequestId = action.meta.requestId;
-        state.companyProblems = [];
       })
       .addCase(fetchCompanyProblems.fulfilled, (state, action) => {
+        if (state.companyProblemsRequestId !== action.meta.requestId) return;
         const { key, problems, fetchedAt } = action.payload;
         state.problemsCache[key] = { problems, fetchedAt };
-        if (state.companyProblemsRequestId === action.meta.requestId || state.companyProblemsRequestKey === key) {
+        if (state.companyProblemsRequestId === action.meta.requestId) {
           state.companyProblems = problems;
           state.companyProblemsLoading = false;
           state.companyProblemsRequestId = null;
         }
       })
       .addCase(fetchCompanyProblems.rejected, (state, action) => {
-        const lookup = normalizeProblemLookup(action.meta.arg);
-        if (state.companyProblemsRequestId === action.meta.requestId || state.companyProblemsRequestKey === lookup.key) {
+        if (state.companyProblemsRequestId === action.meta.requestId) {
           state.companyProblemsLoading = false;
           state.companyProblemsRequestId = null;
           if (!action.meta.aborted) {
-            state.error = (action.payload as string) || action.error.message || 'Failed to fetch company problems';
+            state.problemsError = state.error = (action.payload as string) || action.error.message || 'Failed to fetch company problems';
           }
         }
       });

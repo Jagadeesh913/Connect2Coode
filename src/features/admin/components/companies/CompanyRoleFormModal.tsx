@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { AdminModal } from '../AdminModal';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import type { CompanyRoleItem } from '../../../companies/types/companyExam';
-import { Briefcase, IndianRupee, Tag, FileText } from 'lucide-react';
+import { Briefcase, IndianRupee, Tag } from 'lucide-react';
 
 export interface CompanyRoleFormData {
   id: number | null;

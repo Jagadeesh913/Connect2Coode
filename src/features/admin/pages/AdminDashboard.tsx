@@ -1,3 +1,4 @@
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { DashboardOverview } from '../components/dashboard/DashboardOverview';
@@ -13,14 +14,16 @@ import { Play, RotateCw } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
-    totalProblems: 0,
-    easyCount: 0,
-    mediumCount: 0,
-    hardCount: 0,
-    totalCompanies: 0,
-    totalInstitutions: 0,
-    totalMcqs: 0,
+    totalProblems: null,
+    easyCount: null,
+    mediumCount: null,
+    hardCount: null,
+    totalCompanies: null,
+    totalInstitutions: null,
+    totalMcqs: null,
   });
+  const [error, setError] = useState<string | null>(null);
+  const [hasData, setHasData] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const dashboardRequestRef = useRef<AbortController | null>(null);
 
@@ -29,6 +32,7 @@ export const AdminDashboard: React.FC = () => {
     const controller = new AbortController();
     dashboardRequestRef.current = controller;
     setLoading(true);
+    setError(null);
 
     try {
       const [probRes, compRes, instRes, mcqRes] = await Promise.allSettled([
@@ -131,15 +135,18 @@ export const AdminDashboard: React.FC = () => {
             : 0;
       }
 
-      setStats({
-        totalProblems,
-        easyCount,
-        mediumCount,
-        hardCount,
-        totalCompanies,
-        totalInstitutions,
-        totalMcqs,
-      });
+      const failures = [probRes, compRes, instRes, mcqRes].map((result, index) => result.status === 'rejected' ? ['problems', 'companies', 'institutions', 'MCQs'][index] : null).filter(Boolean);
+      setError(failures.length ? 'Could not refresh ' + failures.join(', ') + '. Previous values, if available, are retained.' : null);
+      setHasData(true);
+      setStats((previous) => ({
+        totalProblems: probRes.status === 'fulfilled' ? totalProblems : previous.totalProblems,
+        easyCount: probRes.status === 'fulfilled' ? easyCount : previous.easyCount,
+        mediumCount: probRes.status === 'fulfilled' ? mediumCount : previous.mediumCount,
+        hardCount: probRes.status === 'fulfilled' ? hardCount : previous.hardCount,
+        totalCompanies: compRes.status === 'fulfilled' ? totalCompanies : previous.totalCompanies,
+        totalInstitutions: instRes.status === 'fulfilled' ? totalInstitutions : previous.totalInstitutions,
+        totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
+      }));
     } catch (err) {
       if (controller.signal.aborted) return;
       console.warn('Dashboard fetch error:', err);
@@ -192,7 +199,8 @@ export const AdminDashboard: React.FC = () => {
       <DashboardOverview />
 
       {/* 2. Real-Time Platform Metrics Grid */}
-      <DashboardMetricsGrid stats={stats} loading={loading} />
+      <RequestStatus pending={loading} error={error} onRetry={fetchDashboardData} label="Refreshing metrics…" />
+      <DashboardMetricsGrid stats={stats} loading={loading && !hasData} />
 
       {/* 3. Interactive Problem Code Runner & Test Suite */}
       <div id="dashboard-code-runner">

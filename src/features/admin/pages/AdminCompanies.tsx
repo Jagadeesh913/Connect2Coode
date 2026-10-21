@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
-import { AdminCard } from '../components/AdminCard';
 import { AdminErrorState } from '../components/AdminErrorState';
+import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { CompanyFormModal, CompanyFormData } from '../components/companies/CompanyFormModal';
 import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
@@ -11,7 +12,6 @@ import { adminCompanyService, CompanyItem } from '../../../services/admin/adminC
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import {
-  Building2,
   Plus,
   RotateCw,
   Search,
@@ -39,38 +39,51 @@ export const AdminCompanies: React.FC = () => {
   const [detailsTab, setDetailsTab] = useState<'overview' | 'exams'>('overview');
   const [selectedCompany, setSelectedCompany] = useState<CompanyItem | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
+  const [editingCompanyId, setEditingCompanyId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   /**
    * REAL API ONLY — GET /api/v1/company
    * Fetches target company records directly from Backend database.
    */
+  const listController = useRef<AbortController | null>(null);
   const fetchCompanies = useCallback(async () => {
+    listController.current?.abort();
+    const controller = new AbortController();
+    listController.current = controller;
     setLoading(true);
     setError(null);
     try {
-      const res = await adminCompanyService.getCompanies();
+      const res = await adminCompanyService.getCompanies(controller.signal);
+      if (controller.signal.aborted) return;
       const list = res?.data || (Array.isArray(res) ? res : []);
       setCompanies(Array.isArray(list) ? list : []);
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       const msg = getActionableErrorMessage(err, 'Failed to fetch companies list.');
       setError(msg);
-      setCompanies([]);
+
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     fetchCompanies();
+    return () => listController.current?.abort();
   }, [fetchCompanies]);
 
+  const inspectionId = useRef(0);
+  useEffect(() => () => { inspectionId.current++; }, []);
   const handleInspect = async (id: string | number, tab: 'overview' | 'exams' = 'overview') => {
     setDetailsTab(tab);
+    const requestId = ++inspectionId.current;
+    setSelectedCompany(null);
     setDetailsLoading(true);
     setIsDetailsOpen(true);
     try {
       const res = await adminCompanyService.getCompanyById(id);
+      if (requestId !== inspectionId.current) return;
       const companyData = res?.data || ((res as any)?.id ? (res as any) : null);
       if (companyData) {
         setSelectedCompany(companyData);
@@ -79,17 +92,22 @@ export const AdminCompanies: React.FC = () => {
         toast.error('Company details not found.');
       }
     } catch (err: any) {
+      if (requestId !== inspectionId.current) return;
+      setIsDetailsOpen(false);
       setSelectedCompany(null);
       toast.error(getActionableErrorMessage(err, 'Failed to fetch company details.'));
     } finally {
-      setDetailsLoading(false);
+      if (requestId === inspectionId.current) setDetailsLoading(false);
     }
   };
 
   const handleEditClick = async (item: CompanyItem) => {
     if (!item.id) return;
+    const requestId = ++inspectionId.current;
+    setEditingCompanyId(item.id);
     try {
       const res = await adminCompanyService.getCompanyById(item.id);
+      if (requestId !== inspectionId.current) return;
       const companyData = res?.data || ((res as any)?.id ? (res as any) : null);
       if (companyData) {
         setSelectedCompany(companyData);
@@ -98,11 +116,16 @@ export const AdminCompanies: React.FC = () => {
         toast.error('Unable to retrieve full company data for editing.');
       }
     } catch (err: any) {
+      if (requestId !== inspectionId.current) return;
       toast.error(getActionableErrorMessage(err, 'Error retrieving company for editing.'));
+    } finally {
+      if (requestId === inspectionId.current) setEditingCompanyId(null);
     }
   };
 
   const handleCreateClick = () => {
+    inspectionId.current += 1;
+    setEditingCompanyId(null);
     setSelectedCompany(null);
     setIsFormOpen(true);
   };
@@ -227,10 +250,12 @@ export const AdminCompanies: React.FC = () => {
           </button>
           <button
             onClick={() => handleEditClick(row)}
+            disabled={editingCompanyId !== null}
+            aria-label={editingCompanyId === row.id ? `Loading ${row.name} for editing` : `Edit ${row.name}`}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
             title="Edit Company"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {editingCompanyId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
           </button>
         </div>
       ),
@@ -239,6 +264,7 @@ export const AdminCompanies: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      <RequestStatus error={companies.length ? error : null} onRetry={fetchCompanies} />
       {/* Page Header */}
       <AdminPageHeader
         title="Target Hiring Companies"
@@ -313,10 +339,10 @@ export const AdminCompanies: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && <AdminErrorState message={error} onRetry={fetchCompanies} />}
+      {error && companies.length === 0 && <AdminErrorState message={error} onRetry={fetchCompanies} />}
 
       {/* Main Content: Table or Grid */}
-      {!error && viewMode === 'table' && (
+      {(!error || companies.length > 0) && viewMode === 'table' && (
         <AdminTable<CompanyItem>
           columns={columns}
           data={filteredCompanies}
@@ -337,9 +363,23 @@ export const AdminCompanies: React.FC = () => {
         />
       )}
 
-      {!error && viewMode === 'grid' && (
+      {(!error || companies.length > 0) && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredCompanies.map((c) => {
+          {loading && companies.length === 0 ? (
+            Array.from({ length: 6 }, (_, index) => (
+              <div key={index} className="h-52 rounded-2xl border border-slate-200/80 bg-white p-5 dark:border-slate-800/80 dark:bg-[#0D1322]">
+                <Skeleton className="h-12 w-12 rounded-xl" />
+                <Skeleton className="mt-4 h-5 w-2/3" />
+                <Skeleton className="mt-2 h-3 w-1/3" />
+                <Skeleton className="mt-6 h-8 w-full" />
+              </div>
+            ))
+          ) : filteredCompanies.length === 0 ? (
+            <div className="col-span-full min-h-52 rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
+              <p className="font-bold text-slate-800 dark:text-slate-100">No Companies Found</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">No companies match the current search.</p>
+            </div>
+          ) : filteredCompanies.map((c) => {
             return (
               <div
                 key={c.id || c.name}
@@ -410,10 +450,12 @@ export const AdminCompanies: React.FC = () => {
                         e.stopPropagation();
                         handleEditClick(c);
                       }}
+                      disabled={editingCompanyId !== null}
+                      aria-label={editingCompanyId === c.id ? `Loading ${c.name} for editing` : `Edit ${c.name}`}
                       className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
                       title="Edit"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
+                      {editingCompanyId === c.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                 </div>
@@ -426,7 +468,11 @@ export const AdminCompanies: React.FC = () => {
       {/* Company Form Modal */}
       <CompanyFormModal
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          inspectionId.current += 1;
+          setEditingCompanyId(null);
+          setIsFormOpen(false);
+        }}
         onSubmit={handleSaveCompany}
         initialData={selectedCompany}
         availableCompanies={companies}
@@ -436,7 +482,11 @@ export const AdminCompanies: React.FC = () => {
       {/* Company Details Modal */}
       <CompanyDetailsModal
         isOpen={isDetailsOpen}
-        onClose={() => setIsDetailsOpen(false)}
+        onClose={() => {
+          inspectionId.current += 1;
+          setDetailsLoading(false);
+          setIsDetailsOpen(false);
+        }}
         company={selectedCompany}
         loading={detailsLoading}
         initialTab={detailsTab}

@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { CompanyCardSkeleton } from '../../../shared/components/ui/Skeleton';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
 import { openAuthModal } from '../../auth/redux/authSlice';
@@ -36,8 +37,10 @@ export const CompanyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
 
+  const requestSequence = useRef(0);
   const loadCompanies = useCallback(
     async (page: number, signal?: AbortSignal) => {
+      const requestId = ++requestSequence.current;
       setLoading(true);
       setError(null);
       try {
@@ -51,16 +54,17 @@ export const CompanyList: React.FC = () => {
           signal
         );
 
+        if (signal?.aborted || requestId !== requestSequence.current) return;
         const data = res.data;
         setCompanies(data.content || []);
         setPageNumber(data.pageNumber ?? page);
         setTotalPages(data.totalPages ?? 1);
         setTotalElements(data.totalElements ?? data.content?.length ?? 0);
       } catch (err: any) {
-        if (err?.name === 'CanceledError' || signal?.aborted) return;
+        if (requestId !== requestSequence.current || err?.name === 'CanceledError' || signal?.aborted) return;
         setError(err?.message || 'Failed to fetch companies');
       } finally {
-        setLoading(false);
+        if (!signal?.aborted && requestId === requestSequence.current) setLoading(false);
       }
     },
     [pageSize]
@@ -178,11 +182,12 @@ export const CompanyList: React.FC = () => {
         </div>
 
         {/* 3. COMPANIES 4-COLUMN RESPONSIVE GRID */}
-        {loading ? (
+        <RequestStatus pending={loading} error={companies.length ? error : null} onRetry={() => loadCompanies(pageNumber)} />
+        {loading && companies.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <CompanyCardSkeleton count={8} />
           </div>
-        ) : error && companies.length === 0 ? (
+        ) : error && companies.length === 0 && !/authentication required/i.test(error) ? (
           <div className="my-10 p-8 rounded-3xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 text-center max-w-xl mx-auto shadow-xs">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 text-xl">
               <Building2 className="w-6 h-6" />
@@ -229,7 +234,7 @@ export const CompanyList: React.FC = () => {
                 <div
                   key={company.id || company.name}
                   onClick={() => navigate(`/companies/${companyTargetId}`)}
-                  className="group relative bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 rounded-2xl p-5 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
+                  className="group relative bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 rounded-2xl p-5 min-h-[230px] shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
                 >
                   {/* Faint Background Watermark Logo Silhouette */}
                   <div className="absolute -right-3 -top-3 w-32 h-32 opacity-[0.06] dark:opacity-[0.07] text-slate-900 dark:text-white pointer-events-none select-none overflow-hidden flex items-center justify-center">
@@ -311,7 +316,7 @@ export const CompanyList: React.FC = () => {
         )}
 
         {/* 4. PAGINATION BAR */}
-        {!loading && totalPages > 1 && (
+        {totalPages > 1 && (
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl p-4 shadow-xs">
             <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium">
               Showing {pageNumber * pageSize + 1}–{Math.min((pageNumber + 1) * pageSize, totalElements)} of {totalElements} companies

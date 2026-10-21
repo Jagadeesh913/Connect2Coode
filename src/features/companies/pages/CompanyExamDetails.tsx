@@ -52,6 +52,7 @@ export const CompanyExamDetails: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     let isMounted = true;
     const controller = new AbortController();
@@ -64,6 +65,9 @@ export const CompanyExamDetails: React.FC = () => {
       }
 
       setLoading(true);
+      setDetails(null);
+      setCompany(null);
+      setSiblingExams([]);
       setError(null);
 
       try {
@@ -73,6 +77,7 @@ export const CompanyExamDetails: React.FC = () => {
         );
         if (!isMounted) return;
         setDetails(res.data);
+        setLoading(false);
 
         // Load associated company information and sibling exams
         const compId = effectiveCompanyId || res.data?.exam?.companyId;
@@ -119,32 +124,7 @@ export const CompanyExamDetails: React.FC = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [effectiveExamId, effectiveCompanyId]);
-
-  // Aggregate stats across pattern
-  const patternStats = useMemo(() => {
-    if (!details?.pattern || details.pattern.length === 0) {
-      return { totalRounds: 0, totalSections: 0, totalSectionMinutes: 0 };
-    }
-
-    let totalRounds = details.pattern.length;
-    let totalSections = 0;
-    let totalSectionMinutes = 0;
-
-    details.pattern.forEach((round) => {
-      if (round.sections && round.sections.length > 0) {
-        totalSections += round.sections.length;
-        round.sections.forEach((sec) => {
-          totalSectionMinutes += sec.durationMinutes || 0;
-        });
-      } else {
-        totalSections += 1;
-        totalSectionMinutes += round.durationMinutes || 0;
-      }
-    });
-
-    return { totalRounds, totalSections, totalSectionMinutes };
-  }, [details]);
+  }, [effectiveExamId, effectiveCompanyId, retry]);
 
   // Find another edition of this exam (if available) for comparison
   const alternativeExam = useMemo(() => {
@@ -263,8 +243,8 @@ export const CompanyExamDetails: React.FC = () => {
               <EmptyState
                 title="Unable to load exam details"
                 description={error}
-                actionText="Back to Companies"
-                onAction={() => navigate('/companies')}
+                actionText="Retry"
+                onAction={() => setRetry((value) => value + 1)}
                 icon={<HelpCircle className="w-12 h-12 text-rose-500" />}
               />
             )}

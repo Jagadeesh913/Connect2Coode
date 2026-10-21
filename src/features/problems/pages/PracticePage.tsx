@@ -5,21 +5,25 @@ import { fetchProblems, resetFilters } from '../redux/problemSlice';
 import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
 import { KNOWN_QUESTION_PLATFORMS } from '../../../core/mappers/problemMapper';
 import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies } from '../../companies/redux/companySlice';
-import { CompanyBrandLogo, CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
+import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
 import { toast } from 'react-hot-toast';
 import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
 
+const EMPTY_REFERENCES: ReferenceItem[] = [];
+const EMPTY_COMPANIES: CompanyItem[] = [];
+
 export const PracticePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { problems: apiProblems, loading, pagination } = useAppSelector((state) => state.problems);
+  const { problems: apiProblems, listLoading: loading, listError: error, pagination } = useAppSelector((state) => state.problems);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-  const { solvedByProblemId, attemptedByProblemId } = useAppSelector((state) => state.progress);
+  const { solvedByProblemId } = useAppSelector((state) => state.progress);
   const referenceGroups = useAppSelector((state) => state.references.groups);
   const serverCompanies = useAppSelector((state) => state.companies.companies);
 
@@ -139,10 +143,10 @@ export const PracticePage: React.FC = () => {
   }, [rawPage, parsedPage, updatePracticeParams]);
 
   // Reference groups from API
-  const apiDifficulties: ReferenceItem[] = referenceGroups.DIFF ?? [];
-  const apiTopics: ReferenceItem[] = referenceGroups.TOPIC ?? [];
-  const apiPlatforms: ReferenceItem[] = referenceGroups.QPF ?? [];
-  const apiCompanies = serverCompanies ?? [];
+  const apiDifficulties: ReferenceItem[] = referenceGroups.DIFF ?? EMPTY_REFERENCES;
+  const apiTopics: ReferenceItem[] = referenceGroups.TOPIC ?? EMPTY_REFERENCES;
+  const apiPlatforms: ReferenceItem[] = referenceGroups.QPF ?? EMPTY_REFERENCES;
+  const apiCompanies = serverCompanies ?? EMPTY_COMPANIES;
 
   // Resolve filters to numeric backend IDs whether passed as number or name/code
   const resolvedDifficultyId = useMemo(() => {
@@ -199,8 +203,11 @@ export const PracticePage: React.FC = () => {
     dispatch(fetchCompanies(undefined));
   }, [dispatch]);
 
+  const [retryAttempt, setRetryAttempt] = useState(0);
+
   // Fetch real problems from backend API (ONLY triggers when applied URL params or page change)
   useEffect(() => {
+    let active = true;
     const topicId = resolvedTopicId;
     const difficultyId = resolvedDifficultyId;
     const companyId = resolvedCompanyId;
@@ -227,10 +234,11 @@ export const PracticePage: React.FC = () => {
       .unwrap()
       .catch(() => {})
       .finally(() => {
-        setHasFetchedOnce(true);
+        if (active) setHasFetchedOnce(true);
       });
 
     return () => {
+      active = false;
       request.abort();
     };
   }, [
@@ -241,9 +249,10 @@ export const PracticePage: React.FC = () => {
     resolvedCompanyId,
     resolvedPlatformId,
     currentPage,
+    retryAttempt,
   ]);
 
-  const isProblemsLoading = loading || !hasFetchedOnce;
+  const isProblemsLoading = (loading || !hasFetchedOnce) && apiProblems.length === 0;
 
   // Filter Selection handlers (updates DRAFT state ONLY - NO API call until Apply clicked)
   const handleDifficultyClick = (diffVal: string) => {
@@ -838,6 +847,7 @@ export const PracticePage: React.FC = () => {
             
             <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
               <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                <RequestStatus pending={loading} error={error ? `${error}${apiProblems.length ? " Showing previous results." : ""}` : null} onRetry={() => setRetryAttempt((value) => value + 1)} />
                 <table className="w-full text-left border-collapse min-w-[640px]">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
@@ -874,6 +884,8 @@ export const PracticePage: React.FC = () => {
                           </div>
                         </td>
                       </tr>
+                    ) : error && displayedProblems.length === 0 ? (
+                      <tr><td colSpan={6} className="p-8 text-center">Unable to load problems. Use Retry above to try again.</td></tr>
                     ) : displayedProblems.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -888,7 +900,7 @@ export const PracticePage: React.FC = () => {
                       displayedProblems.map((prob, idx) => {
                         const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(prob.id));
                         const isSolved = Boolean(solvedByProblemId[String(prob.id)]);
-                        const rowNumber = String((currentPage - 1) * pageSize + idx + 1).padStart(2, '0');
+                        const rowNumber = String((pagination.page - 1) * pageSize + idx + 1).padStart(2, '0');
 
                         return (
                           <tr

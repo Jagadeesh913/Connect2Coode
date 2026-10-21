@@ -1,3 +1,4 @@
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -276,7 +277,7 @@ export const AdminMcqs: React.FC = () => {
     } catch (err: any) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch MCQ questions'));
-      setMcqs([]);
+
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);
@@ -625,6 +626,7 @@ export const AdminMcqs: React.FC = () => {
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
+      <RequestStatus error={mcqs.length ? error : null} onRetry={fetchMcqs} />
       {/* Page Header */}
       <AdminPageHeader
         title="MCQ & Aptitude Bank"
@@ -722,10 +724,10 @@ export const AdminMcqs: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && <AdminErrorState message={error} onRetry={fetchMcqs} />}
+      {error && mcqs.length === 0 && <AdminErrorState message={error} onRetry={fetchMcqs} />}
 
       {/* MCQs Table */}
-      {!error && (
+      {(!error || mcqs.length > 0) && (
         <div className="space-y-4">
           <AdminTable<McqQuestion>
             columns={columns}

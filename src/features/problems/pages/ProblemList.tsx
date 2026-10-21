@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems } from '../redux/problemSlice';
 import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
+import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { toast } from 'react-hot-toast';
 
 export const ProblemList: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { problems, loading, error, pagination } = useAppSelector((state) => state.problems);
+  const { problems, listLoading: loading, listError: error, pagination } = useAppSelector((state) => state.problems);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
@@ -24,6 +25,8 @@ export const ProblemList: React.FC = () => {
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const pageSize = 20;
+
+  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
   // Sanitize invalid page query parameters (F-031)
   useEffect(() => {
@@ -38,17 +41,20 @@ export const ProblemList: React.FC = () => {
 
   // Normalize out-of-bounds page query parameters when total pages decrease (F-031)
   useEffect(() => {
-    if (!loading && pagination.totalPages > 0 && currentPage > pagination.totalPages) {
+    if (hasFetchedOnce && !loading && pagination.page === currentPage && pagination.totalPages > 0 && currentPage > pagination.totalPages) {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('page', String(pagination.totalPages));
         return next;
       }, { replace: true });
     }
-  }, [loading, pagination.totalPages, currentPage, setSearchParams]);
+  }, [loading, pagination.totalPages, pagination.page, hasFetchedOnce, currentPage, setSearchParams]);
 
+  const previousSearch = useRef(searchInput);
   useEffect(() => {
+    if (previousSearch.current === searchInput) return;
     const timer = setTimeout(() => {
+      previousSearch.current = searchInput;
       setDebouncedSearch(searchInput.trim());
       if (rawPage && rawPage !== '1') {
         setSearchParams((prev) => {
@@ -61,9 +67,8 @@ export const ProblemList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchInput, rawPage, setSearchParams]);
 
-  const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
-
   useEffect(() => {
+    let active = true;
     const request = dispatch(
       fetchProblems({
         search: debouncedSearch || undefined,
@@ -77,13 +82,13 @@ export const ProblemList: React.FC = () => {
       .unwrap()
       .catch(() => {})
       .finally(() => {
-        setHasFetchedOnce(true);
+        if (active) setHasFetchedOnce(true);
       });
 
-    return () => request.abort();
+    return () => { active = false; request.abort(); };
   }, [dispatch, debouncedSearch, currentPage]);
 
-  const isListLoading = loading || !hasFetchedOnce;
+  const isListLoading = (loading || !hasFetchedOnce) && problems.length === 0;
 
   const groupedProblems = useMemo(() => {
     const groups = new Map<string, typeof problems>();
@@ -181,6 +186,7 @@ export const ProblemList: React.FC = () => {
         </div>
       </div>
 
+      <RequestStatus pending={loading} error={problems.length ? error : null} onRetry={() => dispatch(fetchProblems({ search: debouncedSearch, page: currentPage, limit: pageSize }))} />
       {isListLoading ? (
         <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8 space-y-4">
           <Skeleton className="h-16 w-full rounded-2xl" count={6} />
@@ -201,7 +207,7 @@ export const ProblemList: React.FC = () => {
             title="Unable to load problems"
             description={error}
             actionText="Retry"
-            onAction={() => dispatch(fetchProblems({ page: currentPage, limit: pageSize }))}
+            onAction={() => dispatch(fetchProblems({ search: debouncedSearch, page: currentPage, limit: pageSize }))}
             icon={<i className="fa-solid fa-triangle-exclamation text-2xl text-slate-400" />}
           />
         </div>

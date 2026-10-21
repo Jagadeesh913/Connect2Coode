@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { AdminModal } from '../AdminModal';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import type { CompanyExamSectionItem } from '../../../companies/types/companyExam';
-import { ListTree, Clock, FileText, Award, Hash, Layers } from 'lucide-react';
+import { ListTree, Clock, FileText, Award, Hash } from 'lucide-react';
 
 export interface ExamSectionFormData {
   id: number | null;

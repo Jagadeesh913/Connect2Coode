@@ -352,3 +352,17 @@ html.dark .c2c-toast {
 }
 
 
+
+/* Delay the decorative sweep, never the actual request or content. */
+.shimmer-wave::after { animation-delay: 180ms; }
+.loading-status { animation: loading-status-reveal 0s 180ms both; }
+@keyframes loading-status-reveal { from { visibility: hidden; } to { visibility: visible; } }
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-wave::after { animation: none !important; display: none; }
+  .loading-status { animation: none !important; }
+  .animate-spin, .fa-spin, .animate-pulse { animation: none !important; }
+}
+
+.shimmer-wave { animation: skeleton-reveal 0s 150ms both; }
+@keyframes skeleton-reveal { from { visibility: hidden; } to { visibility: visible; } }
+@media (prefers-reduced-motion: reduce) { .shimmer-wave { animation: none !important; } }
