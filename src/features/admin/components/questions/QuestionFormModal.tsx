@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AdminModal } from '../AdminModal';
+import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
 import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminCompanyService, CompanyItem } from '../../../../services/admin/adminCompanyService';
@@ -57,7 +58,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       isHidden: false,
       displayOrder: 1,
       typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: '',
+      typeRefCode: 'SAMPLE',
+      typeRefName: 'Visible Sample Test Case',
     },
   ]);
   const [testCaseErrors, setTestCaseErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
@@ -286,6 +288,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       });
       setHints([]);
       setSelectedCompanies([]);
+      const defaultCreateType =
+        testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || 'SAMPLE';
+      const defaultCreateTypeName =
+        testCaseTypes.find((t) => t.refCode === defaultCreateType)?.refName || 'Visible Sample Test Case';
       setTestCases([
         {
           input: '',
@@ -294,7 +300,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           isHidden: false,
           displayOrder: 1,
           typeRefGroupCode: 'TESTCASETYPE',
-          typeRefCode: testCaseTypes[0]?.refCode || 'SAMPLE',
+          typeRefCode: defaultCreateType,
+          typeRefName: defaultCreateTypeName,
         },
       ]);
     }
@@ -355,10 +362,25 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       ));
     }
     if (testCaseTypes.length > 0) {
-      setTestCases((current) => current.map((testCase) => testCase.typeRefCode ? testCase : {
-        ...testCase,
-        typeRefCode: testCaseTypes[0].refCode,
-      }));
+      setTestCases((current) =>
+        current.map((testCase) => {
+          if (testCase.typeRefCode) {
+            const matched = testCaseTypes.find((t) => t.refCode === testCase.typeRefCode);
+            if (matched && !testCase.typeRefName) {
+              return { ...testCase, typeRefName: matched.refName };
+            }
+            return testCase;
+          }
+          const matched = testCase.isHidden
+            ? testCaseTypes.find((t) => t.refCode === 'NECESSARY') || testCaseTypes[0]
+            : testCaseTypes.find((t) => t.refCode === 'SAMPLE') || testCaseTypes[0];
+          return {
+            ...testCase,
+            typeRefCode: matched.refCode,
+            typeRefName: matched.refName,
+          };
+        })
+      );
     }
   }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, getValues, setValue]);
 
@@ -423,7 +445,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   };
 
   const handleAddTestCase = () => {
-    const defaultType = testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'NECESSARY';
+    const defaultType =
+      testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || 'SAMPLE';
+    const defaultTypeName =
+      testCaseTypes.find((t) => t.refCode === defaultType)?.refName || 'Visible Sample Test Case';
     setTestCases((prev) => [
       ...prev,
       {
@@ -434,6 +459,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         displayOrder: prev.length + 1,
         typeRefGroupCode: 'TESTCASETYPE',
         typeRefCode: defaultType,
+        typeRefName: defaultTypeName,
       },
     ]);
   };
@@ -453,12 +479,18 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
       if (field === 'typeRefCode') {
         const matched = testCaseTypes.find((t) => t.refCode === value);
-        if (matched) {
-          target.typeRefGroupCode = 'TESTCASETYPE';
-          target.typeRefName = matched.refName;
+        target.typeRefCode = value;
+        target.typeRefGroupCode = 'TESTCASETYPE';
+        target.typeRefName =
+          matched?.refName || (value === 'NECESSARY' ? 'Mandatory Test Case' : 'Visible Sample Test Case');
+        if (value === 'SAMPLE') {
+          target.isHidden = false;
+        } else if (value === 'NECESSARY') {
+          target.isHidden = true;
         }
       }
       if (field === 'isHidden') {
+        target.isHidden = Boolean(value);
         if (value === true && target.typeRefCode === 'SAMPLE') {
           target.typeRefCode = 'NECESSARY';
           target.typeRefName =
@@ -878,7 +910,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                   key={idx}
                   className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 space-y-3 shadow-xs"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold text-xs">
                         #{idx + 1}
@@ -886,9 +918,42 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                       <span className="font-bold text-slate-900 dark:text-white text-xs">
                         Assertion #{idx + 1}
                       </span>
+                      <AdminBadge variant={tc.isHidden ? 'neutral' : 'success'} size="sm">
+                        {tc.isHidden ? 'Hidden Evaluation' : 'Visible Sample'}
+                      </AdminBadge>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      {/* Test Case Type Selection Option */}
+                      <div className="flex items-center gap-1.5">
+                        <label
+                          htmlFor={`tc-type-${idx}`}
+                          className="text-[11px] font-bold text-slate-500 dark:text-slate-400"
+                        >
+                          Type:
+                        </label>
+                        <select
+                          id={`tc-type-${idx}`}
+                          aria-label={`Test Case #${idx + 1} Type`}
+                          value={tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE')}
+                          onChange={(e) => handleTestCaseChange(idx, 'typeRefCode', e.target.value)}
+                          className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                        >
+                          {testCaseTypes.map((t) => (
+                            <option key={t.id || t.refCode} value={t.refCode}>
+                              {t.refName || t.refCode}
+                            </option>
+                          ))}
+                          {testCaseTypes.length === 0 && (
+                            <>
+                              <option value="SAMPLE">Sample Test Case</option>
+                              <option value="NECESSARY">Mandatory Test Case</option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+
+                      {/* Hidden Case Toggle */}
                       <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
                         <input
                           type="checkbox"
@@ -904,6 +969,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                           type="button"
                           onClick={() => handleRemoveTestCase(idx)}
                           className="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
+                          title="Remove Test Case"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -947,6 +1013,24 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                       />
                       <FormFieldError error={testCaseErrors[idx]?.expectedOutput} />
                     </div>
+                  </div>
+
+                  {/* Test Case Explanation */}
+                  <div className="space-y-1">
+                    <label
+                      htmlFor={`tc-explanation-${idx}`}
+                      className="block text-[11px] font-bold text-slate-600 dark:text-slate-400"
+                    >
+                      Test Case Explanation (Optional)
+                    </label>
+                    <input
+                      id={`tc-explanation-${idx}`}
+                      type="text"
+                      value={tc.explanation || ''}
+                      onChange={(e) => handleTestCaseChange(idx, 'explanation', e.target.value)}
+                      placeholder="e.g. Because nums[0] + nums[1] == 9, we return [0, 1]..."
+                      className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
                 </div>
               ))}

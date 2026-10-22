@@ -5,7 +5,6 @@ import { fetchProblems, resetFilters } from '../redux/problemSlice';
 import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
-import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
 import { KNOWN_QUESTION_PLATFORMS } from '../../../core/mappers/problemMapper';
@@ -13,6 +12,8 @@ import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies } from '../../companies/redux/companySlice';
 import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
 import { toast } from 'react-hot-toast';
+import { Lock } from 'lucide-react';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
 
 const EMPTY_REFERENCES: ReferenceItem[] = [];
@@ -208,6 +209,10 @@ export const PracticePage: React.FC = () => {
   // Fetch real problems from backend API (ONLY triggers when applied URL params or page change)
   useEffect(() => {
     let active = true;
+    if (!isAuthenticated) {
+      setHasFetchedOnce(true);
+      return;
+    }
     const topicId = resolvedTopicId;
     const difficultyId = resolvedDifficultyId;
     const companyId = resolvedCompanyId;
@@ -243,6 +248,7 @@ export const PracticePage: React.FC = () => {
     };
   }, [
     dispatch,
+    isAuthenticated,
     searchInputParam,
     resolvedTopicId,
     resolvedDifficultyId,
@@ -844,48 +850,52 @@ export const PracticePage: React.FC = () => {
 
           {/* MAIN DATA TABLE (Right 9 cols on lg) */}
           <div className="lg:col-span-9 flex flex-col gap-4">
-            
-            <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
-                <RequestStatus pending={loading} error={error ? `${error}${apiProblems.length ? " Showing previous results." : ""}` : null} onRetry={() => setRetryAttempt((value) => value + 1)} />
-                <table className="w-full text-left border-collapse min-w-[640px]">
-                  <thead>
-                    <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
-                      <th className="py-3 px-4 w-12 text-center shrink-0">#</th>
-                      <th className="py-3 px-4 min-w-[200px]">Title</th>
-                      <th className="py-3 px-4 w-28 whitespace-nowrap">Platform</th>
-                      <th className="py-3 px-4 w-28 whitespace-nowrap">Companies</th>
-                      <th className="py-3 px-2 w-10 text-center shrink-0"></th>
-                      <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Action</th>
-                    </tr>
-                  </thead>
+            {!isAuthenticated && displayedProblems.length === 0 ? (
+              <EmptyState
+                title="Sign in to explore Problem Bank"
+                description="Log in with your Connect 2 Code account to browse coding problems, track your submissions, and practice algorithms."
+                actionText="Sign In"
+                onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+                icon={<Lock className="w-12 h-12 text-blue-500" />}
+              />
+            ) : (
+              <>
+                <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
+                  <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+                    <table className="w-full text-left border-collapse min-w-[640px]">
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
+                          <th className="py-3 px-4 w-16 text-center shrink-0">#</th>
+                          <th className="py-3 px-4 min-w-[200px]">Title</th>
+                          <th className="py-3 px-4 w-28 whitespace-nowrap">Platform</th>
+                          <th className="py-3 px-4 w-28 whitespace-nowrap">Companies</th>
+                          <th className="py-3 px-2 w-10 text-center shrink-0"></th>
+                          <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Action</th>
+                        </tr>
+                      </thead>
 
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                    {isProblemsLoading ? (
-                      <TableRowSkeleton rows={20} showTopic={false} showDifficulty={false} />
-                    ) : !isAuthenticated && displayedProblems.length === 0 ? (
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
+                        {isProblemsLoading ? (
+                          <TableRowSkeleton rows={20} showTopic={false} showDifficulty={false} />
+                        ) : error && displayedProblems.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-14 text-center text-slate-500 dark:text-slate-400">
-                          <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
-                            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-xs">
-                              <i className="fa-solid fa-lock"></i>
-                            </div>
-                            <span className="font-bold text-base text-slate-900 dark:text-white">Sign In to Practice</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                              Sign in to your Connect 2 Code account to browse problems, run code in the editor, and submit solutions.
+                        <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-1"></i>
+                            <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
+                              Unable to load problems
                             </span>
+                            <span className="text-xs text-slate-400 max-w-md">{error}</span>
                             <button
                               type="button"
-                              onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                              className="mt-1 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                              onClick={() => setRetryAttempt((value) => value + 1)}
+                              className="mt-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
                             >
-                              Sign In
+                              Retry
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ) : error && displayedProblems.length === 0 ? (
-                      <tr><td colSpan={6} className="p-8 text-center">Unable to load problems. Use Retry above to try again.</td></tr>
                     ) : displayedProblems.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -897,22 +907,22 @@ export const PracticePage: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      displayedProblems.map((prob, idx) => {
+                      displayedProblems.map((prob) => {
                         const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(prob.id));
                         const isSolved = Boolean(solvedByProblemId[String(prob.id)]);
-                        const rowNumber = String((pagination.page - 1) * pageSize + idx + 1).padStart(2, '0');
+                        const questionId = prob.questionId || prob.id;
 
                         return (
                           <tr
                             key={prob.id}
                             className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
                           >
-                            {/* 1. Row Number (Colored by difficulty) */}
+                            {/* 1. Question ID (Colored by difficulty) */}
                             <td
-                              className={`py-3 px-4 text-center font-mono text-xs shrink-0 ${getDifficultyNumberColor(prob.difficulty)}`}
-                              title={`Difficulty: ${prob.difficulty || 'Unknown'}`}
+                              className={`py-3 px-4 text-center font-mono text-xs font-semibold shrink-0 ${getDifficultyNumberColor(prob.difficulty)}`}
+                              title={`Question ID: ${questionId} • Difficulty: ${prob.difficulty || 'Unknown'}`}
                             >
-                              {rowNumber}
+                              {questionId}
                             </td>
 
                             {/* 2. Title */}
@@ -1024,11 +1034,43 @@ export const PracticePage: React.FC = () => {
                 />
               </div>
             )}
+          </>
+        )}
 
-          </div>
+      </div>
 
         </div>
       </section>
+
+      {/* Floating Status Popup for Updating Results */}
+      {loading && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-slate-900/95 dark:bg-slate-800/95 text-white text-xs font-semibold shadow-2xl border border-slate-700/60 backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 pointer-events-none"
+        >
+          <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0"></div>
+          <span>Updating results…</span>
+        </div>
+      )}
+
+      {/* Floating Error Notification with Retry when showing stale data */}
+      {error && apiProblems.length > 0 && !loading && (
+        <div
+          role="alert"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-rose-950/95 text-rose-200 text-xs font-semibold shadow-2xl border border-rose-800/60 backdrop-blur-md"
+        >
+          <i className="fa-solid fa-circle-exclamation text-rose-400 text-sm shrink-0"></i>
+          <span>Failed to refresh ({error}). Showing previous results.</span>
+          <button
+            type="button"
+            onClick={() => setRetryAttempt((value) => value + 1)}
+            className="ml-2 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] transition-colors cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
     </div>
   );

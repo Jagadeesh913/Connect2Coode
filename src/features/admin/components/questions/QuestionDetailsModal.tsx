@@ -240,6 +240,12 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                         </pre>
                       </div>
                     </div>
+                    {tc.explanation && (
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400 font-sans pt-1">
+                        <span className="font-semibold text-slate-700 dark:text-slate-300">Explanation: </span>
+                        {tc.explanation}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

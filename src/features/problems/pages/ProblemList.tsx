@@ -8,6 +8,7 @@ import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Pagination } from '../../../shared/components/ui/Pagination';
+import { Lock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export const ProblemList: React.FC = () => {
@@ -69,6 +70,10 @@ export const ProblemList: React.FC = () => {
 
   useEffect(() => {
     let active = true;
+    if (!isAuthenticated) {
+      setHasFetchedOnce(true);
+      return;
+    }
     const request = dispatch(
       fetchProblems({
         search: debouncedSearch || undefined,
@@ -86,7 +91,7 @@ export const ProblemList: React.FC = () => {
       });
 
     return () => { active = false; request.abort(); };
-  }, [dispatch, debouncedSearch, currentPage]);
+  }, [dispatch, isAuthenticated, debouncedSearch, currentPage]);
 
   const isListLoading = (loading || !hasFetchedOnce) && problems.length === 0;
 
@@ -194,11 +199,11 @@ export const ProblemList: React.FC = () => {
       ) : !isAuthenticated && problems.length === 0 ? (
         <div className="w-full max-w-5xl px-4 sm:px-6 lg:px-8">
           <EmptyState
-            title="Sign in to access DSA Sheet"
+            title="Sign in to explore DSA Sheet"
             description="Log in with your Connect 2 Code account to browse problems, track solved status, and save bookmarks."
             actionText="Sign In"
             onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
-            icon={<i className="fa-solid fa-lock text-3xl text-blue-500" />}
+            icon={<Lock className="w-12 h-12 text-blue-500" />}
           />
         </div>
       ) : error && problems.length === 0 ? (

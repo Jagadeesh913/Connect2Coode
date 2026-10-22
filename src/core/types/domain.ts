@@ -34,6 +34,7 @@ export interface Company {
 
 export interface Problem {
   id: string;
+  questionId?: string | number;
   title: string;
   slug: string;
   difficulty: string;
@@ -182,24 +183,35 @@ export interface AdminLanguage {
 }
 
 export interface UserInfoData {
-  id?: number;
+  id?: number | null;
   userId?: number | string;
+  firstName?: string | null;
+  lastName?: string | null;
   regNumber?: string;
   joinedYear?: number | string;
   passedOutYear?: number | string;
   college?: string;
+  collegeName?: string;
+  collegeId?: number | string | null;
   bio?: string;
+  gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
+  dob?: string | null;
 }
 
 export interface SaveUserInfoPayload {
-  id?: number;
+  id?: number | null;
   userId?: number;
   regNumber: string;
   joinedYear: number;
   passedOutYear: number;
   college: string;
+  collegeId?: string | number | null;
   bio: string;
+  gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
+  dob?: string | null;
   token?: string;
+  jwtToken?: string;
+  jwttoken?: string;
 }
 
 export interface UserProfile {
@@ -217,8 +229,8 @@ export interface UserProfile {
   leetcodeUrl?: string;
   bio?: string;
   avatarUrl?: string;
-  dob?: string;
-  gender?: string;
+  dob?: string | null;
+  gender?: string | ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
   location?: string;
   degree?: string;
   branch?: string;
@@ -355,6 +367,9 @@ export interface McqQuestion {
   question: string;
   explanation?: string | null;
   isActive?: boolean;
+  correctOption?: string | null;
+  correctAnswer?: string | null;
+  answer?: string | null;
   options: McqOption[];
 }
 
@@ -386,15 +401,9 @@ export interface AdminCreateMcqPayload {
   isActive?: boolean;
   options: Array<{
     id?: number;
-    optionId?: number;
     optionLabel: string;
     optionText: string;
-    optionValue?: string;
-    value?: string;
-    text?: string;
-    option?: string;
     isCorrect: boolean;
-    correct?: boolean;
   }>;
 }
 

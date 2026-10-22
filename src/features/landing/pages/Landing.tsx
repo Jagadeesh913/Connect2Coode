@@ -5,6 +5,7 @@ import { closeAuthModal, logoutUser } from '../../auth/redux/authSlice';
 import { Login } from '../../auth/pages/Login';
 import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
+import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { toast } from 'react-hot-toast';
 
 export const Landing: React.FC = () => {
@@ -694,7 +695,7 @@ export const Landing: React.FC = () => {
                   className="min-w-[130px] sm:min-w-[145px] h-[78px] px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center transition-all cursor-pointer group shrink-0 no-underline"
                 >
                   <div className="h-6 flex items-center justify-center">
-                    {company.logo}
+                    <CompanyBrandLogo name={company.name} className="h-6 w-20" />
                   </div>
                   <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">
                     {company.name}

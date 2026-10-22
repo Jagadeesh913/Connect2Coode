@@ -10,6 +10,10 @@ import {
 } from '../utils/mcqUtils';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { Skeleton, AptitudeQuestionSkeleton } from '../../../shared/components/ui/Skeleton';
+import { EmptyState } from '../../../shared/components/ui/EmptyState';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { openAuthModal } from '../../auth/redux/authSlice';
+import { Lock } from 'lucide-react';
 
 export type AptitudeItem = McqQuestion;
 
@@ -324,6 +328,8 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
 };
 
 export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) => {
+  const dispatch = useAppDispatch();
+  const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Parse category from URL query param
@@ -440,7 +446,17 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
         if (code === 'VERBAL' && typeof s.id === 'number') map.VERBAL = s.id;
         if (code === 'PSEUDOCODE' && typeof s.id === 'number') map.PSEUDOCODE = s.id;
       });
-      setSubjectRefMap(map);
+      setSubjectRefMap((prev) => {
+        if (
+          prev.APTITUDE === map.APTITUDE &&
+          prev.REASONING === map.REASONING &&
+          prev.VERBAL === map.VERBAL &&
+          prev.PSEUDOCODE === map.PSEUDOCODE
+        ) {
+          return prev;
+        }
+        return map;
+      });
     }).catch(() => {});
 
     return () => {
@@ -448,7 +464,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     };
   }, []);
 
-  const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState<string | null>(null);
   const [topicsRetry, setTopicsRetry] = useState(0);
 
@@ -456,7 +471,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   useEffect(() => {
     let isMounted = true;
     setActiveQuestionTypes([]);
-    setTopicsLoading(true);
     setTopicsError(null);
     referenceService.getByGroupCode(activeSubject).then((res) => {
       if (!isMounted) return;
@@ -470,8 +484,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       setActiveQuestionTypes(items);
     }).catch(() => {
       if (isMounted) setTopicsError("Unable to load topic filters.");
-    }).finally(() => {
-      if (isMounted) setTopicsLoading(false);
     });
 
     return () => {
@@ -518,16 +530,21 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     return ids;
   }, [appliedDifficulties]);
 
+  const activeSubjectId = subjectRefMap[activeSubject] ?? SUBJECT_CONFIG[activeSubject].defaultId;
+
   // Fetch Questions from backend API
   const fetchQuestions = useCallback(async () => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     setLoading(true);
     setError(null);
-
-    const activeSubjectId = subjectRefMap[activeSubject] ?? SUBJECT_CONFIG[activeSubject].defaultId;
 
     let sortField = 'id';
     let sortDir: 'ASC' | 'DESC' = 'ASC';
@@ -548,7 +565,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           subject: [activeSubjectId],
           difficulty: selectedDifficultyIds,
           companies: [],
-          topic: appliedTopicIds.length > 0 ? appliedTopicIds : null,
+          topic: appliedTopicIds.length > 0 ? appliedTopicIds : [],
           searchText: appliedSearch.trim(),
           pageRequest: {
             pageNumber: Math.max(0, currentPage - 1),
@@ -595,14 +612,19 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [activeSubject, subjectRefMap, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
+  }, [isAuthenticated, activeSubjectId, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      setQuestions([]);
+      return;
+    }
     fetchQuestions();
     return () => {
       abortControllerRef.current?.abort();
     };
-  }, [fetchQuestions]);
+  }, [fetchQuestions, isAuthenticated]);
 
   // Handlers for Filters
   const handleDifficultyToggle = (diff: string) => {
@@ -906,7 +928,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           </div>
 
           {/* RIGHT COLUMN: SEARCH, SORT, ACTIVE FILTERS & QUESTIONS LIST */}
-          <div className="lg:col-span-9 w-full flex flex-col gap-4">
+          <div className="lg:col-span-9 w-full flex flex-col gap-3">
             
             {/* Top Bar: Search Input + Sort Dropdown */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
@@ -965,7 +987,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
             {/* Active Filter Pills Bar */}
             {activeFilterCount > 0 && (
-              <div className="flex flex-wrap items-center gap-2 pt-1 pb-1 animate-fade-in">
+              <div className="flex flex-wrap items-center gap-2 py-0.5 animate-fade-in">
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mr-1">
                   <i className="fa-solid fa-sliders text-[11px] text-blue-500"></i> Active Filters:
                 </span>
@@ -1028,10 +1050,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               </div>
             )}
 
-            {/* Questions Counter */}
-            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 pt-1 flex items-center justify-between min-h-[22px]">
+            {/* Questions Counter & Loading Status */}
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between min-h-[20px]">
               {loading && totalElements === 0 ? (
                 <Skeleton className="h-4 w-32 rounded-md" />
+              ) : !isAuthenticated ? (
+                <span>0 Questions Found</span>
               ) : (
                 <span>{totalElements} Questions Found</span>
               )}
@@ -1044,10 +1068,22 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
             {/* Questions List */}
             <div className="flex flex-col gap-3">
-              <RequestStatus pending={topicsLoading} error={topicsError} onRetry={() => setTopicsRetry((value) => value + 1)} label="Loading topic filters…" />
-              <RequestStatus pending={loading} error={questions.length && error ? `${error} Showing previous results.` : null} onRetry={fetchQuestions} />
+              {topicsError && (
+                <RequestStatus error={topicsError} onRetry={() => setTopicsRetry((value) => value + 1)} />
+              )}
+              {error && questions.length > 0 && (
+                <RequestStatus error={`${error} Showing previous results.`} onRetry={fetchQuestions} />
+              )}
               {loading && questions.length === 0 ? (
                 <AptitudeQuestionSkeleton count={6} />
+              ) : !isAuthenticated && questions.length === 0 ? (
+                <EmptyState
+                  title="Sign in to explore Aptitude Bank"
+                  description="Log in with your Connect 2 Code account to access practice questions, reasoning challenges, and pseudocode tests."
+                  actionText="Sign In"
+                  onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+                  icon={<Lock className="w-12 h-12 text-blue-500" />}
+                />
               ) : error && questions.length === 0 ? (
                 <div className="text-center py-12 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-6">
                   <i className="fa-solid fa-triangle-exclamation text-amber-500 text-3xl mb-3"></i>
@@ -1089,7 +1125,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
             </div>
 
             {/* Pagination Matching Reference Layout */}
-            {totalPages > 1 && (
+            {isAuthenticated && totalPages > 1 && (
               <div className="flex items-center justify-center gap-1.5 pt-6 pb-2">
                 <button
                   type="button"

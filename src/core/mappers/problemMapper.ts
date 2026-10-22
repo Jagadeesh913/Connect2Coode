@@ -58,7 +58,8 @@ export const mapProblemDto = (
   context: ProblemMappingContext = {}
 ): Problem => {
   const rawValue = value as Record<string, unknown>;
-  const rawId = rawValue.id ?? rawValue._id ?? '';
+  const rawId = rawValue.id ?? rawValue.questionId ?? rawValue.question_id ?? rawValue._id ?? '';
+  const questionId = rawValue.questionId ?? rawValue.question_id ?? rawValue.id ?? rawValue._id ?? '';
   const knownPlatform = KNOWN_QUESTION_PLATFORMS[String(rawId)] || {
     refCode: 'CONNECT2CODE',
     refName: 'Connect 2 Code',
@@ -96,6 +97,7 @@ export const mapProblemDto = (
 
   return {
     id: String(rawId),
+    questionId: questionId ? String(questionId) : String(rawId),
     title: String(rawValue.title || rawValue.name || ''),
     slug: String(rawValue.slug || rawId),
     difficulty: String(difficulty),

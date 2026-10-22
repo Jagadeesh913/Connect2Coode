@@ -102,26 +102,26 @@ const appRoutes = [
       { path: '/company-patterns', element: <Navigate to="/companies" replace /> },
       { path: '/company-patterns/:slug', element: withSuspense(CompanyDetails) },
 
-      // All app features require authentication except the Home landing page & Company Prep
+      // Practice & Problems Pages (Publicly accessible with in-app tracking for logged-in users)
+      { path: '/dsa-sheet', element: withSuspense(ProblemList) },
+      { path: '/practice', element: withSuspense(PracticePage) },
+      { path: '/problems', element: <Navigate to="/practice" replace /> },
+      { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
+
+      // Aptitude Practice Pages (Publicly accessible with in-app tracking for logged-in users)
+      { path: '/aptitude', element: withSuspense(AptitudePrep) },
+      { path: '/progress', element: <Navigate to="/aptitude" replace /> },
+      { path: '/roadmaps', element: <Navigate to="/aptitude" replace /> },
+      { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
+      { path: '/logical', element: <Navigate to="/aptitude?category=reasoning" replace /> },
+      { path: '/verbal', element: <Navigate to="/aptitude?category=verbal" replace /> },
+      { path: '/pseudocode', element: <Navigate to="/aptitude?category=pseudocode" replace /> },
+      { path: '/interviews', element: renderFeature(InterviewPrep, 'Interview Questions') },
+
+      // All app features require authentication except Home, Company Prep, Practice & Aptitude
       {
         element: <ProtectedRoute />,
         children: [
-          // Practice & Problems Pages
-          { path: '/dsa-sheet', element: withSuspense(ProblemList) },
-          { path: '/practice', element: withSuspense(PracticePage) },
-          { path: '/problems', element: <Navigate to="/practice" replace /> },
-          { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
-
-          // Aptitude Practice Pages
-          { path: '/aptitude', element: withSuspense(AptitudePrep) },
-          { path: '/progress', element: <Navigate to="/aptitude" replace /> },
-          { path: '/roadmaps', element: <Navigate to="/aptitude" replace /> },
-          { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
-          { path: '/logical', element: <Navigate to="/aptitude?category=reasoning" replace /> },
-          { path: '/verbal', element: <Navigate to="/aptitude?category=verbal" replace /> },
-          { path: '/pseudocode', element: <Navigate to="/aptitude?category=pseudocode" replace /> },
-          { path: '/interviews', element: renderFeature(InterviewPrep, 'Interview Questions') },
-
           // Active User Features
           { path: '/dashboard', element: <Navigate to="/practice" replace /> },
           { path: '/bookmarks', element: withSuspense(BookmarksList) },

@@ -43,8 +43,6 @@ import {
   Bell,
   Moon,
   Globe,
-  AtSign,
-  Hash,
 } from 'lucide-react';
 
 export const UserProfilePage: React.FC = () => {
@@ -68,12 +66,7 @@ export const UserProfilePage: React.FC = () => {
   // Live real question stats from backend API
   const [liveSolvedCount, setLiveSolvedCount] = useState<number | null>(null);
   const [liveAttemptedCount, setLiveAttemptedCount] = useState<number | null>(null);
-  const [recentAttemptsCount, setRecentAttemptsCount] = useState<number>(0);
   const [currentStreak, setCurrentStreak] = useState<number>(0);
-
-  // Fallback progress state from Redux
-  const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
-  const attemptedByProblemId = useAppSelector((state) => state.progress.attemptedByProblemId);
 
   // Preferences local state
   const [emailNotifications, setEmailNotifications] = useState<boolean>(() => {
@@ -199,10 +192,14 @@ export const UserProfilePage: React.FC = () => {
           const res = await profileService.getUserInfo(effectiveUserId);
           if (!active) return;
           if (res?.data) {
-            setUserInfo({
-              ...res.data,
+            const merged = {
               ...(cachedAcademic || {}),
-            });
+              ...res.data,
+            };
+            setUserInfo(merged);
+            try {
+              localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(merged));
+            } catch {}
             return;
           }
         } catch {
@@ -242,17 +239,7 @@ export const UserProfilePage: React.FC = () => {
         if (Array.isArray(attemptedList)) {
           setLiveAttemptedCount(attemptedList.length);
 
-          // Weekly attempts calculation
-          const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const weekly = attemptedList.filter((item) => {
-            const raw = item.submittedDate || (item as any).createdAt;
-            if (!raw) return false;
-            const time = new Date(raw).getTime();
-            return !isNaN(time) && time >= oneWeekAgo;
-          }).length;
-          setRecentAttemptsCount(weekly);
-
-          // Streak calculation
+          // Streak calculation from real user submission dates
           const streak = calculateStreak(attemptedList as any);
           setCurrentStreak(streak);
         }
@@ -280,10 +267,16 @@ export const UserProfilePage: React.FC = () => {
           if (raw) cachedAcademic = JSON.parse(raw);
         } catch {}
       }
-      setUserInfo({
-        ...reduxUserInfo,
+      const merged = {
         ...(cachedAcademic || {}),
-      });
+        ...reduxUserInfo,
+      };
+      setUserInfo(merged);
+      if (effectiveUserId) {
+        try {
+          localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(merged));
+        } catch {}
+      }
     }
   }, [reduxUserInfo, effectiveUserId]);
 
@@ -338,11 +331,13 @@ export const UserProfilePage: React.FC = () => {
           fullName: data.fullName,
           email: data.email,
           bio: data.bio,
+          gender: data.gender?.refName || data.gender?.refCode || data.gender,
+          dob: data.dob,
         })
       ).unwrap();
 
-      // If user provided a bio, update it on the backend via userInfo API as well
-      if (effectiveUserId) {
+      // Keep backend userInfo in sync if user account is active
+      if (effectiveUserId && (userInfo?.regNumber || userInfo?.college || data.dob || data.gender)) {
         try {
           const currentYear = new Date().getFullYear();
           const token = tokenStorage.getAccessToken();
@@ -350,19 +345,27 @@ export const UserProfilePage: React.FC = () => {
             saveUserInfoThunk({
               userId: effectiveUserId,
               payload: {
-                id: userInfo?.id ? Number(userInfo.id) : undefined,
+                id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
                 userId: Number(effectiveUserId),
                 regNumber: userInfo?.regNumber || '',
                 joinedYear: Number(userInfo?.joinedYear) || currentYear - 2,
                 passedOutYear: Number(userInfo?.passedOutYear) || currentYear + 2,
-                college: userInfo?.college || '',
+                college: userInfo?.college || userInfo?.collegeName || '',
+                collegeId: userInfo?.collegeId !== undefined && userInfo?.collegeId !== null ? String(userInfo.collegeId) : null,
                 bio: (data.bio !== undefined ? data.bio : userInfo?.bio) || '',
+                gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
+                dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
                 token: token || undefined,
+                jwtToken: token || undefined,
+                jwttoken: token || undefined,
               },
             })
           ).unwrap();
           if (res) {
             setUserInfo(res);
+            try {
+              localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(res));
+            } catch {}
           }
         } catch {}
       }
@@ -392,38 +395,51 @@ export const UserProfilePage: React.FC = () => {
     try {
       const currentYear = new Date().getFullYear();
       const token = tokenStorage.getAccessToken();
+      const resolvedCollegeId =
+        data.collegeId !== undefined && data.collegeId !== null && data.collegeId !== ''
+          ? String(data.collegeId)
+          : userInfo?.collegeId !== undefined && userInfo?.collegeId !== null
+          ? String(userInfo.collegeId)
+          : null;
+
       const payload: SaveUserInfoPayload = {
-        id: userInfo?.id ? Number(userInfo.id) : undefined,
+        id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
         userId: Number(effectiveUserId),
         regNumber: (data.regNumber || '').trim(),
         joinedYear: Number(data.joinedYear) || currentYear - 2,
         passedOutYear: Number(data.passedOutYear) || currentYear + 2,
         college: (data.college || '').trim(),
+        collegeId: resolvedCollegeId,
         bio: (data.bio || '').trim(),
+        gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
+        dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
         token: token || undefined,
+        jwtToken: token || undefined,
+        jwttoken: token || undefined,
       };
 
-      let savedData: UserInfoData | null = null;
-      try {
-        savedData = await dispatch(
-          saveUserInfoThunk({
-            userId: effectiveUserId,
-            payload,
-          })
-        ).unwrap();
-      } catch {
-        // Backend returned error (e.g. unique constraint violation on re-insert)
-      }
+      // Direct unwrap: any backend error throws directly into catch block
+      const savedData = await dispatch(
+        saveUserInfoThunk({
+          userId: effectiveUserId,
+          payload,
+        })
+      ).unwrap();
 
       const mergedUserInfo: UserInfoData = {
         ...(userInfo || {}),
         ...(savedData || {}),
+        id: savedData?.id ?? (userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null),
         userId: Number(effectiveUserId),
-        regNumber: payload.regNumber,
-        joinedYear: payload.joinedYear,
-        passedOutYear: payload.passedOutYear,
-        college: payload.college,
-        bio: payload.bio,
+        regNumber: savedData?.regNumber ?? payload.regNumber,
+        joinedYear: savedData?.joinedYear ?? payload.joinedYear,
+        passedOutYear: savedData?.passedOutYear ?? payload.passedOutYear,
+        college: savedData?.college ?? savedData?.collegeName ?? payload.college,
+        collegeName: savedData?.collegeName ?? savedData?.college ?? payload.college,
+        collegeId: savedData?.collegeId ?? payload.collegeId ?? null,
+        bio: savedData?.bio ?? payload.bio,
+        gender: savedData?.gender ?? payload.gender ?? null,
+        dob: savedData?.dob ?? payload.dob ?? null,
       };
 
       setUserInfo(mergedUserInfo);
@@ -434,7 +450,7 @@ export const UserProfilePage: React.FC = () => {
 
       if (payload.college) {
         setInstitution((prev) => ({
-          id: prev?.id ?? 0,
+          id: prev?.id ?? (resolvedCollegeId ? Number(resolvedCollegeId) : 0),
           name: payload.college,
           institutionType: prev?.institutionType ?? 'COLLEGE',
           state: prev?.state ?? '',
@@ -531,19 +547,12 @@ export const UserProfilePage: React.FC = () => {
     toast.success(`Language set to ${newLang}`);
   };
 
-  // Calculated display metrics from real API data
-  const fallbackSolved = Object.values(solvedByProblemId).filter(Boolean).length;
-  const fallbackAttempted = Object.values(attemptedByProblemId).filter(Boolean).length;
-
-  const displaySolved = liveSolvedCount !== null ? liveSolvedCount : fallbackSolved;
-  const displayAttempted =
-    liveAttemptedCount !== null ? liveAttemptedCount : fallbackAttempted || displaySolved;
-  const displayAccuracy =
-    displayAttempted > 0
-      ? Math.round((displaySolved / displayAttempted) * 100)
-      : displaySolved > 0
-      ? 100
-      : 0;
+  // Real live question statistics strictly from backend API (no mockups / fake fallbacks)
+  const realSolvedCount = liveSolvedCount !== null ? liveSolvedCount : 0;
+  const realAttemptedCount = liveAttemptedCount !== null ? liveAttemptedCount : 0;
+  const realAccuracy =
+    realAttemptedCount > 0 ? Math.round((realSolvedCount / realAttemptedCount) * 100) : 0;
+  const realStreak = currentStreak !== null ? currentStreak : 0;
 
   // Real User Profile Values (Driven strictly from session & API)
   const fullName =
@@ -553,20 +562,6 @@ export const UserProfilePage: React.FC = () => {
       : authUser?.fullName || (authUser as any)?.username || 'User');
 
   const email = profile?.email || authUser?.email || '';
-
-  const userName =
-    (authUser as any)?.userName ||
-    (authUser as any)?.labelUserName ||
-    (profile as any)?.userName ||
-    (profile as any)?.labelUserName ||
-    (email ? email.split('@')[0] : 'developer');
-
-  const roleName = useMemo(() => {
-    const rawRole = (profile?.role || authUser?.role || 'STUDENT').toUpperCase();
-    if (rawRole.includes('ADMIN')) return 'Admin';
-    if (rawRole.includes('FACULTY') || rawRole.includes('COLLEGE')) return 'Faculty';
-    return 'Student';
-  }, [profile?.role, authUser?.role]);
 
   const initials = useMemo(() => {
     if (fullName && fullName.trim()) {
@@ -584,10 +579,24 @@ export const UserProfilePage: React.FC = () => {
 
   // Real academic values from userInfo API
   const regNumber = userInfo?.regNumber || profile?.regNumber || '';
-  const collegeName = userInfo?.college || institution?.name || profile?.collegeName || '';
+  const collegeName = userInfo?.college || userInfo?.collegeName || institution?.name || profile?.collegeName || '';
   const joinedYear = userInfo?.joinedYear || profile?.joinedYear;
   const passedOutYear = userInfo?.passedOutYear || profile?.graduationYear || profile?.passedOutYear;
   const bio = userInfo?.bio || profile?.bio || '';
+  const genderDisplay: string =
+    userInfo?.gender?.refName ||
+    userInfo?.gender?.refCode ||
+    (typeof profile?.gender === 'object' && profile?.gender
+      ? (profile.gender as any).refName || (profile.gender as any).refCode || ''
+      : (profile?.gender as string)) ||
+    '—';
+  const dobDisplay = userInfo?.dob || profile?.dob || '—';
+  const collegeIdDisplay =
+    userInfo?.collegeId !== undefined && userInfo?.collegeId !== null
+      ? String(userInfo.collegeId)
+      : institution?.id
+      ? String(institution.id)
+      : null;
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const token = tokenStorage.getAccessToken();
@@ -670,26 +679,13 @@ export const UserProfilePage: React.FC = () => {
                   <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
                     {fullName}
                   </h1>
-                  <span className="inline-block px-3 py-0.5 rounded-full text-xs font-semibold bg-[#EAF2FE] dark:bg-blue-950/60 text-[#2563EB] dark:text-blue-400 border border-blue-100 dark:border-blue-900/50">
-                    {roleName}
-                  </span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                   <div className="flex items-center gap-1.5">
-                    <AtSign className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{userName}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>{email}</span>
                   </div>
-                  {effectiveUserId && (
-                    <div className="flex items-center gap-1 text-slate-400 font-mono text-xs">
-                      <Hash className="w-3 h-3" />
-                      <span>{effectiveUserId}</span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -718,10 +714,10 @@ export const UserProfilePage: React.FC = () => {
             <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Problems Solved</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
-                {displaySolved}
+                {realSolvedCount}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Keep going! 🎯
+                Solved questions
               </p>
             </div>
           </div>
@@ -734,10 +730,10 @@ export const UserProfilePage: React.FC = () => {
             <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Total Attempts</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
-                {displayAttempted}
+                {realAttemptedCount}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {recentAttemptsCount > 0 ? `+${recentAttemptsCount} this week` : 'Consistent progress!'}
+                Attempted questions
               </p>
             </div>
           </div>
@@ -750,10 +746,10 @@ export const UserProfilePage: React.FC = () => {
             <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Accuracy</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
-                {displayAccuracy}%
+                {realAccuracy}%
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Overall submission rate
+                Solved / Attempted
               </p>
             </div>
           </div>
@@ -766,10 +762,10 @@ export const UserProfilePage: React.FC = () => {
             <div className="min-w-0">
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Current Streak</p>
               <p className="text-2xl font-bold text-slate-900 dark:text-white leading-tight mt-0.5">
-                {currentStreak} {currentStreak === 1 ? 'day' : 'days'}
+                {realStreak} {realStreak === 1 ? 'day' : 'days'}
               </p>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {currentStreak > 0 ? 'Great consistency! 🔥' : 'Start solving today! 🔥'}
+                Consecutive active days
               </p>
             </div>
           </div>
@@ -811,27 +807,21 @@ export const UserProfilePage: React.FC = () => {
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Username</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0 break-words">
-                  @{userName}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
                 <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Email Address</span>
                 <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-all">
                   {email || '—'}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Platform Role</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
-                  {roleName}
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Gender</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 capitalize">
+                  {genderDisplay}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">User Account ID</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0">
-                  #{effectiveUserId || '—'}
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Date of Birth</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 font-mono">
+                  {dobDisplay}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
@@ -882,6 +872,12 @@ export const UserProfilePage: React.FC = () => {
                 <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">College / Institute</span>
                 <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-words">
                   {collegeName || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">College ID</span>
+                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0">
+                  {collegeIdDisplay ? `#${collegeIdDisplay}` : '—'}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
@@ -1048,18 +1044,39 @@ export const UserProfilePage: React.FC = () => {
         isOpen={isPersonalModalOpen}
         onClose={() => setIsPersonalModalOpen(false)}
         onSubmit={handleSavePersonalInfo}
-        initialData={profile ? { ...profile, bio: userInfo?.bio || profile?.bio || '' } : null}
+        initialData={
+          profile
+            ? {
+                ...profile,
+                bio: userInfo?.bio || profile?.bio || '',
+                gender: userInfo?.gender || profile?.gender,
+                dob: userInfo?.dob || profile?.dob,
+              }
+            : null
+        }
         submitting={submitting}
       />
-
 
       {/* Edit Academic Details Modal */}
       <EditAcademicModal
         isOpen={isAcademicModalOpen}
         onClose={() => setIsAcademicModalOpen(false)}
         onSubmit={handleSaveAcademic}
-        initialData={userInfo}
-        defaultCollege={userInfo?.college || institution?.name || profile?.collegeName || ''}
+        initialData={
+          userInfo || (profile?.regNumber ? {
+            id: null,
+            userId: effectiveUserId ? Number(effectiveUserId) : undefined,
+            regNumber: profile.regNumber || '',
+            college: profile.collegeName || institution?.name || '',
+            collegeId: profile.institutionId ? String(profile.institutionId) : null,
+            joinedYear: profile.joinedYear,
+            passedOutYear: profile.graduationYear || profile.passedOutYear,
+            bio: profile.bio || '',
+            gender: null,
+            dob: profile.dob || '',
+          } : null)
+        }
+        defaultCollege={userInfo?.college || userInfo?.collegeName || institution?.name || profile?.collegeName || ''}
         submitting={submitting}
       />
 

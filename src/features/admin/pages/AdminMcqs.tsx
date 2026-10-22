@@ -78,6 +78,7 @@ export const AdminMcqs: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [selectedMcq, setSelectedMcq] = useState<McqQuestion | null>(null);
   const [editingMcq, setEditingMcq] = useState<McqQuestion | null>(null);
+  const [editingLoadingId, setEditingLoadingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Form State
@@ -240,38 +241,48 @@ export const AdminMcqs: React.FC = () => {
         ? rawData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
 
-      setMcqs((prev) => {
-        const existingMap = new Map(prev.map((item) => [item.id, item]));
-        return contentList.map((item) => {
-          const localItem = existingMap.get(item.id);
-          // If the fetched item from catalog has no options but local state has options, preserve local options
-          if ((!item.options || item.options.length === 0) && localItem?.options && localItem.options.length > 0) {
-            return { ...item, options: localItem.options };
-          }
-          // If the fetched item has options, ensure optionText is populated from optionValue if needed
-          if (Array.isArray(item.options) && item.options.length > 0) {
-            const normalizedOpts = item.options.map((opt: any, idx: number) => {
-              const localOpt = localItem?.options?.[idx];
-              const resolvedText = String(
-                opt.optionText ??
-                opt.optionValue ??
-                opt.value ??
-                opt.text ??
-                opt.option ??
-                localOpt?.optionText ??
-                ''
-              );
-              return {
-                ...opt,
-                optionText: resolvedText,
-                optionValue: resolvedText,
-              };
-            });
-            return { ...item, options: normalizedOpts };
-          }
+      const normalizedContentList: McqQuestion[] = contentList.map((item) => {
+        if (!Array.isArray(item.options) || item.options.length === 0) {
           return item;
+        }
+        const hasServerCorrect = item.options.some(
+          (o: any) => o.isCorrect === true || o.correct === true || o.is_correct === true
+        );
+        const targetCorrectOption =
+          item.correctOption ||
+          (item as any).answer ||
+          (item as any).correctAnswer;
+
+        const normalizedOpts = item.options.map((opt: any, idx: number) => {
+          const label = opt.optionLabel || String.fromCharCode(65 + idx);
+          const resolvedText = String(
+            opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
+          );
+
+          let isCorrect = false;
+          if (hasServerCorrect) {
+            isCorrect = Boolean(opt.isCorrect || opt.correct || opt.is_correct);
+          } else if (targetCorrectOption) {
+            isCorrect = String(label).toUpperCase() === String(targetCorrectOption).toUpperCase();
+          } else {
+            isCorrect = idx === 0;
+          }
+
+          return {
+            id: opt.id ? Number(opt.id) : undefined,
+            optionLabel: label,
+            optionText: resolvedText,
+            isCorrect,
+          };
         });
+
+        return {
+          ...item,
+          options: normalizedOpts,
+        };
       });
+
+      setMcqs(normalizedContentList);
       setTotalElements(total);
       setTotalPages(computedPages);
     } catch (err: any) {
@@ -311,57 +322,87 @@ export const AdminMcqs: React.FC = () => {
     setIsCreateModalOpen(true);
   };
 
-  // Open Edit Modal
+  // Open Edit Modal - fetches authoritative question details BEFORE opening modal to prevent race conditions
   const handleOpenEditModal = async (mcq: McqQuestion) => {
-    setEditingMcq(mcq);
-    const subj = mcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || 'APTITUDE';
-    setFormSubjectRefCode(subj);
-    setFormTopicRefCode(mcq.topicRefCode || '');
-    setFormDifficultyRefCode(mcq.difficultyRefCode || 'EASY');
-    setFormCompanyId(mcq.companyId ? String(mcq.companyId) : '');
-    setFormQuestion(cleanQuestionText(mcq.question) || mcq.question || '');
-    setFormExplanation(mcq.explanation || '');
-
-    let optionsToUse = Array.isArray(mcq.options) && mcq.options.length > 0 ? mcq.options : [];
-
-    // If options are missing on the row item, asynchronously fetch the full MCQ details by ID from the API
-    if (optionsToUse.length === 0) {
+    setEditingLoadingId(mcq.id);
+    try {
+      let authoritativeMcq = mcq;
       try {
         const detailRes = await adminMcqService.getMcqById(mcq.id);
         const detailData: any = (detailRes?.data as any)?.data || detailRes?.data;
-        if (detailData && Array.isArray(detailData.options) && detailData.options.length > 0) {
-          optionsToUse = detailData.options;
+        if (detailData && typeof detailData === 'object' && detailData.id) {
+          authoritativeMcq = { ...mcq, ...detailData };
         }
       } catch (err) {
-        console.warn('Could not load detailed options for MCQ #' + mcq.id, err);
+        console.warn('Could not load authoritative detailed options for MCQ #' + mcq.id, err);
       }
-    }
 
-    if (optionsToUse.length > 0) {
-      const hasAnyCorrect = optionsToUse.some(
-        (o: any) => o.isCorrect === true || o.is_correct === true || o.correct === true
+      setEditingMcq(authoritativeMcq);
+      const subj = authoritativeMcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || 'APTITUDE';
+      setFormSubjectRefCode(subj);
+      setFormTopicRefCode(authoritativeMcq.topicRefCode || '');
+      setFormDifficultyRefCode(authoritativeMcq.difficultyRefCode || 'EASY');
+      setFormCompanyId(authoritativeMcq.companyId ? String(authoritativeMcq.companyId) : '');
+      setFormQuestion(cleanQuestionText(authoritativeMcq.question) || authoritativeMcq.question || '');
+      setFormExplanation(authoritativeMcq.explanation || '');
+
+      const authoritativeOpts: any[] =
+        Array.isArray(authoritativeMcq.options) && authoritativeMcq.options.length > 0
+          ? authoritativeMcq.options
+          : synthesizeMcqOptions(authoritativeMcq);
+
+      const targetCorrectOption =
+        authoritativeMcq.correctOption ||
+        authoritativeMcq.answer ||
+        (authoritativeMcq as any).correctAnswer;
+
+      const hasExplicitCorrect = authoritativeOpts.some(
+        (o: any) => o.isCorrect === true || o.correct === true || o.is_correct === true
       );
-      setFormOptions(
-        optionsToUse.map((o: any, idx: number) => ({
-          id: o.id || o.optionId ? Number(o.id || o.optionId) : undefined,
-          optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
-          optionText: String(
-            o.optionText ?? o.optionValue ?? o.value ?? o.text ?? o.option ?? ''
-          ),
-          isCorrect: hasAnyCorrect
-            ? Boolean(o.isCorrect || o.is_correct || o.correct)
-            : idx === 0,
-        }))
-      );
-    } else {
-      setFormOptions([
-        { optionLabel: 'A', optionText: '', isCorrect: true },
-        { optionLabel: 'B', optionText: '', isCorrect: false },
-        { optionLabel: 'C', optionText: '', isCorrect: false },
-        { optionLabel: 'D', optionText: '', isCorrect: false },
-      ]);
+
+      const mapped: OptionFormState[] = authoritativeOpts.map((o: any, idx: number) => {
+        const label = o.optionLabel || String.fromCharCode(65 + idx);
+        const text = String(o.optionText ?? o.optionValue ?? o.value ?? o.text ?? o.option ?? '');
+        let isCorrect = false;
+
+        if (hasExplicitCorrect) {
+          isCorrect = Boolean(o.isCorrect || o.correct || o.is_correct);
+        } else if (targetCorrectOption) {
+          isCorrect =
+            String(label).toUpperCase() === String(targetCorrectOption).toUpperCase() ||
+            Boolean(text && String(text).trim().toLowerCase() === String(targetCorrectOption).trim().toLowerCase());
+        } else {
+          isCorrect = idx === 0;
+        }
+
+        const optId = o.id ? Number(o.id) : undefined;
+        return {
+          id: optId,
+          optionLabel: label,
+          optionText: text,
+          isCorrect,
+        };
+      });
+
+      if (!mapped.some((m) => m.isCorrect) && mapped.length > 0) {
+        mapped[0].isCorrect = true;
+      }
+
+      if (mapped.length > 0) {
+        setFormOptions(mapped);
+      } else {
+        setFormOptions([
+          { optionLabel: 'A', optionText: '', isCorrect: true },
+          { optionLabel: 'B', optionText: '', isCorrect: false },
+          { optionLabel: 'C', optionText: '', isCorrect: false },
+          { optionLabel: 'D', optionText: '', isCorrect: false },
+        ]);
+      }
+
+      setIsCreateModalOpen(true);
+    } finally {
+      setEditingLoadingId(null);
     }
-    setIsCreateModalOpen(true);
   };
 
   // Handle Create or Update MCQ submission
@@ -388,20 +429,14 @@ export const AdminMcqs: React.FC = () => {
     setSubmitting(true);
     try {
       const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
-      const mappedOptions = filledOptions.map((o) => {
-        const textVal = o.optionText.trim();
-        return {
-          ...(o.id ? { id: Number(o.id), optionId: Number(o.id) } : {}),
-          optionLabel: o.optionLabel,
-          optionText: textVal,
-          optionValue: textVal,
-          value: textVal,
-          text: textVal,
-          option: textVal,
-          isCorrect: Boolean(o.isCorrect),
-          correct: Boolean(o.isCorrect),
-        };
-      });
+
+      // Clean payload strictly adhering to Spring Boot POST /api/v1/admin/mcq contract
+      const mappedOptions = filledOptions.map((o, idx) => ({
+        ...(o.id ? { id: Number(o.id) } : {}),
+        optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
+        optionText: o.optionText.trim(),
+        isCorrect: Boolean(o.isCorrect),
+      }));
 
       const payload: AdminCreateMcqPayload = {
         ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
@@ -419,40 +454,7 @@ export const AdminMcqs: React.FC = () => {
       };
 
       if (editingMcq) {
-        const res = await adminMcqService.updateMcq(editingMcq.id, payload);
-        const updatedRaw: any = (res?.data as any)?.data || res?.data;
-        const targetId =
-          typeof updatedRaw === 'object' && updatedRaw?.id ? updatedRaw.id : editingMcq.id;
-
-        const rawOpts =
-          typeof updatedRaw === 'object' && Array.isArray(updatedRaw?.options) && updatedRaw.options.length > 0
-            ? updatedRaw.options
-            : mappedOptions;
-
-        const normalizedOptions = rawOpts.map((o: any, idx: number) => {
-          const resolvedText = String(
-            o.optionText ?? o.optionValue ?? o.value ?? o.text ?? mappedOptions[idx]?.optionText ?? ''
-          );
-          return {
-            id: o.id || o.optionId || mappedOptions[idx]?.id,
-            optionLabel: o.optionLabel || mappedOptions[idx]?.optionLabel || String.fromCharCode(65 + idx),
-            optionText: resolvedText,
-            optionValue: resolvedText,
-            isCorrect: Boolean(o.isCorrect ?? o.correct ?? mappedOptions[idx]?.isCorrect),
-          };
-        });
-
-        const updatedItem: McqQuestion = {
-          ...editingMcq,
-          ...payload,
-          ...(typeof updatedRaw === 'object' && updatedRaw !== null ? updatedRaw : {}),
-          id: targetId,
-          options: normalizedOptions,
-        };
-
-        setMcqs((prev) =>
-          prev.map((item) => (item.id === editingMcq.id ? { ...item, ...updatedItem } : item))
-        );
+        await adminMcqService.updateMcq(editingMcq.id, payload);
         toast.success('MCQ question updated successfully');
       } else {
         await adminMcqService.createMcq(payload);
@@ -604,10 +606,15 @@ export const AdminMcqs: React.FC = () => {
           </button>
           <button
             onClick={() => handleOpenEditModal(row)}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            disabled={editingLoadingId === row.id}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
             title="Edit MCQ"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {editingLoadingId === row.id ? (
+              <RotateCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <Edit3 className="w-3.5 h-3.5" />
+            )}
           </button>
           <button
             onClick={() => {

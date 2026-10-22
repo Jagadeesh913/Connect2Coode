@@ -12,10 +12,9 @@ The API documentation suite is structured into the following dedicated reference
 
 | Document | Purpose |
 | :--- | :--- |
-| [**API_REFERENCE.md**](file:///c:/Users/sakha/Desktop/Connect-2-code/docs/api/API_REFERENCE.md) | **Primary Developer Reference**: Complete specifications for all 37 investigated platform endpoints, including HTTP methods, paths, headers, parameter schemas, request/response bodies, frontend callers, and error behaviors. |
-| [**API_AUTH_MATRIX.md**](file:///c:/Users/sakha/Desktop/Connect-2-code/docs/api/API_AUTH_MATRIX.md) | **Evidence-Based Authentication Matrix**: Comprehensive test matrix recording observed HTTP status codes for Anonymous, USER, and ADMIN credentials, alongside definitive access classifications (`PUBLIC`, `USER_OR_ADMIN`, `ADMIN_ONLY`, `USER_ONLY`, etc.). |
-| [**API_TEST_RESULTS.md**](file:///c:/Users/sakha/Desktop/Connect-2-code/docs/api/API_TEST_RESULTS.md) | **Audit & Execution Report**: Detailed report of live Postman MCP collection runs, live endpoint probing, execution latencies, the Judge0 code execution pipeline, and backend defects uncovered during testing. |
-| [**api-inventory.json**](file:///c:/Users/sakha/Desktop/Connect-2-code/docs/api/api-inventory.json) | **Machine-Readable API Inventory**: Structured JSON catalog of all endpoints, parameters, schemas, and test outcomes for CI/CD validation and automated tooling. |
+| [**API_REFERENCE.md**](./API_REFERENCE.md) | **Primary Developer Reference**: Complete specifications for all 37 investigated platform endpoints, including HTTP methods, paths, headers, parameter schemas, request/response bodies, frontend callers, and error behaviors. |
+| [**API_AUTH_MATRIX.md**](./API_AUTH_MATRIX.md) | **Evidence-Based Authentication Matrix**: Comprehensive test matrix recording observed HTTP status codes for Anonymous, USER, and ADMIN credentials, alongside definitive access classifications (`PUBLIC`, `USER_OR_ADMIN`, `ADMIN_ONLY`, `USER_ONLY`, etc.). |
+| [**api-inventory.json**](./api-inventory.json) | **Machine-Readable API Inventory**: Structured JSON catalog of all endpoints, parameters, schemas, and test outcomes for CI/CD validation and automated tooling. |
 
 ---
 

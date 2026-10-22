@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
+import { isTokenValid } from '../security/jwt';
 
 /**
  * Resolves and normalizes the API base URL.
@@ -250,8 +251,9 @@ apiClient.interceptors.request.use(
     const storedRefreshToken = tokenStorage.getRefreshToken();
     const storedUser = tokenStorage.getUser();
 
-    // Proactively refresh if access token is missing but refresh token or user session exists
-    if (!token && (storedRefreshToken || storedUser) && !isPublicAuthEndpoint) {
+    const hasValidToken = Boolean(token && isTokenValid(token));
+    // Proactively refresh if access token is missing or expired, but refresh token or user session exists
+    if (!hasValidToken && (storedRefreshToken || storedUser) && !isPublicAuthEndpoint) {
       try {
         token = await executeRefreshToken();
       } catch {}
@@ -287,6 +289,9 @@ apiClient.interceptors.request.use(
           }
           if (!config.data.jwtToken) {
             config.data.jwtToken = token;
+          }
+          if (!config.data.jwttoken) {
+            config.data.jwttoken = token;
           }
         }
       }

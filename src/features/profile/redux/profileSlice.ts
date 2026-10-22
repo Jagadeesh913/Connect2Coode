@@ -56,7 +56,7 @@ export const updateUserProfile = createAsyncThunk(
 export const fetchUserInfoThunk = createAsyncThunk<
   UserInfoData | null,
   string | number,
-  { rejectValue: string }
+  { rejectValue: any }
 >(
   'profile/fetchUserInfo',
   async (userId: string | number, { rejectWithValue }) => {
@@ -64,7 +64,7 @@ export const fetchUserInfoThunk = createAsyncThunk<
       const res = await profileService.getUserInfo(userId);
       return res.data;
     } catch (err: any) {
-      return rejectWithValue(err?.message || 'Failed to fetch user academic info');
+      return rejectWithValue(err);
     }
   },
   {
@@ -94,7 +94,7 @@ export const saveUserInfoThunk = createAsyncThunk(
       const res = await profileService.saveUserInfo(userId, payload);
       return res.data;
     } catch (err: any) {
-      return rejectWithValue(err?.message || 'Failed to save user academic info');
+      return rejectWithValue(err);
     }
   }
 );

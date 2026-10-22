@@ -28,6 +28,7 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 const { API_ENDPOINTS } = await import('../../src/core/api/endpoints.ts');
 const { profileService } = await import('../../src/services/profileService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
+const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 
 describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userId})', () => {
   it('API_ENDPOINTS: accurately defines USER_INFO parameterized endpoint', () => {
@@ -102,9 +103,9 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
           statusCode: 200,
           message: 'User profile saved successfully',
           data: {
+            ...payload,
             id: 1,
             userId: 68,
-            ...payload,
           },
           errors: null,
           timestamp: '2026-10-12T23:26:59.6955885',
@@ -119,15 +120,92 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         bio: 'Java developer and coding enthusiast',
       };
 
+      tokenStorage.setAccessToken('mock_session_jwt_token_123');
       const res = await profileService.saveUserInfo(68, payload);
       assert.equal(capturedUrl, '/userInfo/68');
       assert.equal(capturedPayload.userId, 68);
       assert.equal(capturedPayload.regNumber, '22CS101');
       assert.equal(capturedPayload.college, 'ABC Engineering College');
+      assert.equal(capturedPayload.jwttoken, 'mock_session_jwt_token_123');
+      assert.equal(capturedPayload.jwtToken, 'mock_session_jwt_token_123');
+      assert.equal(capturedPayload.token, 'mock_session_jwt_token_123');
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.id, 1);
       assert.equal(res.data.regNumber, '22CS101');
       assert.equal(res.data.college, 'ABC Engineering College');
+    });
+
+    it('sends POST /userInfo/{userId} matching exact contract (userId: 89, regNumber, collegeId, gender, dob, jwtToken)', async () => {
+      let capturedUrl = '';
+      let capturedPayload = null;
+
+      apiClient.post = async (url, payload) => {
+        capturedUrl = url;
+        capturedPayload = payload;
+        return {
+          statusCode: 200,
+          message: 'User profile saved successfully',
+          data: {
+            id: 1,
+            userId: 89,
+            firstName: 'connecttocodetechsolutions',
+            lastName: null,
+            regNumber: '192G1A0497',
+            joinedYear: 2024,
+            passedOutYear: 2028,
+            collegeName:
+              'Ambaba Commerce College, Maniba Institute of Business Management & Deviba Institute of Computer Application',
+            collegeId: 2250,
+            bio: 'just for test',
+            gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
+            dob: '2002-01-14',
+          },
+          errors: null,
+          timestamp: '2026-10-22T14:56:51.2029399',
+        };
+      };
+
+      const payload = {
+        id: null,
+        userId: 89,
+        regNumber: '192G1A0497',
+        joinedYear: 2024,
+        passedOutYear: 2028,
+        college: 'Anantha Lakshmi Institute of Technology & Sciences',
+        collegeId: '2250',
+        bio: 'just for test',
+        gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
+        dob: '2002-01-14',
+      };
+
+      tokenStorage.setAccessToken('sample_access_jwt_token_xyz');
+      const res = await profileService.saveUserInfo(89, payload);
+
+      assert.equal(capturedUrl, '/userInfo/89');
+      assert.equal(capturedPayload.id, null);
+      assert.equal(capturedPayload.userId, 89);
+      assert.equal(capturedPayload.regNumber, '192G1A0497');
+      assert.equal(capturedPayload.joinedYear, 2024);
+      assert.equal(capturedPayload.passedOutYear, 2028);
+      assert.equal(capturedPayload.college, 'Anantha Lakshmi Institute of Technology & Sciences');
+      assert.equal(capturedPayload.collegeId, '2250');
+      assert.equal(capturedPayload.bio, 'just for test');
+      assert.deepEqual(capturedPayload.gender, {
+        id: 102,
+        refGroupCode: 'GENDER',
+        refCode: 'MALE',
+        refName: 'Male',
+        isActive: true,
+      });
+      assert.equal(capturedPayload.dob, '2002-01-14');
+      assert.equal(capturedPayload.jwtToken, 'sample_access_jwt_token_xyz');
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.data.id, 1);
+      assert.equal(
+        res.data.collegeName,
+        'Ambaba Commerce College, Maniba Institute of Business Management & Deviba Institute of Computer Application'
+      );
+      assert.equal(res.data.collegeId, 2250);
     });
   });
 });

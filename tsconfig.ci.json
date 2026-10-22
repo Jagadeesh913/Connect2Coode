@@ -23,7 +23,6 @@
     "src/app/rootReducer.ts",
     "src/core/**/*.ts",
     "src/features/auth/redux/authSlice.ts",
-    "src/features/auth/hooks/useGoogleOAuthHandler.ts",
     "src/features/bookmarks/redux/bookmarkSlice.ts",
     "src/features/companies/pages/CompanyDetails.tsx",
     "src/features/companies/redux/companySlice.ts",

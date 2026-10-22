@@ -16,8 +16,8 @@ export const personalInfoSchema = z.object({
   fullName: nameRule('Full name'),
   email: emailRule,
   phone: optionalPhoneRule,
-  dob: z.string().trim().optional().or(z.literal('')),
-  gender: z.string().trim().optional().or(z.literal('')),
+  dob: z.string().trim().optional().or(z.literal('')).nullable(),
+  gender: z.any().optional().nullable(),
   location: z.string().trim().optional().or(z.literal('')),
   bio: z.string().trim().optional().or(z.literal('')),
 });
@@ -44,6 +44,9 @@ export const academicDetailsSchema = z
       .min(1990, 'Graduation year cannot be earlier than 1990')
       .max(currentYear + 10, 'Graduation year cannot exceed 10 years in the future'),
     college: requiredTextRule('College or university name', 2),
+    collegeId: z.union([z.string(), z.number()]).nullish(),
+    dob: z.string().trim().optional().or(z.literal('')).nullable(),
+    gender: z.any().optional().nullable(),
     bio: z.string().trim().max(500, 'Bio cannot exceed 500 characters').optional().or(z.literal('')),
   })
   .refine((data) => data.passedOutYear >= data.joinedYear, {

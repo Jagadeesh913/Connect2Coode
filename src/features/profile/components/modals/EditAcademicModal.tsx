@@ -46,6 +46,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
       joinedYear: initialData?.joinedYear ? Number(initialData.joinedYear) : currentYear - 2,
       passedOutYear: initialData?.passedOutYear ? Number(initialData.passedOutYear) : currentYear + 2,
       college: initialData?.college || defaultCollege || '',
+      collegeId: initialData?.collegeId !== undefined && initialData?.collegeId !== null ? String(initialData.collegeId) : '',
       bio: initialData?.bio || '',
     },
   });
@@ -88,6 +89,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
         joinedYear: initialData?.joinedYear ? Number(initialData.joinedYear) : currentYear - 2,
         passedOutYear: initialData?.passedOutYear ? Number(initialData.passedOutYear) : currentYear + 2,
         college: initialData?.college || defaultCollege || '',
+        collegeId: initialData?.collegeId !== undefined && initialData?.collegeId !== null ? String(initialData.collegeId) : '',
         bio: initialData?.bio || '',
       });
     }
@@ -165,13 +167,22 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
               placeholder="Search or type college name (min 3 characters)..."
               value={watch('college') || ''}
               error={errors.college?.message}
-              onChange={(val) => {
+              onChange={(val, opt) => {
                 setValue('college', val, { shouldValidate: true, shouldDirty: true });
+                if (opt?.id) {
+                  setValue('collegeId', String(opt.id), { shouldDirty: true });
+                }
               }}
               onSelectOption={(opt) => {
                 setValue('college', opt.name, { shouldValidate: true, shouldDirty: true });
+                setValue('collegeId', String(opt.id), { shouldDirty: true });
               }}
             />
+            {watch('collegeId') && (
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 font-mono">
+                College ID: #{watch('collegeId')}
+              </p>
+            )}
           </div>
 
           {/* Joined Year and Passed Out Year Dropdowns */}

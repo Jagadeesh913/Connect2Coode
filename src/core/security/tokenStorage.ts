@@ -101,6 +101,7 @@ export const tokenStorage = {
       getCookie('accessToken') ||
       getCookie('jwt') ||
       getCookie('jwtToken') ||
+      getCookie('jwttoken') ||
       getCookie('authToken') ||
       getLocalItem(ACCESS_TOKEN_KEY) ||
       getLocalItem('token') ||
@@ -108,6 +109,7 @@ export const tokenStorage = {
       getLocalItem('accessToken') ||
       getLocalItem('jwt') ||
       getLocalItem('jwtToken') ||
+      getLocalItem('jwttoken') ||
       getLocalItem('authToken')
     );
   },
@@ -117,9 +119,13 @@ export const tokenStorage = {
     setCookie(ACCESS_TOKEN_KEY, token, maxAgeSeconds);
     setCookie('token', token, maxAgeSeconds);
     setCookie('access_token', token, maxAgeSeconds);
+    setCookie('jwtToken', token, maxAgeSeconds);
+    setCookie('jwttoken', token, maxAgeSeconds);
     setLocalItem(ACCESS_TOKEN_KEY, token);
     setLocalItem('token', token);
     setLocalItem('access_token', token);
+    setLocalItem('jwtToken', token);
+    setLocalItem('jwttoken', token);
   },
 
   removeAccessToken(): void {
@@ -127,9 +133,13 @@ export const tokenStorage = {
     removeCookie(ACCESS_TOKEN_KEY);
     removeCookie('token');
     removeCookie('access_token');
+    removeCookie('jwtToken');
+    removeCookie('jwttoken');
     removeLocalItem(ACCESS_TOKEN_KEY);
     removeLocalItem('token');
     removeLocalItem('access_token');
+    removeLocalItem('jwtToken');
+    removeLocalItem('jwttoken');
   },
 
   getRefreshToken(): string | null {

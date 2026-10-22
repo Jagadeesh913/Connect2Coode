@@ -78,10 +78,18 @@ export const profileService = {
     signal?: AbortSignal
   ): Promise<ApiResponse<UserInfoData | null>> {
     const res: any = await apiClient.get(API_ENDPOINTS.USER.USER_INFO(userId), { signal });
+    const rawData = res?.data ?? null;
+    const normalizedData: UserInfoData | null = rawData
+      ? {
+          ...rawData,
+          college: rawData.college || rawData.collegeName || '',
+          collegeName: rawData.collegeName || rawData.college || '',
+        }
+      : null;
     return {
       statusCode: res?.statusCode || 200,
       message: res?.message || 'User profile fetched successfully',
-      data: res?.data ?? null,
+      data: normalizedData,
       errors: res?.errors ?? null,
     };
   },
@@ -95,17 +103,35 @@ export const profileService = {
     payload: SaveUserInfoPayload
   ): Promise<ApiResponse<UserInfoData>> {
     const token = tokenStorage.getAccessToken();
-    const payloadWithToken = {
-      ...payload,
-      token: token || payload.token,
-      ...(payload.id ? { id: Number(payload.id) } : {}),
+    const effectiveToken = token || payload.token || payload.jwtToken || payload.jwttoken;
+    const payloadWithToken: Record<string, any> = {
+      id: payload.id !== undefined && payload.id !== null ? Number(payload.id) : null,
       userId: Number(userId),
+      regNumber: payload.regNumber,
+      joinedYear: Number(payload.joinedYear),
+      passedOutYear: Number(payload.passedOutYear),
+      college: payload.college,
+      collegeId: payload.collegeId !== undefined && payload.collegeId !== null ? String(payload.collegeId) : null,
+      bio: payload.bio ?? '',
+      gender: payload.gender ?? null,
+      dob: payload.dob ?? null,
+      token: effectiveToken,
+      jwtToken: effectiveToken,
+      jwttoken: effectiveToken,
     };
     const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payloadWithToken);
+    const rawData = res?.data ?? res;
+    const normalizedData: UserInfoData = rawData
+      ? {
+          ...rawData,
+          college: rawData.college || rawData.collegeName || payload.college || '',
+          collegeName: rawData.collegeName || rawData.college || payload.college || '',
+        }
+      : rawData;
     return {
       statusCode: res?.statusCode || 200,
       message: res?.message || 'User profile saved successfully',
-      data: res?.data ?? res,
+      data: normalizedData,
       errors: res?.errors ?? null,
     };
   },

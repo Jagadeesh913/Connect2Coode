@@ -187,7 +187,17 @@ export const CompanyList: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <CompanyCardSkeleton count={8} />
           </div>
-        ) : error && companies.length === 0 && !/authentication required/i.test(error) ? (
+        ) : !isAuthenticated && companies.length === 0 ? (
+          <div className="my-12">
+            <EmptyState
+              title="Sign in to explore Company Prep"
+              description="Log in with your Connect 2 Code account to browse hiring companies, recruitment patterns, and interview questions."
+              actionText="Sign In"
+              onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+              icon={<Lock className="w-12 h-12 text-blue-500" />}
+            />
+          </div>
+        ) : error && companies.length === 0 ? (
           <div className="my-10 p-8 rounded-3xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 text-center max-w-xl mx-auto shadow-xs">
             <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center mx-auto mb-4 text-xl">
               <Building2 className="w-6 h-6" />
@@ -201,16 +211,6 @@ export const CompanyList: React.FC = () => {
             >
               Retry Loading
             </button>
-          </div>
-        ) : !isAuthenticated && companies.length === 0 ? (
-          <div className="my-12">
-            <EmptyState
-              title="Sign in to explore Company Prep"
-              description="Log in with your Connect 2 Code account to browse hiring companies, recruitment patterns, and interview questions."
-              actionText="Sign In"
-              onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
-              icon={<Lock className="w-12 h-12 text-blue-500" />}
-            />
           </div>
         ) : filteredCompanies.length === 0 ? (
           <div className="my-12">
