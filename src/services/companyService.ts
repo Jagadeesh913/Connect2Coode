@@ -27,7 +27,6 @@ export const companyService = {
       pageSize: pageRequest.pageSize ?? 24,
       sortBy: pageRequest.sortBy ?? 'name',
       sortDirection: pageRequest.sortDirection ?? 'ASC',
-      token: tokenStorage.getAccessToken(),
       jwtToken: tokenStorage.getAccessToken(),
     };
 
@@ -161,7 +160,6 @@ export const companyService = {
       pageSize: pageRequest.pageSize ?? 20,
       sortBy: pageRequest.sortBy ?? 'year',
       sortDirection: pageRequest.sortDirection ?? 'DESC',
-      token: tokenStorage.getAccessToken(),
       jwtToken: tokenStorage.getAccessToken(),
     };
 

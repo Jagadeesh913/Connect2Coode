@@ -103,7 +103,7 @@ export const profileService = {
     payload: SaveUserInfoPayload
   ): Promise<ApiResponse<UserInfoData>> {
     const token = tokenStorage.getAccessToken();
-    const effectiveToken = token || payload.token || payload.jwtToken || payload.jwttoken;
+    const effectiveToken = token || payload.jwtToken;
     const payloadWithToken: Record<string, any> = {
       id: payload.id !== undefined && payload.id !== null ? Number(payload.id) : null,
       userId: Number(userId),
@@ -115,9 +115,7 @@ export const profileService = {
       bio: payload.bio ?? '',
       gender: payload.gender ?? null,
       dob: payload.dob ?? null,
-      token: effectiveToken,
       jwtToken: effectiveToken,
-      jwttoken: effectiveToken,
     };
     const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payloadWithToken);
     const rawData = res?.data ?? res;

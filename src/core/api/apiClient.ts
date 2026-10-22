@@ -9,8 +9,7 @@ import { isTokenValid } from '../security/jwt';
  * - Supports relative API base paths (e.g. '/api/v1') to enable Vite development proxying.
  * - Normalizes relative paths without a leading slash (e.g. 'api/v1' -> '/api/v1').
  * - Handles missing, empty, or invalid configuration safely and clearly by defaulting
- *   to relative '/api/v1' with a diagnostic warning, removing silent fallback to a
- *   hardcoded production Render instance (F-005, F-006).
+ *   to production 'https://api.connect2code.in/api/v1'.
  */
 export const BACKEND_ORIGIN = 'https://api.connect2code.in';
 export const RENDER_BACKEND_ORIGIN = BACKEND_ORIGIN;
@@ -56,15 +55,11 @@ export const getBackendOrigin = (rawUrl?: string | null): string => {
 
 export const resolveDeploymentApiBaseUrl = (
   rawUrl?: string | null,
-  isLocal: boolean = false
+  _isLocal: boolean = false
 ): string => {
-  if (isLocal) {
-    return '/api/v1';
-  }
-
   const resolved = resolveApiBaseUrl(rawUrl);
 
-  // In deployed production environments, ALL API calls must strictly
+  // In all environments, ALL API calls must strictly
   // target the live backend origin https://api.connect2code.in/api/v1 and NEVER localhost.
   if (
     resolved.includes('localhost') ||
@@ -78,27 +73,12 @@ export const resolveDeploymentApiBaseUrl = (
 };
 
 export const getBaseUrl = (): string => {
-  const envUrl = typeof import.meta !== 'undefined' && import.meta.env
-    ? import.meta.env.VITE_API_BASE_URL
-    : undefined;
+  const envUrl =
+    typeof import.meta !== 'undefined' && import.meta.env
+      ? import.meta.env.VITE_API_BASE_URL
+      : undefined;
 
-  // In any browser execution environment, route through relative '/api/v1'.
-  // This enables Vite's development proxy locally and the edge proxy in production,
-  // completely eliminating browser cross-origin preflight (OPTIONS) failures on all deployed domains.
-  if (typeof window !== 'undefined' && window.location.origin !== BACKEND_ORIGIN) {
-    return '/api/v1';
-  }
-
-  const isLocalDev =
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname.startsWith('192.168.') ||
-      window.location.hostname.startsWith('10.') ||
-      window.location.hostname.endsWith('.local') ||
-      Boolean(import.meta.env?.DEV));
-
-  return resolveDeploymentApiBaseUrl(envUrl, isLocalDev);
+  return resolveDeploymentApiBaseUrl(envUrl);
 };
 
 export const BASE_URL = getBaseUrl();
@@ -168,45 +148,20 @@ export const executeRefreshToken = async (): Promise<string> => {
     try {
       const storedRefreshToken = tokenStorage.getRefreshToken();
       const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
-      const isLocalDev =
-        typeof window !== 'undefined' &&
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-      const refreshUrl = isLocalDev
-        ? `${BASE_URL}/auth/refresh`
-        : `${DEFAULT_API_BASE_URL}/auth/refresh`;
+      const refreshUrl = `${BASE_URL}/auth/refresh`;
 
-      let refreshRes: any;
-      try {
-        refreshRes = await axios.post(
-          refreshUrl,
-          payload,
-          {
-            timeout: 30_000,
-            withCredentials: true,
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-            },
-          }
-        );
-      } catch (directErr) {
-        if (!isLocalDev && refreshUrl.startsWith('http')) {
-          refreshRes = await axios.post(
-            `${BASE_URL}/auth/refresh`,
-            payload,
-            {
-              timeout: 30_000,
-            withCredentials: true,
-              headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
-            }
-          );
-        } else {
-          throw directErr;
+      const refreshRes: any = await axios.post(
+        refreshUrl,
+        payload,
+        {
+          timeout: 30_000,
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
         }
-      }
+      );
 
       const responseData = refreshRes.data;
       const tokenData = responseData?.data || responseData;
@@ -284,14 +239,15 @@ apiClient.interceptors.request.use(
           !Array.isArray(config.data) &&
           !(config.data instanceof FormData)
         ) {
-          if (!config.data.token) {
-            config.data.token = token;
+          // Ensure only jwtToken is sent in request bodies; remove duplicate/invalid token fields
+          if ('token' in config.data) {
+            delete config.data.token;
+          }
+          if ('jwttoken' in config.data) {
+            delete config.data.jwttoken;
           }
           if (!config.data.jwtToken) {
             config.data.jwtToken = token;
-          }
-          if (!config.data.jwttoken) {
-            config.data.jwttoken = token;
           }
         }
       }

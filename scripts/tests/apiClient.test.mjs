@@ -9,7 +9,7 @@ export async function resolve(specifier, context, nextResolve) {
   if (specifier === 'axios') {
     return {
       shortCircuit: true,
-      url: 'data:text/javascript,' + encodeURIComponent('export default { create: () => ({ interceptors: { request: { use: () => {} }, response: { use: () => {} } } }), isCancel: () => false }; export const AxiosInstance = {}; export const AxiosResponse = {}; export const InternalAxiosRequestConfig = {}; export const isCancel = () => false;')
+      url: 'data:text/javascript,' + encodeURIComponent('export default { create: (cfg) => ({ defaults: { baseURL: cfg?.baseURL }, baseURL: cfg?.baseURL, getUri: (reqCfg) => ((reqCfg?.baseURL || cfg?.baseURL || "").replace(new RegExp("/+$"), "") + "/" + (reqCfg?.url || "").replace(new RegExp("^/+"), "")), interceptors: { request: { use: () => {} }, response: { use: () => {} } } }), isCancel: () => false }; export const AxiosInstance = {}; export const AxiosResponse = {}; export const InternalAxiosRequestConfig = {}; export const isCancel = () => false;')
     };
   }
   try {
@@ -79,12 +79,14 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
     assert.equal(BASE_URL, 'https://api.connect2code.in/api/v1');
   });
 
-  describe('Deployed / Vercel Environment URL Guarantees', () => {
-    const { resolveDeploymentApiBaseUrl } = apiClientModule;
+  describe('Deployed / Development Environment URL Guarantees', () => {
+    const { resolveDeploymentApiBaseUrl, apiClient } = apiClientModule;
 
-    it('returns local proxy /api/v1 when isLocal is true', () => {
-      assert.equal(resolveDeploymentApiBaseUrl(undefined, true), '/api/v1');
-      assert.equal(resolveDeploymentApiBaseUrl('https://custom.backend.com/api/v1', true), '/api/v1');
+    it('strictly resolves to live backend URL in local development mode without local proxy', () => {
+      assert.equal(resolveDeploymentApiBaseUrl(undefined, true), 'https://api.connect2code.in/api/v1');
+      assert.equal(resolveDeploymentApiBaseUrl('https://custom.backend.com/api/v1', true), 'https://custom.backend.com/api/v1');
+      assert.equal(resolveDeploymentApiBaseUrl('http://localhost:5173/api/v1', true), 'https://api.connect2code.in/api/v1');
+      assert.equal(resolveDeploymentApiBaseUrl('/api/v1', true), 'https://api.connect2code.in/api/v1');
     });
 
     it('strictly enforces backend URL and rejects localhost in deployed production', () => {
@@ -121,6 +123,13 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
         resolveDeploymentApiBaseUrl('https://api.connect2code.in/api/v1', false),
         'https://api.connect2code.in/api/v1'
       );
+    });
+
+    it('REGRESSION: login request URL resolves to https://api.connect2code.in/api/v1/auth/login and preserves /api/v1 prefix exactly once', () => {
+      const loginUrl = apiClient.getUri({ url: '/auth/login' });
+      assert.equal(loginUrl, 'https://api.connect2code.in/api/v1/auth/login');
+      assert.ok(!loginUrl.includes('/api/v1/api/v1'), 'Must not duplicate /api/v1 prefix');
+      assert.ok(!loginUrl.includes('localhost'), 'Must not target localhost origin');
     });
   });
 });

@@ -209,9 +209,7 @@ export interface SaveUserInfoPayload {
   bio: string;
   gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
   dob?: string | null;
-  token?: string;
   jwtToken?: string;
-  jwttoken?: string;
 }
 
 export interface UserProfile {

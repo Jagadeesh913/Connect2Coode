@@ -67,7 +67,6 @@ export interface PageRequestPayload {
   pageSize: number;
   sortBy?: string;
   sortDirection?: 'ASC' | 'DESC';
-  token?: string | null;
   jwtToken?: string | null;
 }
 

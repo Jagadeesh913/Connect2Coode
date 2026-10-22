@@ -355,9 +355,7 @@ export const UserProfilePage: React.FC = () => {
                 bio: (data.bio !== undefined ? data.bio : userInfo?.bio) || '',
                 gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
                 dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
-                token: token || undefined,
                 jwtToken: token || undefined,
-                jwttoken: token || undefined,
               },
             })
           ).unwrap();
@@ -413,9 +411,7 @@ export const UserProfilePage: React.FC = () => {
         bio: (data.bio || '').trim(),
         gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
         dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
-        token: token || undefined,
         jwtToken: token || undefined,
-        jwttoken: token || undefined,
       };
 
       // Direct unwrap: any backend error throws directly into catch block

@@ -28,7 +28,6 @@ export const adminCompanyService = {
       pageSize: 100,
       sortBy: 'name',
       sortDirection: 'ASC',
-      token,
       jwtToken: token,
     };
     const res: any = await apiClient.post(API_ENDPOINTS.COMPANY.LIST, payload, { signal });
@@ -59,7 +58,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/company
    * Saves a new company (id: null) or updates an existing company (id: number).
-   * Request Payload: { "id": null, "name": "...", "websiteUrl": "...", "logoUrl": "...", "description": "...", "isActive": true, "token": "...", "jwtToken": "..." }
+   * Request Payload: { "id": null, "name": "...", "websiteUrl": "...", "logoUrl": "...", "description": "...", "isActive": true, "jwtToken": "..." }
    */
   async saveOrUpdateCompany(payload: CompanyItem): Promise<ApiResponse<Company>> {
     const token = tokenStorage.getAccessToken();
@@ -70,7 +69,6 @@ export const adminCompanyService = {
       logoUrl: payload.logoUrl || (payload as any).logo || '',
       description: payload.description || '',
       isActive: payload.isActive ?? true,
-      token,
       jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_BASE, formattedPayload);
@@ -87,7 +85,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/companyRole
    * Saves or updates a company exam role
-   * Request Payload: { "id": null, "companyExamId": 1, "roleName": "Ninja", "roleCode": "NINJA", "salary": "...", "description": "...", "token": "...", "jwtToken": "..." }
+   * Request Payload: { "id": null, "companyExamId": 1, "roleName": "Ninja", "roleCode": "NINJA", "salary": "...", "description": "...", "jwtToken": "..." }
    */
   async saveOrUpdateCompanyRole(payload: {
     id: number | null;
@@ -105,7 +103,6 @@ export const adminCompanyService = {
       roleCode: payload.roleCode.trim(),
       salary: payload.salary.trim(),
       description: payload.description?.trim() || '',
-      token,
       jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_ROLE, formattedPayload);
@@ -114,7 +111,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/examSection
    * Saves or updates an exam section / round
-   * Request Payload: { "id": 10, "companyExamId": 1, "parentSectionId": 9, "sectionName": "SQL", "sectionType": { "id": 100 }, "questionType": { "id": 89 }, "questionCount": 10, "durationMinutes": 15, "totalMarks": 10, "sequenceNumber": 1, "token": "...", "jwtToken": "..." }
+   * Request Payload: { "id": 10, "companyExamId": 1, "parentSectionId": 9, "sectionName": "SQL", "sectionType": { "id": 100 }, "questionType": { "id": 89 }, "questionCount": 10, "durationMinutes": 15, "totalMarks": 10, "sequenceNumber": 1, "jwtToken": "..." }
    */
   async saveOrUpdateExamSection(payload: {
     id: number | null;
@@ -152,7 +149,6 @@ export const adminCompanyService = {
       durationMinutes: payload.durationMinutes !== undefined && payload.durationMinutes !== null ? Number(payload.durationMinutes) : null,
       totalMarks: payload.totalMarks !== undefined && payload.totalMarks !== null ? Number(payload.totalMarks) : null,
       sequenceNumber: payload.sequenceNumber ? Number(payload.sequenceNumber) : 1,
-      token,
       jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_EXAM_SECTION, formattedPayload);
@@ -161,7 +157,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/companyExam
    * Saves or updates a company exam
-   * Request Payload: { "id": 1, "companyId": 1, "examName": "TCS NQT", "year": 2026, "description": "...", "totalDurationMinutes": 120, "totalQuestions": 65, "totalMarks": 100, "sourceUrl": "...", "token": "...", "jwtToken": "..." }
+   * Request Payload: { "id": 1, "companyId": 1, "examName": "TCS NQT", "year": 2026, "description": "...", "totalDurationMinutes": 120, "totalQuestions": 65, "totalMarks": 100, "sourceUrl": "...", "jwtToken": "..." }
    */
   async saveOrUpdateCompanyExam(payload: {
     id: number | null;
@@ -187,7 +183,6 @@ export const adminCompanyService = {
       totalMarks: Number(payload.totalMarks) || 0,
       sourceUrl: payload.sourceUrl?.trim() || '',
       isActive: payload.isActive ?? true,
-      token,
       jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_EXAM, formattedPayload);

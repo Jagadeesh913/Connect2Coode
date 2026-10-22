@@ -27,6 +27,8 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 
 const { API_ENDPOINTS } = await import('../../src/core/api/endpoints.ts');
 const { profileService } = await import('../../src/services/profileService.ts');
+const { companyService } = await import('../../src/services/companyService.ts');
+const { adminCompanyService } = await import('../../src/services/admin/adminCompanyService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 
@@ -126,9 +128,9 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(capturedPayload.userId, 68);
       assert.equal(capturedPayload.regNumber, '22CS101');
       assert.equal(capturedPayload.college, 'ABC Engineering College');
-      assert.equal(capturedPayload.jwttoken, 'mock_session_jwt_token_123');
       assert.equal(capturedPayload.jwtToken, 'mock_session_jwt_token_123');
-      assert.equal(capturedPayload.token, 'mock_session_jwt_token_123');
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.id, 1);
       assert.equal(res.data.regNumber, '22CS101');
@@ -199,6 +201,8 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       });
       assert.equal(capturedPayload.dob, '2002-01-14');
       assert.equal(capturedPayload.jwtToken, 'sample_access_jwt_token_xyz');
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.id, 1);
       assert.equal(
@@ -206,6 +210,128 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         'Ambaba Commerce College, Maniba Institute of Business Management & Deviba Institute of Computer Application'
       );
       assert.equal(res.data.collegeId, 2250);
+    });
+  });
+
+  describe('Comprehensive jwtToken verification across all API services', () => {
+    const TEST_TOKEN = 'verified_access_jwt_token_999';
+
+    it('companyService.getCompaniesPaginated sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: [] };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await companyService.getCompaniesPaginated({ pageNumber: 0, pageSize: 10 });
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('companyService.getCompanyExamsList sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: [] };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await companyService.getCompanyExamsList(12);
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('adminCompanyService.getCompanies sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: [] };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await adminCompanyService.getCompanies();
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('adminCompanyService.saveOrUpdateCompany sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: {} };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await adminCompanyService.saveOrUpdateCompany({ id: 5, name: 'Microsoft' });
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('adminCompanyService.saveOrUpdateCompanyRole sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: {} };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await adminCompanyService.saveOrUpdateCompanyRole({
+        id: null,
+        companyExamId: 10,
+        roleName: 'SDE-1',
+        roleCode: 'SDE1',
+        salary: '15 LPA',
+        description: 'Software Engineer',
+      });
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('adminCompanyService.saveOrUpdateExamSection sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: {} };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await adminCompanyService.saveOrUpdateExamSection({
+        id: null,
+        companyExamId: 10,
+        sectionName: 'Coding Round',
+      });
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('adminCompanyService.saveOrUpdateCompanyExam sends jwtToken and no duplicate token/jwttoken', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (url, payload) => {
+        capturedPayload = payload;
+        return { statusCode: 200, message: 'Success', data: {} };
+      };
+      tokenStorage.setAccessToken(TEST_TOKEN);
+
+      await adminCompanyService.saveOrUpdateCompanyExam({
+        id: null,
+        companyId: 2,
+        examName: 'Infosys SP',
+        year: 2026,
+        description: 'Specialist Programmer',
+        totalDurationMinutes: 180,
+        totalQuestions: 3,
+        totalMarks: 100,
+      });
+      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.token, undefined);
+      assert.equal(capturedPayload.jwttoken, undefined);
     });
   });
 });
