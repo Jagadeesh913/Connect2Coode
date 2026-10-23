@@ -37,6 +37,9 @@ jobs:
       - name: Architecture verification
         run: npm run verify:architecture
 
+      - name: Documentation verification
+        run: npm run verify:docs
+
       - name: Dependency audit
         run: npm audit --audit-level=high
 

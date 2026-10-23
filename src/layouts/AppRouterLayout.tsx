@@ -12,6 +12,7 @@ import { fetchBookmarks } from '../features/bookmarks/redux/bookmarkSlice';
 import { registerAuthListener, registerAuthFailureListener } from '../core/api/apiClient';
 import { tokenStorage } from '../core/security/tokenStorage';
 import { decodeJwtPayload, isJwtExpired } from '../core/security/jwt';
+import { subscribeToAuthSessionEvents } from '../core/security/authSessionSync';
 import { toast } from 'react-hot-toast';
 
 /**
@@ -40,6 +41,24 @@ export const AppRouterLayout: React.FC = () => {
       unregisterFailure();
     };
   }, [dispatch]);
+
+  // Cookies are shared by tabs, but Redux and the access-token cache are not.
+  // Reconcile both immediately when another tab signs in, refreshes, or logs out.
+  useEffect(() => subscribeToAuthSessionEvents((event) => {
+    if (event.type === 'session-cleared') {
+      tokenStorage.clearTokens({ broadcast: false });
+      dispatch(setUnauthenticatedSession());
+      return;
+    }
+
+    tokenStorage.discardInMemorySession();
+    dispatch(initializeAuth());
+    const token = tokenStorage.getAccessToken();
+    const hasValidToken = Boolean(token && !isJwtExpired(decodeJwtPayload(token)));
+    if (!hasValidToken && (tokenStorage.getRefreshToken() || tokenStorage.getUser())) {
+      dispatch(refreshSessionThunk());
+    }
+  }), [dispatch]);
 
   // Intercept popup OAuth completion messages
   useEffect(() => {
@@ -100,7 +119,8 @@ export const AppRouterLayout: React.FC = () => {
     }
   }, [dispatch, location.pathname, location.search, location.hash, navigate]);
 
-  // Fetch bookmarks once user session is active
+  // Fetch bookmarks only after identity restoration completes. Progress hydration
+  // is owned by App's ProgressHydrator, keyed to the authenticated user scope.
   useEffect(() => {
     if (userId) {
       dispatch(fetchBookmarks());

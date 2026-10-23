@@ -8,7 +8,6 @@ import { AdminErrorState } from '../components/AdminErrorState';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
-import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { companyService } from '../../../services/companyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
@@ -24,6 +23,7 @@ import {
   Check,
   Edit3,
 } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 interface OptionFormState {
   id?: number;
@@ -65,12 +65,9 @@ export const AdminMcqs: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
 
   // Reference options
-  const [subjects, setSubjects] = useState<ReferenceItem[]>([]);
-  const [difficulties, setDifficulties] = useState<ReferenceItem[]>([]);
+  const { items: subjects } = useReferenceGroup('SUBJECT');
+  const { items: difficulties } = useReferenceGroup('DIFF');
   const [companies, setCompanies] = useState<Company[]>([]);
-
-  // Subject-specific topics for the create/edit form
-  const [subjectTopics, setSubjectTopics] = useState<SubjectTopicItem[]>([]);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -82,9 +79,9 @@ export const AdminMcqs: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Form State
-  const [formSubjectRefCode, setFormSubjectRefCode] = useState<string>('APTITUDE');
+  const [formSubjectRefCode, setFormSubjectRefCode] = useState<string>('');
   const [formTopicRefCode, setFormTopicRefCode] = useState<string>('');
-  const [formDifficultyRefCode, setFormDifficultyRefCode] = useState<string>('EASY');
+  const [formDifficultyRefCode, setFormDifficultyRefCode] = useState<string>('');
   const [formCompanyId, setFormCompanyId] = useState<string>('');
   const [formQuestion, setFormQuestion] = useState<string>('');
   const [formExplanation, setFormExplanation] = useState<string>('');
@@ -94,6 +91,18 @@ export const AdminMcqs: React.FC = () => {
     { optionLabel: 'C', optionText: '', isCorrect: false },
     { optionLabel: 'D', optionText: '', isCorrect: false },
   ]);
+
+  // Subject-specific topics for the create/edit form.
+  const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
+  const { items: topicReferences } = useReferenceGroup(topicGroupCode, Boolean(formSubjectRefCode));
+  const subjectTopics: SubjectTopicItem[] = React.useMemo(
+    () => topicReferences.map((item) => ({
+      id: Number(item.id),
+      refCode: item.refCode || '',
+      refName: item.refName || item.refCode || '',
+    })),
+    [topicReferences]
+  );
 
   const searchAbortRef = useRef<AbortController | null>(null);
 
@@ -106,34 +115,15 @@ export const AdminMcqs: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load filter reference items on mount directly from live API
+  // Companies use their own API; shared reference groups come from Redux.
   useEffect(() => {
     let isMounted = true;
     const loadReferences = async () => {
       try {
-        const [subjRes, diffRes, compRes] = await Promise.allSettled([
-          referenceService.getByGroupCode('SUBJECT'),
-          referenceService.getByGroupCode('DIFF'),
-          companyService.getCompanies(),
-        ]);
+        const compRes = await companyService.getCompanies();
         if (!isMounted) return;
-
-        if (subjRes.status === 'fulfilled' && subjRes.value?.data) {
-          const raw = (subjRes.value.data as any)?.data || subjRes.value.data;
-          const list = Array.isArray(raw) ? raw : [];
-          setSubjects(list);
-          if (list.length > 0) {
-            setFormSubjectRefCode((prev) => prev || list[0].refCode);
-          }
-        }
-        if (diffRes.status === 'fulfilled' && diffRes.value?.data) {
-          const raw = (diffRes.value.data as any)?.data || diffRes.value.data;
-          setDifficulties(Array.isArray(raw) ? raw : []);
-        }
-        if (compRes.status === 'fulfilled' && compRes.value?.data) {
-          const raw = (compRes.value.data as any)?.data || compRes.value.data;
-          setCompanies(Array.isArray(raw) ? raw : []);
-        }
+        const raw = (compRes.data as any)?.data || compRes.data;
+        setCompanies(Array.isArray(raw) ? raw : []);
       } catch (err) {
         console.warn('Failed to load MCQ filter references from API:', err);
       }
@@ -144,38 +134,31 @@ export const AdminMcqs: React.FC = () => {
     };
   }, []);
 
-  // Dynamically load subject-specific topics from API whenever formSubjectRefCode changes
   useEffect(() => {
-    let isMounted = true;
-    const topicGroup = resolveTopicGroupCode(formSubjectRefCode);
+    if (subjects.length === 0) return;
+    setFormSubjectRefCode((previous) =>
+      subjects.some((subject) => subject.refCode === previous)
+        ? previous
+        : subjects[0].refCode
+    );
+  }, [subjects]);
 
-    referenceService
-      .getByGroupCode(topicGroup)
-      .then((res) => {
-        if (!isMounted) return;
-        const raw = (res as any)?.data?.data || (res as any)?.data || res;
-        const items = Array.isArray(raw) ? raw : [];
-        const mapped: SubjectTopicItem[] = items.map((it: any) => ({
-          id: Number(it.id),
-          refCode: it.refCode || '',
-          refName: it.refName || it.refCode || '',
-        }));
-        setSubjectTopics(mapped);
-        setFormTopicRefCode((prev) => {
-          const exists = mapped.some((m) => m.refCode.toUpperCase() === prev.toUpperCase());
-          return exists ? prev : (mapped[0]?.refCode || '');
-        });
-      })
-      .catch((err) => {
-        if (!isMounted) return;
-        console.warn(`Failed to fetch topics from API for ${topicGroup}:`, err);
-        setSubjectTopics([]);
-      });
+  useEffect(() => {
+    setFormTopicRefCode((previous) =>
+      subjectTopics.some((topic) => topic.refCode.toUpperCase() === previous.toUpperCase())
+        ? previous
+        : subjectTopics[0]?.refCode || ''
+    );
+  }, [subjectTopics]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [formSubjectRefCode]);
+  useEffect(() => {
+    if (difficulties.length === 0) return;
+    setFormDifficultyRefCode((previous) =>
+      difficulties.some((difficulty) => difficulty.refCode === previous)
+        ? previous
+        : difficulties[0].refCode
+    );
+  }, [difficulties]);
 
   // Fetch MCQs from POST /api/v1/mcq
   const fetchMcqs = useCallback(async () => {
@@ -246,7 +229,16 @@ export const AdminMcqs: React.FC = () => {
           return item;
         }
         const hasServerCorrect = item.options.some(
-          (o: any) => o.isCorrect === true || o.correct === true || o.is_correct === true
+          (o: any) =>
+            o.isCorrect === true ||
+            String(o.isCorrect).toLowerCase() === 'true' ||
+            o.isCorrect === 1 ||
+            o.correct === true ||
+            String(o.correct).toLowerCase() === 'true' ||
+            o.correct === 1 ||
+            o.is_correct === true ||
+            String(o.is_correct).toLowerCase() === 'true' ||
+            o.is_correct === 1
         );
         const targetCorrectOption =
           item.correctOption ||
@@ -261,9 +253,21 @@ export const AdminMcqs: React.FC = () => {
 
           let isCorrect = false;
           if (hasServerCorrect) {
-            isCorrect = Boolean(opt.isCorrect || opt.correct || opt.is_correct);
+            isCorrect = Boolean(
+              opt.isCorrect === true ||
+              String(opt.isCorrect).toLowerCase() === 'true' ||
+              opt.isCorrect === 1 ||
+              opt.correct === true ||
+              String(opt.correct).toLowerCase() === 'true' ||
+              opt.correct === 1 ||
+              opt.is_correct === true ||
+              String(opt.is_correct).toLowerCase() === 'true' ||
+              opt.is_correct === 1
+            );
           } else if (targetCorrectOption) {
-            isCorrect = String(label).toUpperCase() === String(targetCorrectOption).toUpperCase();
+            isCorrect =
+              String(label).toUpperCase() === String(targetCorrectOption).toUpperCase() ||
+              Boolean(resolvedText && String(resolvedText).trim().toLowerCase() === String(targetCorrectOption).trim().toLowerCase());
           } else {
             isCorrect = idx === 0;
           }
@@ -306,10 +310,10 @@ export const AdminMcqs: React.FC = () => {
   // Open Create Modal
   const handleOpenCreateModal = () => {
     setEditingMcq(null);
-    const initialSubject = subjects[0]?.refCode || 'APTITUDE';
+    const initialSubject = subjects[0]?.refCode || '';
     setFormSubjectRefCode(initialSubject);
     setFormTopicRefCode('');
-    setFormDifficultyRefCode('EASY');
+    setFormDifficultyRefCode(difficulties[0]?.refCode || '');
     setFormCompanyId('');
     setFormQuestion('');
     setFormExplanation('');
@@ -338,10 +342,10 @@ export const AdminMcqs: React.FC = () => {
       }
 
       setEditingMcq(authoritativeMcq);
-      const subj = authoritativeMcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || 'APTITUDE';
+      const subj = authoritativeMcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || '';
       setFormSubjectRefCode(subj);
       setFormTopicRefCode(authoritativeMcq.topicRefCode || '');
-      setFormDifficultyRefCode(authoritativeMcq.difficultyRefCode || 'EASY');
+      setFormDifficultyRefCode(authoritativeMcq.difficultyRefCode || difficulties[0]?.refCode || '');
       setFormCompanyId(authoritativeMcq.companyId ? String(authoritativeMcq.companyId) : '');
       setFormQuestion(cleanQuestionText(authoritativeMcq.question) || authoritativeMcq.question || '');
       setFormExplanation(authoritativeMcq.explanation || '');
@@ -357,7 +361,16 @@ export const AdminMcqs: React.FC = () => {
         (authoritativeMcq as any).correctAnswer;
 
       const hasExplicitCorrect = authoritativeOpts.some(
-        (o: any) => o.isCorrect === true || o.correct === true || o.is_correct === true
+        (o: any) =>
+          o.isCorrect === true ||
+          String(o.isCorrect).toLowerCase() === 'true' ||
+          o.isCorrect === 1 ||
+          o.correct === true ||
+          String(o.correct).toLowerCase() === 'true' ||
+          o.correct === 1 ||
+          o.is_correct === true ||
+          String(o.is_correct).toLowerCase() === 'true' ||
+          o.is_correct === 1
       );
 
       const mapped: OptionFormState[] = authoritativeOpts.map((o: any, idx: number) => {
@@ -366,7 +379,17 @@ export const AdminMcqs: React.FC = () => {
         let isCorrect = false;
 
         if (hasExplicitCorrect) {
-          isCorrect = Boolean(o.isCorrect || o.correct || o.is_correct);
+          isCorrect = Boolean(
+            o.isCorrect === true ||
+            String(o.isCorrect).toLowerCase() === 'true' ||
+            o.isCorrect === 1 ||
+            o.correct === true ||
+            String(o.correct).toLowerCase() === 'true' ||
+            o.correct === 1 ||
+            o.is_correct === true ||
+            String(o.is_correct).toLowerCase() === 'true' ||
+            o.is_correct === 1
+          );
         } else if (targetCorrectOption) {
           isCorrect =
             String(label).toUpperCase() === String(targetCorrectOption).toUpperCase() ||
@@ -430,13 +453,22 @@ export const AdminMcqs: React.FC = () => {
     try {
       const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
 
+      const selectedCorrectOption = filledOptions.find((o) => o.isCorrect);
+      const correctOptionLabel = selectedCorrectOption?.optionLabel || 'A';
+      const correctOptionText = selectedCorrectOption?.optionText.trim() || '';
+
       // Clean payload strictly adhering to Spring Boot POST /api/v1/admin/mcq contract
-      const mappedOptions = filledOptions.map((o, idx) => ({
-        ...(o.id ? { id: Number(o.id) } : {}),
-        optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
-        optionText: o.optionText.trim(),
-        isCorrect: Boolean(o.isCorrect),
-      }));
+      const mappedOptions = filledOptions.map((o, idx) => {
+        const isOptionCorrect = Boolean(o.isCorrect);
+        return {
+          ...(o.id ? { id: Number(o.id), optionId: Number(o.id) } : {}),
+          optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
+          optionText: o.optionText.trim(),
+          isCorrect: isOptionCorrect,
+          correct: isOptionCorrect,
+          is_correct: isOptionCorrect,
+        };
+      });
 
       const payload: AdminCreateMcqPayload = {
         ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
@@ -450,11 +482,35 @@ export const AdminMcqs: React.FC = () => {
         question: formQuestion.trim(),
         explanation: formExplanation.trim() || undefined,
         isActive: true,
+        correctOption: correctOptionLabel,
+        correctAnswer: correctOptionText,
+        answer: correctOptionText,
         options: mappedOptions,
       };
 
       if (editingMcq) {
-        await adminMcqService.updateMcq(editingMcq.id, payload);
+        const res = await adminMcqService.updateMcq(editingMcq.id, payload);
+        const updatedRaw: any = (res?.data as any)?.data || res?.data;
+
+        // Immediate optimistic update with the selected correct option
+        setMcqs((prev) =>
+          prev.map((item) =>
+            item.id === editingMcq.id
+              ? {
+                  ...item,
+                  ...payload,
+                  ...(typeof updatedRaw === 'object' && updatedRaw !== null ? updatedRaw : {}),
+                  options: mappedOptions.map((opt) => ({
+                    ...opt,
+                    isCorrect: Boolean(opt.isCorrect),
+                  })),
+                  correctOption: correctOptionLabel,
+                  correctAnswer: correctOptionText,
+                  answer: correctOptionText,
+                }
+              : item
+          )
+        );
         toast.success('MCQ question updated successfully');
       } else {
         await adminMcqService.createMcq(payload);

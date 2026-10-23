@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   footer,
   maxWidth = 'xl',
 }) => {
+  const shouldReduceMotion = useReducedMotion();
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -38,8 +40,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     };
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
-
   const widthClasses = {
     sm: 'max-w-sm',
     md: 'max-w-md',
@@ -52,16 +52,30 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans">
+    <AnimatePresence>
+      {isOpen && (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto font-sans"
+      initial={shouldReduceMotion ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+    >
       {/* Backdrop */}
-      <div
+      <motion.div
         className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
+        initial={shouldReduceMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={shouldReduceMotion ? undefined : { opacity: 0 }}
       />
 
       {/* Modal Dialog */}
-      <div
-        className={`relative w-full bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] z-10 text-left font-sans ${widthClasses[maxWidth]} transition-all animate-in fade-in zoom-in-95 duration-150`}
+      <motion.div
+        className={`relative w-full bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] z-10 text-left font-sans ${widthClasses[maxWidth]}`}
+        initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.95, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={shouldReduceMotion ? undefined : { opacity: 0, scale: 0.95, y: 8 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#070A13]/50">
@@ -102,7 +116,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             {footer}
           </div>
         )}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

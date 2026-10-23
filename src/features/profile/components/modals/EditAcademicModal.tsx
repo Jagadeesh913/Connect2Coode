@@ -38,7 +38,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<AcademicDetailsFormData>({
-    resolver: zodResolver(academicDetailsSchema) as any,
+    resolver: zodResolver(academicDetailsSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {

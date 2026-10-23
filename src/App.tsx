@@ -19,8 +19,8 @@ const ProgressHydrator: React.FC = () => {
     : 'guest';
 
   React.useEffect(() => {
-    void dispatch(hydrateProgress());
-  }, [dispatch, scopeKey]);
+    void dispatch(hydrateProgress({ userId: isAuthenticated ? user?.id ?? null : null }));
+  }, [dispatch, scopeKey, isAuthenticated, user?.id]);
 
   return null;
 };

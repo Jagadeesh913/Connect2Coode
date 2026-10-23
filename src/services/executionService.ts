@@ -5,23 +5,63 @@ import type {
   ExecutionResult,
   ExecutionTestCaseResult,
   Language,
-  QuestionTestCase,
 } from '../core/types/domain';
 
 export type { CodeExecutionPayload, ExecutionTestCaseResult };
 export type LanguageDropdownItem = Language;
 export type ExecutionResultData = ExecutionResult;
 
+export const normalizeExecutionResult = (value: unknown): ExecutionResultData => {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const testCases = Array.isArray(raw.testCases) ? raw.testCases : [];
+  const passedTestCases = Number(raw.passedTestCases ?? 0);
+  const failedTestCases = Number(raw.failedTestCases ?? 0);
+  const totalTestCases = Number(raw.totalTestCases ?? testCases.length);
+
+  return {
+    totalTestCases: Number.isFinite(totalTestCases) ? totalTestCases : testCases.length,
+    passedTestCases: Number.isFinite(passedTestCases) ? passedTestCases : 0,
+    failedTestCases: Number.isFinite(failedTestCases) ? failedTestCases : 0,
+    runtimeMs: typeof raw.runtimeMs === 'string' || typeof raw.runtimeMs === 'number' ? raw.runtimeMs : undefined,
+    memoryMb: typeof raw.memoryMb === 'string' || typeof raw.memoryMb === 'number' ? raw.memoryMb : undefined,
+    testCases: testCases.map((testCase, index) => {
+      const item = testCase && typeof testCase === 'object' ? testCase as Record<string, unknown> : {};
+      return {
+        testCaseId: Number(item.testCaseId ?? index + 1),
+        testCaseType: typeof item.testCaseType === 'string' ? item.testCaseType : 'Test Case',
+        isHidden: typeof item.isHidden === 'boolean' ? item.isHidden : null,
+        status: typeof item.status === 'string' ? item.status : 'Unknown',
+        input: typeof item.input === 'string' ? item.input : undefined,
+        expectedOutput: typeof item.expectedOutput === 'string' ? item.expectedOutput : undefined,
+        actualOutput: typeof item.actualOutput === 'string' ? item.actualOutput : undefined,
+        errorMessage: typeof item.errorMessage === 'string' ? item.errorMessage : undefined,
+      };
+    }),
+  };
+};
+
 let cachedLanguages: LanguageDropdownItem[] | null = null;
 let languageFetchPromise: Promise<LanguageDropdownItem[]> | null = null;
+let languageCacheTime = 0;
+const LANGUAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 
 export const executionService = {
+  invalidateLanguageCache(): void {
+    cachedLanguages = null;
+    languageFetchPromise = null;
+    languageCacheTime = 0;
+  },
+
   /**
    * Fetches supported languages with both Table IDs and Reference IDs.
    * Prioritizes /api/v1/language to get referenceId directly from entity records.
    */
-  async getLanguageDropdown(): Promise<LanguageDropdownItem[]> {
-    if (cachedLanguages && cachedLanguages.length > 0) {
+  async getLanguageDropdown(force = false): Promise<LanguageDropdownItem[]> {
+    if (
+      !force &&
+      cachedLanguages &&
+      Date.now() - languageCacheTime < LANGUAGE_CACHE_TTL_MS
+    ) {
       return cachedLanguages;
     }
 
@@ -30,48 +70,26 @@ export const executionService = {
     }
 
     languageFetchPromise = (async () => {
-      try {
-        // Attempt full language list first as it includes referenceId
-        const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
-        const data = res?.data || res;
-        if (Array.isArray(data) && data.length > 0) {
-          const list: LanguageDropdownItem[] = data.map((item: any) => ({
-            id: Number(item.id),
-            name: item.languageName || item.name || 'Unknown',
-            referenceId:
-              item.referenceId !== undefined && item.referenceId !== null
-                ? Number(item.referenceId)
-                : undefined,
-            judge0LanguageId: item.judge0LanguageId ? Number(item.judge0LanguageId) : undefined,
-            version: item.version,
-          }));
-          cachedLanguages = list;
-          return list;
-        }
-      } catch {
-        // Fall through to dropdown endpoint if base is unavailable
+      const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
+      const data = res?.data || res;
+      if (Array.isArray(data) && data.length > 0) {
+        const list: LanguageDropdownItem[] = data.map((item: any) => ({
+          id: Number(item.id),
+          name: item.languageName || item.name || 'Unknown',
+          referenceId:
+            item.referenceId !== undefined && item.referenceId !== null
+              ? Number(item.referenceId)
+              : undefined,
+          judge0LanguageId: item.judge0LanguageId ? Number(item.judge0LanguageId) : undefined,
+          version: item.version,
+          isActive: item.isActive !== false,
+        }));
+        cachedLanguages = list;
+        languageCacheTime = Date.now();
+        return list;
       }
 
-      try {
-        const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.DROPDOWN);
-        const data = res?.data || res;
-        if (Array.isArray(data) && data.length > 0) {
-          const list: LanguageDropdownItem[] = data.map((item: any) => ({
-            id: Number(item.id),
-            name: item.name || 'Unknown',
-            referenceId:
-              item.referenceId !== undefined && item.referenceId !== null
-                ? Number(item.referenceId)
-                : undefined,
-          }));
-          cachedLanguages = list;
-          return list;
-        }
-      } catch (err) {
-        console.warn('Language dropdown fetch failed:', err);
-      }
-
-      throw new Error('Supported languages could not be loaded from the backend');
+      throw new Error('The backend returned no supported languages');
     })().finally(() => {
       languageFetchPromise = null;
     });
@@ -87,48 +105,31 @@ export const executionService = {
     const numericId = Number(languageId);
 
     // Ensure cached languages are populated
-    if (!cachedLanguages) {
-      await this.getLanguageDropdown().catch(() => {});
-    }
+    if (!cachedLanguages) await this.getLanguageDropdown();
 
     if (cachedLanguages && cachedLanguages.length > 0) {
+      const activeLanguages = cachedLanguages.filter((language) => language.isActive !== false);
       // 1. If numericId matches language table ID (e.g. 1), resolve to referenceId (e.g. 5)
-      const idMatch = cachedLanguages.find((l) => l.id === numericId);
+      const idMatch = activeLanguages.find((l) => l.id === numericId);
       if (idMatch?.referenceId) {
         return idMatch.referenceId;
       }
 
       // 2. If numericId is already a known referenceId, retain it
-      const refMatch = cachedLanguages.find((l) => l.referenceId === numericId);
+      const refMatch = activeLanguages.find((l) => l.referenceId === numericId);
       if (refMatch?.referenceId) {
         return refMatch.referenceId;
       }
 
       // 3. Fallback match by language name if provided
       if (languageName) {
-        const nameMatch = cachedLanguages.find(
+        const nameMatch = activeLanguages.find(
           (l) => l.name.toLowerCase() === languageName.toLowerCase()
         );
         if (nameMatch?.referenceId) {
           return nameMatch.referenceId;
         }
       }
-    }
-
-    // Fallback deterministic mapping for standard platforms: Table ID (1-4) -> Reference ID (5-8)
-    const STATIC_TABLE_TO_REF: Record<number, number> = { 1: 5, 2: 6, 3: 7, 4: 8 };
-    if (STATIC_TABLE_TO_REF[numericId]) {
-      return STATIC_TABLE_TO_REF[numericId];
-    }
-
-    // If numericId is already a known reference ID (5-8), retain it
-    if (numericId >= 5 && numericId <= 8) {
-      return numericId;
-    }
-
-    // If no dynamic match found but numericId is positive, return it as fallback
-    if (numericId > 0) {
-      return numericId;
     }
 
     throw new Error(
@@ -147,14 +148,15 @@ export const executionService = {
     const resolvedLanguageId = await this.resolveLanguageReferenceId(payload.languageId);
     let sanitizedCode = payload.sourceCode || '';
 
-    // Check if Java via cached registry or fallback reference ID 5
+    // Java is derived from the backend language registry; reference IDs are not guessed.
     const isJava =
       cachedLanguages?.some(
         (l) =>
+          l.isActive !== false &&
           (l.id === payload.languageId || l.referenceId === resolvedLanguageId) &&
           l.name.toLowerCase().includes('java') &&
           !l.name.toLowerCase().includes('script')
-      ) || resolvedLanguageId === 5;
+      );
 
     if (isJava) {
       if (/public\s+class\s+Solution\b/.test(sanitizedCode)) {
@@ -166,6 +168,7 @@ export const executionService = {
       questionId: Number(payload.questionId),
       languageId: resolvedLanguageId,
       sourceCode: sanitizedCode,
+      ...(payload.customInput?.trim() ? { customInput: payload.customInput } : {}),
     };
   },
 
@@ -177,7 +180,7 @@ export const executionService = {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
     const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_RUN, finalPayload, { signal });
-    return res?.data || res;
+    return normalizeExecutionResult(res?.data || res);
   },
 
   /**
@@ -188,7 +191,7 @@ export const executionService = {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
     const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_SUBMIT, finalPayload, { signal });
-    return res?.data || res;
+    return normalizeExecutionResult(res?.data || res);
   },
 
   /**
@@ -200,7 +203,7 @@ export const executionService = {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
     const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_RUN, finalPayload, { signal });
-    return res?.data || res;
+    return normalizeExecutionResult(res?.data || res);
   },
 
   /**
@@ -212,39 +215,7 @@ export const executionService = {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
     const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload, { signal });
-    return res?.data || res;
+    return normalizeExecutionResult(res?.data || res);
   },
 
-  /**
-   * Fetches real live execution test cases for a question directly from backend execution engine
-   */
-  async getProblemTestCases(questionId: number | string): Promise<QuestionTestCase[]> {
-    const qId = Number(questionId);
-    if (!qId) return [];
-
-    try {
-      const res = await this.runCode({
-        questionId: qId,
-        languageId: 5,
-        sourceCode: 'public class Main { public static void main(String[] args) {} }',
-      });
-      const cases = res?.testCases || (res as any)?.data?.testCases;
-      if (Array.isArray(cases) && cases.length > 0) {
-        return cases.map((tc: any, idx: number) => ({
-          id: tc.testCaseId || idx + 1,
-          questionId: qId,
-          input: tc.input || '',
-          expectedOutput: tc.expectedOutput || '',
-          explanation: tc.explanation || '',
-          isHidden: Boolean(tc.isHidden),
-          displayOrder: idx + 1,
-          typeRefGroupCode: 'TESTCASETYPE',
-          typeRefCode: tc.testCaseType?.toLowerCase().includes('sample') ? 'SAMPLE' : 'NECESSARY',
-          typeRefName: tc.testCaseType || 'Visible Sample Test Case',
-        }));
-      }
-    } catch {}
-
-    return [];
-  },
 };

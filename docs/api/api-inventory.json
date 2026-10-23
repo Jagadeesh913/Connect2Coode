@@ -904,8 +904,7 @@
     "fullUrl": "https://api.connect2code.in/api/v1/language",
     "purpose": "Fetch all available programming languages with Table IDs and Reference IDs",
     "frontendCallers": [
-      "src/services/executionService.ts (executionService.getLanguageDropdown)",
-      "src/services/admin/adminLanguageService.ts (adminLanguageService.getLanguages)"
+      "src/services/executionService.ts (executionService.getLanguageDropdown)"
     ],
     "authentication": "USER_OR_ADMIN",
     "allowedRoles": [
@@ -973,9 +972,7 @@
     "path": "/language/dropdown",
     "fullUrl": "https://api.connect2code.in/api/v1/language/dropdown",
     "purpose": "Fetch language dropdown options",
-    "frontendCallers": [
-      "src/services/executionService.ts"
-    ],
+    "frontendCallers": [],
     "authentication": "USER_OR_ADMIN",
     "allowedRoles": [
       "USER",
@@ -1711,9 +1708,7 @@
     "path": "/user/profile",
     "fullUrl": "https://api.connect2code.in/api/v1/user/profile",
     "purpose": "Retrieve authenticated user profile",
-    "frontendCallers": [
-      "src/services/profileService.ts (profileService.getProfile)"
-    ],
+    "frontendCallers": [],
     "authentication": "UNKNOWN",
     "allowedRoles": [],
     "headers": null,
@@ -1741,9 +1736,7 @@
     "path": "/user/profile",
     "fullUrl": "https://api.connect2code.in/api/v1/user/profile",
     "purpose": "Update authenticated user profile",
-    "frontendCallers": [
-      "src/services/profileService.ts (profileService.updateProfile)"
-    ],
+    "frontendCallers": [],
     "authentication": "UNKNOWN",
     "allowedRoles": [],
     "headers": null,

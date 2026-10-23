@@ -1,20 +1,26 @@
-# Connect-2-Code — Central API Documentation
+# Connect-2-Code — API Reference Archive
 
-Welcome to the central, authoritative API documentation repository for the **Connect-2-Code** platform.
+Welcome to the API reference and empirical verification archive for the **Connect-2-Code** platform.
 
-This directory serves as the primary technical specification and integration guide for all REST endpoints powering the frontend and backend of the Connect-2-Code ecosystem. Future frontend and backend integrations should consult these documents before modifying or adding API interactions.
+> [!IMPORTANT]
+> **Canonical Platform Documentation**:
+> For the authoritative, comprehensive project documentation system, consult:
+> - Root [**AGENTS.md**](../../AGENTS.md): Mandatory developer and agent operating directives.
+> - [**docs/project/**](../project/): Full architectural documentation, routing, state management, UI tokens, and complete API contracts (including Institutions, MCQs, Company Exams, and User Info).
+> - [**docs/project/05_api_contracts_and_security.md**](../project/05_api_contracts_and_security.md): The consolidated API specifications and token security lifecycle.
 
 ---
 
 ## 1. Documentation Index
 
-The API documentation suite is structured into the following dedicated references:
+The API documentation suite is structured into the following references:
 
 | Document | Purpose |
 | :--- | :--- |
-| [**API_REFERENCE.md**](./API_REFERENCE.md) | **Primary Developer Reference**: Complete specifications for all 37 investigated platform endpoints, including HTTP methods, paths, headers, parameter schemas, request/response bodies, frontend callers, and error behaviors. |
-| [**API_AUTH_MATRIX.md**](./API_AUTH_MATRIX.md) | **Evidence-Based Authentication Matrix**: Comprehensive test matrix recording observed HTTP status codes for Anonymous, USER, and ADMIN credentials, alongside definitive access classifications (`PUBLIC`, `USER_OR_ADMIN`, `ADMIN_ONLY`, `USER_ONLY`, etc.). |
-| [**api-inventory.json**](./api-inventory.json) | **Machine-Readable API Inventory**: Structured JSON catalog of all endpoints, parameters, schemas, and test outcomes for CI/CD validation and automated tooling. |
+| [**docs/project/05_api_contracts_and_security.md**](../project/05_api_contracts_and_security.md) | **Current Comprehensive API Reference**: Authoritative documentation covering all platform endpoints (Auth, Questions, Code Execution, Companies, Exams, MCQs, Institutions, User Info, and Progress). |
+| [**API_REFERENCE.md**](./API_REFERENCE.md) | **Empirical Endpoint Specifications**: Historical specifications for the initial 37 investigated platform endpoints, including HTTP methods, parameter schemas, request/response bodies, frontend callers, and error behaviors. |
+| [**API_AUTH_MATRIX.md**](./API_AUTH_MATRIX.md) | **Evidence-Based Authentication Matrix**: Comprehensive test matrix recording observed HTTP status codes for Anonymous, USER, and ADMIN credentials, alongside definitive access classifications (`PUBLIC`, `USER_OR_ADMIN`, `ADMIN_ONLY`, `USER_ONLY`). |
+| [**api-inventory.json**](./api-inventory.json) | **Machine-Readable API Inventory**: Structured JSON catalog of endpoints, parameters, schemas, and test outcomes for CI/CD validation. |
 
 ---
 
@@ -24,7 +30,11 @@ The platform backend is a Java Spring Boot REST API service connected to a remot
 
 ### Base URL Specifications
 
-- **Production / Remote Base URL:**
+- **Production API Origin:**
+  ```text
+  https://api.connect2code.in
+  ```
+- **Production REST Base URL:**
   ```text
   https://api.connect2code.in/api/v1
   ```
@@ -32,17 +42,16 @@ The platform backend is a Java Spring Boot REST API service connected to a remot
   ```text
   /api/v1
   ```
-  In local development, browser network requests target `/api/v1`, which is proxied by Vite (`vite.config.js`) to the remote backend service to prevent CORS policy violations during browser debugging.
+  In local development, requests targeting `/api/v1` are proxied by Vite (`vite.config.ts`) to the backend origin `https://api.connect2code.in` to prevent CORS issues during browser debugging.
 
 ### Environment Variable Contract
 
-The frontend API client (`src/core/api/apiClient.ts`) normalizes base URL configuration according to the following precedence:
-1. `import.meta.env.VITE_API_BASE_URL` (if configured, whitespace trimmed, trailing slashes removed).
-2. If `VITE_API_BASE_URL` is empty or relative (`/api/v1`), it attaches to the window origin.
-3. If unspecified in development, defaults to `/api/v1`.
+The frontend API client (`src/core/api/apiClient.ts`) resolves the base URL according to the following precedence:
+1. `import.meta.env.VITE_API_BASE_URL` (configured as `https://api.connect2code.in/api/v1`).
+2. If `VITE_API_BASE_URL` is empty, invalid, or specifies localhost, it automatically defaults to `https://api.connect2code.in/api/v1`.
 
-> [!WARNING]
-> **Render Cold-Start Latency**: The free-tier Render backend spins down during periods of inactivity. Initial requests after a dormant period can take 30–60 seconds to awaken the container. All automated scripts and clients must configure timeouts of at least 60–120 seconds to prevent premature timeout aborts.
+> [!NOTE]
+> **Backend Cold-Start Latency**: Initial requests after a dormant backend period can take 30–60 seconds while the container awakens. All automated scripts and clients configure timeouts of 60–120 seconds to prevent premature timeout aborts.
 
 ---
 

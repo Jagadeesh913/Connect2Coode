@@ -61,8 +61,7 @@ export const userQuestionService = {
     if (!userId || !questionId) {
       throw new Error('Both userId and questionId are required to bookmark a question');
     }
-    const res = await apiClient.post(API_ENDPOINTS.USER.BOOKMARK(userId, questionId));
-    return res?.data || res;
+    return apiClient.post(API_ENDPOINTS.USER.BOOKMARK(userId, questionId));
   },
 
   /**
@@ -76,8 +75,7 @@ export const userQuestionService = {
     if (!userId || !questionId) {
       throw new Error('Both userId and questionId are required to remove a bookmark');
     }
-    const res = await apiClient.delete(API_ENDPOINTS.USER.BOOKMARK(userId, questionId));
-    return res?.data || res;
+    return apiClient.delete(API_ENDPOINTS.USER.BOOKMARK(userId, questionId));
   },
 
   /**
@@ -103,12 +101,13 @@ export const userQuestionService = {
    * Retrieves solved / submitted questions for user progress tracking.
    */
   async getSolvedQuestions(
-    userId: string | number
+    userId: string | number,
+    signal?: AbortSignal
   ): Promise<UserSubmittedQuestionItem[]> {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId));
+    const res: any = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
     const data = res?.data || res;
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.data)) return data.data;
@@ -130,12 +129,13 @@ export const userQuestionService = {
    * Retrieves attempted questions for user progress tracking.
    */
   async getAttemptedQuestions(
-    userId: string | number
+    userId: string | number,
+    signal?: AbortSignal
   ): Promise<UserAttemptedQuestionItem[]> {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId));
+    const res: any = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
     const data = res?.data || res;
     if (Array.isArray(data)) return data;
     if (data && Array.isArray(data.data)) return data.data;

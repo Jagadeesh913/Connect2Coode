@@ -2,27 +2,21 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import {
   fetchUserProfile,
-  updateUserProfile,
+  fetchUserInfoThunk,
   saveUserInfoThunk,
 } from '../redux/profileSlice';
-import { profileService } from '../../../services/profileService';
-import { userQuestionService } from '../../../services/userQuestionService';
 import { institutionService } from '../../../services/institutionService';
-import type {
-  UserInfoData,
-  Institution,
-  SaveUserInfoPayload,
-} from '../../../core/types/domain';
+import type { Institution, SaveUserInfoPayload } from '../../../core/types/domain';
 import { getActionableErrorMessage } from '../../../core/validation';
 
 // Modals
 import { EditPersonalInfoModal } from '../components/modals/EditPersonalInfoModal';
 import { EditAcademicModal } from '../components/modals/EditAcademicModal';
-import { UploadPhotoModal } from '../components/modals/UploadPhotoModal';
 import { toast } from 'react-hot-toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload } from '../../../core/security/jwt';
+import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
 import { useTheme } from '../../../shared/context/ThemeContext';
@@ -49,24 +43,30 @@ export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { setTheme } = useTheme();
 
-  const { profile, loading: profileLoading, error: profileError } = useAppSelector((state) => state.profile);
-  const reduxUserInfo = useAppSelector((state) => state.profile.userInfo);
+  const {
+    profile,
+    userInfo,
+    loading: profileLoading,
+    userInfoLoading: academicLoading,
+    error: profileError,
+    userInfoError: academicError,
+  } = useAppSelector((state) => state.profile);
   const authUser = useAppSelector((state) => state.auth.user);
 
   // Modals state
   const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
   const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
-  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
-  // Local state for userInfo and institution (populated from backend API)
-  const [userInfo, setUserInfo] = useState<UserInfoData | null>(null);
+  // Institution display enrichment remains page-local; academic data lives in Redux.
   const [institution, setInstitution] = useState<Institution | null>(null);
 
-  // Live real question stats from backend API
-  const [liveSolvedCount, setLiveSolvedCount] = useState<number | null>(null);
-  const [liveAttemptedCount, setLiveAttemptedCount] = useState<number | null>(null);
-  const [currentStreak, setCurrentStreak] = useState<number>(0);
+  const {
+    solvedItems,
+    attemptedItems,
+    loading: activityLoading,
+    error: activityError,
+  } = useAppSelector((state) => state.progress);
 
   // Preferences local state
   const [emailNotifications, setEmailNotifications] = useState<boolean>(() => {
@@ -113,7 +113,6 @@ export const UserProfilePage: React.FC = () => {
 
   // Refs to guarantee profile and user-info are only fetched once per user session
   const hasFetchedProfileRef = useRef(false);
-  const fetchedUserIdRef = useRef<string | number | null>(null);
 
   // Calculate Streak from submission history
   const calculateStreak = (submissions: Array<{ submittedDate?: string }>): number => {
@@ -163,122 +162,32 @@ export const UserProfilePage: React.FC = () => {
     return streak;
   };
 
-  const [academicLoading, setAcademicLoading] = useState(false);
-  const [academicError, setAcademicError] = useState<string | null>(null);
-  const [activityLoading, setActivityLoading] = useState(false);
-  const [activityError, setActivityError] = useState<string | null>(null);
   const [sectionRetry, setSectionRetry] = useState(0);
 
   // Initial Data Fetching from real API
   useEffect(() => {
-    let active = true;
     if (!hasFetchedProfileRef.current) {
       hasFetchedProfileRef.current = true;
       void dispatch(fetchUserProfile());
     }
 
     if (effectiveUserId) {
-      fetchedUserIdRef.current = effectiveUserId;
-      setAcademicLoading(true);
-      setAcademicError(null);
-      void (async () => {
-        let cachedAcademic: any = null;
-        try {
-          const raw = localStorage.getItem(`c2c_user_academic_${effectiveUserId}`);
-          if (raw) cachedAcademic = JSON.parse(raw);
-        } catch {}
-
-        try {
-          const res = await profileService.getUserInfo(effectiveUserId);
-          if (!active) return;
-          if (res?.data) {
-            const merged = {
-              ...(cachedAcademic || {}),
-              ...res.data,
-            };
-            setUserInfo(merged);
-            try {
-              localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(merged));
-            } catch {}
-            return;
-          }
-        } catch {
-          if (active) setAcademicError('Unable to refresh academic details.');
-        } finally {
-          if (active) setAcademicLoading(false);
-        }
-
-        if (active && cachedAcademic) {
-          setUserInfo(cachedAcademic);
-        }
-      })();
-    }
-    return () => { active = false; };
-  }, [dispatch, effectiveUserId, sectionRetry]);
-
-  // Fetch real question statistics from live backend APIs
-  useEffect(() => {
-    if (!effectiveUserId) return;
-
-    let isMounted = true;
-
-    const fetchLiveStats = async () => {
-      setActivityLoading(true);
-      setActivityError(null);
       try {
-        const [solvedList, attemptedList] = await Promise.all([
-          userQuestionService.getSolvedQuestions(effectiveUserId),
-          userQuestionService.getAttemptedQuestions(effectiveUserId),
-        ]);
-
-        if (!isMounted) return;
-
-        if (Array.isArray(solvedList)) {
-          setLiveSolvedCount(solvedList.length);
-        }
-        if (Array.isArray(attemptedList)) {
-          setLiveAttemptedCount(attemptedList.length);
-
-          // Streak calculation from real user submission dates
-          const streak = calculateStreak(attemptedList as any);
-          setCurrentStreak(streak);
-        }
-      } catch {
-        if (isMounted) setActivityError('Unable to refresh activity. Previously saved progress is shown.');
-      } finally {
-        if (isMounted) setActivityLoading(false);
-      }
-    };
-
-    void fetchLiveStats();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [effectiveUserId, sectionRetry]);
-
-  // Synchronize Redux User Info when updated
-  useEffect(() => {
-    if (reduxUserInfo) {
-      let cachedAcademic: any = null;
-      if (effectiveUserId) {
-        try {
-          const raw = localStorage.getItem(`c2c_user_academic_${effectiveUserId}`);
-          if (raw) cachedAcademic = JSON.parse(raw);
-        } catch {}
-      }
-      const merged = {
-        ...(cachedAcademic || {}),
-        ...reduxUserInfo,
+        // Remove the legacy browser cache: academic records are server-owned.
+        localStorage.removeItem(`c2c_user_academic_${effectiveUserId}`);
+      } catch {}
+      const request = dispatch(
+        fetchUserInfoThunk({ userId: effectiveUserId, force: sectionRetry > 0 })
+      );
+      const progressRequest = dispatch(
+        hydrateProgress({ userId: effectiveUserId, force: sectionRetry > 0 })
+      );
+      return () => {
+        request.abort();
+        progressRequest.abort();
       };
-      setUserInfo(merged);
-      if (effectiveUserId) {
-        try {
-          localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(merged));
-        } catch {}
-      }
     }
-  }, [reduxUserInfo, effectiveUserId]);
+  }, [dispatch, effectiveUserId, sectionRetry]);
 
   // Synchronize institution from profile if available
   useEffect(() => {
@@ -324,49 +233,48 @@ export const UserProfilePage: React.FC = () => {
 
   // Handle Personal Info Submit
   const handleSavePersonalInfo = async (data: any) => {
+    if (!effectiveUserId) {
+      toast.error('Please log in to save personal information.');
+      dispatch(openAuthModal({ mode: 'login' }));
+      return;
+    }
+
+    const joinedYear = Number(userInfo?.joinedYear);
+    const passedOutYear = Number(userInfo?.passedOutYear);
+    if (
+      !userInfo?.regNumber?.trim() ||
+      !(userInfo?.college || userInfo?.collegeName)?.trim() ||
+      !Number.isInteger(joinedYear) ||
+      joinedYear <= 0 ||
+      !Number.isInteger(passedOutYear) ||
+      passedOutYear <= 0
+    ) {
+      toast.error('Complete your academic details before saving personal information.');
+      setIsPersonalModalOpen(false);
+      setIsAcademicModalOpen(true);
+      return;
+    }
+
     setSubmitting(true);
     try {
       await dispatch(
-        updateUserProfile({
-          fullName: data.fullName,
-          email: data.email,
-          bio: data.bio,
-          gender: data.gender?.refName || data.gender?.refCode || data.gender,
-          dob: data.dob,
+        saveUserInfoThunk({
+          userId: effectiveUserId,
+          payload: {
+            id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
+            userId: Number(effectiveUserId),
+            regNumber: userInfo.regNumber!.trim(),
+            joinedYear,
+            passedOutYear,
+            college: (userInfo.college || userInfo.collegeName)!.trim(),
+            collegeId: userInfo.collegeId !== undefined && userInfo.collegeId !== null ? String(userInfo.collegeId) : null,
+            bio: data.bio?.trim() || '',
+            gender: data.gender ?? null,
+            dob: data.dob || null,
+            jwtToken: tokenStorage.getAccessToken() || undefined,
+          },
         })
       ).unwrap();
-
-      // Keep backend userInfo in sync if user account is active
-      if (effectiveUserId && (userInfo?.regNumber || userInfo?.college || data.dob || data.gender)) {
-        try {
-          const currentYear = new Date().getFullYear();
-          const token = tokenStorage.getAccessToken();
-          const res = await dispatch(
-            saveUserInfoThunk({
-              userId: effectiveUserId,
-              payload: {
-                id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
-                userId: Number(effectiveUserId),
-                regNumber: userInfo?.regNumber || '',
-                joinedYear: Number(userInfo?.joinedYear) || currentYear - 2,
-                passedOutYear: Number(userInfo?.passedOutYear) || currentYear + 2,
-                college: userInfo?.college || userInfo?.collegeName || '',
-                collegeId: userInfo?.collegeId !== undefined && userInfo?.collegeId !== null ? String(userInfo.collegeId) : null,
-                bio: (data.bio !== undefined ? data.bio : userInfo?.bio) || '',
-                gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
-                dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
-                jwtToken: token || undefined,
-              },
-            })
-          ).unwrap();
-          if (res) {
-            setUserInfo(res);
-            try {
-              localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(res));
-            } catch {}
-          }
-        } catch {}
-      }
 
       toast.success('Personal information updated successfully.');
       setIsPersonalModalOpen(false);
@@ -391,7 +299,6 @@ export const UserProfilePage: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const currentYear = new Date().getFullYear();
       const token = tokenStorage.getAccessToken();
       const resolvedCollegeId =
         data.collegeId !== undefined && data.collegeId !== null && data.collegeId !== ''
@@ -404,8 +311,8 @@ export const UserProfilePage: React.FC = () => {
         id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
         userId: Number(effectiveUserId),
         regNumber: (data.regNumber || '').trim(),
-        joinedYear: Number(data.joinedYear) || currentYear - 2,
-        passedOutYear: Number(data.passedOutYear) || currentYear + 2,
+        joinedYear: Number(data.joinedYear),
+        passedOutYear: Number(data.passedOutYear),
         college: (data.college || '').trim(),
         collegeId: resolvedCollegeId,
         bio: (data.bio || '').trim(),
@@ -415,34 +322,12 @@ export const UserProfilePage: React.FC = () => {
       };
 
       // Direct unwrap: any backend error throws directly into catch block
-      const savedData = await dispatch(
+      await dispatch(
         saveUserInfoThunk({
           userId: effectiveUserId,
           payload,
         })
       ).unwrap();
-
-      const mergedUserInfo: UserInfoData = {
-        ...(userInfo || {}),
-        ...(savedData || {}),
-        id: savedData?.id ?? (userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null),
-        userId: Number(effectiveUserId),
-        regNumber: savedData?.regNumber ?? payload.regNumber,
-        joinedYear: savedData?.joinedYear ?? payload.joinedYear,
-        passedOutYear: savedData?.passedOutYear ?? payload.passedOutYear,
-        college: savedData?.college ?? savedData?.collegeName ?? payload.college,
-        collegeName: savedData?.collegeName ?? savedData?.college ?? payload.college,
-        collegeId: savedData?.collegeId ?? payload.collegeId ?? null,
-        bio: savedData?.bio ?? payload.bio,
-        gender: savedData?.gender ?? payload.gender ?? null,
-        dob: savedData?.dob ?? payload.dob ?? null,
-      };
-
-      setUserInfo(mergedUserInfo);
-
-      try {
-        localStorage.setItem(`c2c_user_academic_${effectiveUserId}`, JSON.stringify(mergedUserInfo));
-      } catch {}
 
       if (payload.college) {
         setInstitution((prev) => ({
@@ -456,41 +341,12 @@ export const UserProfilePage: React.FC = () => {
         } as Institution));
       }
 
-      await dispatch(
-        updateUserProfile({
-          collegeName: data.college,
-          bio: data.bio,
-        })
-      );
-
       toast.success('Academic details saved successfully.');
       setIsAcademicModalOpen(false);
     } catch (err: any) {
       const errorMsg = getActionableErrorMessage(
         err,
         'Unable to save academic details. Please try again.'
-      );
-      toast.error(errorMsg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Handle Avatar Change
-  const handleSaveAvatar = async (url: string) => {
-    setSubmitting(true);
-    try {
-      await dispatch(
-        updateUserProfile({
-          avatarUrl: url,
-        })
-      ).unwrap();
-      toast.success('Profile photo updated successfully.');
-      setIsPhotoModalOpen(false);
-    } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(
-        err,
-        'Unable to update profile photo. Please try again.'
       );
       toast.error(errorMsg);
     } finally {
@@ -544,11 +400,11 @@ export const UserProfilePage: React.FC = () => {
   };
 
   // Real live question statistics strictly from backend API (no mockups / fake fallbacks)
-  const realSolvedCount = liveSolvedCount !== null ? liveSolvedCount : 0;
-  const realAttemptedCount = liveAttemptedCount !== null ? liveAttemptedCount : 0;
+  const realSolvedCount = solvedItems.length;
+  const realAttemptedCount = attemptedItems.length;
   const realAccuracy =
     realAttemptedCount > 0 ? Math.round((realSolvedCount / realAttemptedCount) * 100) : 0;
-  const realStreak = currentStreak !== null ? currentStreak : 0;
+  const realStreak = calculateStreak(attemptedItems);
 
   // Real User Profile Values (Driven strictly from session & API)
   const fullName =
@@ -661,9 +517,10 @@ export const UserProfilePage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsPhotoModalOpen(true)}
-                  title="Upload Profile Picture"
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#1E3A8A] hover:bg-blue-800 text-white flex items-center justify-center shadow-md transition-transform hover:scale-110 cursor-pointer border-2 border-white dark:border-neutral-900"
+                  disabled
+                  title="Profile photo updates are not supported by the current API"
+                  aria-label="Profile photo updates are not supported by the current API"
+                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-500 text-white flex items-center justify-center shadow-md cursor-not-allowed border-2 border-white dark:border-neutral-900"
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -1076,14 +933,6 @@ export const UserProfilePage: React.FC = () => {
         submitting={submitting}
       />
 
-      {/* Upload Photo Modal */}
-      <UploadPhotoModal
-        isOpen={isPhotoModalOpen}
-        onClose={() => setIsPhotoModalOpen(false)}
-        onSaveAvatar={handleSaveAvatar}
-        currentAvatar={profile?.avatarUrl}
-        submitting={submitting}
-      />
     </div>
   );
 };

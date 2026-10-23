@@ -38,7 +38,15 @@ globalThis.localStorage = {
 
 // Import production bookmarkReducer and thunks
 const bookmarkModule = await import('../../src/features/bookmarks/redux/bookmarkSlice.ts');
-const { default: bookmarkReducer, fetchBookmarks, toggleBookmarkItem, clearBookmarks } = bookmarkModule;
+const { default: bookmarkReducer, fetchBookmarks, toggleBookmarkItem, clearBookmarks, isBookmarkItem } = bookmarkModule;
+const progressModule = await import('../../src/features/progress/redux/progressSlice.ts');
+const { default: progressReducer, hydrateProgress } = progressModule;
+const profileModule = await import('../../src/features/profile/redux/profileSlice.ts');
+const { default: profileReducer, fetchUserInfoThunk } = profileModule;
+const referenceModule = await import('../../src/features/references/redux/referenceSlice.ts');
+const { default: referenceReducer, fetchReferenceGroup } = referenceModule;
+const languageModule = await import('../../src/features/languages/redux/languageSlice.ts');
+const { default: languageReducer, fetchLanguages } = languageModule;
 
 describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & Automation', () => {
 
@@ -300,7 +308,7 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       const sampleBookmarks = [{ id: 'bm-t1', itemId: '404', type: 'PROBLEM', title: 'Problem 404', savedAt: '2026-04-04' }];
       state = bookmarkReducer(state, {
         type: toggleBookmarkItem.fulfilled.type,
-        payload: sampleBookmarks,
+        payload: { item: sampleBookmarks[0], removed: false },
       });
       assert.deepEqual(state.bookmarks, sampleBookmarks);
 
@@ -310,6 +318,121 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.deepEqual(state.bookmarks, []);
       assert.equal(state.loading, false);
       assert.equal(state.currentRequestId, null);
+    });
+
+    it('uses type plus itemId as bookmark identity so problem and aptitude IDs cannot collide', () => {
+      const problem = { id: 'p-1', itemId: '1', type: 'PROBLEM', title: 'Problem 1', savedAt: '2026-04-04' };
+      const aptitude = { id: 'a-1', itemId: '1', type: 'APTITUDE', title: 'Aptitude 1', savedAt: '2026-04-04' };
+
+      assert.equal(isBookmarkItem(problem, '1', 'PROBLEM'), true);
+      assert.equal(isBookmarkItem(problem, '1', 'APTITUDE'), false);
+
+      let state = bookmarkReducer(undefined, {
+        type: toggleBookmarkItem.fulfilled.type,
+        payload: { item: problem, removed: false },
+      });
+      state = bookmarkReducer(state, {
+        type: toggleBookmarkItem.fulfilled.type,
+        payload: { item: aptitude, removed: false },
+      });
+      assert.equal(state.bookmarks.length, 2);
+    });
+  });
+
+  describe('F-042: Server-Owned Admin Test Cases and Motion Accessibility', () => {
+    it('does not report an unsaved test-case mutation as a successful local save', () => {
+      const modalPath = path.resolve(process.cwd(), 'src/features/admin/components/questions/TestCaseModal.tsx');
+      const code = fs.readFileSync(modalPath, 'utf8');
+
+      assert.doesNotMatch(code, /userScopedStorage/, 'Admin test cases must not be persisted in browser storage');
+      assert.doesNotMatch(code, /Saved \$\{payload\.length\} test cases locally/, 'A failed API save must remain visibly failed');
+    });
+
+    it('does not override backend-owned question metadata or test cases from browser storage or fixtures', () => {
+      const questionPage = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/features/admin/pages/AdminQuestions.tsx'),
+        'utf8'
+      );
+      const resolver = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/features/admin/utils/testCaseUtils.ts'),
+        'utf8'
+      );
+
+      assert.doesNotMatch(questionPage, /userScopedStorage/, 'Admin question metadata must reflect the API response');
+      assert.doesNotMatch(resolver, /userScopedStorage|KNOWN_PROBLEM_TEST_CASES|admin_test_cases_/, 'Problem test cases must come from the API payload or visible problem content');
+    });
+
+    it('keeps submission history server-derived instead of mirroring execution data in browser storage', () => {
+      const problemDetails = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/features/problems/pages/ProblemDetails.tsx'),
+        'utf8'
+      );
+
+      assert.doesNotMatch(problemDetails, /userScopedStorage|submissions_\$\{activeQuestionId\}/, 'Submission history must be fetched from its API endpoint');
+      assert.match(problemDetails, /setSubmissionsRetry\(\(attempt\) => attempt \+ 1\)/, 'A completed submission must invalidate the live history query');
+    });
+
+    it('uses Framer Motion with reduced-motion support for admin modals', () => {
+      const modalPath = path.resolve(process.cwd(), 'src/features/admin/components/AdminModal.tsx');
+      const code = fs.readFileSync(modalPath, 'utf8');
+
+      assert.match(code, /AnimatePresence/, 'AdminModal must coordinate mount/unmount transitions');
+      assert.match(code, /useReducedMotion/, 'AdminModal must respect reduced-motion preferences');
+    });
+  });
+
+  describe('F-043: Redux User Scope and Request Ownership', () => {
+    it('ignores late progress responses from the previous authenticated user', () => {
+      let state = progressReducer(undefined, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-A', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-B', arg: { userId: 'B' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.fulfilled.type,
+        payload: { solved: { 1: true }, attempted: {}, userId: 'A', warning: null },
+        meta: { requestId: 'progress-A', arg: { userId: 'A' } },
+      });
+
+      assert.deepEqual(state.solvedByProblemId, {});
+      assert.equal(state.currentRequestId, 'progress-B');
+    });
+
+    it('ignores late academic-profile responses after a newer user owns the request', () => {
+      let state = profileReducer(undefined, {
+        type: fetchUserInfoThunk.pending.type,
+        meta: { requestId: 'profile-A', arg: { userId: 'A' } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserInfoThunk.pending.type,
+        meta: { requestId: 'profile-B', arg: { userId: 'B' } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserInfoThunk.fulfilled.type,
+        payload: { userId: 'A', data: { userId: 1, regNumber: 'A' } },
+        meta: { requestId: 'profile-A', arg: { userId: 'A' } },
+      });
+
+      assert.equal(state.userInfo, null);
+      assert.equal(state.userInfoRequestId, 'profile-B');
+    });
+
+    it('stores the academic payload rather than the thunk request wrapper', () => {
+      let state = profileReducer(undefined, {
+        type: fetchUserInfoThunk.pending.type,
+        meta: { requestId: 'profile-current', arg: { userId: 63 } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserInfoThunk.fulfilled.type,
+        payload: { userId: 63, data: { userId: 63, regNumber: 'C2C-63' } },
+        meta: { requestId: 'profile-current', arg: { userId: 63 } },
+      });
+
+      assert.equal(state.userInfo?.regNumber, 'C2C-63');
+      assert.equal('data' in state.userInfo, false);
     });
   });
 
@@ -364,6 +487,70 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
 
     it('disables SHOW_COMING_SOON when VITE_SHOW_COMING_SOON is explicitly set to false', () => {
       assert.equal(evaluateComingSoonFlag('false'), false);
+    });
+  });
+
+  describe('Reference and language Redux cache ownership', () => {
+    it('caches an API-confirmed empty reference group using the thunk timestamp', () => {
+      let state = referenceReducer(undefined, {
+        type: fetchReferenceGroup.pending.type,
+        meta: { requestId: 'ref-current', arg: 'topic' },
+      });
+      state = referenceReducer(state, {
+        type: fetchReferenceGroup.fulfilled.type,
+        payload: { groupCode: 'TOPIC', items: [], fetchedAt: 1234 },
+        meta: { requestId: 'ref-current', arg: 'topic' },
+      });
+
+      assert.deepEqual(state.groups.TOPIC, []);
+      assert.equal(state.lastFetchedAt.TOPIC, 1234);
+      assert.equal(state.loading.TOPIC, false);
+    });
+
+    it('ignores a stale reference response after a newer request takes ownership', () => {
+      let state = referenceReducer(undefined, {
+        type: fetchReferenceGroup.pending.type,
+        meta: { requestId: 'ref-old', arg: 'DIFF' },
+      });
+      state = referenceReducer(state, {
+        type: fetchReferenceGroup.pending.type,
+        meta: { requestId: 'ref-new', arg: { groupCode: 'DIFF', force: true } },
+      });
+      state = referenceReducer(state, {
+        type: fetchReferenceGroup.fulfilled.type,
+        payload: { groupCode: 'DIFF', items: [{ id: 1, refCode: 'OLD' }], fetchedAt: 1 },
+        meta: { requestId: 'ref-old', arg: 'DIFF' },
+      });
+
+      assert.equal(state.requestIds.DIFF, 'ref-new');
+      assert.equal(state.loading.DIFF, true);
+      assert.equal(state.groups.DIFF, undefined);
+    });
+
+    it('uses the language thunk timestamp and ignores superseded responses', () => {
+      let state = languageReducer(undefined, {
+        type: fetchLanguages.pending.type,
+        meta: { requestId: 'lang-old', arg: undefined },
+      });
+      state = languageReducer(state, {
+        type: fetchLanguages.pending.type,
+        meta: { requestId: 'lang-new', arg: { force: true } },
+      });
+      state = languageReducer(state, {
+        type: fetchLanguages.fulfilled.type,
+        payload: { items: [{ id: 1, name: 'Old' }], fetchedAt: 1 },
+        meta: { requestId: 'lang-old', arg: undefined },
+      });
+      assert.equal(state.currentRequestId, 'lang-new');
+      assert.deepEqual(state.languages, []);
+
+      state = languageReducer(state, {
+        type: fetchLanguages.fulfilled.type,
+        payload: { items: [], fetchedAt: 5678 },
+        meta: { requestId: 'lang-new', arg: { force: true } },
+      });
+      assert.deepEqual(state.languages, []);
+      assert.equal(state.lastFetchedAt, 5678);
     });
   });
 

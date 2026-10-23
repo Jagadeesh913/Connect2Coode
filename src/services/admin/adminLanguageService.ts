@@ -2,10 +2,9 @@ import { apiClient } from '../../core/api/apiClient';
 import { API_ENDPOINTS } from '../../core/api/endpoints';
 import { executionService } from '../executionService';
 import type { ApiResponse } from '../../core/types/api';
-import type { AdminLanguage, Language } from '../../core/types/domain';
+import type { AdminLanguage } from '../../core/types/domain';
 
 export type AdminLanguageItem = AdminLanguage;
-export type LanguageDropdownItem = Language;
 
 /**
  * Dedicated Admin Language Service Layer
@@ -13,35 +12,6 @@ export type LanguageDropdownItem = Language;
  * Base URL: /api/v1/language
  */
 export const adminLanguageService = {
-  /**
-   * GET /api/v1/language/dropdown & /language
-   * Fetches active languages with table IDs and reference IDs for code execution.
-   */
-  async getLanguageDropdown(): Promise<LanguageDropdownItem[]> {
-    return executionService.getLanguageDropdown();
-  },
-
-  /**
-   * GET /api/v1/language
-   * Fetches all registered languages (both active and inactive)
-   */
-  async getLanguages(): Promise<AdminLanguageItem[]> {
-    const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
-    const data = res?.data || res;
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
-  },
-
-  /**
-   * GET /api/v1/language/:id
-   * Fetches specific language entity for viewing or editing
-   */
-  async getLanguageById(id: number | string): Promise<AdminLanguageItem> {
-    const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.DETAILS(id));
-    return res?.data || res;
-  },
-
   /**
    * POST /api/v1/language
    * Registers a new language in the platform (without id)
@@ -52,7 +22,12 @@ export const adminLanguageService = {
     version?: string;
     isActive?: boolean;
   }): Promise<ApiResponse<AdminLanguageItem>> {
-    return apiClient.post(API_ENDPOINTS.LANGUAGE.BASE, payload);
+    const response: ApiResponse<AdminLanguageItem> = await apiClient.post(
+      API_ENDPOINTS.LANGUAGE.BASE,
+      payload
+    );
+    executionService.invalidateLanguageCache();
+    return response;
   },
 
   /**
@@ -66,7 +41,12 @@ export const adminLanguageService = {
     version?: string;
     isActive?: boolean;
   }): Promise<ApiResponse<AdminLanguageItem>> {
-    return apiClient.post(API_ENDPOINTS.LANGUAGE.BASE, payload);
+    const response: ApiResponse<AdminLanguageItem> = await apiClient.post(
+      API_ENDPOINTS.LANGUAGE.BASE,
+      payload
+    );
+    executionService.invalidateLanguageCache();
+    return response;
   },
 
   /**
@@ -74,7 +54,11 @@ export const adminLanguageService = {
    * Performs soft delete (sets isActive = false)
    */
   async deleteLanguage(id: number | string): Promise<ApiResponse<null>> {
-    return apiClient.delete(API_ENDPOINTS.LANGUAGE.DETAILS(id));
+    const response: ApiResponse<null> = await apiClient.delete(
+      API_ENDPOINTS.LANGUAGE.DETAILS(id)
+    );
+    executionService.invalidateLanguageCache();
+    return response;
   },
 };
 

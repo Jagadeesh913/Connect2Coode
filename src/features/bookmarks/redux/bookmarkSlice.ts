@@ -4,10 +4,12 @@ import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 
+export type BookmarkType = 'PROBLEM' | 'COMPANY' | 'APTITUDE';
+
 export interface BookmarkItem {
   id: string;
   itemId: string;
-  type: 'PROBLEM' | 'COMPANY' | 'APTITUDE';
+  type: BookmarkType;
   title: string;
   difficulty?: string;
   category?: string;
@@ -21,6 +23,7 @@ export interface BookmarkState {
   currentRequestId: string | null;
   activeUserId: string | number | null;
   lastFetchedAt: number | null;
+  pendingToggleKeys: Record<string, boolean>;
 }
 
 const LOCAL_STORAGE_KEY = 'myjo_bookmarks';
@@ -35,14 +38,6 @@ const loadBookmarksFromStorage = (): BookmarkItem[] => {
     console.error('Failed to load bookmarks from storage', e);
   }
   return [];
-};
-
-const saveBookmarksToStorage = (bookmarks: BookmarkItem[]) => {
-  try {
-    userScopedStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(bookmarks));
-  } catch (e) {
-    console.error('Failed to save bookmarks to storage', e);
-  }
 };
 
 const getInitialActiveUserId = (): string | number | null => {
@@ -61,14 +56,25 @@ const initialState: BookmarkState = {
   currentRequestId: null,
   activeUserId: getInitialActiveUserId(),
   lastFetchedAt: null,
+  pendingToggleKeys: {},
 };
 
+const getBookmarkKey = (itemId: string | number, type: BookmarkType): string =>
+  `${type}:${String(itemId)}`;
+
+export const isBookmarkItem = (
+  item: BookmarkItem,
+  itemId: string | number,
+  type: BookmarkType
+): boolean => item.type === type && String(item.itemId) === String(itemId);
+
 export const fetchBookmarks = createAsyncThunk<
-  { userId: string | number | null; bookmarks: BookmarkItem[] },
-  { force?: boolean } | boolean | void
+  { userId: string | number | null; bookmarks: BookmarkItem[]; fetchedAt: number; warning?: string },
+  { force?: boolean } | boolean | void,
+  { state: RootState }
 >(
   'bookmarks/fetchList',
-  async (_, { getState, rejectWithValue }) => {
+  async (_, { getState }) => {
     const local = loadBookmarksFromStorage();
     const state = getState() as RootState;
     const userId = state.auth?.user?.id;
@@ -94,16 +100,23 @@ export const fetchBookmarks = createAsyncThunk<
           return {
             userId,
             bookmarks: merged,
+            fetchedAt: Date.now(),
           };
         }
       } catch {
-        return rejectWithValue('Could not refresh bookmarks. Your saved data is still shown.');
+        return {
+          userId,
+          bookmarks: local,
+          fetchedAt: Date.now(),
+          warning: 'Could not refresh bookmarks. Your saved data is still shown.',
+        };
       }
     }
 
     return {
       userId: userId || null,
       bookmarks: local,
+      fetchedAt: Date.now(),
     };
   },
   {
@@ -129,22 +142,27 @@ export const fetchBookmarks = createAsyncThunk<
   }
 );
 
-export const toggleBookmarkItem = createAsyncThunk(
+export const toggleBookmarkItem = createAsyncThunk<
+  { item: BookmarkItem; removed: boolean },
+  {
+    itemId: string;
+    type?: BookmarkType;
+    title?: string;
+    difficulty?: string;
+    category?: string;
+  },
+  { state: RootState; rejectValue: string }
+>(
   'bookmarks/toggle',
   async (
-    payload: {
-      itemId: string;
-      type?: 'PROBLEM' | 'COMPANY' | 'APTITUDE';
-      title?: string;
-      difficulty?: string;
-      category?: string;
-    },
+    payload,
     { getState, rejectWithValue }
   ) => {
     const { itemId, type = 'PROBLEM', title, difficulty, category } = payload;
     const state = getState() as RootState;
     const current = state.bookmarks.bookmarks;
-    const exists = current.some((b) => b.itemId === itemId);
+    const existing = current.find((b) => isBookmarkItem(b, itemId, type));
+    const exists = Boolean(existing);
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
 
@@ -165,25 +183,25 @@ export const toggleBookmarkItem = createAsyncThunk(
       }
     }
 
-    // On successful server sync or for local unauthenticated usage, update state & storage
-    let updated: BookmarkItem[];
-    if (exists) {
-      updated = current.filter((b) => b.itemId !== itemId);
-    } else {
-      const newItem: BookmarkItem = {
-        id: `bm-${Date.now()}`,
-        itemId,
-        type,
-        title: title || itemId,
-        difficulty,
-        category,
-        savedAt: new Date().toISOString(),
-      };
-      updated = [newItem, ...current];
-    }
-
-    saveBookmarksToStorage(updated);
-    return updated;
+    return {
+      removed: exists,
+      item:
+        existing || {
+          id: `bm-${type.toLowerCase()}-${itemId}`,
+          itemId,
+          type,
+          title: title || itemId,
+          difficulty,
+          category,
+          savedAt: new Date().toISOString(),
+        },
+    };
+  },
+  {
+    condition: (payload, { getState }) => {
+      const type = payload.type || 'PROBLEM';
+      return !getState().bookmarks.pendingToggleKeys[getBookmarkKey(payload.itemId, type)];
+    },
   }
 );
 
@@ -196,9 +214,8 @@ const bookmarkSlice = createSlice({
     },
     clearBookmarks(state) {
       state.currentRequestId = null;
-      state.activeUserId = getInitialActiveUserId();
       state.bookmarks = [];
-      saveBookmarksToStorage([]);
+      state.pendingToggleKeys = {};
       state.loading = false;
       state.error = null;
     },
@@ -217,17 +234,10 @@ const bookmarkSlice = createSlice({
           return;
         }
 
-        const bookmarks = Array.isArray(action.payload)
-          ? action.payload
-          : action.payload?.bookmarks || [];
-        const targetUserId =
-          !Array.isArray(action.payload) && action.payload?.userId !== undefined
-            ? action.payload.userId
-              ? String(action.payload.userId)
-              : null
-            : state.activeUserId
-            ? String(state.activeUserId)
-            : null;
+        const bookmarks = action.payload.bookmarks;
+        const targetUserId = action.payload.userId
+          ? String(action.payload.userId)
+          : null;
         const currentActiveUserId = state.activeUserId ? String(state.activeUserId) : null;
 
         if (targetUserId !== currentActiveUserId) {
@@ -238,8 +248,8 @@ const bookmarkSlice = createSlice({
         state.loading = false;
         state.currentRequestId = null;
         state.bookmarks = bookmarks;
-        state.lastFetchedAt = Date.now();
-        saveBookmarksToStorage(bookmarks);
+        state.lastFetchedAt = action.payload.fetchedAt;
+        state.error = action.payload.warning || null;
       })
       .addCase(fetchBookmarks.rejected, (state, action) => {
         const isCurrent = state.currentRequestId === action.meta.requestId;
@@ -253,11 +263,28 @@ const bookmarkSlice = createSlice({
         if (action.meta.aborted) return;
         state.error = (action.payload as string) || action.error.message || 'Failed to fetch bookmarks';
       })
+      .addCase(toggleBookmarkItem.pending, (state, action) => {
+        const type = action.meta.arg.type || 'PROBLEM';
+        state.pendingToggleKeys[getBookmarkKey(action.meta.arg.itemId, type)] = true;
+        state.error = null;
+      })
       .addCase(toggleBookmarkItem.fulfilled, (state, action) => {
-        state.bookmarks = action.payload;
+        const { item, removed } = action.payload;
+        const key = getBookmarkKey(item.itemId, item.type);
+        delete state.pendingToggleKeys[key];
+        if (removed) {
+          state.bookmarks = state.bookmarks.filter(
+            (bookmark) => !isBookmarkItem(bookmark, item.itemId, item.type)
+          );
+        } else if (!state.bookmarks.some((bookmark) => isBookmarkItem(bookmark, item.itemId, item.type))) {
+          state.bookmarks.unshift(item);
+        }
         state.error = null;
       })
       .addCase(toggleBookmarkItem.rejected, (state, action) => {
+        const type = action.meta.arg.type || 'PROBLEM';
+        delete state.pendingToggleKeys[getBookmarkKey(action.meta.arg.itemId, type)];
+        if (action.meta.condition) return;
         state.error = (action.payload as string) || 'Failed to toggle bookmark';
       })
       // Reset and re-scope bookmarks on auth lifecycle events (logout, login) (F-010)
@@ -268,7 +295,8 @@ const bookmarkSlice = createSlice({
         (state) => {
           state.currentRequestId = null;
           state.activeUserId = null;
-          state.bookmarks = loadBookmarksFromStorage();
+          state.bookmarks = [];
+          state.pendingToggleKeys = {};
           state.loading = false;
           state.error = null;
         }
@@ -278,21 +306,27 @@ const bookmarkSlice = createSlice({
           action.type === 'auth/login/fulfilled' ||
           action.type === 'auth/loginWithGoogleRefreshToken/fulfilled' ||
           action.type === 'auth/refreshSession/fulfilled' ||
-          action.type === 'auth/silentRefresh/fulfilled',
+          action.type === 'auth/silentRefresh/fulfilled' ||
+          action.type === 'auth/setAuthenticatedSession',
         (state, action: any) => {
           state.currentRequestId = null;
-          state.activeUserId = action.payload?.id ?? action.payload?.user?.id ?? null;
-          state.bookmarks = loadBookmarksFromStorage();
+          state.activeUserId =
+            action.payload?.user?.id ?? action.payload?.id ?? state.activeUserId;
+          state.bookmarks = [];
+          state.pendingToggleKeys = {};
           state.loading = false;
           state.error = null;
         }
       )
       .addMatcher(
         (action) => action.type === 'auth/initializeAuth',
-        (state) => {
+        (state, action: any) => {
           state.currentRequestId = null;
-          state.activeUserId = getInitialActiveUserId();
-          state.bookmarks = loadBookmarksFromStorage();
+          const nextUserId = action.payload?.savedUser?.id ?? null;
+          const isSameScope = String(state.activeUserId ?? '') === String(nextUserId ?? '');
+          state.activeUserId = nextUserId;
+          if (!isSameScope) state.bookmarks = [];
+          state.pendingToggleKeys = {};
           state.loading = false;
           state.error = null;
         }

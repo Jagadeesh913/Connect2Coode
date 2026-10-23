@@ -336,6 +336,7 @@ const companySlice = createSlice({
         if (state.companyProblemsRequestKey !== normalizeProblemLookup(action.meta.arg).key) state.companyProblems = [];
         state.error = null;
         state.companyProblemsLoading = true;
+        state.loading = true;
         state.companyProblemsRequestKey = normalizeProblemLookup(action.meta.arg).key;
         state.companyProblemsRequestId = action.meta.requestId;
       })
@@ -346,12 +347,14 @@ const companySlice = createSlice({
         if (state.companyProblemsRequestId === action.meta.requestId) {
           state.companyProblems = problems;
           state.companyProblemsLoading = false;
+          state.loading = state.listLoading || state.detailsLoading;
           state.companyProblemsRequestId = null;
         }
       })
       .addCase(fetchCompanyProblems.rejected, (state, action) => {
         if (state.companyProblemsRequestId === action.meta.requestId) {
           state.companyProblemsLoading = false;
+          state.loading = state.listLoading || state.detailsLoading;
           state.companyProblemsRequestId = null;
           if (!action.meta.aborted) {
             state.problemsError = state.error = (action.payload as string) || action.error.message || 'Failed to fetch company problems';

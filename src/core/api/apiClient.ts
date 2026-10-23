@@ -1,6 +1,7 @@
 import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
 import { isTokenValid } from '../security/jwt';
+import { publishAuthSessionEvent } from '../security/authSessionSync';
 
 /**
  * Resolves and normalizes the API base URL.
@@ -12,7 +13,6 @@ import { isTokenValid } from '../security/jwt';
  *   to production 'https://api.connect2code.in/api/v1'.
  */
 export const BACKEND_ORIGIN = 'https://api.connect2code.in';
-export const RENDER_BACKEND_ORIGIN = BACKEND_ORIGIN;
 export const DEFAULT_API_BASE_URL = 'https://api.connect2code.in/api/v1';
 
 export const resolveApiBaseUrl = (rawUrl?: string | null): string => {
@@ -173,6 +173,7 @@ export const executeRefreshToken = async (): Promise<string> => {
         if (newRefreshToken) {
           tokenStorage.setRefreshToken(newRefreshToken);
         }
+        publishAuthSessionEvent('session-updated');
         notifyAuthListeners(newAccessToken, tokenData);
         return newAccessToken;
       } else {
@@ -191,10 +192,31 @@ export const executeRefreshToken = async (): Promise<string> => {
 };
 
 // Request Interceptor: Attach Access Token & Proactively Refresh if Expired
+/**
+ * Recursively removes duplicate/invalid 'token' and 'jwttoken' fields at any depth
+ * within objects and arrays. Only 'jwtToken' is permitted as the valid field.
+ */
+function purgeDuplicateTokenFields(obj: any): void {
+  if (!obj || typeof obj !== 'object' || obj instanceof FormData) return;
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      purgeDuplicateTokenFields(item);
+    }
+    return;
+  }
+  for (const key of Object.keys(obj)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'token' || (lowerKey === 'jwttoken' && key !== 'jwtToken') || lowerKey === 'jwt_token') {
+      delete obj[key];
+    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+      purgeDuplicateTokenFields(obj[key]);
+    }
+  }
+}
+
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const reqUrl = config.url || '';
-
     const isPublicAuthEndpoint =
       reqUrl.includes('/auth/login') ||
       reqUrl.includes('/signUp') ||
@@ -221,32 +243,44 @@ apiClient.interceptors.request.use(
       }
       config.headers['Authorization'] = `Bearer ${token}`;
       config.headers['authorization'] = `Bearer ${token}`;
+    }
 
-      // Ensure token is NEVER sent in URL query parameters
-      if (config.params && 'token' in config.params) {
-        delete config.params.token;
+    // Parameter protection: Ensure token is NEVER sent in URL query parameters
+    if (config.params && typeof config.params === 'object') {
+      for (const key of Object.keys(config.params)) {
+        const lowerKey = key.toLowerCase();
+        if (lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token') {
+          delete config.params[key];
+        }
       }
+    }
 
-      // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
-      const method = (config.method || 'get').toLowerCase();
-      if (['post', 'put', 'patch', 'delete'].includes(method)) {
+    // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
+    // and strictly guarantee duplicate/invalid 'token' field is removed across each and every API call
+    const method = (config.method || 'get').toLowerCase();
+    if (['post', 'put', 'patch', 'delete'].includes(method)) {
+      if (typeof config.data === 'string') {
+        try {
+          const parsed = JSON.parse(config.data);
+          if (parsed && typeof parsed === 'object') {
+            purgeDuplicateTokenFields(parsed);
+            if (token && !isPublicAuthEndpoint && !parsed.jwtToken && !Array.isArray(parsed)) {
+              parsed.jwtToken = token;
+            }
+            config.data = JSON.stringify(parsed);
+          }
+        } catch {}
+      } else {
         if (!config.data && method !== 'delete') {
           config.data = {};
         }
         if (
           config.data &&
           typeof config.data === 'object' &&
-          !Array.isArray(config.data) &&
           !(config.data instanceof FormData)
         ) {
-          // Ensure only jwtToken is sent in request bodies; remove duplicate/invalid token fields
-          if ('token' in config.data) {
-            delete config.data.token;
-          }
-          if ('jwttoken' in config.data) {
-            delete config.data.jwttoken;
-          }
-          if (!config.data.jwtToken) {
+          purgeDuplicateTokenFields(config.data);
+          if (token && !isPublicAuthEndpoint && !config.data.jwtToken && !Array.isArray(config.data)) {
             config.data.jwtToken = token;
           }
         }

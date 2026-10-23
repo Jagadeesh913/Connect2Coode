@@ -247,6 +247,7 @@ export interface CodeExecutionPayload {
   questionId: number;
   languageId: number;
   sourceCode: string;
+  customInput?: string;
 }
 
 export interface ExecutionTestCaseResult {
@@ -397,11 +398,17 @@ export interface AdminCreateMcqPayload {
   question: string;
   explanation?: string;
   isActive?: boolean;
+  correctOption?: string | null;
+  correctAnswer?: string | null;
+  answer?: string | null;
   options: Array<{
     id?: number;
+    optionId?: number;
     optionLabel: string;
     optionText: string;
     isCorrect: boolean;
+    correct?: boolean;
+    is_correct?: boolean;
   }>;
 }
 

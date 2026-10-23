@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchCompanyBySlug, fetchCompanyProblems } from '../redux/companySlice';
 import { CompanyDetailsSkeleton, TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
+import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { toast } from 'react-hot-toast';
 import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
@@ -305,6 +305,7 @@ export const CompanyDetails: React.FC = () => {
       dispatch(openAuthModal({ mode: 'login' }));
       return;
     }
+    const wasBookmarked = bookmarks.some((b) => isBookmarkItem(b, q.id, 'PROBLEM'));
     dispatch(
       toggleBookmarkItem({
         itemId: String(q.id),
@@ -313,8 +314,10 @@ export const CompanyDetails: React.FC = () => {
         difficulty: q.difficulty,
         category: q.topic || company?.name || '',
       })
-    );
-    toast.success('Bookmark updated');
+    )
+      .unwrap()
+      .then(() => toast.success(wasBookmarked ? 'Bookmark removed' : 'Problem bookmarked!'))
+      .catch((err: unknown) => toast.error(typeof err === 'string' ? err : 'Failed to update bookmark'));
   };
 
   const handleMcqBookmarkToggle = (q: McqQuestion, e: React.MouseEvent) => {
@@ -324,7 +327,7 @@ export const CompanyDetails: React.FC = () => {
       dispatch(openAuthModal({ mode: 'login' }));
       return;
     }
-    const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(q.id));
+    const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, q.id, 'APTITUDE'));
     dispatch(
       toggleBookmarkItem({
         itemId: String(q.id),
@@ -333,12 +336,10 @@ export const CompanyDetails: React.FC = () => {
         difficulty: q.difficultyRefName || q.difficultyRefCode || 'Medium',
         category: q.topicRefName || q.topicRefCode || company?.name || 'Aptitude',
       })
-    );
-    if (isBookmarked) {
-      toast.success('Question removed from bookmarks');
-    } else {
-      toast.success('Question added to bookmarks');
-    }
+    )
+      .unwrap()
+      .then(() => toast.success(isBookmarked ? 'Question removed from bookmarks' : 'Question added to bookmarks'))
+      .catch((err: unknown) => toast.error(typeof err === 'string' ? err : 'Failed to update bookmark'));
   };
 
   const handleOpenSolveModal = (mcq: McqQuestion) => {
@@ -753,7 +754,7 @@ export const CompanyDetails: React.FC = () => {
                   ) : (
                     filteredProblems.map((problem, index) => {
                       const isSolved = Boolean(solvedByProblemId[problem.id]);
-                      const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(problem.id));
+                      const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, problem.id, 'PROBLEM'));
                       const diff = problem.difficulty?.toLowerCase();
 
                       return (
@@ -895,7 +896,7 @@ export const CompanyDetails: React.FC = () => {
                     </tr>
                   ) : (
                     filteredMcqs.map((mcq, index) => {
-                      const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(mcq.id));
+                      const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, mcq.id, 'APTITUDE'));
                       const diff = getMcqDifficultyLabel(mcq);
 
                       return (
@@ -1038,7 +1039,7 @@ export const CompanyDetails: React.FC = () => {
                 >
                   <i
                     className={`text-sm ${
-                      bookmarks.some((b) => String(b.itemId) === String(activeSolveMcq.id))
+                      bookmarks.some((b) => isBookmarkItem(b, activeSolveMcq.id, 'APTITUDE'))
                         ? 'fa-solid fa-bookmark text-amber-500'
                         : 'fa-regular fa-bookmark'
                     }`}

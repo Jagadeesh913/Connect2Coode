@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { fetchBookmarks, toggleBookmarkItem } from '../redux/bookmarkSlice';
+import { fetchBookmarks, toggleBookmarkItem, type BookmarkType } from '../redux/bookmarkSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Badge } from '../../../shared/components/ui/Badge';
@@ -27,8 +27,8 @@ export const BookmarksList: React.FC = () => {
 
   const isBookmarksLoading = (loading || !hasFetchedOnce) && bookmarks.length === 0;
 
-  const handleRemove = (itemId: string) => {
-    dispatch(toggleBookmarkItem({ itemId }))
+  const handleRemove = (itemId: string, type: BookmarkType) => {
+    dispatch(toggleBookmarkItem({ itemId, type }))
       .unwrap()
       .then(() => {
         toast.success('Bookmark removed');
@@ -145,7 +145,7 @@ export const BookmarksList: React.FC = () => {
                     <i className="fa-solid fa-arrow-up-right-from-square"></i>
                   </Link>
                   <button
-                    onClick={() => handleRemove(bm.itemId)}
+                    onClick={() => handleRemove(bm.itemId, bm.type)}
                     className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors text-sm cursor-pointer"
                     title="Remove bookmark"
                   >

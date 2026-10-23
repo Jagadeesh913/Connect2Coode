@@ -1,5 +1,8 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminBadge } from '../components/AdminBadge';
 import { AdminModal } from '../components/AdminModal';
@@ -7,13 +10,15 @@ import { AdminTable, Column } from '../components/AdminTable';
 import {
   adminLanguageService,
   AdminLanguageItem,
-  LanguageDropdownItem,
 } from '../../../services/admin/adminLanguageService';
-import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { toast } from 'react-hot-toast';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
-import { getActionableErrorMessage } from '../../../core/validation';
+import {
+  adminLanguageSchema,
+  type AdminLanguageFormData,
+  getActionableErrorMessage,
+} from '../../../core/validation';
 import {
   Languages,
   Plus,
@@ -24,129 +29,111 @@ import {
   CheckCircle2,
   Code2,
 } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { fetchLanguages, invalidateLanguages } from '../../languages/redux/languageSlice';
 
 export const AdminLanguages: React.FC = () => {
-  const [languages, setLanguages] = useState<AdminLanguageItem[]>([]);
-  const [activeDropdown, setActiveDropdown] = useState<LanguageDropdownItem[]>([]);
-  const [refLanguages, setRefLanguages] = useState<ReferenceItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-
+  const dispatch = useAppDispatch();
+  const { languages: activeDropdown, loading: dropdownLoading, error: dropdownError } =
+    useAppSelector((state) => state.languages);
+  const languages: AdminLanguageItem[] = activeDropdown.map((language) => ({
+    id: language.id,
+    referenceId: Number(language.referenceId) || 0,
+    languageName: language.languageName || language.name,
+    judge0LanguageId: Number(language.judge0LanguageId) || 0,
+    version: language.version,
+    isActive: language.isActive,
+  }));
+  const {
+    items: refLanguages,
+    loading: refsLoading,
+    error: refsError,
+    retry: retryRefs,
+  } = useReferenceGroup('LANG');
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingLanguage, setEditingLanguage] = useState<AdminLanguageItem | null>(null);
-  const [formReferenceId, setFormReferenceId] = useState<number>(5);
-  const [formJudge0Id, setFormJudge0Id] = useState<number>(62);
-  const [formVersion, setFormVersion] = useState<string>('Java 17');
-  const [formIsActive, setFormIsActive] = useState<boolean>(true);
-  const [formErrors, setFormErrors] = useState<{ referenceId?: string; judge0Id?: string }>({});
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors: formErrors },
+  } = useForm<z.input<typeof adminLanguageSchema>, unknown, AdminLanguageFormData>({
+    resolver: zodResolver(adminLanguageSchema),
+    defaultValues: {
+      referenceId: 0,
+      judge0LanguageId: 0,
+      version: '',
+      isActive: true,
+    },
+  });
 
   // Deactivate confirmation state
   const [languageToDeactivate, setLanguageToDeactivate] = useState<AdminLanguageItem | null>(null);
   const [submittingDeactivation, setSubmittingDeactivation] = useState<boolean>(false);
 
-  const requestSequence = useRef(0);
-  const fetchLanguagesData = useCallback(async () => {
-    const requestId = ++requestSequence.current;
-    setLoading(true);
-    setError(null);
-    try {
-      const [langs, drop, refs] = await Promise.allSettled([
-        adminLanguageService.getLanguages(),
-        adminLanguageService.getLanguageDropdown(),
-        referenceService.getByGroupCode('LANG'),
-      ]);
-
-      if (requestId !== requestSequence.current) return;
-      if ([langs, drop, refs].some((result) => result.status === 'rejected')) setError('Some language data could not be loaded. Retry to refresh the registry and options.');
-      if (langs.status === 'fulfilled') {
-        const list = Array.isArray(langs.value) ? langs.value : [];
-        setLanguages(list);
-      }
-      if (drop.status === 'fulfilled') {
-        const dropList = Array.isArray(drop.value) ? drop.value : [];
-        setActiveDropdown(dropList);
-      }
-      if (refs.status === 'fulfilled') {
-        const refList = refs.value?.data || (Array.isArray(refs.value) ? refs.value : []);
-        if (Array.isArray(refList)) setRefLanguages(refList);
-      }
-    } catch {
-      toast.error('Failed to load language data.');
-    } finally {
-      if (requestId === requestSequence.current) setLoading(false);
-    }
-  }, []);
-
-  const invalidateLanguageRequests = useCallback(() => {
-    requestSequence.current += 1;
-  }, []);
-
   useEffect(() => {
-    fetchLanguagesData();
-    return invalidateLanguageRequests;
-  }, [fetchLanguagesData, invalidateLanguageRequests]);
+    void dispatch(fetchLanguages());
+  }, [dispatch]);
+
+  const pageLoading = dropdownLoading || refsLoading;
+  const pageError = dropdownError || refsError;
+  const handleRetry = useCallback(() => {
+    void dispatch(fetchLanguages({ force: true }));
+    void retryRefs();
+  }, [dispatch, retryRefs]);
 
   const handleOpenCreateModal = () => {
     setEditingLanguage(null);
-    setFormReferenceId(refLanguages[0]?.id || 5);
-    setFormJudge0Id(62);
-    setFormVersion('Java 17');
-    setFormIsActive(true);
-    setFormErrors({});
+    reset({
+      referenceId: Number(refLanguages[0]?.id) || 0,
+      judge0LanguageId: 0,
+      version: '',
+      isActive: true,
+    });
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (lang: AdminLanguageItem) => {
     setEditingLanguage(lang);
-    setFormReferenceId(lang.referenceId || 5);
-    setFormJudge0Id(lang.judge0LanguageId || 62);
-    setFormVersion(lang.version || '');
-    setFormIsActive(lang.isActive !== false);
-    setFormErrors({});
+    reset({
+      id: lang.id,
+      referenceId: lang.referenceId || 0,
+      judge0LanguageId: lang.judge0LanguageId || 0,
+      version: lang.version || '',
+      isActive: lang.isActive !== false,
+    });
     setIsModalOpen(true);
   };
 
-  const handleSaveLanguage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const errors: { referenceId?: string; judge0Id?: string } = {};
-    if (!formReferenceId || isNaN(formReferenceId) || formReferenceId <= 0) {
-      errors.referenceId = 'Select a valid language from the list.';
-    }
-    if (!formJudge0Id || isNaN(formJudge0Id) || formJudge0Id <= 0) {
-      errors.judge0Id = 'Enter a valid numeric Judge0 Language ID.';
-    }
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors);
-      return;
-    }
-    setFormErrors({});
-
+  const handleSaveLanguage = async (data: AdminLanguageFormData) => {
     setSubmitting(true);
     try {
       if (editingLanguage && editingLanguage.id) {
         // Update Language (POST /api/v1/language with id)
         await adminLanguageService.updateLanguage({
           id: editingLanguage.id,
-          referenceId: Number(formReferenceId),
-          judge0LanguageId: Number(formJudge0Id),
-          version: formVersion.trim() || undefined,
-          isActive: formIsActive,
+          referenceId: data.referenceId,
+          judge0LanguageId: data.judge0LanguageId,
+          version: data.version?.trim() || undefined,
+          isActive: data.isActive,
         });
         toast.success(`Language #${editingLanguage.id} updated successfully!`);
       } else {
         // Create Language (POST /api/v1/language without id)
         await adminLanguageService.createLanguage({
-          referenceId: Number(formReferenceId),
-          judge0LanguageId: Number(formJudge0Id),
-          version: formVersion.trim() || undefined,
-          isActive: formIsActive,
+          referenceId: data.referenceId,
+          judge0LanguageId: data.judge0LanguageId,
+          version: data.version?.trim() || undefined,
+          isActive: data.isActive,
         });
         toast.success('Language registered successfully!');
       }
       setIsModalOpen(false);
-      fetchLanguagesData();
+      dispatch(invalidateLanguages());
+      void dispatch(fetchLanguages({ force: true }));
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save language.'));
     } finally {
@@ -161,7 +148,8 @@ export const AdminLanguages: React.FC = () => {
       await adminLanguageService.deleteLanguage(languageToDeactivate.id);
       toast.success(`Language #${languageToDeactivate.id} deactivated successfully.`);
       setLanguageToDeactivate(null);
-      fetchLanguagesData();
+      dispatch(invalidateLanguages());
+      void dispatch(fetchLanguages({ force: true }));
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to deactivate language.'));
     } finally {
@@ -275,12 +263,12 @@ export const AdminLanguages: React.FC = () => {
               <span>Register Language</span>
             </button>
             <button
-              onClick={fetchLanguagesData}
-              disabled={loading}
+              onClick={handleRetry}
+              disabled={pageLoading}
               className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
               title="Refresh Data"
             >
-              <RotateCw className={`w-4 h-4 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+              <RotateCw className={`w-4 h-4 ${pageLoading ? 'animate-spin text-blue-500' : ''}`} />
             </button>
           </div>
         }
@@ -323,11 +311,11 @@ export const AdminLanguages: React.FC = () => {
       </div>
 
       {/* Languages Table */}
-      <RequestStatus pending={loading} error={error} onRetry={fetchLanguagesData} label="Loading language registry…" />
+      <RequestStatus pending={pageLoading} error={pageError} onRetry={handleRetry} label="Loading language registry…" />
       <AdminTable<AdminLanguageItem>
         columns={columns}
         data={languages}
-        loading={loading}
+        loading={pageLoading}
         keyExtractor={(row) => row.id || `${row.referenceId}-${row.judge0LanguageId}`}
         emptyTitle="No Languages Found"
         emptyDescription="There are currently no languages registered in the platform database."
@@ -362,8 +350,8 @@ export const AdminLanguages: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={handleSaveLanguage}
-              disabled={submitting}
+              onClick={handleSubmit(handleSaveLanguage)}
+              disabled={submitting || refLanguages.length === 0}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
             >
               {submitting ? 'Saving...' : editingLanguage ? 'Update Language' : 'Register'}
@@ -371,26 +359,27 @@ export const AdminLanguages: React.FC = () => {
           </div>
         }
       >
-        <form onSubmit={handleSaveLanguage} className="space-y-4 font-sans text-left">
+        <form onSubmit={handleSubmit(handleSaveLanguage)} className="space-y-4 font-sans text-left">
           {/* Reference Language Select */}
           <div className="space-y-1.5">
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Reference Language <span className="text-rose-500">*</span>
             </label>
             <select
-              value={formReferenceId}
-              onChange={(e) => setFormReferenceId(Number(e.target.value))}
-              disabled={submitting}
+              {...register('referenceId', { valueAsNumber: true })}
+              disabled={submitting || refLanguages.length === 0}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
+              <option value={0} disabled>
+                {refsLoading ? 'Loading languages…' : 'Select a language'}
+              </option>
               {refLanguages.map((ref) => (
                 <option key={ref.id} value={ref.id}>
                   {ref.refName} ({ref.refCode})
                 </option>
               ))}
-              {refLanguages.length === 0 && <option value="5">Java (5)</option>}
             </select>
-            <FormFieldError error={formErrors.referenceId} />
+            <FormFieldError error={formErrors.referenceId?.message} />
           </div>
 
           {/* Judge0 Language ID */}
@@ -400,8 +389,7 @@ export const AdminLanguages: React.FC = () => {
             </label>
             <input
               type="number"
-              value={formJudge0Id}
-              onChange={(e) => setFormJudge0Id(Number(e.target.value))}
+              {...register('judge0LanguageId', { valueAsNumber: true })}
               placeholder="e.g. 62 for Java 17, 71 for Python 3"
               disabled={submitting}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
@@ -409,7 +397,7 @@ export const AdminLanguages: React.FC = () => {
             <span className="text-[11px] text-slate-400">
               Corresponds to Judge0 CE language ID mapping.
             </span>
-            <FormFieldError error={formErrors.judge0Id} />
+            <FormFieldError error={formErrors.judge0LanguageId?.message} />
           </div>
 
           {/* Version */}
@@ -419,8 +407,7 @@ export const AdminLanguages: React.FC = () => {
             </label>
             <input
               type="text"
-              value={formVersion}
-              onChange={(e) => setFormVersion(e.target.value)}
+              {...register('version')}
               placeholder="e.g. OpenJDK 17, Python 3.10"
               disabled={submitting}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -432,8 +419,7 @@ export const AdminLanguages: React.FC = () => {
             <input
               type="checkbox"
               id="lang-is-active"
-              checked={formIsActive}
-              onChange={(e) => setFormIsActive(e.target.checked)}
+              {...register('isActive')}
               className="w-4 h-4 text-blue-600 rounded-md border-slate-300 dark:border-slate-700 focus:ring-blue-500 cursor-pointer"
             />
             <label

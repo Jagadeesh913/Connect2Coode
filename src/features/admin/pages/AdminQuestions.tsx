@@ -12,11 +12,9 @@ import { AdminCodeTestModal } from '../components/questions/AdminCodeTestModal';
 import { QuestionPayload, QuestionTestCase } from '../../../services/questionService';
 import { adminQuestionService } from '../../../services/admin/adminQuestionService';
 import { adminCompanyService } from '../../../services/admin/adminCompanyService';
-import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
-import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import {
   Plus,
   RotateCw,
@@ -26,6 +24,7 @@ import {
   Layers,
   Terminal,
 } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 export const AdminQuestions: React.FC = () => {
   const [questions, setQuestions] = useState<QuestionPayload[]>([]);
@@ -45,9 +44,9 @@ export const AdminQuestions: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Reference Library & Companies Data for Filters
-  const [difficulties, setDifficulties] = useState<ReferenceItem[]>([]);
-  const [topics, setTopics] = useState<ReferenceItem[]>([]);
-  const [qpfs, setQpfs] = useState<ReferenceItem[]>([]);
+  const { items: difficulties } = useReferenceGroup('DIFF');
+  const { items: topics } = useReferenceGroup('TOPIC');
+  const { items: qpfs } = useReferenceGroup('QPF');
   const [companies, setCompanies] = useState<any[]>([]);
 
   // Modals State
@@ -73,29 +72,23 @@ export const AdminQuestions: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Load Filter References from Backend API
+  // Companies use their own API/store domain; reference groups are shared by Redux.
   useEffect(() => {
-    const fetchFilterReferences = async () => {
+    let active = true;
+    const fetchCompanies = async () => {
       try {
-        const [diffRes, topicRes, qpfRes, compRes] = await Promise.all([
-          referenceService.getByGroupCode('DIFF'),
-          referenceService.getByGroupCode('TOPIC'),
-          referenceService.getByGroupCode('QPF'),
-          adminCompanyService.getCompanies(),
-        ]);
-        const diffList = diffRes?.data || (Array.isArray(diffRes) ? diffRes : []);
-        const topicList = topicRes?.data || (Array.isArray(topicRes) ? topicRes : []);
-        const qpfList = qpfRes?.data || (Array.isArray(qpfRes) ? qpfRes : []);
+        const compRes = await adminCompanyService.getCompanies();
+        if (!active) return;
         const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
-        setDifficulties(Array.isArray(diffList) ? diffList : []);
-        setTopics(Array.isArray(topicList) ? topicList : []);
-        setQpfs(Array.isArray(qpfList) ? qpfList : []);
         setCompanies(Array.isArray(compList) ? compList : []);
       } catch (err) {
-        console.warn('Failed to load filter reference data:', err);
+        console.warn('Failed to load company filter data:', err);
       }
     };
-    fetchFilterReferences();
+    void fetchCompanies();
+    return () => {
+      active = false;
+    };
   }, []);
 
   /**
@@ -143,30 +136,9 @@ export const AdminQuestions: React.FC = () => {
           ? rawData.data
           : []
       ).map((item: any) => {
-        const qId = item.id;
-        let finalCompanies = item.companies;
-        let finalPlatform = item.questionPlatform || item.qpfRefName || item.platformName;
-        let finalPlatformCode = item.qpfRefCode;
-
-        if (qId) {
-          try {
-            const storedCompanies = userScopedStorage.getItem(`c2c_question_companies_${qId}`);
-            if (storedCompanies) {
-              const parsed = JSON.parse(storedCompanies);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                finalCompanies = parsed;
-              }
-            }
-          } catch {}
-          const storedPlatform = userScopedStorage.getItem(`c2c_question_platform_${qId}`);
-          if (storedPlatform) {
-            finalPlatform = storedPlatform;
-          }
-          const storedPlatformCode = userScopedStorage.getItem(`c2c_question_platform_code_${qId}`);
-          if (storedPlatformCode) {
-            finalPlatformCode = storedPlatformCode;
-          }
-        }
+        const finalCompanies = item.companies;
+        const finalPlatform = item.questionPlatform || item.qpfRefName || item.platformName;
+        const finalPlatformCode = item.qpfRefCode;
 
         return {
           ...item,
@@ -393,21 +365,7 @@ export const AdminQuestions: React.FC = () => {
       const savedQuestion: any = res?.data || res;
       const targetQuestionId = savedQuestion?.id || questionId;
 
-      // Persist the user's latest company selections and platform in userScopedStorage
       if (targetQuestionId) {
-        try {
-          userScopedStorage.setItem(
-            `c2c_question_companies_${targetQuestionId}`,
-            JSON.stringify(formData.companies || [])
-          );
-          if (platformName) {
-            userScopedStorage.setItem(`c2c_question_platform_${targetQuestionId}`, platformName);
-          }
-          if (formData.qpfRefCode) {
-            userScopedStorage.setItem(`c2c_question_platform_code_${targetQuestionId}`, formData.qpfRefCode);
-          }
-        } catch {}
-
         // Optimistically update local questions state
         setQuestions((prev) =>
           prev.map((q) => {
@@ -445,9 +403,6 @@ export const AdminQuestions: React.FC = () => {
 
       // Attach test cases if provided
       if (targetQuestionId && Array.isArray(formData.testCases) && formData.testCases.length > 0) {
-        try {
-          userScopedStorage.setItem(`admin_test_cases_${targetQuestionId}`, JSON.stringify(formData.testCases));
-        } catch {}
         try {
           const testCasesPayload: QuestionTestCase[] = formData.testCases.map((tc, idx) => ({
             id: tc.id,

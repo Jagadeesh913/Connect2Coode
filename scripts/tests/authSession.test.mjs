@@ -28,8 +28,9 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 // Import real production security modules, types, and reducers
 const { decodeJwtPayload, isJwtAdmin } = await import('../../src/core/security/jwt.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
+const { isAuthSessionEvent } = await import('../../src/core/security/authSessionSync.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
-const { default: authReducer, logoutUser, refreshSessionThunk } = authSliceModule;
+const { default: authReducer, logoutUser, refreshSessionThunk, initializeAuth } = authSliceModule;
 
 // Helper to create mock JWT tokens with base64url payload
 function createMockJwt(payload) {
@@ -117,7 +118,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
     const getLoggedInState = () => ({
       user: { id: 1, email: 'test@c2c.test', role: 'USER' },
       token: 'validToken123',
-      refreshToken: 'refreshToken456',
+      status: 'AUTHENTICATED',
       isAuthenticated: true,
       loading: false,
       error: null,
@@ -131,7 +132,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       assert.equal(nextState.user, null, 'User must be cleared');
       assert.equal(nextState.token, null, 'Access token must be cleared');
-      assert.equal(nextState.refreshToken, null, 'Refresh token must be cleared');
+      assert.equal('refreshToken' in nextState, false, 'Refresh token must not be duplicated in Redux');
       assert.equal(nextState.isAuthenticated, false, 'isAuthenticated must be false');
       assert.equal(nextState.loading, false, 'Loading must be false');
     });
@@ -145,7 +146,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       assert.equal(nextState.user, null, 'User must be cleared even on network failure');
       assert.equal(nextState.token, null, 'Token must be cleared even on network failure');
-      assert.equal(nextState.refreshToken, null, 'Refresh token must be cleared on failure');
+      assert.equal('refreshToken' in nextState, false, 'Refresh token must not be duplicated in Redux');
       assert.equal(nextState.isAuthenticated, false, 'Session must not remain active after failed logout');
       assert.equal(nextState.loading, false, 'Loading flag must be reset');
     });
@@ -159,7 +160,6 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       const activeState = {
         user: { id: 'user-42', email: 'user@c2c.test' },
         token: validToken,
-        refreshToken: null,
         status: 'AUTHENTICATED',
         isAuthenticated: true,
         loading: false,
@@ -188,7 +188,6 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       const expiredState = {
         user: { id: 'user-42', email: 'user@c2c.test' },
         token: expiredToken,
-        refreshToken: null,
         status: 'AUTHENTICATED',
         isAuthenticated: true,
         loading: false,
@@ -206,14 +205,73 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.status, 'UNAUTHENTICATED', 'Status must be UNAUTHENTICATED');
       assert.equal(nextState.user, null, 'User must be cleared');
     });
+
+    it('keeps startup loading while an expired access token still has a refresh session', () => {
+      const expiredToken = createMockJwt({
+        sub: 'user-42',
+        exp: Math.floor(Date.now() / 1000) - 60,
+      });
+      const originalGetAccessToken = tokenStorage.getAccessToken;
+      const originalGetRefreshToken = tokenStorage.getRefreshToken;
+      const originalGetUser = tokenStorage.getUser;
+
+      tokenStorage.getAccessToken = () => expiredToken;
+      tokenStorage.getRefreshToken = () => 'refresh-token';
+      tokenStorage.getUser = () => ({ id: 'user-42', email: 'user@c2c.test' });
+
+      const nextState = authReducer(undefined, initializeAuth());
+
+      assert.equal(nextState.status, 'LOADING');
+      assert.equal(nextState.loading, true);
+      assert.equal(nextState.isAuthenticated, false);
+
+      tokenStorage.getAccessToken = originalGetAccessToken;
+      tokenStorage.getRefreshToken = originalGetRefreshToken;
+      tokenStorage.getUser = originalGetUser;
+    });
+
+    it('preserves the existing user profile when refresh returns token fields without email', () => {
+      const currentState = {
+        user: { id: 63, email: 'user@c2c.test', firstName: 'Current', role: 'USER' },
+        token: 'old-token',
+        status: 'AUTHENTICATED',
+        isAuthenticated: true,
+        loading: false,
+        error: null,
+        isAuthModalOpen: false,
+        authModalMode: 'login',
+      };
+
+      const nextState = authReducer(currentState, {
+        type: refreshSessionThunk.fulfilled.type,
+        payload: { token: 'new-token', refreshToken: 'new-refresh', id: 63, role: 'USER' },
+      });
+
+      assert.equal(nextState.token, 'new-token');
+      assert.equal(nextState.user?.email, 'user@c2c.test');
+      assert.equal(nextState.user?.firstName, 'Current');
+    });
   });
 
   // =========================================================================
   // F-013: User Profile Serialization Strongly Typed in tokenStorage
   // =========================================================================
   describe('F-013 & F-011: tokenStorage Typing & Token Management', () => {
-    it('sets and retrieves typed User profile object', () => {
-      // Mock global localStorage and document.cookie for Node.js test environment
+    it('clears a tab-local in-memory token so the shared cookie session is authoritative after cross-tab sync', () => {
+      tokenStorage.setAccessToken('tab-local-token');
+      tokenStorage.discardInMemorySession();
+      assert.equal(tokenStorage.getAccessToken(), null);
+    });
+
+    it('accepts only token-free, well-formed cross-tab auth session events', () => {
+      assert.equal(isAuthSessionEvent({ type: 'session-cleared', occurredAt: Date.now() }), true);
+      assert.equal(isAuthSessionEvent({ type: 'session-updated', occurredAt: 1 }), true);
+      assert.equal(isAuthSessionEvent({ type: 'session-cleared', token: 'must-not-exist' }), false);
+      assert.equal(isAuthSessionEvent({ type: 'logout' }), false);
+    });
+
+    it('stores the typed User profile in the session cookie without mirroring it into web storage', () => {
+      // Mock browser persistence for the Node.js test environment.
       const memoryStore = new Map();
       globalThis.localStorage = {
         getItem: (k) => memoryStore.get(k) || null,
@@ -221,11 +279,21 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
         removeItem: (k) => memoryStore.delete(k),
         clear: () => memoryStore.clear(),
       };
-      let cookieStore = '';
+      const cookieStore = new Map();
       Object.defineProperty(globalThis, 'document', {
         value: {
-          get cookie() { return cookieStore; },
-          set cookie(val) { cookieStore = val; },
+          get cookie() {
+            return Array.from(cookieStore.entries()).map(([key, value]) => `${key}=${value}`).join('; ');
+          },
+          set cookie(value) {
+            const [nameValue, ...attributes] = value.split(';').map((part) => part.trim());
+            const separator = nameValue.indexOf('=');
+            const name = nameValue.slice(0, separator);
+            const cookieValue = nameValue.slice(separator + 1);
+            const maxAge = attributes.find((attribute) => attribute.toLowerCase().startsWith('max-age='));
+            if (maxAge === 'max-age=0') cookieStore.delete(name);
+            else cookieStore.set(name, cookieValue);
+          },
         },
         writable: true,
         configurable: true,
@@ -245,6 +313,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(retrieved?.id, 'user-42');
       assert.equal(retrieved?.email, 'developer@c2c.test');
       assert.equal(retrieved?.role, 'USER');
+      assert.equal(memoryStore.size, 0, 'Session metadata must not be mirrored into localStorage');
 
       tokenStorage.clearTokens();
       assert.equal(tokenStorage.getUser(), null);

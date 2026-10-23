@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems } from '../redux/problemSlice';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
+import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
@@ -121,7 +121,7 @@ export const ProblemList: React.FC = () => {
       return;
     }
 
-    const isCurrentlyBookmarked = bookmarks.some((b) => b.itemId === problem.id);
+    const isCurrentlyBookmarked = bookmarks.some((b) => isBookmarkItem(b, problem.id, 'PROBLEM'));
     dispatch(
       toggleBookmarkItem({
         itemId: problem.id,
@@ -242,7 +242,7 @@ export const ProblemList: React.FC = () => {
               <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
                 {group.questions.map((problem) => {
                   const solved = solvedByProblemId[problem.id] ?? problem.isSolved;
-                  const bookmarked = problem.isBookmarked || bookmarks.some((b) => b.itemId === problem.id);
+                  const bookmarked = problem.isBookmarked || bookmarks.some((b) => isBookmarkItem(b, problem.id, 'PROBLEM'));
                   const targetSlug = problem.slug || problem.id;
 
                   return (

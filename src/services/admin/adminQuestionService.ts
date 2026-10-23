@@ -4,7 +4,6 @@ import type { ApiResponse } from '../../core/types/api';
 import type {
   CodeExecutionPayload,
   ExecutionResult,
-  Language,
   PageRequest,
   Question,
   QuestionListItem as DomainQuestionListItem,
@@ -53,7 +52,7 @@ export const adminQuestionService = {
 
   /**
    * GET /api/v1/question/:id/testCases
-   * Fetches test cases for a question from backend or fallback.
+   * Fetches test cases from the verified numeric question-details response.
    */
   async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
     return questionService.getTestCases(id, signal);
@@ -68,14 +67,6 @@ export const adminQuestionService = {
   },
 
   /**
-   * GET /api/v1/language/dropdown & /language
-   * Fetches supported languages with database table IDs and reference IDs for admin execution
-   */
-  async getLanguagesDropdown(): Promise<Language[]> {
-    return executionService.getLanguageDropdown();
-  },
-
-  /**
    * POST /api/v1/admin/testCode
    * Admin RUN: executes sample / visible test cases for testing without persistence.
    * Auto-resolves the backend referenceId and uses the dedicated admin endpoint.
@@ -87,7 +78,7 @@ export const adminQuestionService = {
   /**
    * POST /api/v1/admin/submitCode
    * Admin SUBMIT: executes all test cases (visible + hidden) for validation without persistence.
-   * Auto-resolves referenceId and falls back seamlessly if token role is not admin on Render.
+   * Auto-resolves referenceId and preserves strict admin authorization.
    */
   async adminSubmitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResult> {
     return executionService.adminSubmitCode(payload, signal);

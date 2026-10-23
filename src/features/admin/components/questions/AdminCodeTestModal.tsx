@@ -1,7 +1,7 @@
 import { useExecutionRequest } from '../../../problems/hooks/useExecutionRequest';
 import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
@@ -19,6 +19,8 @@ import {
   RotateCcw,
   Loader2,
 } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
+import { fetchLanguages } from '../../../languages/redux/languageSlice';
 
 interface AdminCodeTestModalProps {
   isOpen: boolean;
@@ -80,9 +82,15 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   onClose,
   question,
 }) => {
+  const dispatch = useAppDispatch();
   const { theme } = useTheme();
 
-  const [languages, setLanguages] = useState<Array<{ id: number; name: string }>>([]);
+  const { languages: languageRegistry, loading: languagesLoading, error: languagesError } =
+    useAppSelector((state) => state.languages);
+  const languages = useMemo(
+    () => languageRegistry.filter((language) => language.isActive !== false),
+    [languageRegistry]
+  );
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
   const [sourceCode, setSourceCode] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
@@ -92,6 +100,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const [isStatementOpen, setIsStatementOpen] = useState<boolean>(false);
   const [executionMessage, setExecutionMessage] = useState<string>('');
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const [resourcesLoading, setResourcesLoading] = useState(true);
   const [resourcesError, setResourcesError] = useState<string | null>(null);
@@ -102,19 +111,12 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     setResourcesLoading(true);
     setResourcesError(null);
     setQuestionDetails(null); setLoadingDetails(true);
+    void dispatch(fetchLanguages(resourcesRetry > 0 ? { force: true } : undefined));
     Promise.allSettled([
-      adminQuestionService.getLanguagesDropdown(),
       question?.id ? adminQuestionService.getQuestionById(question.id) : Promise.resolve(null),
-    ]).then(([languageResult, questionResult]) => {
+    ]).then(([questionResult]) => {
       if (!active) return;
       const failures: string[] = [];
-      if (languageResult.status === 'fulfilled') {
-        const list = languageResult.value;
-        setLanguages(list);
-        setSelectedLanguageId((previous) => list.some((language) => language.id === previous) ? previous : list[0]?.id ?? null);
-        setSourceCode((code) => code || STARTER_CODES[list[0]?.name] || '');
-        if (!list.length) failures.push('No execution languages are configured.');
-      } else failures.push('Unable to load execution languages.');
       if (questionResult.status === 'fulfilled') {
         const raw: any = questionResult.value?.data || questionResult.value;
         setQuestionDetails(raw);
@@ -124,7 +126,21 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       setLoadingDetails(false);
     });
     return () => { active = false; };
-  }, [resourcesRetry, isOpen, question?.id]);
+  }, [dispatch, resourcesRetry, isOpen, question?.id]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedLanguageId((previous) =>
+      languages.some((language) => language.id === previous)
+        ? previous
+        : languages[0]?.id ?? null
+    );
+    setSourceCode((code) => code || STARTER_CODES[languages[0]?.name] || '');
+  }, [isOpen, languages]);
+
+  const combinedResourcesLoading = resourcesLoading || languagesLoading;
+  const combinedResourcesError = resourcesError || languagesError ||
+    (!languagesLoading && languages.length === 0 ? 'No execution languages are configured.' : null);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
@@ -154,7 +170,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
 
   // 1. Run Sample Cases (POST /api/v1/admin/testCode)
   const handleRunSampleCases = async () => {
-    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
+    if (combinedResourcesLoading || !languages.length || !sourceCode.trim()) return;
     if (!question?.id || selectedLanguageId === null) return;
 
     const controller = executionRequest.begin();
@@ -174,7 +190,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed sample test cases');
-      toast.success('Sample test cases passed execution!');
+      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+        toast.success('All sample test cases passed.');
+      } else {
+        toast.error(`${data.failedTestCases} sample test case(s) failed.`);
+      }
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
@@ -189,7 +209,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
 
   // 2. Submit All Cases (POST /api/v1/admin/submitCode)
   const handleSubmitAllCases = async () => {
-    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
+    if (combinedResourcesLoading || !languages.length || !sourceCode.trim()) return;
     if (!question?.id || selectedLanguageId === null) return;
 
     const controller = executionRequest.begin();
@@ -209,7 +229,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed all test cases');
-      toast.success('Admin validation run completed against all test cases!');
+      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+        toast.success('All validation test cases passed.');
+      } else {
+        toast.error(`${data.failedTestCases} validation test case(s) failed.`);
+      }
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
@@ -224,6 +248,14 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
 
   const isBusy = isRunning || isSubmitting;
 
+  useEffect(() => {
+    if (!result && !executionMessage) return;
+    const frame = window.requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [executionMessage, result]);
+
   return (
     <AdminModal
       isOpen={isOpen}
@@ -237,7 +269,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleRunSampleCases}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length || !sourceCode.trim()}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Play className={`w-3.5 h-3.5 fill-current ${isRunning ? 'animate-spin' : ''}`} />
@@ -245,7 +277,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             </button>
             <button
               onClick={handleSubmitAllCases}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length || !sourceCode.trim()}
               className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <Send className={`w-3.5 h-3.5 ${isSubmitting ? 'animate-pulse' : ''}`} />
@@ -262,7 +294,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       }
     >
       <div className="space-y-4 font-sans text-left">
-        <RequestStatus pending={resourcesLoading} error={resourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
+        <RequestStatus pending={combinedResourcesLoading} error={combinedResourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
         {/* Collapsible Statement Drawer */}
         <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-900/60 overflow-hidden">
           <button
@@ -312,7 +344,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             <select
               value={selectedLanguageId ?? ''}
               onChange={handleLanguageChange}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length}
               className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {languages.map((l) => (
@@ -354,13 +386,18 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
               scrollBeyondLastLine: false,
               automaticLayout: true,
               padding: { top: 12, bottom: 12 },
+              readOnly: isBusy,
+              readOnlyMessage: { value: 'Editing is paused while code execution is in progress.' },
+              wordWrap: 'on',
+              smoothScrolling: true,
+              accessibilitySupport: 'auto',
             }}
           />
         </div>
 
         {/* Execution Results */}
         {result && (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4 space-y-3">
+          <div ref={resultsRef} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4 space-y-3" aria-live="polite">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                 <Terminal className="w-4 h-4 text-blue-600" />

@@ -1,17 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { UserProfile, ReferenceItem } from '../../../../core/types/domain';
+import type { UserProfile } from '../../../../core/types/domain';
 import { personalInfoSchema, PersonalInfoFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
-import { referenceService } from '../../../../services/referenceService';
 import { User, Mail, FileText, X, Loader2, CheckCircle2, Calendar, Lock } from 'lucide-react';
-
-const FALLBACK_GENDERS: ReferenceItem[] = [
-  { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
-  { id: 103, refGroupCode: 'GENDER', refCode: 'FEMALE', refName: 'Female', isActive: true },
-  { id: 104, refGroupCode: 'GENDER', refCode: 'OTHER', refName: 'Other', isActive: true },
-];
+import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 
 interface EditPersonalInfoModalProps {
   isOpen: boolean;
@@ -28,25 +22,12 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
   initialData,
   submitting = false,
 }) => {
-  const [genderOptions, setGenderOptions] = useState<ReferenceItem[]>(FALLBACK_GENDERS);
+  const { items: genderReferences, loading: gendersLoading, error: gendersError, retry: retryGenders } =
+    useReferenceGroup('GENDER', isOpen);
+  const genderOptions = genderReferences.filter((item) => item.isActive !== false);
   const [selectedGenderId, setSelectedGenderId] = useState<number | null>(() => {
     return initialData?.gender?.id ?? (initialData?.gender ? Number((initialData.gender as any).id) : null);
   });
-
-  useEffect(() => {
-    let isMounted = true;
-    referenceService
-      .getByGroupCode('GENDER')
-      .then((res) => {
-        if (isMounted && res?.data && Array.isArray(res.data) && res.data.length > 0) {
-          setGenderOptions(res.data.filter((item) => item.isActive !== false));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      isMounted = false;
-    };
-  }, []);
 
   const {
     register,
@@ -56,7 +37,7 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<PersonalInfoFormData>({
-    resolver: zodResolver(personalInfoSchema) as any,
+    resolver: zodResolver(personalInfoSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {
@@ -217,6 +198,7 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
                   id="personal-gender-select"
                   value={selectedGenderId ?? ''}
                   onChange={handleGenderChange}
+                  disabled={gendersLoading}
                   className="w-full appearance-none pl-9 pr-8 py-2.5 bg-slate-50 dark:bg-neutral-950 border border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 focus:border-blue-500 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none transition-colors cursor-pointer"
                 >
                   <option value="" className="bg-white dark:bg-neutral-900 text-slate-400">
@@ -228,6 +210,11 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
                     </option>
                   ))}
                 </select>
+                {gendersError && (
+                  <button type="button" onClick={retryGenders} className="text-xs text-rose-600 hover:underline">
+                    Unable to load gender options. Retry
+                  </button>
+                )}
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 text-xs">
                   ▼
                 </div>

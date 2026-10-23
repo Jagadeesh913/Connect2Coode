@@ -36,8 +36,6 @@ export const API_ENDPOINTS = {
     SUBMIT: (id: string) => `/question/${id}/submit`,
   },
   USER: {
-    PROFILE: '/user/profile',
-    UPDATE: '/user/profile',
     BOOKMARK: (userId: string | number, questionId: string | number) =>
       `/users/${userId}/questions/${questionId}/bookmark`,
     BOOKMARKS: (userId: string | number) => `/users/${userId}/questions/bookmarks`,

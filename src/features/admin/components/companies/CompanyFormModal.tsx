@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { adminCompanySchema, AdminCompanyFormData } from '../../../../core/validation';
@@ -36,8 +37,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
     setValue,
     watch,
     formState: { errors },
-  } = useForm<CompanyFormData>({
-    resolver: zodResolver(adminCompanySchema) as any,
+  } = useForm<z.input<typeof adminCompanySchema>, unknown, CompanyFormData>({
+    resolver: zodResolver(adminCompanySchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {

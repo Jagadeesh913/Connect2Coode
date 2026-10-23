@@ -1,8 +1,7 @@
-import { apiClient } from '../core/api/apiClient';
+import { apiClient, isRequestCanceled } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Question, QuestionHint, QuestionTestCase } from '../core/types/domain';
-import { executionService } from './executionService';
 import { extractTestCasesFromProblem } from '../features/admin/utils/testCaseUtils';
 
 export type { Question, QuestionHint, QuestionTestCase };
@@ -15,13 +14,32 @@ export const questionService = {
   },
 
   async getById(id: string | number, signal?: AbortSignal): Promise<ApiResponse<QuestionPayload>> {
-    // 1. Direct Catalog Fetch:
-    // Query the questions catalog (POST /api/v1/questions) to retrieve problem metadata cleanly
-    // without triggering unmapped or failing GET /api/v1/question/{id} (HTTP 500)
+    const numericId = Number(id);
+    const isNumericId = Number.isFinite(numericId) && numericId > 0;
+
+    // The verified numeric details endpoint is authoritative and includes the
+    // complete question payload. Text slugs are not accepted by the backend.
+    if (isNumericId) {
+      try {
+        const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(numericId), { signal });
+        const data = res?.data;
+        if (data && (data.id || data.title)) {
+          return {
+            statusCode: res?.statusCode || 200,
+            message: res?.message || 'Question details fetched',
+            data,
+          };
+        }
+      } catch (err: unknown) {
+        if (isRequestCanceled(err)) throw err;
+        // Preserve the catalog fallback for deployments where the details route
+        // is temporarily unavailable.
+      }
+    }
+
+    // Catalog fallback also resolves human-readable route slugs.
     try {
-      const numericId = Number(id);
-      const isNum = Number.isFinite(numericId) && numericId > 0;
-      const pageNumber = isNum ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
+      const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 
       const payload: Record<string, any> = {
         level: null,
@@ -85,15 +103,11 @@ export const questionService = {
       if (matched) {
         const rawMatched: any = matched;
         const descriptionText = String(rawMatched.description || '');
-        let testCases: QuestionTestCase[] = extractTestCasesFromProblem({
+        const testCases: QuestionTestCase[] = extractTestCasesFromProblem({
           id: rawMatched.id,
           description: descriptionText,
           testCases: rawMatched.testCases,
         });
-
-        if (testCases.length === 0 && rawMatched.id) {
-          testCases = await executionService.getProblemTestCases(rawMatched.id);
-        }
 
         const recovered: QuestionPayload = {
           id: Number(rawMatched.id),
@@ -127,49 +141,20 @@ export const questionService = {
           data: recovered,
         };
       }
-    } catch {
-      // Catalog search error, attempt direct details endpoint if catalog fails
-    }
-
-    // 2. Direct Details Fallback
-    try {
-      const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(id), { signal });
-      const data = res?.data || res;
-      if (data && (data.id || data.title)) {
-        return {
-          statusCode: 200,
-          message: 'Question details fetched',
-          data,
-        };
-      }
-    } catch (err: any) {
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED' || err?.message === 'canceled') {
-        throw err;
-      }
+    } catch (err: unknown) {
+      if (isRequestCanceled(err)) throw err;
+      // The endpoint error is surfaced below as a domain-specific retrieval error.
     }
 
     throw new Error(`Question #${id} could not be retrieved`);
   },
 
-  async getTestCases(id: string | number, _signal?: AbortSignal): Promise<QuestionTestCase[]> {
+  async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
     const numericId = Number(id);
     if (!numericId) return [];
 
-    // 1. Resolve from testCaseUtils (checks storage, explicit cases, canonical seed table)
-    const existing = extractTestCasesFromProblem({ id: numericId });
-    if (existing.length > 0) {
-      return existing;
-    }
-
-    // 2. Resolve live execution test cases from backend execution engine
-    try {
-      const liveCases = await executionService.getProblemTestCases(numericId);
-      if (liveCases.length > 0) {
-        return liveCases;
-      }
-    } catch {}
-
-    return [];
+    const response = await this.getById(numericId, signal);
+    return extractTestCasesFromProblem(response.data);
   },
 
   async addTestCases(
@@ -177,15 +162,6 @@ export const questionService = {
     testCases: QuestionTestCase[],
     signal?: AbortSignal
   ): Promise<ApiResponse<QuestionTestCase[]>> {
-    try {
-      return await apiClient.post(API_ENDPOINTS.QUESTION.TEST_CASES(id), testCases, { signal });
-    } catch {
-      // Return accepted response if backend accepts test cases embedded in question payload
-      return {
-        statusCode: 200,
-        message: 'Test cases processed',
-        data: testCases,
-      };
-    }
+    return apiClient.post(API_ENDPOINTS.QUESTION.TEST_CASES(id), testCases, { signal });
   },
 };

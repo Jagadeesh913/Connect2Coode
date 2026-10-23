@@ -3,19 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionTestCase } from '../../../../services/questionService';
-import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { getActionableErrorMessage } from '../../../../core/validation';
 import { extractTestCasesFromProblem } from '../../utils/testCaseUtils';
-import { userScopedStorage } from '../../../../core/storage/userScopedStorage';
 import {
   Layers,
   Plus,
   Trash2,
   Loader2,
 } from 'lucide-react';
+import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 
 interface TestCaseModalProps {
   isOpen: boolean;
@@ -42,13 +41,17 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       isHidden: false,
       displayOrder: 1,
       typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
+      typeRefCode: '',
     },
   ]);
 
   const [fieldErrors, setFieldErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
-  const [testCaseTypes, setTestCaseTypes] = useState<ReferenceItem[]>([]);
-  const [typesLoading, setTypesLoading] = useState<boolean>(false);
+  const {
+    items: testCaseTypes,
+    loading: typesLoading,
+    error: typesError,
+    retry: retryTypes,
+  } = useReferenceGroup('TESTCASETYPE', isOpen);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -59,28 +62,11 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     if (!isOpen) return;
 
     let isMounted = true;
-    setTypesLoading(true);
     setLoadError(null);
 
     const initModal = async () => {
       try {
-        // 1. Fetch Reference Library TESTCASETYPE items dynamically from API
-        let validTypes: ReferenceItem[] = [];
-        try {
-          const refRes = await referenceService.getByGroupCode('TESTCASETYPE');
-          const refList = (refRes as any)?.data || (Array.isArray(refRes) ? refRes : []);
-          if (Array.isArray(refList) && refList.length > 0) {
-            validTypes = refList;
-          }
-        } catch {
-          if (isMounted) setLoadError('Unable to load test case types. Retry before saving.');
-        }
-
-        if (isMounted) {
-          setTestCaseTypes(validTypes);
-        }
-
-        // 2. Fetch existing test cases for the question
+        // Fetch existing test cases for the question.
         let existingCases: QuestionTestCase[] = [];
 
         // Check question object first (e.g. from table or parsed from description)
@@ -88,7 +74,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           existingCases = extractTestCasesFromProblem(question);
         }
 
-        // Fallback to backend or local cache if questionId exists and existingCases is empty
+        // Fetch the authoritative question-details payload when row data has no cases.
         if (existingCases.length === 0 && questionId) {
           try {
             const fetched = await adminQuestionService.getTestCases(questionId);
@@ -104,7 +90,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           if (existingCases.length > 0) {
             setTestCases(existingCases);
           } else {
-            const defaultType = validTypes.length > 0 ? validTypes[0].refCode : 'SAMPLE';
+            const defaultType = testCaseTypes[0]?.refCode || '';
             setTestCases([
               {
                 input: '',
@@ -119,9 +105,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           }
         }
       } catch (err) {
-        console.warn('Failed to load test case reference types:', err);
-      } finally {
-        if (isMounted) setTypesLoading(false);
+        console.warn('Failed to load existing test cases:', err);
       }
     };
 
@@ -129,10 +113,10 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, questionId, question, retry]);
+  }, [isOpen, questionId, question, retry, testCaseTypes]);
 
   const handleAddTestCase = () => {
-    const defaultType = testCaseTypes.length > 0 ? testCaseTypes[0].refCode : 'SAMPLE';
+    const defaultType = testCaseTypes[0]?.refCode || '';
     setTestCases((prev) => [
       ...prev,
       {
@@ -183,6 +167,10 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       toast.error('No question targeted for test cases attachment.');
       return;
     }
+    if (typesError || testCaseTypes.length === 0 || testCases.some((testCase) => !testCase.typeRefCode)) {
+      toast.error('Load and select an API-provided test case type before saving.');
+      return;
+    }
 
     const errors: Record<number, { input?: string; expectedOutput?: string }> = {};
     let hasError = false;
@@ -218,27 +206,15 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       isHidden: tc.isHidden === true,
       displayOrder: idx + 1,
       typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
+      typeRefCode: tc.typeRefCode,
     }));
 
     try {
       await adminQuestionService.addTestCases(questionId, payload);
-      try {
-        userScopedStorage.setItem(`admin_test_cases_${questionId}`, JSON.stringify(payload));
-      } catch {}
-
       toast.success(`Successfully saved ${payload.length} test cases for Question #${questionId}`);
       if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
-      // If network fails, also cache locally so admin work is not lost
-      try {
-        userScopedStorage.setItem(`admin_test_cases_${questionId}`, JSON.stringify(payload));
-        toast.success(`Saved ${payload.length} test cases locally for Question #${questionId}`);
-        if (onSuccess) onSuccess();
-        onClose();
-        return;
-      } catch {}
       toast.error(getActionableErrorMessage(err, 'Failed to save test cases.'));
     } finally {
       setSubmitting(false);
@@ -267,7 +243,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={submitting || typesLoading || Boolean(loadError)}
+              disabled={submitting}
               className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer"
             >
               Cancel
@@ -275,7 +251,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || typesLoading || Boolean(typesError) || Boolean(loadError) || testCaseTypes.length === 0}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
               {submitting ? 'Saving Test Cases...' : `Save ${testCases.length} Test Cases`}
@@ -285,7 +261,15 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       }
     >
       <div className="space-y-4 font-sans text-left">
-        <RequestStatus pending={typesLoading} error={loadError} onRetry={() => setRetry((value) => value + 1)} label="Loading test cases…" />
+        <RequestStatus
+          pending={typesLoading}
+          error={typesError || loadError}
+          onRetry={() => {
+            void retryTypes();
+            setRetry((value) => value + 1);
+          }}
+          label="Loading test cases…"
+        />
         {typesLoading ? (
           <div className="flex items-center justify-center p-8 text-slate-500 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-blue-600" />

@@ -1,6 +1,7 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import { tokenStorage } from '../core/security/tokenStorage';
+import { publishAuthSessionEvent } from '../core/security/authSessionSync';
 import type { ApiResponse } from '../core/types/api';
 
 export interface AuthResponseData {
@@ -42,6 +43,31 @@ export interface VerifyOtpPayload {
   password?: string;
 }
 
+const persistAuthSession = (data: AuthResponseData): void => {
+  const accessToken = data.accessToken || data.token;
+  if (accessToken) tokenStorage.setAccessToken(accessToken);
+  if (data.refreshToken) tokenStorage.setRefreshToken(data.refreshToken);
+
+  const currentUser = tokenStorage.getUser();
+  const responseUser = data.user || data;
+  const email = responseUser.email || currentUser?.email;
+  const id = responseUser.id ?? currentUser?.id;
+
+  // Refresh responses are allowed to contain only token/role/id. Preserve the
+  // existing profile instead of serializing tokens as user metadata.
+  if (email) {
+    tokenStorage.setUser({
+      ...currentUser,
+      id,
+      email,
+      firstName: responseUser.firstName ?? currentUser?.firstName,
+      lastName: responseUser.lastName ?? currentUser?.lastName,
+      fullName: responseUser.fullName ?? currentUser?.fullName,
+      role: responseUser.role ?? currentUser?.role,
+    });
+  }
+};
+
 export const authService = {
   // SignUp: POST /api/v1/signUp (Does NOT require OTP)
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
@@ -62,21 +88,9 @@ export const authService = {
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
   async login(payload: LoginPayload): Promise<ApiResponse<AuthResponseData>> {
     const response: any = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, { timeout: 120000 });
-    if (response && response.data) {
-      const data = response.data;
-      const token = data.accessToken || data.token;
-      if (token) {
-        tokenStorage.setAccessToken(token);
-      }
-      const refreshToken = data.refreshToken;
-      if (refreshToken) {
-        tokenStorage.setRefreshToken(refreshToken);
-      }
-      if (data.user) {
-        tokenStorage.setUser(data.user);
-      } else {
-        tokenStorage.setUser(data);
-      }
+    if (response?.data) {
+      persistAuthSession(response.data);
+      publishAuthSessionEvent('session-updated');
     }
     return response;
   },
@@ -113,27 +127,12 @@ export const authService = {
       payload,
       { withCredentials: true, timeout: 60000 }
     );
-    if (response) {
-      const data = response.data || response;
-      const bearerToken = data.accessToken || data.token;
-      if (bearerToken) {
-        tokenStorage.setAccessToken(bearerToken);
-      }
-      const newRefreshToken = data.refreshToken || token;
-      if (newRefreshToken) {
-        tokenStorage.setRefreshToken(newRefreshToken);
-      }
-      if (data.user) {
-        tokenStorage.setUser(data.user);
-      } else if (data.id && data.email) {
-        tokenStorage.setUser({
-          id: data.id,
-          email: data.email,
-          role: data.role || 'USER',
-          firstName: data.firstName || '',
-          lastName: data.lastName || '',
-        });
-      }
+    if (response?.data) {
+      persistAuthSession({
+        ...response.data,
+        refreshToken: response.data.refreshToken || token,
+      });
+      publishAuthSessionEvent('session-updated');
     }
     return response;
   },

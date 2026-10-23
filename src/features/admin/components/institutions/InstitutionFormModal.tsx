@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import type { Institution } from '../../../../core/types/domain';
 import { adminInstitutionSchema, AdminInstitutionFormData } from '../../../../core/validation';
@@ -39,8 +40,8 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
     setError,
     clearErrors,
     formState: { errors },
-  } = useForm<InstitutionFormValues>({
-    resolver: zodResolver(adminInstitutionSchema) as any,
+  } = useForm<z.input<typeof adminInstitutionSchema>, unknown, InstitutionFormValues>({
+    resolver: zodResolver(adminInstitutionSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {

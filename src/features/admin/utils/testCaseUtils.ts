@@ -1,5 +1,4 @@
 import type { QuestionTestCase, Question } from '../../../core/types/domain';
-import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 
 /**
  * Extracts constraints block from Markdown / text problem descriptions.
@@ -100,120 +99,11 @@ export function parseTestCasesFromMarkdown(
 }
 
 /**
- * Canonical test cases for standard DSA problem bank problems.
- * Directly mirrors the Java execution engine test fixtures.
- */
-export const KNOWN_PROBLEM_TEST_CASES: Record<number, QuestionTestCase[]> = {
-  1: [
-    {
-      id: 1,
-      questionId: 1,
-      input: '5\n1 2 3 4 5',
-      expectedOutput: '5',
-      explanation: '5 is the largest element in [1, 2, 3, 4, 5]',
-      isHidden: false,
-      displayOrder: 1,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
-    },
-    {
-      id: 2,
-      questionId: 1,
-      input: '6\n8 10 5 7 9 2',
-      expectedOutput: '10',
-      explanation: '10 is the largest integer in the array',
-      isHidden: false,
-      displayOrder: 2,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
-    },
-    {
-      id: 3,
-      questionId: 1,
-      input: '4\n-1 -2 -3 -4',
-      expectedOutput: '-1',
-      explanation: '-1 is the largest element among negative integers',
-      isHidden: false,
-      displayOrder: 3,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
-    },
-    {
-      id: 4,
-      questionId: 1,
-      input: '1\n42',
-      expectedOutput: '42',
-      explanation: 'Single element array has only 42',
-      isHidden: true,
-      displayOrder: 4,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'NECESSARY',
-      typeRefName: 'Hidden Evaluation Test Case',
-    },
-    {
-      id: 5,
-      questionId: 1,
-      input: '7\n100 200 50 400 300 250 150',
-      expectedOutput: '400',
-      explanation: 'Maximum value is 400',
-      isHidden: true,
-      displayOrder: 5,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'NECESSARY',
-      typeRefName: 'Hidden Evaluation Test Case',
-    },
-  ],
-  2: [
-    {
-      id: 1,
-      questionId: 2,
-      input: '5\n1 2 3 4 5',
-      expectedOutput: '4',
-      explanation: '4 is the second largest distinct element',
-      isHidden: false,
-      displayOrder: 1,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
-    },
-    {
-      id: 2,
-      questionId: 2,
-      input: '5\n10 10 10 10 10',
-      expectedOutput: '-1',
-      explanation: 'No distinct second largest element exists',
-      isHidden: false,
-      displayOrder: 2,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
-    },
-    {
-      id: 3,
-      questionId: 2,
-      input: '6\n12 35 1 10 34 1',
-      expectedOutput: '34',
-      explanation: 'Largest is 35, second largest is 34',
-      isHidden: true,
-      displayOrder: 3,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'NECESSARY',
-      typeRefName: 'Hidden Evaluation Test Case',
-    },
-  ],
-};
-
-/**
  * Robust test cases resolver for any DSA problem.
  * Evaluates in order:
  * 1. Explicit question.testCases (if non-empty)
- * 2. Saved local storage test cases (if admin previously saved for this questionId)
- * 3. Canonical seed test cases for standard questions
- * 4. question.examples array
- * 5. Extracted test cases from question description
+ * 2. question.examples array
+ * 3. Extracted test cases from question description
  */
 export function extractTestCasesFromProblem(
   question?: (Partial<Question> & { examples?: any[] }) | null
@@ -238,28 +128,9 @@ export function extractTestCasesFromProblem(
     }
   }
 
-  // 2. Locally cached admin test cases
   const numericId = question.id ? Number(question.id) : undefined;
-  if (numericId) {
-    try {
-      const cachedStr = userScopedStorage.getItem(`admin_test_cases_${numericId}`);
-      if (cachedStr) {
-        const cached = JSON.parse(cachedStr);
-        if (Array.isArray(cached) && cached.length > 0) {
-          return cached;
-        }
-      }
-    } catch {
-      // Ignore cache parse error
-    }
 
-    // 3. Known canonical problem test cases
-    if (KNOWN_PROBLEM_TEST_CASES[numericId]) {
-      return KNOWN_PROBLEM_TEST_CASES[numericId];
-    }
-  }
-
-  // 4. Examples array
+  // 2. Examples array
   const rawExamples = (question as any).examples;
   if (Array.isArray(rawExamples) && rawExamples.length > 0) {
     return rawExamples.map((ex: any, idx: number) => ({
@@ -276,7 +147,7 @@ export function extractTestCasesFromProblem(
     }));
   }
 
-  // 5. Extracted from description
+  // 3. Extracted from description
   const desc = question.description || '';
   if (desc) {
     const parsed = parseTestCasesFromMarkdown(desc, numericId);

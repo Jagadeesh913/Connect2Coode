@@ -160,6 +160,7 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
       tokenStorage.setAccessToken('login.access.token');
       const payload = {
         id: 101,
+        accessToken: 'login.access.token',
         email: 'developer@c2c.test',
         firstName: 'Jane',
         lastName: 'Dev',
@@ -183,7 +184,6 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
       const loggedInState = {
         user: { id: 1, email: 'user@c2c.test', role: 'USER' },
         token: 'activeToken',
-        refreshToken: null,
         status: 'AUTHENTICATED',
         isAuthenticated: true,
         loading: false,

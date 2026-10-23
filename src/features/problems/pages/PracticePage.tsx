@@ -2,12 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems, resetFilters } from '../redux/problemSlice';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
+import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
-import { KNOWN_QUESTION_PLATFORMS } from '../../../core/mappers/problemMapper';
 import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies } from '../../companies/redux/companySlice';
 import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
@@ -329,7 +328,7 @@ export const PracticePage: React.FC = () => {
       dispatch(openAuthModal({ mode: 'login' }));
       return;
     }
-    const isCurrentlyBookmarked = bookmarks.some((b) => String(b.itemId) === String(problemId));
+    const isCurrentlyBookmarked = bookmarks.some((b) => isBookmarkItem(b, problemId, 'PROBLEM'));
     dispatch(
       toggleBookmarkItem({
         itemId: problemId,
@@ -387,18 +386,11 @@ export const PracticePage: React.FC = () => {
     const targetName = (selectedItem?.refName || '').toLowerCase();
 
     return apiProblems.filter((prob) => {
-      const known = KNOWN_QUESTION_PLATFORMS[String(prob.id)];
-      const code = (prob.qpfRefCode || known?.refCode || '').toUpperCase();
-      const name = (prob.qpfRefName || known?.refName || prob.examPlatform || '').toLowerCase();
+      const code = (prob.qpfRefCode || '').toUpperCase();
+      const name = (prob.qpfRefName || prob.examPlatform || '').toLowerCase();
 
       if (code && code === targetCode) return true;
       if (name && targetName && name.includes(targetName)) return true;
-      if (targetCode === 'LEETCODE' && (prob.leetCodeUrl || prob.title.toLowerCase().includes('leetcode'))) return true;
-      if (targetCode === 'HACKERRANK' && (prob.hackerRankUrl || prob.title.toLowerCase().includes('hackerrank'))) return true;
-      if (targetCode === 'GFG' && (prob.gfgUrl || prob.title.toLowerCase().includes('gfg') || prob.title.toLowerCase().includes('geeks'))) return true;
-      if (targetCode === 'AON' && name.includes('aon')) return true;
-      if (targetCode === 'TCSION' && (name.includes('tcs') || name.includes('ion'))) return true;
-      if (targetCode === 'METTL' && name.includes('mettl')) return true;
       return false;
     });
   }, [apiProblems, selectedPlatform, apiPlatforms]);
@@ -433,21 +425,15 @@ export const PracticePage: React.FC = () => {
   };
 
   const getPlatformBadge = (prob: Problem) => {
-    const known = KNOWN_QUESTION_PLATFORMS[String(prob.id)];
     const rawPlatform =
       prob.qpfRefName ||
       prob.examPlatform ||
-      prob.qpfRefCode ||
-      known?.refName ||
-      known?.refCode ||
-      (prob.leetCodeUrl ? 'LeetCode' : '') ||
-      (prob.hackerRankUrl ? 'HackerRank' : '') ||
-      (prob.gfgUrl ? 'GeeksforGeeks' : '');
+      prob.qpfRefCode;
 
-    const pLower = (rawPlatform || 'Connect 2 Code').toLowerCase();
+    const pLower = (rawPlatform || 'Unspecified').toLowerCase();
     let badgeColor =
       'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60';
-    let displayName = rawPlatform || 'Connect 2 Code';
+    let displayName = rawPlatform || 'Unspecified';
     let iconClass = 'fa-solid fa-laptop-code';
 
     if (pLower.includes('leetcode')) {
@@ -908,7 +894,7 @@ export const PracticePage: React.FC = () => {
                       </tr>
                     ) : (
                       displayedProblems.map((prob) => {
-                        const isBookmarked = bookmarks.some((b) => String(b.itemId) === String(prob.id));
+                        const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, prob.id, 'PROBLEM'));
                         const isSolved = Boolean(solvedByProblemId[String(prob.id)]);
                         const questionId = prob.questionId || prob.id;
 

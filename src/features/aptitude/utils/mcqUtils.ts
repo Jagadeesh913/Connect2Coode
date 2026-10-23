@@ -24,30 +24,68 @@ export function cleanQuestionText(text?: string | null): string {
  */
 export function synthesizeMcqOptions(q: McqQuestion): SynthesizedOption[] {
   if (q.options && q.options.length > 0) {
-    const rawOpts = q.options.map((opt: any, i) => {
-      const text = String(
-        opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
-      );
-      const isExplicitCorrect =
+    // 1. Check if the options already have explicit isCorrect flags
+    const hasExplicitIsCorrect = q.options.some(
+      (opt: any) =>
         opt.isCorrect === true ||
         String(opt.isCorrect).toLowerCase() === 'true' ||
         opt.isCorrect === 1 ||
         opt.correct === true ||
+        String(opt.correct).toLowerCase() === 'true' ||
+        opt.correct === 1 ||
         opt.is_correct === true ||
-        opt.is_correct === 1 ||
-        Boolean((q as any).correctOption && String((q as any).correctOption).toUpperCase() === String(opt.optionLabel || '').toUpperCase()) ||
-        Boolean((q as any).correctAnswer && String((q as any).correctAnswer).trim().toLowerCase() === text.trim().toLowerCase()) ||
-        Boolean((q as any).answer && String((q as any).answer).trim().toLowerCase() === text.trim().toLowerCase());
+        String(opt.is_correct).toLowerCase() === 'true' ||
+        opt.is_correct === 1
+    );
+
+    if (hasExplicitIsCorrect) {
+      // Strictly use the option's own isCorrect field.
+      // Do NOT allow question-level correctOption / answer to override an option whose isCorrect is false.
+      return q.options.map((opt: any, i) => {
+        const text = String(
+          opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
+        );
+        const isThisOptionCorrect =
+          opt.isCorrect === true ||
+          String(opt.isCorrect).toLowerCase() === 'true' ||
+          opt.isCorrect === 1 ||
+          opt.correct === true ||
+          String(opt.correct).toLowerCase() === 'true' ||
+          opt.correct === 1 ||
+          opt.is_correct === true ||
+          String(opt.is_correct).toLowerCase() === 'true' ||
+          opt.is_correct === 1;
+
+        return {
+          id: opt.id || opt.optionId || i + 1,
+          optionLabel: opt.optionLabel || String.fromCharCode(65 + i),
+          optionText: text,
+          isCorrect: isThisOptionCorrect,
+        };
+      });
+    }
+
+    // 2. Only if NO option has an explicit isCorrect flag, fallback to question-level targetCorrectOption
+    const targetLabel = (q.correctOption || '').toUpperCase();
+    const targetText = ((q as any).correctAnswer || (q as any).answer || '').trim().toLowerCase();
+
+    const rawOpts = q.options.map((opt: any, i) => {
+      const text = String(
+        opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
+      );
+      const label = opt.optionLabel || String.fromCharCode(65 + i);
+      const isMatched =
+        Boolean(targetLabel && String(label).toUpperCase() === targetLabel) ||
+        Boolean(targetText && text.trim().toLowerCase() === targetText);
 
       return {
         id: opt.id || opt.optionId || i + 1,
-        optionLabel: opt.optionLabel || String.fromCharCode(65 + i),
+        optionLabel: label,
         optionText: text,
-        isCorrect: isExplicitCorrect,
+        isCorrect: isMatched,
       };
     });
 
-    // If at least one option is marked correct, return mapped options
     if (rawOpts.some((o) => o.isCorrect)) {
       return rawOpts;
     }

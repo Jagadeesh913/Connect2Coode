@@ -2,10 +2,10 @@ import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
-import { referenceService, ReferenceItem } from '../../../../services/referenceService';
 import { adminCompanyService, CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
@@ -13,8 +13,15 @@ import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/val
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../utils/testCaseUtils';
 import { Code2, Building2, Plus, Trash2, X } from 'lucide-react';
+import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
+import type { ReferenceItem } from '../../../../core/types/domain';
 
 export type QuestionFormData = AdminQuestionFormData & {
+  questionHints?: QuestionHint[];
+  testCases?: QuestionTestCase[];
+  companies?: CompanyItem[];
+};
+type QuestionFormInput = z.input<typeof adminQuestionSchema> & {
   questionHints?: QuestionHint[];
   testCases?: QuestionTestCase[];
   companies?: CompanyItem[];
@@ -38,11 +45,15 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const isEditing = Boolean(initialData?.id);
   const [activeTab, setActiveTab] = useState<'METADATA' | 'TESTCASES'>('METADATA');
 
-  // Dynamic Reference Libraries fetched from REAL Backend API
-  const [difficulties, setDifficulties] = useState<ReferenceItem[]>([]);
-  const [topics, setTopics] = useState<ReferenceItem[]>([]);
-  const [qpfs, setQpfs] = useState<ReferenceItem[]>([]);
-  const [testCaseTypes, setTestCaseTypes] = useState<ReferenceItem[]>([]);
+  // Dynamic Reference Libraries fetched from the shared Redux-backed API cache.
+  const difficultyQuery = useReferenceGroup('DIFF', isOpen);
+  const topicQuery = useReferenceGroup('TOPIC', isOpen);
+  const qpfQuery = useReferenceGroup('QPF', isOpen);
+  const testCaseTypeQuery = useReferenceGroup('TESTCASETYPE', isOpen);
+  const difficulties = difficultyQuery.items;
+  const topics = topicQuery.items;
+  const qpfs = qpfQuery.items;
+  const testCaseTypes = testCaseTypeQuery.items;
   const [allCompanies, setAllCompanies] = useState<CompanyItem[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<CompanyItem[]>([]);
 
@@ -58,8 +69,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       isHidden: false,
       displayOrder: 1,
       typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
+      typeRefCode: '',
+      typeRefName: '',
     },
   ]);
   const [testCaseErrors, setTestCaseErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
@@ -72,8 +83,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     getValues,
     watch,
     formState: { errors },
-  } = useForm<QuestionFormData>({
-    resolver: zodResolver(adminQuestionSchema) as any,
+  } = useForm<QuestionFormInput, unknown, QuestionFormData>({
+    resolver: zodResolver(adminQuestionSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
     defaultValues: {
@@ -93,44 +104,42 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     },
   });
 
-  const [referenceLoading, setReferenceLoading] = useState(true);
-  const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
+  const [companiesError, setCompaniesError] = useState<string | null>(null);
   const [referenceRetry, setReferenceRetry] = useState(0);
+  const referenceLoading =
+    companiesLoading ||
+    difficultyQuery.loading ||
+    topicQuery.loading ||
+    qpfQuery.loading ||
+    testCaseTypeQuery.loading;
+  const referenceError =
+    companiesError ||
+    difficultyQuery.error ||
+    topicQuery.error ||
+    qpfQuery.error ||
+    testCaseTypeQuery.error;
 
   // Fetch Reference Libraries and Companies from REAL backend API
   useEffect(() => {
     if (!isOpen) return;
 
     let isMounted = true;
-    setReferenceLoading(true);
-    setReferenceError(null);
+    setCompaniesLoading(true);
+    setCompaniesError(null);
     const loadReferenceData = async () => {
       try {
-        const [diffRes, topicRes, qpfRes, tcTypeRes, compRes] = await Promise.all([
-          referenceService.getByGroupCode('DIFF'),
-          referenceService.getByGroupCode('TOPIC'),
-          referenceService.getByGroupCode('QPF'),
-          referenceService.getByGroupCode('TESTCASETYPE'),
-          adminCompanyService.getCompanies(),
-        ]);
+        const compRes = await adminCompanyService.getCompanies();
 
         if (!isMounted) return;
 
-        const diffList = diffRes?.data || (Array.isArray(diffRes) ? diffRes : []);
-        const topicList = topicRes?.data || (Array.isArray(topicRes) ? topicRes : []);
-        const qpfList = qpfRes?.data || (Array.isArray(qpfRes) ? qpfRes : []);
-        const tcTypeList = tcTypeRes?.data || (Array.isArray(tcTypeRes) ? tcTypeRes : []);
         const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
 
-        setDifficulties(Array.isArray(diffList) ? diffList : []);
-        setTopics(Array.isArray(topicList) ? topicList : []);
-        setQpfs(Array.isArray(qpfList) ? qpfList : []);
-        setTestCaseTypes(Array.isArray(tcTypeList) ? tcTypeList : []);
         setAllCompanies(Array.isArray(compList) ? compList : []);
       } catch {
-        if (isMounted) setReferenceError('Unable to load form options. Retry before saving.');
+        if (isMounted) setCompaniesError('Unable to load company options. Retry before saving.');
       } finally {
-        if (isMounted) setReferenceLoading(false);
+        if (isMounted) setCompaniesLoading(false);
       }
     };
 
@@ -289,9 +298,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       setHints([]);
       setSelectedCompanies([]);
       const defaultCreateType =
-        testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || 'SAMPLE';
+        testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || '';
       const defaultCreateTypeName =
-        testCaseTypes.find((t) => t.refCode === defaultCreateType)?.refName || 'Visible Sample Test Case';
+        testCaseTypes.find((t) => t.refCode === defaultCreateType)?.refName || '';
       setTestCases([
         {
           input: '',
@@ -371,14 +380,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             }
             return testCase;
           }
-          const matched = testCase.isHidden
-            ? testCaseTypes.find((t) => t.refCode === 'NECESSARY') || testCaseTypes[0]
-            : testCaseTypes.find((t) => t.refCode === 'SAMPLE') || testCaseTypes[0];
-          return {
-            ...testCase,
-            typeRefCode: matched.refCode,
-            typeRefName: matched.refName,
-          };
+          return testCase;
         })
       );
     }
@@ -446,9 +448,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
   const handleAddTestCase = () => {
     const defaultType =
-      testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || 'SAMPLE';
+      testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || '';
     const defaultTypeName =
-      testCaseTypes.find((t) => t.refCode === defaultType)?.refName || 'Visible Sample Test Case';
+      testCaseTypes.find((t) => t.refCode === defaultType)?.refName || '';
     setTestCases((prev) => [
       ...prev,
       {
@@ -481,8 +483,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         const matched = testCaseTypes.find((t) => t.refCode === value);
         target.typeRefCode = value;
         target.typeRefGroupCode = 'TESTCASETYPE';
-        target.typeRefName =
-          matched?.refName || (value === 'NECESSARY' ? 'Mandatory Test Case' : 'Visible Sample Test Case');
+        target.typeRefName = matched?.refName || '';
         if (value === 'SAMPLE') {
           target.isHidden = false;
         } else if (value === 'NECESSARY') {
@@ -491,15 +492,6 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       }
       if (field === 'isHidden') {
         target.isHidden = Boolean(value);
-        if (value === true && target.typeRefCode === 'SAMPLE') {
-          target.typeRefCode = 'NECESSARY';
-          target.typeRefName =
-            testCaseTypes.find((t) => t.refCode === 'NECESSARY')?.refName || 'Mandatory Test Case';
-        } else if (value === false && target.typeRefCode === 'NECESSARY') {
-          target.typeRefCode = 'SAMPLE';
-          target.typeRefName =
-            testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refName || 'Visible Sample Test Case';
-        }
       }
 
       updated[index] = target;
@@ -557,11 +549,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       toast.error('Please enter required inputs and outputs for all test cases.');
       return;
     }
+    if (testCaseTypes.length === 0 || testCases.some((testCase) => !testCase.typeRefCode)) {
+      setActiveTab('TESTCASES');
+      toast.error('Load and select an API-provided test case type before saving.');
+      return;
+    }
 
     const sanitizedTestCases: QuestionTestCase[] = testCases
       .filter((tc) => tc.input?.trim() && tc.expectedOutput?.trim())
       .map((tc, idx) => {
-        const typeCode = tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE');
+        const typeCode = tc.typeRefCode;
         const matched = testCaseTypes.find((t) => t.refCode === typeCode);
         return {
           ...tc,
@@ -571,8 +568,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           displayOrder: idx + 1,
           typeRefGroupCode: 'TESTCASETYPE',
           typeRefCode: typeCode,
-          typeRefName:
-            matched?.refName || tc.typeRefName || (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
+          typeRefName: matched?.refName || tc.typeRefName || '',
         };
       });
 
@@ -655,7 +651,18 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       }
     >
       <form aria-busy={referenceLoading || submitting} onSubmit={handleSubmit(handleFormSubmit)} className="space-y-5 font-sans text-left">
-        <RequestStatus pending={referenceLoading} error={referenceError} onRetry={() => setReferenceRetry((value) => value + 1)} label="Loading form options…" />
+        <RequestStatus
+          pending={referenceLoading}
+          error={referenceError}
+          onRetry={() => {
+            void difficultyQuery.retry();
+            void topicQuery.retry();
+            void qpfQuery.retry();
+            void testCaseTypeQuery.retry();
+            setReferenceRetry((value) => value + 1);
+          }}
+          label="Loading form options…"
+        />
         {activeTab === 'METADATA' && (
           <div className="space-y-4">
             {/* Title */}
@@ -935,7 +942,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                         <select
                           id={`tc-type-${idx}`}
                           aria-label={`Test Case #${idx + 1} Type`}
-                          value={tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE')}
+                          value={tc.typeRefCode || ''}
                           onChange={(e) => handleTestCaseChange(idx, 'typeRefCode', e.target.value)}
                           className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
                         >
@@ -945,10 +952,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                             </option>
                           ))}
                           {testCaseTypes.length === 0 && (
-                            <>
-                              <option value="SAMPLE">Sample Test Case</option>
-                              <option value="NECESSARY">Mandatory Test Case</option>
-                            </>
+                            <option value="">No API test case types available</option>
                           )}
                         </select>
                       </div>

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, isAnyOf, type PayloadAction } from '@reduxjs/toolkit';
 import { authService, type LoginPayload } from '../../../services/authService';
+import type { AuthResponseData } from '../../../services/authService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { decodeJwtPayload, isJwtExpired, isTokenValid } from '../../../core/security/jwt';
 
@@ -18,7 +19,6 @@ export interface UserProfile {
 export interface AuthState {
   user: UserProfile | null;
   token: string | null;
-  refreshToken: string | null;
   status: AuthStatus;
   isAuthenticated: boolean;
   loading: boolean;
@@ -30,7 +30,6 @@ export interface AuthState {
 const initialState: AuthState = {
   user: null,
   token: null,
-  refreshToken: null,
   status: 'LOADING',
   isAuthenticated: false,
   loading: true,
@@ -39,9 +38,36 @@ const initialState: AuthState = {
   authModalMode: 'login',
 };
 
+const buildUserProfile = (
+  data: AuthResponseData | null | undefined,
+  fallback: UserProfile | null = null
+): UserProfile | null => {
+  const raw = data?.user || data;
+  const email = raw?.email || fallback?.email;
+  const id = raw?.id ?? fallback?.id;
+  if (!email && id === undefined) return fallback;
+
+  const firstName = raw?.firstName ?? fallback?.firstName;
+  const lastName = raw?.lastName ?? fallback?.lastName;
+  return {
+    ...fallback,
+    id,
+    firstName,
+    lastName,
+    fullName:
+      raw?.fullName ||
+      `${firstName || ''} ${lastName || ''}`.trim() ||
+      fallback?.fullName ||
+      email ||
+      'User',
+    email: String(email || ''),
+    role: raw?.role ?? fallback?.role,
+  };
+};
+
 // Canonical session refresh thunk: calls POST /api/v1/auth/refresh with HttpOnly cookie or explicit token
 export const refreshSessionThunk = createAsyncThunk<
-  any,
+  AuthResponseData,
   string | undefined,
   { rejectValue: string }
 >(
@@ -49,9 +75,12 @@ export const refreshSessionThunk = createAsyncThunk<
   async (explicitToken, { rejectWithValue }) => {
     try {
       const res = await authService.refreshToken(explicitToken);
-      const data = res?.data || res;
-      return data;
+      return res.data;
     } catch (err: any) {
+      const currentToken = tokenStorage.getAccessToken();
+      if (!currentToken || !isTokenValid(currentToken)) {
+        tokenStorage.clearTokens();
+      }
       const errMsg = err?.message || (err?.errors && err?.errors[0]) || 'Session refresh failed';
       return rejectWithValue(errMsg);
     }
@@ -64,7 +93,7 @@ export const silentRefreshSession = refreshSessionThunk;
 // Backward compatibility alias for legacy Google login thunk
 export const loginWithGoogleRefreshToken = refreshSessionThunk;
 
-export const loginUser = createAsyncThunk(
+export const loginUser = createAsyncThunk<AuthResponseData, LoginPayload, { rejectValue: string }>(
   'auth/login',
   async (payload: LoginPayload, { rejectWithValue }) => {
     try {
@@ -114,24 +143,45 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    initializeAuth(state) {
-      const token = tokenStorage.getAccessToken();
-      const savedUser = tokenStorage.getUser();
-      const hasValidToken = isTokenValid(token);
-      if (hasValidToken && token) {
-        state.status = 'AUTHENTICATED';
-        state.isAuthenticated = true;
-        state.user = savedUser;
-        state.token = token;
-        state.loading = false;
-      } else {
-        tokenStorage.clearTokens();
-        state.status = 'UNAUTHENTICATED';
-        state.isAuthenticated = false;
-        state.user = null;
-        state.token = null;
-        state.loading = false;
-      }
+    initializeAuth: {
+      prepare() {
+        const token = tokenStorage.getAccessToken();
+        const savedUser = tokenStorage.getUser();
+        return {
+          payload: {
+            token,
+            savedUser,
+            hasValidToken: isTokenValid(token),
+            canRefresh: Boolean(tokenStorage.getRefreshToken() || savedUser),
+          },
+        };
+      },
+      reducer(
+        state,
+        action: PayloadAction<{
+          token: string | null;
+          savedUser: UserProfile | null;
+          hasValidToken: boolean;
+          canRefresh: boolean;
+        }>
+      ) {
+        const { token, savedUser, hasValidToken, canRefresh } = action.payload;
+        if (hasValidToken && token) {
+          state.status = 'AUTHENTICATED';
+          state.isAuthenticated = true;
+          state.user = savedUser;
+          state.token = token;
+          state.loading = false;
+        } else {
+          // Keep the startup gate closed while AppRouterLayout attempts a refresh.
+          // Clearing here would erase the refresh cookie before that request runs.
+          state.status = canRefresh ? 'LOADING' : 'UNAUTHENTICATED';
+          state.isAuthenticated = false;
+          state.user = canRefresh ? savedUser : null;
+          state.token = null;
+          state.loading = canRefresh;
+        }
+      },
     },
     setAuthenticatedSession(state, action: PayloadAction<{ token: string; user?: any }>) {
       state.status = 'AUTHENTICATED';
@@ -176,28 +226,12 @@ const authSlice = createSlice({
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.error = null;
-        state.token = tokenStorage.getAccessToken();
-        const data = action.payload as any;
-        if (data) {
-          const u = data.user || data;
-          if (u && (u.id || u.email)) {
-            const roleVal = u.role || u.Role;
-            const userObj: UserProfile = {
-              id: u.id,
-              firstName: u.firstName,
-              lastName: u.lastName,
-              fullName: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email || 'User',
-              email: String(u.email || ''),
-              role: roleVal,
-            };
-            state.user = userObj;
-            tokenStorage.setUser(userObj);
-          }
-        }
+        state.token = action.payload.accessToken || action.payload.token || state.token;
+        state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(refreshSessionThunk.rejected, (state) => {
         state.loading = false;
-        const currentToken = state.token || tokenStorage.getAccessToken();
+        const currentToken = state.token;
         const isStillValid = Boolean(currentToken && !isJwtExpired(decodeJwtPayload(currentToken)));
         if (isStillValid) {
           // Preserve valid active access token session! Do NOT purge or log user out.
@@ -206,10 +240,8 @@ const authSlice = createSlice({
         } else {
           state.user = null;
           state.token = null;
-          state.refreshToken = null;
           state.status = 'UNAUTHENTICATED';
           state.isAuthenticated = false;
-          tokenStorage.clearTokens();
         }
       })
       // Login
@@ -222,20 +254,8 @@ const authSlice = createSlice({
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.isAuthModalOpen = false;
-        const data = action.payload as any;
-        state.token = tokenStorage.getAccessToken();
-        const rawUser = data?.user || data;
-        const roleVal = rawUser?.role || rawUser?.Role;
-        const userObj: UserProfile = {
-          id: rawUser?.id,
-          firstName: rawUser?.firstName,
-          lastName: rawUser?.lastName,
-          fullName: `${rawUser?.firstName || ''} ${rawUser?.lastName || ''}`.trim() || rawUser?.email || 'User',
-          email: String(rawUser?.email || ''),
-          role: roleVal,
-        };
-        state.user = userObj;
-        tokenStorage.setUser(userObj);
+        state.token = action.payload.accessToken || action.payload.token || null;
+        state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
@@ -247,12 +267,10 @@ const authSlice = createSlice({
         (state) => {
           state.user = null;
           state.token = null;
-          state.refreshToken = null;
           state.status = 'UNAUTHENTICATED';
           state.isAuthenticated = false;
           state.loading = false;
           state.error = null;
-          tokenStorage.clearTokens();
         }
       );
   },

@@ -109,14 +109,34 @@ export const problemService = {
     id: string | number,
     signal?: AbortSignal
   ): Promise<ApiResponse<ProblemItem | null>> {
-    // 1. Direct Catalog Fetch:
-    // The backend GET /api/v1/question/{id} endpoint throws HTTP 500 ("Question Fetch Unsuccessfull").
-    // Querying the questions catalog (POST /api/v1/questions) retrieves the complete problem metadata
-    // cleanly and reliably, avoiding the HTTP 500 error in the browser.
+    const numericId = Number(id);
+    const isNumericId = Number.isFinite(numericId) && numericId > 0;
+
+    // Numeric detail requests use the verified full-detail contract first.
+    if (isNumericId) {
+      try {
+        const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(numericId), { signal });
+        const data = res?.data;
+        if (data && (data.id || data.title)) {
+          return {
+            statusCode: res?.statusCode || 200,
+            message: res?.message || 'Problem details fetched',
+            data: mapProblemDto(data),
+          };
+        }
+      } catch (err) {
+        if (isRequestCanceled(err)) {
+          throw err;
+        }
+        // Retain catalog fallback for backend deployments with a degraded
+        // details controller and for older response variants.
+      }
+    }
+
+    // Catalog fallback resolves slugs because the backend details path accepts
+    // numeric IDs only.
     try {
-      const numericId = Number(id);
-      const isNum = Number.isFinite(numericId) && numericId > 0;
-      const pageNumber = isNum ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
+      const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 
       const payload: Record<string, any> = {
         level: null,
@@ -188,24 +208,6 @@ export const problemService = {
       if (isRequestCanceled(catalogErr)) {
         throw catalogErr;
       }
-    }
-
-    // 2. Direct Details Fallback (only attempted if catalog didn't have the question)
-    try {
-      const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(id), { signal });
-      const data = res?.data || res;
-      if (data && (data.id || data.title)) {
-        return {
-          statusCode: 200,
-          message: 'Problem details fetched',
-          data: mapProblemDto(data),
-        };
-      }
-    } catch (err: any) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      throw err;
     }
 
     throw new Error(`Problem #${id} not found`);

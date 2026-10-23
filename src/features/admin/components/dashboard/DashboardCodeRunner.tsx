@@ -1,12 +1,11 @@
 import { useExecutionRequest } from '../../../problems/hooks/useExecutionRequest';
 import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { adminLanguageService, LanguageDropdownItem } from '../../../../services/admin/adminLanguageService';
 import { ExecutionResultData } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
@@ -18,6 +17,8 @@ import {
   XCircle,
   RotateCcw,
 } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
+import { fetchLanguages } from '../../../languages/redux/languageSlice';
 
 const DEFAULT_STARTER_CODES: Record<string, string> = {
   Java: `import java.util.*;
@@ -87,6 +88,7 @@ solve();
 `,
 };
 export const DashboardCodeRunner: React.FC = () => {
+  const dispatch = useAppDispatch();
   const { theme } = useTheme();
 
   // Question options & selection
@@ -95,7 +97,12 @@ export const DashboardCodeRunner: React.FC = () => {
   const [manualQuestionId, setManualQuestionId] = useState<string>('');
 
   // Languages from GET /api/v1/language/dropdown
-  const [languages, setLanguages] = useState<LanguageDropdownItem[]>([]);
+  const { languages: languageRegistry, loading: languagesLoading, error: languagesError } =
+    useAppSelector((state) => state.languages);
+  const languages = useMemo(
+    () => languageRegistry.filter((language) => language.isActive !== false),
+    [languageRegistry]
+  );
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
 
   // Editor code
@@ -107,6 +114,7 @@ export const DashboardCodeRunner: React.FC = () => {
   const [executionMode, setExecutionMode] = useState<'run' | 'submit' | null>(null);
   const [result, setResult] = useState<ExecutionResultData | null>(null);
   const [executionMessage, setExecutionMessage] = useState<string>('');
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   const [resourcesLoading, setResourcesLoading] = useState(true);
   const [resourcesError, setResourcesError] = useState<string | null>(null);
@@ -115,19 +123,12 @@ export const DashboardCodeRunner: React.FC = () => {
     let active = true;
     setResourcesLoading(true);
     setResourcesError(null);
+    void dispatch(fetchLanguages(resourcesRetry > 0 ? { force: true } : undefined));
     Promise.allSettled([
-      adminLanguageService.getLanguageDropdown(),
       adminQuestionService.getQuestions({ level: null, companies: null, topic: null, searchText: null, pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' } }),
-    ]).then(([languageResult, questionResult]) => {
+    ]).then(([questionResult]) => {
       if (!active) return;
       const failures: string[] = [];
-      if (languageResult.status === 'fulfilled') {
-        const list = languageResult.value;
-        setLanguages(list);
-        setSelectedLanguageId((previous) => list.some((language) => language.id === previous) ? previous : list[0]?.id ?? null);
-        setSourceCode((code) => code || DEFAULT_STARTER_CODES[list[0]?.name] || '');
-        if (!list.length) failures.push('No execution languages are configured.');
-      } else failures.push('Unable to load execution languages.');
       if (questionResult.status === 'fulfilled') {
         const raw: any = questionResult.value?.data || questionResult.value;
         const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
@@ -138,7 +139,20 @@ export const DashboardCodeRunner: React.FC = () => {
       setResourcesLoading(false);
     });
     return () => { active = false; };
-  }, [resourcesRetry]);
+  }, [dispatch, resourcesRetry]);
+
+  useEffect(() => {
+    setSelectedLanguageId((previous) =>
+      languages.some((language) => language.id === previous)
+        ? previous
+        : languages[0]?.id ?? null
+    );
+    setSourceCode((code) => code || DEFAULT_STARTER_CODES[languages[0]?.name] || '');
+  }, [languages]);
+
+  const combinedResourcesLoading = resourcesLoading || languagesLoading;
+  const combinedResourcesError = resourcesError || languagesError ||
+    (!languagesLoading && languages.length === 0 ? 'No execution languages are configured.' : null);
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
@@ -183,7 +197,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
   // 1. Admin TEST CODE (POST /api/v1/admin/testCode)
   const handleRunSampleCases = async () => {
-    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
+    if (combinedResourcesLoading || !languages.length || !sourceCode.trim()) return;
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId) || selectedLanguageId === null || languages.length === 0) {
       toast.error('Please select or enter a valid Question ID');
@@ -207,7 +221,11 @@ export const DashboardCodeRunner: React.FC = () => {
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed Sample Test Cases Successfully');
-      toast.success('Sample test cases passed execution!');
+      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+        toast.success('All sample test cases passed.');
+      } else {
+        toast.error(`${data.failedTestCases} sample test case(s) failed.`);
+      }
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
@@ -222,7 +240,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
   // 2. Admin SUBMIT CODE (POST /api/v1/admin/submitCode)
   const handleSubmitAllCases = async () => {
-    if (resourcesLoading || !languages.length || !sourceCode.trim()) return;
+    if (combinedResourcesLoading || !languages.length || !sourceCode.trim()) return;
     const qId = Number(manualQuestionId || selectedQuestionId);
     if (!qId || isNaN(qId)) {
       toast.error('Please select or enter a valid Question ID');
@@ -247,7 +265,11 @@ export const DashboardCodeRunner: React.FC = () => {
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Validated against All Test Cases');
-      toast.success('Admin submission test completed!');
+      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+        toast.success('All validation test cases passed.');
+      } else {
+        toast.error(`${data.failedTestCases} validation test case(s) failed.`);
+      }
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
@@ -262,6 +284,14 @@ export const DashboardCodeRunner: React.FC = () => {
 
   const isBusy = isRunning || isSubmitting;
 
+  useEffect(() => {
+    if (!result && !executionMessage) return;
+    const frame = window.requestAnimationFrame(() => {
+      resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [executionMessage, result]);
+
   return (
     <AdminCard
       title="Admin Code Execution Sandbox"
@@ -269,7 +299,7 @@ export const DashboardCodeRunner: React.FC = () => {
       icon={<Terminal className="w-5 h-5" />}
     >
       <div className="space-y-4 font-sans text-left">
-        <RequestStatus pending={resourcesLoading} error={resourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
+        <RequestStatus pending={combinedResourcesLoading} error={combinedResourcesError} onRetry={() => setResourcesRetry((value) => value + 1)} label="Loading execution options…" />
         {/* Controls Toolbar */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
           {/* Question Select */}
@@ -280,7 +310,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <select
               value={selectedQuestionId ?? ''}
               onChange={handleQuestionSelectChange}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {questions.map((q) => (
@@ -302,7 +332,7 @@ export const DashboardCodeRunner: React.FC = () => {
               value={manualQuestionId}
               onChange={handleManualQuestionIdChange}
               placeholder="e.g. 1"
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
             />
           </div>
@@ -315,7 +345,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <select
               value={selectedLanguageId ?? ''}
               onChange={handleLanguageChange}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length || !sourceCode.trim()}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               {languages.map((l) => (
@@ -330,7 +360,7 @@ export const DashboardCodeRunner: React.FC = () => {
           <div className="md:col-span-3 flex items-center gap-2">
             <button
               onClick={handleRunSampleCases}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length || !sourceCode.trim()}
               className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
               title="Execute sample test cases (/api/v1/admin/testCode)"
             >
@@ -340,7 +370,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
             <button
               onClick={handleSubmitAllCases}
-              disabled={isBusy || resourcesLoading || !languages.length}
+              disabled={isBusy || combinedResourcesLoading || !languages.length}
               className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs hover:shadow-sm disabled:opacity-50 transition-all cursor-pointer"
               title="Submit against all test cases (/api/v1/admin/submitCode)"
             >
@@ -388,6 +418,11 @@ export const DashboardCodeRunner: React.FC = () => {
                 lineNumbers: 'on',
                 automaticLayout: true,
                 padding: { top: 12, bottom: 12 },
+                readOnly: isBusy,
+                readOnlyMessage: { value: 'Editing is paused while code execution is in progress.' },
+                wordWrap: 'on',
+                smoothScrolling: true,
+                accessibilitySupport: 'auto',
               }}
             />
           </div>
@@ -395,7 +430,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
         {/* Results Console Panel */}
         {result && (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-5 space-y-4 shadow-xs animate-in fade-in duration-200">
+          <div ref={resultsRef} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-5 space-y-4 shadow-xs animate-in fade-in duration-200" aria-live="polite">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-blue-600 dark:text-blue-400" />

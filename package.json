@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test scripts/tests/*.test.mjs",
     "preview": "vite preview",
-    "verify:architecture": "node scripts/verify-architecture.mjs"
+    "verify:architecture": "node scripts/verify-architecture.mjs",
+    "verify:docs": "node scripts/verify-documentation.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.5.7",
@@ -38,6 +39,6 @@
     "vite": "^8.2.0"
   },
   "overrides": {
-    "dompurify": "3.4.16"
+    "dompurify": "3.4.17"
   }
 }

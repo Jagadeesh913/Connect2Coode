@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { profileService } from '../../../services/profileService';
 import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../../../core/types/domain';
 
@@ -8,6 +8,9 @@ export interface ProfileState {
   loading: boolean;
   userInfoLoading: boolean;
   error: string | null;
+  userInfoError: string | null;
+  userInfoRequestId: string | null;
+  activeUserInfoUserId: string | number | null;
 }
 
 const initialState: ProfileState = {
@@ -16,6 +19,9 @@ const initialState: ProfileState = {
   loading: false,
   userInfoLoading: false,
   error: null,
+  userInfoError: null,
+  userInfoRequestId: null,
+  activeUserInfoUserId: null,
 };
 
 export const fetchUserProfile = createAsyncThunk<
@@ -45,36 +51,32 @@ export const fetchUserProfile = createAsyncThunk<
   }
 );
 
-export const updateUserProfile = createAsyncThunk(
-  'profile/update',
-  async (payload: Partial<UserProfile>) => {
-    const res = await profileService.updateProfile(payload);
-    return res.data;
-  }
-);
-
 export const fetchUserInfoThunk = createAsyncThunk<
-  UserInfoData | null,
-  string | number,
-  { rejectValue: any }
+  { userId: string | number; data: UserInfoData | null },
+  { userId: string | number; force?: boolean },
+  { rejectValue: string }
 >(
   'profile/fetchUserInfo',
-  async (userId: string | number, { rejectWithValue }) => {
+  async ({ userId }, { rejectWithValue, signal }) => {
     try {
-      const res = await profileService.getUserInfo(userId);
-      return res.data;
+      const res = await profileService.getUserInfo(userId, signal);
+      return { userId, data: res.data };
     } catch (err: any) {
-      return rejectWithValue(err);
+      if (signal.aborted) throw err;
+      return rejectWithValue(err?.message || 'Unable to refresh academic details.');
     }
   },
   {
-    condition: (userId, { getState }) => {
+    condition: ({ userId, force }, { getState }) => {
       const state = getState() as { profile: ProfileState };
-      if (state.profile?.userInfoLoading) {
+      const sameUser =
+        String(state.profile.activeUserInfoUserId ?? '') === String(userId);
+      if (state.profile.userInfoLoading && sameUser) {
         return false;
       }
+      if (force) return true;
       if (
-        state.profile?.userInfo &&
+        state.profile.userInfo &&
         String(state.profile.userInfo.userId ?? '') === String(userId)
       ) {
         return false;
@@ -84,7 +86,11 @@ export const fetchUserInfoThunk = createAsyncThunk<
   }
 );
 
-export const saveUserInfoThunk = createAsyncThunk(
+export const saveUserInfoThunk = createAsyncThunk<
+  UserInfoData,
+  { userId: string | number; payload: SaveUserInfoPayload },
+  { rejectValue: string }
+>(
   'profile/saveUserInfo',
   async (
     { userId, payload }: { userId: string | number; payload: SaveUserInfoPayload },
@@ -92,9 +98,15 @@ export const saveUserInfoThunk = createAsyncThunk(
   ) => {
     try {
       const res = await profileService.saveUserInfo(userId, payload);
-      return res.data;
+      return {
+        ...payload,
+        ...res.data,
+        userId,
+        college: res.data?.college || res.data?.collegeName || payload.college,
+        collegeName: res.data?.collegeName || res.data?.college || payload.college,
+      };
     } catch (err: any) {
-      return rejectWithValue(err);
+      return rejectWithValue(err?.message || 'Unable to save academic details.');
     }
   }
 );
@@ -102,14 +114,7 @@ export const saveUserInfoThunk = createAsyncThunk(
 const profileSlice = createSlice({
   name: 'profile',
   initialState,
-  reducers: {
-    setProfile(state, action: PayloadAction<UserProfile | null>) {
-      state.profile = action.payload;
-    },
-    setUserInfo(state, action: PayloadAction<UserInfoData | null>) {
-      state.userInfo = action.payload;
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
       // fetchUserProfile
@@ -125,43 +130,60 @@ const profileSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || 'Failed to fetch profile';
       })
-      // updateUserProfile
-      .addCase(updateUserProfile.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(updateUserProfile.fulfilled, (state, action) => {
-        state.loading = false;
-        state.profile = action.payload;
-      })
-      .addCase(updateUserProfile.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || 'Failed to update profile';
-      })
       // fetchUserInfo
-      .addCase(fetchUserInfoThunk.pending, (state) => {
+      .addCase(fetchUserInfoThunk.pending, (state, action) => {
         state.userInfoLoading = true;
+        state.userInfoError = null;
+        state.userInfoRequestId = action.meta.requestId;
+        state.activeUserInfoUserId = action.meta.arg.userId;
       })
       .addCase(fetchUserInfoThunk.fulfilled, (state, action) => {
+        if (state.userInfoRequestId !== action.meta.requestId) return;
         state.userInfoLoading = false;
-        state.userInfo = action.payload;
+        state.userInfoRequestId = null;
+        state.activeUserInfoUserId = action.meta.arg.userId;
+        state.userInfo = action.payload.data;
       })
-      .addCase(fetchUserInfoThunk.rejected, (state) => {
+      .addCase(fetchUserInfoThunk.rejected, (state, action) => {
+        if (state.userInfoRequestId !== action.meta.requestId) return;
         state.userInfoLoading = false;
+        state.userInfoRequestId = null;
+        if (!action.meta.aborted && !action.meta.condition) {
+          state.userInfoError = action.payload || action.error.message || 'Unable to refresh academic details.';
+        }
       })
       // saveUserInfo
-      .addCase(saveUserInfoThunk.pending, (state) => {
+      .addCase(saveUserInfoThunk.pending, (state, action) => {
         state.userInfoLoading = true;
+        state.userInfoError = null;
+        state.userInfoRequestId = action.meta.requestId;
+        state.activeUserInfoUserId = action.meta.arg.userId;
       })
       .addCase(saveUserInfoThunk.fulfilled, (state, action) => {
+        if (state.userInfoRequestId !== action.meta.requestId) return;
         state.userInfoLoading = false;
+        state.userInfoRequestId = null;
+        state.activeUserInfoUserId = action.meta.arg.userId;
         state.userInfo = action.payload;
       })
-      .addCase(saveUserInfoThunk.rejected, (state) => {
+      .addCase(saveUserInfoThunk.rejected, (state, action) => {
+        if (state.userInfoRequestId !== action.meta.requestId) return;
         state.userInfoLoading = false;
-      });
+        state.userInfoRequestId = null;
+        state.userInfoError = action.payload || action.error.message || 'Unable to save academic details.';
+      })
+      .addMatcher(
+        (action) => action.type === 'auth/logout/fulfilled' || action.type === 'auth/logout/rejected',
+        (state) => {
+          state.profile = null;
+          state.userInfo = null;
+          state.userInfoLoading = false;
+          state.userInfoError = null;
+          state.userInfoRequestId = null;
+          state.activeUserInfoUserId = null;
+        }
+      );
   },
 });
 
-export const { setProfile, setUserInfo } = profileSlice.actions;
 export default profileSlice.reducer;

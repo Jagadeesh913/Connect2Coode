@@ -193,6 +193,23 @@ describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
       assert.equal(rejected.companyProblemsLoading, false);
       assert.equal(rejected.problemsError, 'Refresh failed');
     });
+
+    it('releases combined loading when the company-problems request settles', () => {
+      const initial = companyReducer(undefined, { type: '@@INIT' });
+      const pending = companyReducer(initial, {
+        type: fetchCompanyProblems.pending.type,
+        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-only' },
+      });
+      assert.equal(pending.loading, true);
+
+      const fulfilled = companyReducer(pending, {
+        type: fetchCompanyProblems.fulfilled.type,
+        payload: { key: 'id:7|name:acme', problems: [], fetchedAt: Date.now() },
+        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-only' },
+      });
+      assert.equal(fulfilled.companyProblemsLoading, false);
+      assert.equal(fulfilled.loading, false);
+    });
   });
 
   describe('F-003: Solved Problem Count & Percentage Against Catalog Total', () => {

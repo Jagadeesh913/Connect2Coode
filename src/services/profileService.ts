@@ -7,13 +7,11 @@ import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../core/typ
 export type UserProfileData = UserProfile;
 
 export const profileService = {
-  /**
-   * Fetches baseline user profile from session and userInfo endpoint
-   */
+  /** Fetches immutable identity fields supplied by the authenticated session. */
   async getProfile(): Promise<ApiResponse<UserProfileData>> {
     const storedUser = tokenStorage.getUser();
     if (storedUser) {
-      const fallbackProfile: UserProfileData = {
+      const profile: UserProfileData = {
         id: storedUser.id,
         email: storedUser.email,
         firstName: storedUser.firstName,
@@ -23,23 +21,10 @@ export const profileService = {
         avatarUrl: storedUser.avatarUrl,
       };
 
-      if (storedUser.id) {
-        try {
-          const infoRes = await this.getUserInfo(storedUser.id);
-          if (infoRes?.data) {
-            fallbackProfile.regNumber = infoRes.data.regNumber;
-            fallbackProfile.collegeName = infoRes.data.college;
-            fallbackProfile.bio = infoRes.data.bio;
-            fallbackProfile.joinedYear = infoRes.data.joinedYear;
-            fallbackProfile.passedOutYear = infoRes.data.passedOutYear;
-          }
-        } catch {}
-      }
-
       return {
         statusCode: 200,
-        message: 'Profile loaded from session',
-        data: fallbackProfile,
+        message: 'Authenticated identity loaded',
+        data: profile,
       };
     }
 
@@ -47,25 +32,6 @@ export const profileService = {
       statusCode: 200,
       message: 'No profile found',
       data: null as any,
-    };
-  },
-
-  /**
-   * Updates base profile and synchronizes with tokenStorage
-   */
-  async updateProfile(payload: Partial<UserProfileData>): Promise<ApiResponse<UserProfileData>> {
-    const current = tokenStorage.getUser() || ({} as any);
-    const updated = {
-      ...current,
-      ...payload,
-      fullName: payload.fullName || `${payload.firstName || current.firstName || ''} ${payload.lastName || current.lastName || ''}`.trim() || current.fullName,
-    };
-    tokenStorage.setUser(updated);
-
-    return {
-      statusCode: 200,
-      message: 'Profile updated successfully',
-      data: updated as UserProfileData,
     };
   },
 

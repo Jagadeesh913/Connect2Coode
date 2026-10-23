@@ -1,0 +1,101 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import { register } from 'node:module';
+import { pathToFileURL } from 'node:url';
+
+// Register ESM loader hook to handle extensionless .ts imports and stub axios
+const loaderCode = `
+export async function resolve(specifier, context, nextResolve) {
+  if (specifier === 'axios') {
+    return {
+      shortCircuit: true,
+      url: 'data:text/javascript,' + encodeURIComponent('export default { create: () => ({ interceptors: { request: { use: () => {} }, response: { use: () => {} } } }), isCancel: () => false }; export const AxiosInstance = {}; export const AxiosResponse = {}; export const InternalAxiosRequestConfig = {}; export const isCancel = () => false;')
+    };
+  }
+  try {
+    return await nextResolve(specifier, context);
+  } catch (err) {
+    if (specifier.startsWith('.') && !specifier.endsWith('.ts')) {
+      return await nextResolve(specifier + '.ts', context);
+    }
+    throw err;
+  }
+}
+`;
+
+register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
+
+const { synthesizeMcqOptions } = await import('../../src/features/aptitude/utils/mcqUtils.ts');
+
+describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () => {
+  it('correctly identifies option B when user edits MCQ and sets option A to isCorrect: false and option B to isCorrect: true, even with stale correctOption: "A"', () => {
+    const mcq = {
+      id: 42,
+      question: 'What is 10 + 10?',
+      correctOption: 'A', // Stale top-level field from when A was initially chosen by mistake
+      correctAnswer: '15', // Stale answer text
+      answer: '15',
+      options: [
+        { id: 101, optionLabel: 'A', optionText: '15', isCorrect: false },
+        { id: 102, optionLabel: 'B', optionText: '20', isCorrect: true }, // User changed to B
+        { id: 103, optionLabel: 'C', optionText: '25', isCorrect: false },
+        { id: 104, optionLabel: 'D', optionText: '30', isCorrect: false },
+      ],
+    };
+
+    const options = synthesizeMcqOptions(mcq);
+
+    // Option A must strictly have isCorrect: false
+    const optA = options.find((o) => o.optionLabel === 'A');
+    assert.equal(optA.isCorrect, false, 'Option A must have isCorrect: false');
+
+    // Option B must strictly have isCorrect: true
+    const optB = options.find((o) => o.optionLabel === 'B');
+    assert.equal(optB.isCorrect, true, 'Option B must have isCorrect: true');
+
+    // Exactly one option must be marked correct
+    const correctOptions = options.filter((o) => o.isCorrect === true);
+    assert.equal(correctOptions.length, 1, 'Only one option must be marked as correct');
+    assert.equal(correctOptions[0].optionLabel, 'B');
+    assert.equal(correctOptions[0].optionText, '20');
+  });
+
+  it('supports boolean equivalents (string "true" / "false", 1 / 0) for isCorrect on options', () => {
+    const mcqWithStringBooleans = {
+      id: 43,
+      question: 'Identify binary flag correctly',
+      options: [
+        { id: 201, optionLabel: 'A', optionText: 'First', isCorrect: 'false' },
+        { id: 202, optionLabel: 'B', optionText: 'Second', isCorrect: 'false' },
+        { id: 203, optionLabel: 'C', optionText: 'Third', isCorrect: 'true' },
+        { id: 204, optionLabel: 'D', optionText: 'Fourth', isCorrect: 0 },
+      ],
+    };
+
+    const options = synthesizeMcqOptions(mcqWithStringBooleans);
+    const correctOpt = options.find((o) => o.isCorrect === true);
+    assert.ok(correctOpt, 'Must find a correct option');
+    assert.equal(correctOpt.optionLabel, 'C');
+    assert.equal(correctOpt.optionText, 'Third');
+  });
+
+  it('falls back to correctOption only when options have no explicit isCorrect flags', () => {
+    const legacyMcq = {
+      id: 44,
+      question: 'Legacy question with only correctOption',
+      correctOption: 'C',
+      options: [
+        { id: 301, optionLabel: 'A', optionText: 'Red' },
+        { id: 302, optionLabel: 'B', optionText: 'Blue' },
+        { id: 303, optionLabel: 'C', optionText: 'Green' },
+        { id: 304, optionLabel: 'D', optionText: 'Yellow' },
+      ],
+    };
+
+    const options = synthesizeMcqOptions(legacyMcq);
+    const correctOpt = options.find((o) => o.isCorrect === true);
+    assert.ok(correctOpt);
+    assert.equal(correctOpt.optionLabel, 'C');
+    assert.equal(correctOpt.optionText, 'Green');
+  });
+});

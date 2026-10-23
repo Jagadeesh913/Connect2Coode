@@ -1,4 +1,5 @@
 import type { User } from '../types/domain';
+import { publishAuthSessionEvent } from './authSessionSync';
 
 /**
  * Browser-side authentication storage.
@@ -19,8 +20,6 @@ import type { User } from '../types/domain';
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_PROFILE_KEY = 'user_profile';
-
-const LOCAL_STORAGE_PREFIX = 'c2c_';
 
 function cookieSecurityAttributes(): string {
   return typeof window !== 'undefined' && window.location.protocol === 'https:'
@@ -57,34 +56,12 @@ function removeCookie(name: string): void {
   } catch {}
 }
 
-function getLocalItem(key: string): string | null {
+function removeLegacyBrowserStorage(key: string): void {
   try {
-    return (
-      localStorage.getItem(`${LOCAL_STORAGE_PREFIX}${key}`) ||
-      localStorage.getItem(key) ||
-      sessionStorage.getItem(`${LOCAL_STORAGE_PREFIX}${key}`) ||
-      sessionStorage.getItem(key)
-    );
-  } catch {
-    return null;
-  }
-}
-
-function setLocalItem(key: string, value: string): void {
-  try {
-    localStorage.setItem(`${LOCAL_STORAGE_PREFIX}${key}`, value);
-    localStorage.setItem(key, value);
-    sessionStorage.setItem(`${LOCAL_STORAGE_PREFIX}${key}`, value);
-    sessionStorage.setItem(key, value);
-  } catch {}
-}
-
-function removeLocalItem(key: string): void {
-  try {
-    localStorage.removeItem(`${LOCAL_STORAGE_PREFIX}${key}`);
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(`${LOCAL_STORAGE_PREFIX}${key}`);
-    sessionStorage.removeItem(key);
+    for (const storage of [localStorage, sessionStorage]) {
+      storage.removeItem(`c2c_${key}`);
+      storage.removeItem(key);
+    }
   } catch {}
 }
 
@@ -102,30 +79,24 @@ export const tokenStorage = {
       getCookie('jwt') ||
       getCookie('jwtToken') ||
       getCookie('jwttoken') ||
-      getCookie('authToken') ||
-      getLocalItem(ACCESS_TOKEN_KEY) ||
-      getLocalItem('token') ||
-      getLocalItem('access_token') ||
-      getLocalItem('accessToken') ||
-      getLocalItem('jwt') ||
-      getLocalItem('jwtToken') ||
-      getLocalItem('jwttoken') ||
-      getLocalItem('authToken')
+      getCookie('authToken')
     );
   },
 
   setAccessToken(token: string, maxAgeSeconds: number = 900): void {
     inMemoryAccessToken = token;
     setCookie(ACCESS_TOKEN_KEY, token, maxAgeSeconds);
-    setCookie('token', token, maxAgeSeconds);
-    setCookie('access_token', token, maxAgeSeconds);
-    setCookie('jwtToken', token, maxAgeSeconds);
-    setCookie('jwttoken', token, maxAgeSeconds);
-    setLocalItem(ACCESS_TOKEN_KEY, token);
-    setLocalItem('token', token);
-    setLocalItem('access_token', token);
-    setLocalItem('jwtToken', token);
-    setLocalItem('jwttoken', token);
+    removeCookie('token');
+    removeCookie('access_token');
+    removeCookie('jwt');
+    removeCookie('jwtToken');
+    removeCookie('jwttoken');
+    removeCookie('authToken');
+    removeLegacyBrowserStorage(ACCESS_TOKEN_KEY);
+    removeLegacyBrowserStorage('token');
+    removeLegacyBrowserStorage('access_token');
+    removeLegacyBrowserStorage('jwtToken');
+    removeLegacyBrowserStorage('jwttoken');
   },
 
   removeAccessToken(): void {
@@ -135,11 +106,11 @@ export const tokenStorage = {
     removeCookie('access_token');
     removeCookie('jwtToken');
     removeCookie('jwttoken');
-    removeLocalItem(ACCESS_TOKEN_KEY);
-    removeLocalItem('token');
-    removeLocalItem('access_token');
-    removeLocalItem('jwtToken');
-    removeLocalItem('jwttoken');
+    removeLegacyBrowserStorage(ACCESS_TOKEN_KEY);
+    removeLegacyBrowserStorage('token');
+    removeLegacyBrowserStorage('access_token');
+    removeLegacyBrowserStorage('jwtToken');
+    removeLegacyBrowserStorage('jwttoken');
   },
 
   getRefreshToken(): string | null {
@@ -147,19 +118,16 @@ export const tokenStorage = {
       inMemoryRefreshToken ||
       getCookie(REFRESH_TOKEN_KEY) ||
       getCookie('refresh_token') ||
-      getCookie('refreshToken') ||
-      getLocalItem(REFRESH_TOKEN_KEY) ||
-      getLocalItem('refresh_token') ||
-      getLocalItem('refreshToken')
+      getCookie('refreshToken')
     );
   },
 
   setRefreshToken(token: string, maxAgeSeconds: number = 604800): void {
     inMemoryRefreshToken = token;
     setCookie(REFRESH_TOKEN_KEY, token, maxAgeSeconds);
-    setCookie('refresh_token', token, maxAgeSeconds);
-    setLocalItem(REFRESH_TOKEN_KEY, token);
-    setLocalItem('refresh_token', token);
+    removeCookie('refresh_token');
+    removeLegacyBrowserStorage(REFRESH_TOKEN_KEY);
+    removeLegacyBrowserStorage('refresh_token');
   },
 
   removeRefreshToken(): void {
@@ -167,18 +135,16 @@ export const tokenStorage = {
     removeCookie(REFRESH_TOKEN_KEY);
     removeCookie('refresh_token');
     removeCookie('refreshToken');
-    removeLocalItem(REFRESH_TOKEN_KEY);
-    removeLocalItem('refresh_token');
-    removeLocalItem('refreshToken');
+    removeLegacyBrowserStorage(REFRESH_TOKEN_KEY);
+    removeLegacyBrowserStorage('refresh_token');
+    removeLegacyBrowserStorage('refreshToken');
   },
 
   // User profile is UI/session metadata, not an authentication credential (F-013).
   getUser(): User | null {
     const raw =
       getCookie(USER_PROFILE_KEY) ||
-      getCookie('user') ||
-      getLocalItem(USER_PROFILE_KEY) ||
-      getLocalItem('user');
+      getCookie('user');
     if (raw) {
       try {
         return JSON.parse(raw) as User;
@@ -190,24 +156,37 @@ export const tokenStorage = {
   setUser(user: User, maxAgeSeconds: number = 604800): void {
     const serialized = JSON.stringify(user);
     setCookie(USER_PROFILE_KEY, serialized, maxAgeSeconds);
-    setCookie('user', serialized, maxAgeSeconds);
-    setLocalItem(USER_PROFILE_KEY, serialized);
-    setLocalItem('user', serialized);
+    removeCookie('user');
+    removeLegacyBrowserStorage(USER_PROFILE_KEY);
+    removeLegacyBrowserStorage('user');
   },
 
   removeUser(): void {
     removeCookie(USER_PROFILE_KEY);
     removeCookie('user');
-    removeLocalItem(USER_PROFILE_KEY);
-    removeLocalItem('user');
+    removeLegacyBrowserStorage(USER_PROFILE_KEY);
+    removeLegacyBrowserStorage('user');
   },
 
-  clearTokens(): void {
+  /**
+   * Clears this tab's in-memory state and the shared cookie session. The
+   * broadcast is suppressed only while processing another tab's notification.
+   */
+  clearTokens(options: { broadcast?: boolean } = {}): void {
     this.removeAccessToken();
     this.removeRefreshToken();
     this.removeUser();
     // Clear any residual legacy cookies from earlier versions
     removeCookie(ACCESS_TOKEN_KEY);
     removeCookie(REFRESH_TOKEN_KEY);
+    if (options.broadcast !== false) {
+      publishAuthSessionEvent('session-cleared');
+    }
+  },
+
+  /** Discards stale per-tab token caches so shared cookies become authoritative. */
+  discardInMemorySession(): void {
+    inMemoryAccessToken = null;
+    inMemoryRefreshToken = null;
   },
 };

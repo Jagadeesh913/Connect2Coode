@@ -53,8 +53,14 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(mapped.description, 'Calculate the sum of all elements present in the given integer array.');
   });
 
-  it('Task 5: tokenStorage retrieves tokens stored both with and without c2c_ prefix', () => {
-    // Test set and get with standard tokenStorage
+  it('does not invent a platform when the API omits platform fields', () => {
+    const mapped = mapProblemDto({ id: 2, title: 'API-owned question' });
+    assert.equal(mapped.qpfRefCode, '');
+    assert.equal(mapped.qpfRefName, '');
+    assert.equal(mapped.examPlatform, '');
+  });
+
+  it('Task 5: tokenStorage keeps session tokens in the canonical cookie/memory contract', () => {
     tokenStorage.setRefreshToken('token_abc_123');
     assert.equal(tokenStorage.getRefreshToken(), 'token_abc_123');
 

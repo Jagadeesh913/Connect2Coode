@@ -6,7 +6,10 @@ import type { ReferenceItem } from '../core/types/domain';
 export type { ReferenceItem };
 
 export const referenceService = {
-  async getByGroupCode(refGroupCode: string): Promise<ApiResponse<ReferenceItem[]>> {
-    return apiClient.get(API_ENDPOINTS.REFERENCE.GROUP(refGroupCode));
+  async getByGroupCode(
+    refGroupCode: string,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<ReferenceItem[]>> {
+    return apiClient.get(API_ENDPOINTS.REFERENCE.GROUP(refGroupCode), { signal });
   },
 };

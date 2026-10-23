@@ -278,6 +278,22 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       }
     });
 
+    it('propagates test-case mutation failures instead of returning a fabricated success response', async () => {
+      const originalPost = apiClient.post;
+      apiClient.post = async () => {
+        throw { statusCode: 500, message: 'Database rejected test cases' };
+      };
+
+      try {
+        await assert.rejects(
+          () => questionService.addTestCases(1, [{ input: '1', expectedOutput: '1' }]),
+          (error) => error?.statusCode === 500 && error?.message === 'Database rejected test cases'
+        );
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
     it('adminQuestionService delegates getQuestionById to canonical questionService', async () => {
       const originalGetById = questionService.getById;
       let delegatedCall = false;

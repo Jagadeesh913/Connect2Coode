@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { mcqService } from '../../../services/mcqService';
-import { referenceService, ReferenceItem } from '../../../services/referenceService';
 import type { McqQuestion } from '../../../core/types/domain';
 import {
   cleanQuestionText,
@@ -14,6 +13,7 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { Lock } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 export type AptitudeItem = McqQuestion;
 
@@ -40,7 +40,6 @@ const SUBJECT_CONFIG: Record<
     icon: string;
     iconBg: string;
     iconColor: string;
-    defaultId: number;
     urlParam: string;
   }
 > = {
@@ -52,7 +51,6 @@ const SUBJECT_CONFIG: Record<
     icon: 'fa-solid fa-calculator',
     iconBg: 'bg-blue-100 dark:bg-blue-900/60',
     iconColor: 'text-blue-600 dark:text-sky-400',
-    defaultId: 30,
     urlParam: 'quantitative',
   },
   REASONING: {
@@ -63,7 +61,6 @@ const SUBJECT_CONFIG: Record<
     icon: 'fa-solid fa-brain',
     iconBg: 'bg-purple-100 dark:bg-purple-900/60',
     iconColor: 'text-purple-600 dark:text-purple-400',
-    defaultId: 32,
     urlParam: 'reasoning',
   },
   VERBAL: {
@@ -74,7 +71,6 @@ const SUBJECT_CONFIG: Record<
     icon: 'fa-solid fa-file-lines',
     iconBg: 'bg-cyan-100 dark:bg-cyan-900/60',
     iconColor: 'text-cyan-600 dark:text-cyan-400',
-    defaultId: 33,
     urlParam: 'verbal',
   },
   PSEUDOCODE: {
@@ -85,7 +81,6 @@ const SUBJECT_CONFIG: Record<
     icon: 'fa-solid fa-code',
     iconBg: 'bg-emerald-100 dark:bg-emerald-900/60',
     iconColor: 'text-emerald-600 dark:text-emerald-400',
-    defaultId: 31,
     urlParam: 'pseudocode',
   },
 };
@@ -370,16 +365,29 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const [totalElements, setTotalElements] = useState<number>(0);
   const [totalPages, setTotalPages] = useState<number>(1);
 
-  // Reference Library Question Types for active category
-  const [activeQuestionTypes, setActiveQuestionTypes] = useState<ReferenceItem[]>([]);
+  const {
+    items: subjectReferences,
+    loading: subjectsLoading,
+    error: subjectsError,
+    retry: retrySubjects,
+  } = useReferenceGroup('SUBJECT');
+  const {
+    items: activeQuestionTypes,
+    error: topicsError,
+    retry: retryTopics,
+  } = useReferenceGroup(activeSubject);
+  const { items: difficultyReferences } = useReferenceGroup('DIFF');
 
-  // Subject ID mapping from reference library
-  const [subjectRefMap, setSubjectRefMap] = useState<Record<AptitudeSubjectCode, number>>({
-    APTITUDE: 30,
-    REASONING: 32,
-    VERBAL: 33,
-    PSEUDOCODE: 31,
-  });
+  const subjectRefMap = useMemo(() => {
+    const map: Partial<Record<AptitudeSubjectCode, number>> = {};
+    subjectReferences.forEach((subject) => {
+      const code = String(subject.refCode || '').toUpperCase().trim() as AptitudeSubjectCode;
+      if (code in SUBJECT_CONFIG && Number.isFinite(Number(subject.id))) {
+        map[code] = Number(subject.id);
+      }
+    });
+    return map;
+  }, [subjectReferences]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -421,76 +429,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     if (isMobileFilterOpen) setIsMobileFilterOpen(false);
   };
 
-  // Load subject reference map on initial mount
-  useEffect(() => {
-    let isMounted = true;
-    referenceService.getByGroupCode('SUBJECT').then((res) => {
-      if (!isMounted) return;
-      const rawSubjs = Array.isArray((res as any)?.data)
-        ? (res as any).data
-        : Array.isArray((res as any)?.data?.data)
-        ? (res as any).data.data
-        : Array.isArray(res)
-        ? res
-        : [];
-      const map: Record<AptitudeSubjectCode, number> = {
-        APTITUDE: 30,
-        REASONING: 32,
-        VERBAL: 33,
-        PSEUDOCODE: 31,
-      };
-      rawSubjs.forEach((s: any) => {
-        const code = String(s.refCode || '').toUpperCase().trim();
-        if (code === 'APTITUDE' && typeof s.id === 'number') map.APTITUDE = s.id;
-        if (code === 'REASONING' && typeof s.id === 'number') map.REASONING = s.id;
-        if (code === 'VERBAL' && typeof s.id === 'number') map.VERBAL = s.id;
-        if (code === 'PSEUDOCODE' && typeof s.id === 'number') map.PSEUDOCODE = s.id;
-      });
-      setSubjectRefMap((prev) => {
-        if (
-          prev.APTITUDE === map.APTITUDE &&
-          prev.REASONING === map.REASONING &&
-          prev.VERBAL === map.VERBAL &&
-          prev.PSEUDOCODE === map.PSEUDOCODE
-        ) {
-          return prev;
-        }
-        return map;
-      });
-    }).catch(() => {});
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const [topicsError, setTopicsError] = useState<string | null>(null);
-  const [topicsRetry, setTopicsRetry] = useState(0);
-
-  // Load Question Types for the active category (APTITUDE, REASONING, VERBAL, PSEUDOCODE)
-  useEffect(() => {
-    let isMounted = true;
-    setActiveQuestionTypes([]);
-    setTopicsError(null);
-    referenceService.getByGroupCode(activeSubject).then((res) => {
-      if (!isMounted) return;
-      const items = Array.isArray((res as any)?.data)
-        ? (res as any).data
-        : Array.isArray((res as any)?.data?.data)
-        ? (res as any).data.data
-        : Array.isArray(res)
-        ? res
-        : [];
-      setActiveQuestionTypes(items);
-    }).catch(() => {
-      if (isMounted) setTopicsError("Unable to load topic filters.");
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeSubject, topicsRetry]);
-
   // Complete category topics with verified database IDs
   const allCategoryTopics: QuestionTypeItem[] = useMemo(() => {
     if (activeQuestionTypes.length > 0) {
@@ -514,28 +452,31 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     );
   }, [allCategoryTopics, topicSearch]);
 
-  // Map applied Difficulties to backend DIFF IDs:
-  // In the DB: 1=BASIC, 2=EASY, 3=MEDIUM, 4=HARD
+  // Resolve selected difficulty names against the live DIFF reference group.
   const selectedDifficultyIds = useMemo(() => {
-    const ids: number[] = [];
-    if (appliedDifficulties.includes('Easy')) {
-      ids.push(1, 2);
-    }
-    if (appliedDifficulties.includes('Medium')) {
-      ids.push(3);
-    }
-    if (appliedDifficulties.includes('Hard')) {
-      ids.push(4);
-    }
-    return ids;
-  }, [appliedDifficulties]);
+    const selected = new Set(appliedDifficulties.map((value) => value.toUpperCase()));
+    return difficultyReferences
+      .filter((item) =>
+        selected.has(String(item.refCode || '').toUpperCase()) ||
+        selected.has(String(item.refName || '').toUpperCase())
+      )
+      .map((item) => Number(item.id))
+      .filter(Number.isFinite);
+  }, [appliedDifficulties, difficultyReferences]);
 
-  const activeSubjectId = subjectRefMap[activeSubject] ?? SUBJECT_CONFIG[activeSubject].defaultId;
+  const activeSubjectId = subjectRefMap[activeSubject];
 
   // Fetch Questions from backend API
   const fetchQuestions = useCallback(async () => {
     if (!isAuthenticated) {
       setLoading(false);
+      return;
+    }
+    if (!activeSubjectId) {
+      setLoading(subjectsLoading);
+      if (!subjectsLoading) {
+        setError(subjectsError || 'Subject reference data is unavailable.');
+      }
       return;
     }
 
@@ -612,7 +553,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [isAuthenticated, activeSubjectId, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
+  }, [isAuthenticated, activeSubjectId, subjectsLoading, subjectsError, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -1069,7 +1010,10 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
             {/* Questions List */}
             <div className="flex flex-col gap-3">
               {topicsError && (
-                <RequestStatus error={topicsError} onRetry={() => setTopicsRetry((value) => value + 1)} />
+                <RequestStatus error={topicsError} onRetry={retryTopics} />
+              )}
+              {subjectsError && (
+                <RequestStatus error={subjectsError} onRetry={retrySubjects} />
               )}
               {error && questions.length > 0 && (
                 <RequestStatus error={`${error} Showing previous results.`} onRetry={fetchQuestions} />

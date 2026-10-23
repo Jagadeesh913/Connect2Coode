@@ -26,7 +26,9 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 const { API_ENDPOINTS } = await import('../../src/core/api/endpoints.ts');
-const { executionService } = await import('../../src/services/executionService.ts');
+const { apiClient } = await import('../../src/core/api/apiClient.ts');
+const { executionService, normalizeExecutionResult } = await import('../../src/services/executionService.ts');
+const { adminLanguageService } = await import('../../src/services/admin/adminLanguageService.ts');
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
 
 describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
@@ -123,45 +125,176 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   });
 
   describe('3. Language ID Mapping & Execution Payload Resolution', () => {
-    it('resolves valid positive numeric language IDs as fallback when registry is empty', async () => {
-      const resolved = await executionService.resolveLanguageReferenceId(5);
-      assert.equal(resolved, 5);
+    it('invalidates the shared execution-language cache after an admin mutation', async () => {
+      const originalGet = apiClient.get;
+      const originalPost = apiClient.post;
+      let getCalls = 0;
+
+      apiClient.get = async () => {
+        getCalls += 1;
+        return {
+          statusCode: 200,
+          data: [{ id: getCalls, languageName: getCalls === 1 ? 'Java' : 'Python', referenceId: getCalls + 4 }],
+        };
+      };
+      apiClient.post = async (_url, payload) => ({ statusCode: 200, message: 'Saved', data: payload });
+
+      try {
+        executionService.invalidateLanguageCache();
+        const beforeMutation = await executionService.getLanguageDropdown();
+        await executionService.getLanguageDropdown();
+        assert.equal(getCalls, 1, 'consecutive reads should reuse the language cache');
+        assert.equal(beforeMutation[0].name, 'Java');
+
+        await adminLanguageService.createLanguage({ referenceId: 6, judge0LanguageId: 71 });
+        const afterMutation = await executionService.getLanguageDropdown();
+        assert.equal(getCalls, 2, 'successful admin mutation must invalidate the language cache');
+        assert.equal(afterMutation[0].name, 'Python');
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+        apiClient.post = originalPost;
+      }
     });
 
-    it('throws error for non-positive or invalid language IDs with no mapping', async () => {
-      await assert.rejects(
-        () => executionService.resolveLanguageReferenceId(0),
-        /No backend reference mapping found for language id: 0/
-      );
+    it('resolves language IDs only from the backend registry', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [{ id: 1, languageName: 'Java', referenceId: 5 }],
+      });
+      try {
+        executionService.invalidateLanguageCache();
+        assert.equal(await executionService.resolveLanguageReferenceId(1), 5);
+        assert.equal(await executionService.resolveLanguageReferenceId(5), 5);
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('throws when an ID has no backend-provided language mapping', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [{ id: 1, languageName: 'Java', referenceId: 5 }],
+      });
+      try {
+        executionService.invalidateLanguageCache();
+        await assert.rejects(
+          () => executionService.resolveLanguageReferenceId(99),
+          /No backend reference mapping found for language id: 99/
+        );
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
     });
 
     it('prepares execution payload with numeric questionId and sanitized code', async () => {
-      const payload = await executionService.prepareExecutionPayload({
-        questionId: '42',
-        languageId: 5,
-        sourceCode: 'public class Solution { public void solve() {} }',
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [{ id: 1, languageName: 'Java', referenceId: 5 }],
       });
+      try {
+        executionService.invalidateLanguageCache();
+        const payload = await executionService.prepareExecutionPayload({
+          questionId: '42',
+          languageId: 1,
+          sourceCode: 'public class Solution { public void solve() {} }',
+        });
 
-      assert.equal(payload.questionId, 42);
-      assert.equal(payload.languageId, 5);
-      // Java code is sanitized from `public class Solution` to `public class Main` for Judge0 entry point
-      assert.match(payload.sourceCode, /public class Main/);
-      assert.doesNotMatch(payload.sourceCode, /public class Solution/);
+        assert.equal(payload.questionId, 42);
+        assert.equal(payload.languageId, 5);
+        assert.match(payload.sourceCode, /public class Main/);
+        assert.doesNotMatch(payload.sourceCode, /public class Solution/);
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
     });
 
     it('does not alter non-Java source code entry classes', async () => {
-      const pyCode = 'def solution():\n    return 42';
-      const payload = await executionService.prepareExecutionPayload({
-        questionId: 10,
-        languageId: 6, // Python reference ID
-        sourceCode: pyCode,
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [{ id: 2, languageName: 'Python', referenceId: 6 }],
       });
+      try {
+        executionService.invalidateLanguageCache();
+        const pyCode = 'def solution():\n    return 42';
+        const payload = await executionService.prepareExecutionPayload({
+          questionId: 10,
+          languageId: 2,
+          sourceCode: pyCode,
+        });
 
-      assert.equal(payload.sourceCode, pyCode);
+        assert.equal(payload.languageId, 6);
+        assert.equal(payload.sourceCode, pyCode);
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
     });
   });
 
   describe('4. Test Case Response Secrecy & Null Safety', () => {
+    it('normalizes partial execution responses without inventing test data', () => {
+      const normalized = normalizeExecutionResult({
+        passedTestCases: '1',
+        failedTestCases: 0,
+        testCases: [{ status: 'Passed', actualOutput: '42' }],
+      });
+
+      assert.deepEqual(normalized, {
+        totalTestCases: 1,
+        passedTestCases: 1,
+        failedTestCases: 0,
+        runtimeMs: undefined,
+        memoryMb: undefined,
+        testCases: [{
+          testCaseId: 1,
+          testCaseType: 'Test Case',
+          isHidden: null,
+          status: 'Passed',
+          input: undefined,
+          expectedOutput: undefined,
+          actualOutput: '42',
+          errorMessage: undefined,
+        }],
+      });
+    });
+
+    it('sends custom input only when the API-supported field is non-empty', async () => {
+      const originalGet = apiClient.get;
+      try {
+        executionService.invalidateLanguageCache();
+        apiClient.get = async () => ({
+          data: [{ id: 1, languageName: 'Java', referenceId: 5, isActive: true }],
+        });
+
+        const withInput = await executionService.prepareExecutionPayload({
+          questionId: 7,
+          languageId: 1,
+          sourceCode: 'public class Main {}',
+          customInput: '4\n1 2 3 4',
+        });
+        const withoutInput = await executionService.prepareExecutionPayload({
+          questionId: 7,
+          languageId: 1,
+          sourceCode: 'public class Main {}',
+          customInput: '   ',
+        });
+
+        assert.equal(withInput.customInput, '4\n1 2 3 4');
+        assert.equal('customInput' in withoutInput, false);
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
+    });
+
     it('handles nullable and hidden test case fields without throwing errors', () => {
       const mockResult = {
         totalTestCases: 3,

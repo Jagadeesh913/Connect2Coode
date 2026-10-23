@@ -50,11 +50,7 @@ export const institutionService = {
       if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
         throw err;
       }
-      return {
-        statusCode: err?.statusCode || 500,
-        message: err?.message || 'Failed to search institutions',
-        data: [],
-      };
+      throw err;
     }
   },
 

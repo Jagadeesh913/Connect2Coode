@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Editor from '@monaco-editor/react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
+import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { fetchProblemById } from '../redux/problemSlice';
 import { markSolvedProblem, hydrateProgress } from '../../progress/redux/progressSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
@@ -21,11 +21,11 @@ import {
   canExecuteProblem,
 } from '../utils/problemExecution';
 import { toast } from 'react-hot-toast';
-import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
+import { useAssessmentIntegrity } from '../../../shared/hooks/useAssessmentIntegrity';
 
 interface QuestionTestCase {
   id?: number;
@@ -113,12 +113,26 @@ export const ProblemDetails: React.FC = () => {
   const { selectedProblem: problem, detailLoading: loadingProblem, detailError: problemError } = useAppSelector((state) => state.problems);
   const { languages: serverLanguages, loading: loadingLanguages, error: languagesError } = useAppSelector((state) => state.languages);
 
-  const languages = serverLanguages;
+  const languages = useMemo(
+    () => serverLanguages.filter((language) => language.isActive !== false),
+    [serverLanguages]
+  );
 
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageDropdownItem | null>(null);
 
   // Editor State
-  const workspaceRef = useRef<HTMLDivElement>(null);
+  const lastIntegrityNoticeAt = useRef(0);
+  const { bindTarget: bindWorkspace, targetRef: workspaceRef, violationCount } = useAssessmentIntegrity<HTMLDivElement>({
+    onViolation: (violation) => {
+      const now = Date.now();
+      if (now - lastIntegrityNoticeAt.current < 1500) return;
+      lastIntegrityNoticeAt.current = now;
+      const message = violation === 'tab-switch'
+        ? 'Leaving the assessment window was detected.'
+        : 'This action is disabled in the coding assessment workspace.';
+      toast.error(message, { id: 'assessment-integrity-warning' });
+    },
+  });
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
@@ -151,7 +165,7 @@ export const ProblemDetails: React.FC = () => {
       // Fallback to full-window CSS if browser policy prevents requestFullscreen
       setIsFullscreen((prev) => !prev);
     }
-  }, []);
+  }, [workspaceRef]);
 
   // Sync isFullscreen with native browser fullscreen changes (e.g. Esc key)
   useEffect(() => {
@@ -180,7 +194,7 @@ export const ProblemDetails: React.FC = () => {
 
   // Execution State
   const [isExecuting, setIsExecuting] = useState<boolean>(false);
-  const [lastExecutionMode, setLastExecutionMode] = useState<'run' | 'submit' | null>(null);
+  const [lastExecutionMode, setLastExecutionMode] = useState<'run' | 'custom' | 'submit' | null>(null);
   const [executionResult, setExecutionResult] = useState<ExecutionResultData | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number>(0);
@@ -192,6 +206,7 @@ export const ProblemDetails: React.FC = () => {
   const [leftTab, setLeftTab] = useState<'description' | 'submissions' | 'companies' | 'hints'>('description');
   const [bottomTab, setBottomTab] = useState<'testcases' | 'custom' | 'results'>('testcases');
   const [customInput, setCustomInput] = useState<string>('');
+  const resultsPanelRef = useRef<HTMLDivElement>(null);
 
   // Check whether the currently loaded problem entity matches this route's identifier
   const isProblemLoadedForRoute = Boolean(
@@ -240,15 +255,7 @@ export const ProblemDetails: React.FC = () => {
         return;
       }
 
-      // 1. Initial cached history from local storage
-      try {
-        const saved = userScopedStorage.getItem(`submissions_${activeQuestionId}`);
-        if (saved && isMounted) {
-          setSubmissionsHistory(JSON.parse(saved));
-        }
-      } catch {}
-
-      // 2. Fetch live submissions from backend if user is authenticated
+      // Submission history is server-owned; never display a browser-cached result.
       if (user?.id) {
         try {
           setLoadingSubmissions(true);
@@ -293,13 +300,9 @@ export const ProblemDetails: React.FC = () => {
               };
             });
             setSubmissionsHistory(mappedRecords);
-            userScopedStorage.setItem(
-              `submissions_${activeQuestionId}`,
-              JSON.stringify(mappedRecords)
-            );
           }
         } catch {
-          if (isMounted) setSubmissionsError('Unable to refresh submissions. Cached records are shown if available.');
+          if (isMounted) setSubmissionsError('Unable to refresh submissions. Please retry.');
         } finally {
           if (isMounted) setLoadingSubmissions(false);
         }
@@ -429,7 +432,7 @@ export const ProblemDetails: React.FC = () => {
   // Bookmark Status
   const isBookmarked = useMemo(() => {
     if (!problem) return false;
-    return bookmarks.some((b) => String(b.itemId) === String(problem.id));
+    return bookmarks.some((b) => isBookmarkItem(b, problem.id, 'PROBLEM'));
   }, [problem, bookmarks]);
 
   const handleBookmarkToggle = () => {
@@ -466,7 +469,7 @@ export const ProblemDetails: React.FC = () => {
   }, [problemIdentifier]);
 
   // RUN CODE (Visible Sample Test Cases only)
-  const handleRunCode = useCallback(async () => {
+  const executeRun = useCallback(async (customInputValue?: string) => {
     if (!isExecutionReady || !activeQuestionId || !selectedLanguage) {
       if (loadingProblem) {
         toast.error('Please wait for the problem to load');
@@ -486,7 +489,7 @@ export const ProblemDetails: React.FC = () => {
     const controller = executionRequest.begin();
     if (!controller) return;
     setIsExecuting(true);
-    setLastExecutionMode('run');
+    setLastExecutionMode(customInputValue ? 'custom' : 'run');
     setExecutionError(null);
     setBottomTab('results');
     setMobileWorkspaceTab('editor');
@@ -496,6 +499,7 @@ export const ProblemDetails: React.FC = () => {
       questionId: activeQuestionId,
       languageId: selectedLanguage.referenceId || selectedLanguage.id,
       sourceCode: currentCode,
+      ...(customInputValue ? { customInput: customInputValue } : {}),
     };
 
     try {
@@ -518,6 +522,18 @@ export const ProblemDetails: React.FC = () => {
       if (executionRequest.finish(controller)) setIsExecuting(false);
     }
   }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, executionRequest]);
+
+  const handleRunCode = useCallback(() => {
+    void executeRun();
+  }, [executeRun]);
+
+  const handleRunCustomInput = useCallback(() => {
+    if (!customInput.trim()) {
+      toast.error('Enter custom input before running the code.');
+      return;
+    }
+    void executeRun(customInput);
+  }, [customInput, executeRun]);
 
   // SUBMIT CODE (Evaluation across all test cases - TEST CASES ARE HIDDEN)
   const handleSubmitCode = useCallback(async () => {
@@ -563,33 +579,14 @@ export const ProblemDetails: React.FC = () => {
       if (isAccepted) {
         toast.success('Accepted! All test cases passed!');
         dispatch(markSolvedProblem({ id: String(activeQuestionId) }));
-        dispatch(hydrateProgress({ force: true }));
+        dispatch(hydrateProgress({ force: true, userId: user?.id ?? null }));
       } else {
         toast.error(`Submission: ${result.failedTestCases || 1} test case(s) failed`);
       }
       setExecutionResult(result);
 
-      // Record in Session Submissions History
-      const newRecord: SubmissionRecord = {
-        id: `sub_${Date.now()}`,
-        status: isAccepted ? 'Accepted' : 'Wrong Answer',
-        passedTestCases: result.passedTestCases,
-        totalTestCases: result.totalTestCases,
-        runtimeMs: result.runtimeMs,
-        memoryMb: result.memoryMb,
-        language: selectedLanguage.name,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setSubmissionsHistory((prev) => {
-        const updated = [newRecord, ...prev].slice(0, 10);
-        if (activeQuestionId) {
-          try {
-            userScopedStorage.setItem(`submissions_${activeQuestionId}`, JSON.stringify(updated));
-          } catch {}
-        }
-        return updated;
-      });
+      // The submission endpoint owns history; refetch it instead of synthesizing a client record.
+      setSubmissionsRetry((attempt) => attempt + 1);
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
@@ -599,7 +596,7 @@ export const ProblemDetails: React.FC = () => {
     } finally {
       if (executionRequest.finish(controller)) setIsExecuting(false);
     }
-  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch, executionRequest]);
+  }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch, executionRequest, user?.id]);
 
   // Keyboard Shortcuts (Ctrl+' or Cmd+' to Run, Ctrl+Enter or Cmd+Enter to Submit)
   useEffect(() => {
@@ -616,6 +613,14 @@ export const ProblemDetails: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleRunCode, handleSubmitCode]);
+
+  useEffect(() => {
+    if (!executionResult && !executionError) return;
+    const frame = window.requestAnimationFrame(() => {
+      resultsPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [executionError, executionResult]);
 
   // Difficulty badge styling
   const difficultyName = problem?.difficultyRefName || problem?.difficulty || '—';
@@ -729,12 +734,13 @@ export const ProblemDetails: React.FC = () => {
 
   return (
     <div
-      ref={workspaceRef}
+      ref={bindWorkspace}
       className={`relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 min-h-screen ${
         isFullscreen
           ? 'fixed inset-0 z-[999] w-screen h-screen overflow-y-auto bg-[#FBFBFD] dark:bg-[#070A13] p-3 sm:p-5'
           : 'overflow-x-hidden pb-16'
       }`}
+      aria-label="Secure coding assessment workspace"
     >
       {/* Ambient glowing blobs matching Home page */}
       <div className="hidden dark:block fixed top-20 -left-48 w-96 h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
@@ -775,6 +781,13 @@ export const ProblemDetails: React.FC = () => {
 
         {/* Right: Previous / Next Problem Quick Buttons */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <span
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300"
+            title="Clipboard, context-menu, drag/drop, printing, source-view and developer-tool shortcuts are restricted in this workspace"
+          >
+            <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
+            Integrity mode{violationCount > 0 ? ` · ${violationCount}` : ''}
+          </span>
           <button
             type="button"
             onClick={() => {
@@ -970,16 +983,6 @@ export const ProblemDetails: React.FC = () => {
                         <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 font-mono text-xs shadow-2xs">
                           <div className="flex items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
                             <span className="text-slate-900 dark:text-white font-bold">Example {idx + 1}</span>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(tc.input);
-                                toast.success('Input copied!');
-                              }}
-                              className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors text-[10px] cursor-pointer flex items-center gap-1"
-                            >
-                              <i className="fa-solid fa-copy"></i>
-                              <span>Copy</span>
-                            </button>
                           </div>
                           <div>
                             <span className="text-slate-500 dark:text-slate-400">Input: </span>
@@ -1288,9 +1291,9 @@ export const ProblemDetails: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleRunCode}
-                  disabled={isExecuting}
+                  disabled={!isExecutionReady || !currentCode.trim()}
                   title="Run code against sample test cases (Ctrl + ')"
-                  className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-800 dark:text-slate-200 hover:text-slate-950 dark:hover:text-white bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
                 >
                   <i className="fa-solid fa-play text-[11px] text-slate-700 dark:text-slate-300"></i>
                   <span>Run</span>
@@ -1299,9 +1302,9 @@ export const ProblemDetails: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSubmitCode}
-                  disabled={isExecuting}
+                  disabled={!isExecutionReady || !currentCode.trim()}
                   title="Submit code for full evaluation (Ctrl + Enter)"
-                  className="px-5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="px-5 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 flex items-center gap-1.5 shadow-sm"
                 >
                   <i className="fa-solid fa-paper-plane text-[11px]"></i>
                   <span>Submit</span>
@@ -1342,6 +1345,13 @@ export const ProblemDetails: React.FC = () => {
                   fontFamily: "JetBrains Mono, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
                   cursorBlinking: 'smooth',
                   smoothScrolling: true,
+                  contextmenu: false,
+                  copyWithSyntaxHighlighting: false,
+                  dragAndDrop: false,
+                  readOnly: isExecuting,
+                  readOnlyMessage: { value: 'Code editing is paused while the current execution is in progress.' },
+                  wordWrap: 'on',
+                  accessibilitySupport: 'auto',
                 }}
               />
             </div>
@@ -1484,15 +1494,6 @@ export const ProblemDetails: React.FC = () => {
                             <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Input</span>
                             <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-800 dark:text-slate-200 shadow-2xs">
                               <pre className="whitespace-pre-wrap">{activeSampleCase.input}</pre>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(activeSampleCase.input);
-                                  toast.success('Input copied!');
-                                }}
-                                className="absolute top-2.5 right-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
-                              >
-                                <i className="fa-regular fa-copy text-xs"></i>
-                              </button>
                             </div>
                           </div>
 
@@ -1500,15 +1501,6 @@ export const ProblemDetails: React.FC = () => {
                             <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Expected Output</span>
                             <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white font-bold shadow-2xs">
                               <pre className="whitespace-pre-wrap">{activeSampleCase.expectedOutput}</pre>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(activeSampleCase.expectedOutput);
-                                  toast.success('Output copied!');
-                                }}
-                                className="absolute top-2.5 right-2.5 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
-                              >
-                                <i className="fa-regular fa-copy text-xs"></i>
-                              </button>
                             </div>
                           </div>
                         </div>
@@ -1550,9 +1542,9 @@ export const ProblemDetails: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Custom Standard Input:</span>
                       <button
-                        onClick={handleRunCode}
-                        disabled={isExecuting}
-                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+                        onClick={handleRunCustomInput}
+                        disabled={!isExecutionReady || !currentCode.trim() || !customInput.trim()}
+                        className="px-4 py-1.5 rounded-full text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
                       >
                         Run with Custom Input
                       </button>
@@ -1568,7 +1560,7 @@ export const ProblemDetails: React.FC = () => {
 
                 {/* 3. TEST RESULTS TAB */}
                 {bottomTab === 'results' && (
-                  <div className="space-y-4 animate-fade-in">
+                  <div ref={resultsPanelRef} className="space-y-4 animate-fade-in" aria-live="polite">
                     
                     {/* Error Box */}
                     {executionError && (
@@ -1590,7 +1582,7 @@ export const ProblemDetails: React.FC = () => {
                     )}
 
                     {/* RUN RESULTS */}
-                    {lastExecutionMode === 'run' && executionResult && (
+                    {(lastExecutionMode === 'run' || lastExecutionMode === 'custom') && executionResult && (
                       <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl font-mono">
                           <div className="flex items-center gap-3">
@@ -1601,7 +1593,9 @@ export const ProblemDetails: React.FC = () => {
                                   : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                               }`}
                             >
-                              {executionResult.failedTestCases === 0 ? '✓ Sample Cases Passed' : '✗ Sample Cases Failed'}
+                              {lastExecutionMode === 'custom'
+                                ? (executionResult.failedTestCases === 0 ? '✓ Custom Run Completed' : '✗ Custom Run Failed')
+                                : (executionResult.failedTestCases === 0 ? '✓ Sample Cases Passed' : '✗ Sample Cases Failed')}
                             </span>
                             <span className="text-xs text-slate-600 dark:text-slate-400">
                               Passed: <strong className="text-slate-900 dark:text-white">{executionResult.passedTestCases}/{executionResult.totalTestCases}</strong>
