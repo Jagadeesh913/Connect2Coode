@@ -61,13 +61,13 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/guards/AdminRoute.tsx` | Admin route gate checking JWT claims | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
-| `src/core/mappers/problemMapper.ts` | DTO to domain model mapper | `RUNTIME-VERIFIED` | Platform values are API-field-only; missing metadata is not inferred from IDs. |
+| `src/core/mappers/problemMapper.ts` | Question-list DTO to problem-list model mapper | `RUNTIME-VERIFIED` | Strictly maps captured `POST /questions` fields; does not accept historical aliases or fabricate detail metadata. |
 | `src/core/security/jwt.ts` | JWT payload decoder, claim extractor, expiry | `RUNTIME-VERIFIED` | Tested in `authSession.test.mjs`. |
 | `src/core/security/authSessionSync.ts` | Credential-free same-origin tab session event transport | `RUNTIME-VERIFIED` | BroadcastChannel with transient storage-event fallback; tested event validation. |
 | `src/core/security/tokenStorage.ts` | Cookie & memory token storage | `RUNTIME-VERIFIED` | Web-storage credential/profile mirroring removed; legacy copies are cleaned, and cross-tab events clear stale per-tab memory. |
 | `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Tested in `taskRemediationVerification.test.mjs`. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
-| `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Includes API-supported optional execution `customInput`; exercised by `apiIntegration.test.mjs`. |
+| `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | MCQ question type no longer admits stale top-level correctness fields; includes API-supported optional execution `customInput`. |
 | `src/core/validation/commonRules.ts` | Zod validators (email, password, name, phone, URL) | `RUNTIME-VERIFIED` | Tested in `validationArchitecture.test.mjs`. |
 | `src/core/validation/serverErrorMapper.ts`| Backend error parser and security leak filter | `RUNTIME-VERIFIED` | Tested in `batch4Remediation.test.mjs`. |
 | `src/core/validation/index.ts` | Re-exports validation rules | `VERIFIED` | Re-exports all schemas. |
@@ -82,8 +82,9 @@ Every first-party source file has been inspected and assigned a verified status 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Login/refresh notify open same-origin tabs without disclosing credentials; tested in `authSession.test.mjs`. |
-| `src/services/companyService.ts` | Companies and recruitment exams service | `RUNTIME-VERIFIED` | Tested in `companyResilience.test.mjs`. |
-| `src/services/executionService.ts` | Monaco code runner and Judge0 service | `RUNTIME-VERIFIED` | Language request deduplication/cache invalidation, API-only reference-ID resolution, custom-input payloads, and defensive response normalization tested. |
+| `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
+| `src/services/companyService.ts` | Companies and recruitment exams service | `PARTIALLY VERIFIED` | Company list/detail read DTO fields (`name`, `logo`, `website`) and the exam-list page envelope captured on 2026-10-23; legacy read aliases removed, but a non-empty exam/details DTO and admin mutations remain unverified. |
+| `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | `GET /language` field `languageName` captured and strictly mapped; language deduplication/cache invalidation, API-only reference-ID resolution, custom-input payloads, and response normalization are covered by tests. |
 | `src/services/institutionService.ts` | Public institution search autocomplete | `RUNTIME-VERIFIED` | Tested in `apiIntegration.test.mjs`. |
 | `src/services/mcqService.ts` | Aptitude MCQ queries and scoring | `RUNTIME-VERIFIED` | Tested in `mcqCorrectOption.test.mjs`. |
 | `src/services/problemService.ts` | Problem catalog and details service | `RUNTIME-VERIFIED` | Numeric direct details with slug/degraded-route catalog fallback tested. |
@@ -176,7 +177,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Quantitative, Reasoning, Verbal, Pseudocode. |
-| `utils/mcqUtils.ts` | MCQ option synthesizer & correct option resolver | `RUNTIME-VERIFIED` | Strict option-level `isCorrect` verified in `mcqCorrectOption.test.mjs`. |
+| `utils/mcqUtils.ts` | MCQ option response mapper and correct-option resolver | `RUNTIME-VERIFIED` | Uses only `id`, `optionLabel`, `optionText`, and boolean `isCorrect`; it does not infer correctness from aliases or question-level answer text. |
 
 ### E. Admin Hub (`src/features/admin/`)
 | File Path | Role | Status | Notes |
@@ -209,7 +210,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `src/features/bookmarks/pages/BookmarksList.tsx` | User bookmarked problems page | `RUNTIME-VERIFIED` | Verified in protected route branch. |
-| `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Type-aware identity, per-item mutation deduplication, and stale-response ownership tested. |
+| `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Server-only bookmark hydration, type-aware mutation identity, and stale-response ownership tested; no browser persistence. |
 | `src/features/institutions/components/InstitutionAutocomplete.tsx` | College autocomplete input | `RUNTIME-VERIFIED` | Min 3 chars debounce check. |
 | `src/features/interviews/pages/InterviewPrep.tsx` | Curated interview questions | `VERIFIED` | Gated by `ComingSoon`. |
 | `src/features/landing/pages/Landing.tsx` | Public landing page with demo runner | `RUNTIME-VERIFIED` | Verified in smoke preview. |
@@ -228,10 +229,10 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 136
 - **Total Automated Test Suites in `scripts/tests/`**: 16
-- **Total Executed Automated Unit Tests**: 215 (215 Passed, 0 Failed)
+- **Total Executed Automated Unit Tests**: 219 (219 Passed, 0 Failed)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 153 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors
-- **Documentation Integrity (`npm run verify:docs`)**: 230 internal links and source references passed.
+- **Documentation Integrity (`npm run verify:docs`)**: 232 internal links and source references passed.
 - **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. The developer-owned file was preserved.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `NOT WORKING` in this local environment; Vite reported ready on 127.0.0.1:4173 but the script could not establish its loopback readiness request. CI has not been observed for this revision.

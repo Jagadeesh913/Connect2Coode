@@ -1021,17 +1021,17 @@ export const ProblemDetails: React.FC = () => {
                 )}
 
                 {/* Exam Platform & Companies Footer Cards */}
-                {((problem?.qpfRefName || problem?.examPlatform) || (problem?.companies && problem.companies.length > 0)) && (
+                {((problem?.questionPlatform || problem?.qpfRefName || problem?.examPlatform) || (problem?.companies && problem.companies.length > 0)) && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                     {/* Exam Platform Card */}
-                    {(problem?.qpfRefName || problem?.examPlatform) && (
+                    {(problem?.questionPlatform || problem?.qpfRefName || problem?.examPlatform) && (
                       <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2 shadow-2xs">
                         <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
                           <i className="fa-solid fa-graduation-cap text-blue-600 dark:text-blue-400"></i>
                           <span>Exam Platform</span>
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {Array.from(new Set([problem?.qpfRefName, problem?.examPlatform].filter(Boolean))).map((plat) => (
+                          {Array.from(new Set([problem?.questionPlatform, problem?.qpfRefName, problem?.examPlatform].filter(Boolean))).map((plat) => (
                             <span key={String(plat)} className="text-[11px] font-medium px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                               {String(plat)}
                             </span>

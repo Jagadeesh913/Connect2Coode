@@ -387,7 +387,7 @@ export const PracticePage: React.FC = () => {
 
     return apiProblems.filter((prob) => {
       const code = (prob.qpfRefCode || '').toUpperCase();
-      const name = (prob.qpfRefName || prob.examPlatform || '').toLowerCase();
+      const name = (prob.questionPlatform || prob.qpfRefName || prob.examPlatform || prob.platformName || '').toLowerCase();
 
       if (code && code === targetCode) return true;
       if (name && targetName && name.includes(targetName)) return true;
@@ -426,8 +426,10 @@ export const PracticePage: React.FC = () => {
 
   const getPlatformBadge = (prob: Problem) => {
     const rawPlatform =
+      prob.questionPlatform ||
       prob.qpfRefName ||
       prob.examPlatform ||
+      prob.platformName ||
       prob.qpfRefCode;
 
     const pLower = (rawPlatform || 'Unspecified').toLowerCase();
@@ -943,8 +945,8 @@ export const PracticePage: React.FC = () => {
                                       <CompanyCircleBadge
                                         key={cIdx}
                                         name={compName}
-                                        logoUrl={compData?.logoUrl}
-                                        website={compData?.websiteUrl}
+                                        logoUrl={compData?.logo}
+                                        website={compData?.website}
                                       />
                                     );
                                   })}

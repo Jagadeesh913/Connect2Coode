@@ -73,17 +73,30 @@ export const executionService = {
       const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
       const data = res?.data || res;
       if (Array.isArray(data) && data.length > 0) {
-        const list: LanguageDropdownItem[] = data.map((item: any) => ({
-          id: Number(item.id),
-          name: item.languageName || item.name || 'Unknown',
-          referenceId:
-            item.referenceId !== undefined && item.referenceId !== null
-              ? Number(item.referenceId)
-              : undefined,
-          judge0LanguageId: item.judge0LanguageId ? Number(item.judge0LanguageId) : undefined,
-          version: item.version,
-          isActive: item.isActive !== false,
-        }));
+        const list: LanguageDropdownItem[] = data.map((item: any) => {
+          if (
+            !Number.isFinite(Number(item.id)) ||
+            typeof item.languageName !== 'string' ||
+            item.languageName.trim() === ''
+          ) {
+            throw new Error('The backend returned an invalid language record');
+          }
+
+          return {
+            id: Number(item.id),
+            // GET /language exposes `languageName`; do not substitute an
+            // undocumented alias or turn a contract error into a selectable runtime.
+            name: item.languageName,
+            languageName: item.languageName,
+            referenceId:
+              item.referenceId !== undefined && item.referenceId !== null
+                ? Number(item.referenceId)
+                : undefined,
+            judge0LanguageId: item.judge0LanguageId ? Number(item.judge0LanguageId) : undefined,
+            version: item.version,
+            isActive: item.isActive !== false,
+          };
+        });
         cachedLanguages = list;
         languageCacheTime = Date.now();
         return list;

@@ -40,7 +40,7 @@ export const AdminLanguages: React.FC = () => {
   const languages: AdminLanguageItem[] = activeDropdown.map((language) => ({
     id: language.id,
     referenceId: Number(language.referenceId) || 0,
-    languageName: language.languageName || language.name,
+    languageName: language.languageName,
     judge0LanguageId: Number(language.judge0LanguageId) || 0,
     version: language.version,
     isActive: language.isActive,

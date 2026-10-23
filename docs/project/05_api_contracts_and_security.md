@@ -33,8 +33,8 @@ sequenceDiagram
     Note over User,API: 1. Login Flow
     User->>Client: authService.login({ email, password })
     Client->>API: POST /auth/login
-    API-->>Client: 200 OK { statusCode: 200, data: { accessToken, refreshToken, user } }
-    Client->>Storage: setAccessToken(accessToken), setRefreshToken(refreshToken), setUser(user)
+    API-->>Client: 200 OK { statusCode: 200, data: { token, refreshToken, role, id, firstName, lastName, email, isDarkTheme } }
+    Client->>Storage: setAccessToken(token), setRefreshToken(refreshToken), setUser(user)
 
     Note over User,API: 2. Authenticated Request with Auto-Attached Token
     User->>Client: problemService.getProblems(...)
@@ -103,7 +103,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | Endpoint | Method | Access | Request Body | Response Envelope |
 | :--- | :---: | :--- | :--- | :--- |
 | `/signUp` | `POST` | `PUBLIC` | `{ firstName, lastName, email, password, role: "USER", labelUserName, userName }` | `ApiResponse<AuthResponseData>` |
-| `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ accessToken, refreshToken, user, role }>` |
+| `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ token, refreshToken, role, id, firstName, lastName, email, isDarkTheme }>` (read-only production capture, 2026-10-23) |
 | `/auth/refresh` | `POST` | `USER_OR_ADMIN` | `{ refreshToken }` | `ApiResponse<{ accessToken, refreshToken }>` |
 | `/auth/logout` | `POST` | `PUBLIC` | `{ refreshToken }` | `ApiResponse<string>` |
 | `/auth/generatePasswordResetOtp` | `POST` | `PUBLIC` | `{ email }` | `ApiResponse<unknown>` |
@@ -113,9 +113,9 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/questions` | `POST` | `USER_OR_ADMIN` | Paginated search: `{ level: number[], companies: number[], topic: number[], searchText: string, pageRequest: { pageNumber, pageSize, sortBy, sortDirection } }` |
-| `/question/{id}` | `GET` | `USER_OR_ADMIN` | Authoritative problem details for a numeric ID. Direct HTTP evidence records `200`; text slugs are not accepted, so only slug/degraded-route lookups fall back to `/questions`. |
+| `/question/{id}` | `GET` | `USER_OR_ADMIN` | Numeric problem detail route. A request for a current catalog ID returned a backend `HttpResponseException` on 2026-10-23; callers retain the catalog fallback and this endpoint is not currently runtime-verified. |
 | `/question` | `POST` | `ADMIN_ONLY` | Creates/updates problem with title, description, constraints, hints, and tax references. |
-| `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). Test cases, including hidden cases, are backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
+| `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). A direct `GET` to this path returned `401` for the temporary authenticated account on 2026-10-23, so catalog fallback does not issue it as a speculative read. Test cases, including hidden cases, remain backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
 
 ### C. Code Execution Engine ([`src/services/executionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/executionService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -132,8 +132,8 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 ### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/company/list` | `POST` | `USER_OR_ADMIN` | Paginated companies: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. |
-| `/company/{id}` | `GET` | `USER_OR_ADMIN` | Company details by numeric ID. |
+| `/company/list` | `POST` | `USER_OR_ADMIN` | Paginated companies: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
+| `/company/{id}` | `GET` | `USER_OR_ADMIN` | Company details by numeric ID; captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
 | `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Exams associated with company: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. |
 | `/company/exams/{examId}` | `GET` | `USER_OR_ADMIN` | Detailed exam blueprint (exam info, recruitment roles, exam sections). |
 | `/admin/company` | `POST` | `ADMIN_ONLY` | Creates or updates company record. |
@@ -146,8 +146,33 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | :--- | :---: | :--- | :--- |
 | `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by subject, difficulty, company, search text with pagination. |
 | `/mcq/{id}` | `GET` | `USER_OR_ADMIN` | Single MCQ question details and options. |
-| `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ with options array containing `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. |
+| `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ. The request contains `id` for an update and each option contains only its persisted `id` when present, `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. Exactly one option must be correct. Legacy question-level answer fields and option aliases are not sent or used to determine correctness. |
 | `/admin/mcq/{id}` | `DELETE` | `ADMIN_ONLY` | Deletes an MCQ question. |
+
+### F. Live Read-Only DTO Fields (2026-10-23)
+
+The following fields were captured from the configured production API using the supplied temporary test account before that account began returning `401` for subsequent requests. They are evidence for read paths only; admin mutation payloads were not sent to production. The Postman MCP connection was authenticated during the follow-up audit, but its enabled-tools handshake repeated instead of returning an inventory and its exposed surface did not offer a live-request executor; it supplied no contract evidence and no collection/example was used as a substitute.
+
+| Endpoint | Captured `data` fields |
+| :--- | :--- |
+| `GET /language` | `id`, `referenceId`, `languageName`, `judge0LanguageId`, `version`, `isActive` |
+| `GET /language/dropdown` | `id`, `name` (a distinct dropdown DTO) |
+| `GET /referenceLibrary/refGroupCode/{group}` | `id`, `refGroupCode`, `refCode`, `refName`, `isActive` |
+| `POST /mcq`, `GET /mcq/{id}` | Question: `subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topic*`, `difficulty*`, `companyName`, `companyId`, `question`, `explanation`, `isActive`, `options`, `id`; option: `id`, `optionLabel`, `optionText`, `isCorrect` |
+| `POST /questions` | `id`, `title`, `description`, `difficultyId`, `difficultyName`, `topicId`, `topicName`, `isOwnProblem`, `isActive`, `companies`, `questionPlatform` |
+| `GET /users/{id}/questions/bookmarks` | `questionId`, `title`, `difficulty` |
+| `GET /{id}/getSubmiteedQuestionIds` | `questionId`, `questionName`, `difficultyLevel`, `submittedDate` |
+| `GET /{id}/getAPttemptedQuestionIds` | `questionId`, `title`, `difficulty`, `submittedDate` |
+| `GET /institutions/search` | `id`, `name`, `institutionType`, `state`, `district` |
+| `GET /admin/institutions`, `GET /admin/institutions/{id}` | `id`, `aisheCode`, `name`, `institutionType`, `state`, `district`, `website`, `yearOfEstablishment`, `location`, `collegeType`, `management`, `universityId`, `universityName`, `universityType`, `isActive`, audit timestamps/IDs |
+
+### G. Endpoint Coverage Boundary
+
+`src/core/api/endpoints.ts` contains only routes with a current service caller. The unused `company/{id}/problems`, `question/{id}/submit`, `/institutions` base, `/language/dropdown`, and duplicate solved-question constant were removed during the source audit rather than represented as working integrations. `/language/dropdown` was captured but intentionally omitted because it supplies only `id` and `name`, whereas code execution requires the `referenceId` supplied by `GET /language`. Read-only routes listed above have direct production evidence. `GET /institutions/{id}` and `GET /question/{id}/testCases` returned `401` under the authenticated temporary account; `GET /question/{id}` returned a backend `500` for a current catalog ID. Create, update, delete, refresh, reset, and execution requests are preserved at their existing callers but remain `PARTIALLY VERIFIED` until a disposable non-production fixture is available; this audit did not mutate production data.
+
+### H. Envelope and Detail Rules
+
+`apiClient` returns the backend envelope directly, so UI callers consume the payload exactly once through `response.data`; user and admin MCQ/question/dashboard views do not attempt nested `data.data` fallbacks. `POST /questions` rows are mapped only from the captured list fields. They are not converted into full `Question` detail records, because the list DTO lacks the reference and test-case fields required for authoring. When `GET /question/{id}` fails, the admin/detail UI reports that API failure instead of showing guessed taxonomy, platform, or test cases.
 
 ### F. User Profile, Bookmarks & Academic Details ([`src/services/profileService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/profileService.ts), [`src/services/userQuestionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/userQuestionService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -162,6 +187,8 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/{userId}/question/{questionId}/getSubmissions` | `GET` | `USER_ONLY` | Submissions history for a specific problem. |
 
 Academic records are server-owned: `ProfileSettings` reads and writes them through `/userInfo/{userId}` and does not retain an offline `localStorage` copy. A legacy `c2c_user_academic_<userId>` value is removed when that profile is opened.
+
+Problem bookmarks are also server-owned. `bookmarkSlice` hydrates only `questionId`, `title`, and `difficulty` from `GET /users/{userId}/questions/bookmarks`; it does not restore, merge, or fall back to browser storage. A failed read is shown as an empty/error state rather than another account's stale bookmarks.
 
 `GET` and `PUT /user/profile` are not used: archived direct probes returned 401 for every available credential and identified the route as unmapped. The client therefore does not fabricate successful identity or avatar mutations in browser storage. Name/email remain session-owned and read-only; avatar editing is disabled. Personal fields supported by `userInfo` are saved only when the required academic fields already exist, so the client never invents registration, college, or year values to satisfy the POST contract.
 

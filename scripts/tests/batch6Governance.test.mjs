@@ -112,7 +112,7 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.match(code, /auth\/logout\/fulfilled/, 'bookmarkSlice must handle auth/logout/fulfilled');
       assert.match(code, /auth\/logout\/rejected/, 'bookmarkSlice must handle auth/logout/rejected');
       assert.match(code, /auth\/login\/fulfilled/, 'bookmarkSlice must handle auth/login/fulfilled');
-      assert.match(code, /loadBookmarksFromStorage\(\)/, 'bookmarkSlice must reset state from scoped storage on auth transition');
+      assert.doesNotMatch(code, /userScopedStorage|localStorage|loadBookmarksFromStorage/, 'bookmarkSlice must keep server-owned bookmarks out of browser persistence');
     });
 
     // =========================================================================

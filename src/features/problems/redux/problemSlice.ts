@@ -109,10 +109,9 @@ export const sanitizeProblemFilters = (params?: ProblemFilter): ProblemFilter | 
   if (params.page !== undefined) sanitized.page = params.page;
   if (params.limit !== undefined) sanitized.limit = params.limit;
 
-  const search = params.searchText?.trim() || params.search?.trim();
+  const search = params.searchText?.trim();
   if (search) {
     sanitized.searchText = search;
-    sanitized.search = search;
   }
 
   if (params.category?.trim()) sanitized.category = params.category.trim();
@@ -130,26 +129,22 @@ export const sanitizeProblemFilters = (params?: ProblemFilter): ProblemFilter | 
     return cleaned.length > 0 ? (cleaned as (number | string)[]) : undefined;
   };
 
-  const difficulty = cleanArray(params.difficulty ?? params.level);
+  const difficulty = cleanArray(params.difficulty);
   if (difficulty) {
     sanitized.difficulty = difficulty as any;
-    sanitized.level = difficulty as any;
   }
 
   const topic = cleanArray(params.topic);
   if (topic) sanitized.topic = topic as any;
 
-  const companies = cleanArray(params.companies ?? params.company);
+  const companies = cleanArray(params.companies);
   if (companies) {
     sanitized.companies = companies as any;
-    sanitized.company = companies as any;
   }
 
-  const platform = cleanArray(params.platform ?? params.platforms ?? params.qpf);
+  const platform = cleanArray(params.platform);
   if (platform) {
     sanitized.platform = platform as any;
-    sanitized.platforms = platform as any;
-    sanitized.qpf = platform as any;
   }
 
   return sanitized;

@@ -133,7 +133,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
         if (!isMounted) return;
 
-        const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
+        const compList = compRes.data;
 
         setAllCompanies(Array.isArray(compList) ? compList : []);
       } catch {

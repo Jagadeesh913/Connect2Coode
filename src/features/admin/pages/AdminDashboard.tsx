@@ -68,22 +68,16 @@ export const AdminDashboard: React.FC = () => {
 
       // 1. Questions breakdown
       if (probRes.status === 'fulfilled' && probRes.value) {
-        const rawData: any = probRes.value?.data || probRes.value;
-        const questionsList = Array.isArray(rawData?.content)
-          ? rawData.content
-          : Array.isArray(rawData)
-          ? rawData
-          : Array.isArray(rawData?.data)
-          ? rawData.data
-          : [];
+        const pageData = probRes.value.data;
+        const questionsList = Array.isArray(pageData?.content) ? pageData.content : [];
 
-        totalProblems = rawData?.totalElements !== undefined ? rawData.totalElements : questionsList.length;
+        totalProblems = pageData?.totalElements ?? questionsList.length;
 
         questionsList.forEach((q: any) => {
           const diffName = String(
-            q.difficultyName || q.difficultyRefName || q.difficulty || q.level || ''
+            q.difficultyName || ''
           ).toUpperCase();
-          const diffId = q.difficultyId || q.levelId;
+          const diffId = q.difficultyId;
 
           if (diffId === 1 || diffName.includes('EASY') || diffName.includes('BASIC')) {
             easyCount++;
@@ -97,42 +91,22 @@ export const AdminDashboard: React.FC = () => {
 
       // 2. Companies
       if (compRes.status === 'fulfilled' && compRes.value) {
-        const rawCompData: any = compRes.value?.data || compRes.value;
-        const compList = Array.isArray(rawCompData?.content)
-          ? rawCompData.content
-          : Array.isArray(rawCompData)
-          ? rawCompData
-          : Array.isArray(rawCompData?.data)
-          ? rawCompData.data
-          : [];
-
-        totalCompanies = rawCompData?.totalElements !== undefined ? rawCompData.totalElements : compList.length;
+        const companies = compRes.value.data;
+        totalCompanies = Array.isArray(companies) ? companies.length : 0;
       }
 
       // 3. Institutions
       if (instRes.status === 'fulfilled' && instRes.value) {
-        const rawInst: any = instRes.value?.data || instRes.value;
+        const pageData = instRes.value.data;
         totalInstitutions =
-          rawInst?.totalElements !== undefined
-            ? rawInst.totalElements
-            : Array.isArray(rawInst?.content)
-            ? rawInst.content.length
-            : Array.isArray(rawInst)
-            ? rawInst.length
-            : 0;
+          Array.isArray(pageData) ? pageData.length : pageData?.totalElements ?? pageData?.content?.length ?? 0;
       }
 
       // 4. MCQs
       if (mcqRes.status === 'fulfilled' && mcqRes.value) {
-        const rawMcq: any = mcqRes.value?.data || mcqRes.value;
+        const pageData = mcqRes.value.data;
         totalMcqs =
-          rawMcq?.totalElements !== undefined
-            ? rawMcq.totalElements
-            : Array.isArray(rawMcq?.content)
-            ? rawMcq.content.length
-            : Array.isArray(rawMcq)
-            ? rawMcq.length
-            : 0;
+          pageData?.totalElements ?? pageData?.content?.length ?? 0;
       }
 
       const failures = [probRes, compRes, instRes, mcqRes].map((result, index) => result.status === 'rejected' ? ['problems', 'companies', 'institutions', 'MCQs'][index] : null).filter(Boolean);

@@ -51,13 +51,16 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(mapped.topic, 'Arrays');
     assert.equal(mapped.companies.length, 5);
     assert.equal(mapped.description, 'Calculate the sum of all elements present in the given integer array.');
+    assert.equal(mapped.qpfRefName, 'AON Assessment Platform');
+    assert.equal(mapped.questionPlatform, 'AON Assessment Platform');
+    assert.equal(mapped.examPlatform, undefined);
   });
 
   it('does not invent a platform when the API omits platform fields', () => {
     const mapped = mapProblemDto({ id: 2, title: 'API-owned question' });
-    assert.equal(mapped.qpfRefCode, '');
-    assert.equal(mapped.qpfRefName, '');
-    assert.equal(mapped.examPlatform, '');
+    assert.equal(mapped.qpfRefCode, undefined);
+    assert.equal(mapped.qpfRefName, undefined);
+    assert.equal(mapped.examPlatform, undefined);
   });
 
   it('Task 5: tokenStorage keeps session tokens in the canonical cookie/memory contract', () => {

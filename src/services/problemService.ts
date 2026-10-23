@@ -139,9 +139,9 @@ export const problemService = {
       const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 
       const payload: Record<string, any> = {
-        level: null,
-        companies: null,
-        topic: null,
+        level: [],
+        companies: [],
+        topic: [],
         searchText: null,
         pageRequest: {
           pageNumber,
@@ -163,19 +163,18 @@ export const problemService = {
 
       const targetStr = String(id).trim().toLowerCase();
       let matched = items.find((item: any) => {
-        const itemId = String(item.id ?? item._id ?? '').trim().toLowerCase();
-        const itemSlug = String(item.slug || '').trim().toLowerCase();
-        const itemTitle = String(item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        return itemId === targetStr || itemSlug === targetStr || itemTitle === targetStr;
+        const itemId = String(item.id ?? '').trim().toLowerCase();
+        const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return itemId === targetStr || itemTitle === targetStr;
       });
 
       if (!matched && pageNumber !== 0) {
         const res0: any = await apiClient.post(
           API_ENDPOINTS.PROBLEMS.LIST,
           {
-            level: null,
-            companies: null,
-            topic: null,
+            level: [],
+            companies: [],
+            topic: [],
             searchText: null,
             pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' as const },
           },
@@ -190,18 +189,21 @@ export const problemService = {
           : [];
 
         matched = items0.find((item: any) => {
-          const itemId = String(item.id ?? item._id ?? '').trim().toLowerCase();
-          const itemSlug = String(item.slug || '').trim().toLowerCase();
-          const itemTitle = String(item.title || item.name || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          return itemId === targetStr || itemSlug === targetStr || itemTitle === targetStr;
+          const itemId = String(item.id ?? '').trim().toLowerCase();
+          const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+          return itemId === targetStr || itemTitle === targetStr;
         });
       }
 
       if (matched) {
+        // GET /question/{id}/testCases is currently rejected with 401 by the
+        // backend even for an authenticated account. Avoid an extra failed
+        // request after catalog fallback; map only catalog-provided cases.
+        const problemItem = matched;
         return {
           statusCode: 200,
           message: 'Problem details fetched',
-          data: mapProblemDto(matched),
+          data: mapProblemDto(problemItem),
         };
       }
     } catch (catalogErr: any) {

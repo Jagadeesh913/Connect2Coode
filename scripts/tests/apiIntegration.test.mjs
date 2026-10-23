@@ -30,6 +30,8 @@ const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const { executionService, normalizeExecutionResult } = await import('../../src/services/executionService.ts');
 const { adminLanguageService } = await import('../../src/services/admin/adminLanguageService.ts');
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
+const { questionService } = await import('../../src/services/questionService.ts');
+const { problemService } = await import('../../src/services/problemService.ts');
 
 describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   describe('1. Endpoint URL Formatting & Route Definitions', () => {
@@ -61,10 +63,6 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         '/63/getSubmiteedQuestionIds'
       );
       assert.equal(
-        API_ENDPOINTS.USER.SOLVED_QUESTIONS(63),
-        '/63/getSubmiteedQuestionIds'
-      );
-      assert.equal(
         API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(63),
         '/63/getAPttemptedQuestionIds'
       );
@@ -76,7 +74,6 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
 
     it('defines language registry endpoints', () => {
       assert.equal(API_ENDPOINTS.LANGUAGE.BASE, '/language');
-      assert.equal(API_ENDPOINTS.LANGUAGE.DROPDOWN, '/language/dropdown');
       assert.equal(API_ENDPOINTS.LANGUAGE.DETAILS(1), '/language/1');
     });
   });
@@ -124,7 +121,54 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
     });
   });
 
-  describe('3. Language ID Mapping & Execution Payload Resolution', () => {
+  describe('3. Question-detail fallback request discipline', () => {
+    it('does not make a known-failing test-case GET after a question-detail failure', async () => {
+      const originalGet = apiClient.get;
+      const originalPost = apiClient.post;
+      const getUrls = [];
+      apiClient.get = async (url) => {
+        getUrls.push(url);
+        throw { statusCode: 500, message: 'Question Fetch Unsuccessfull' };
+      };
+      apiClient.post = async () => ({
+        statusCode: 200,
+        data: {
+          content: [{
+            id: 3,
+            title: 'Catalog question',
+            description: 'Visible description',
+            difficultyName: 'Easy',
+            topicName: 'Arrays',
+            questionPlatform: 'Practice',
+            companies: [],
+          }],
+        },
+      });
+
+      try {
+        await assert.rejects(() => questionService.getById(3), (error) => {
+          assert.equal(error.statusCode, 500);
+          assert.equal(error.message, 'Question Fetch Unsuccessfull');
+          return true;
+        });
+        await problemService.getProblemById(3);
+        assert.deepEqual(getUrls, [
+          API_ENDPOINTS.QUESTION.DETAILS(3),
+          API_ENDPOINTS.QUESTION.DETAILS(3),
+        ]);
+        assert.equal(
+          getUrls.includes(API_ENDPOINTS.QUESTION.TEST_CASES(3)),
+          false,
+          'catalog fallback must not add a test-case request that production rejects with 401'
+        );
+      } finally {
+        apiClient.get = originalGet;
+        apiClient.post = originalPost;
+      }
+    });
+  });
+
+  describe('4. Language ID Mapping & Execution Payload Resolution', () => {
     it('invalidates the shared execution-language cache after an admin mutation', async () => {
       const originalGet = apiClient.get;
       const originalPost = apiClient.post;
@@ -167,6 +211,24 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         executionService.invalidateLanguageCache();
         assert.equal(await executionService.resolveLanguageReferenceId(1), 5);
         assert.equal(await executionService.resolveLanguageReferenceId(5), 5);
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('rejects a language response that omits the captured languageName field', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [{ id: 1, name: 'Java', referenceId: 5 }],
+      });
+      try {
+        executionService.invalidateLanguageCache();
+        await assert.rejects(
+          () => executionService.getLanguageDropdown(),
+          /invalid language record/
+        );
       } finally {
         executionService.invalidateLanguageCache();
         apiClient.get = originalGet;

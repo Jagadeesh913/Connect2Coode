@@ -18,7 +18,6 @@ export const API_ENDPOINTS = {
     BASE: '/company',
     LIST: '/company/list',
     DETAILS: (id: string | number) => `/company/${id}`,
-    PROBLEMS: (id: string | number) => `/company/${id}/problems`,
     EXAMS: (companyId: string | number) => `/company/${companyId}/exams/list`,
     EXAM_DETAILS: (examId: string | number) => `/company/exams/${examId}`,
     ADMIN_BASE: '/admin/company',
@@ -33,7 +32,6 @@ export const API_ENDPOINTS = {
   },
   PROBLEMS: {
     LIST: '/questions',
-    SUBMIT: (id: string) => `/question/${id}/submit`,
   },
   USER: {
     BOOKMARK: (userId: string | number, questionId: string | number) =>
@@ -44,11 +42,9 @@ export const API_ENDPOINTS = {
     QUESTION_SUBMISSIONS: (userId: string | number, questionId: string | number) =>
       `/${userId}/question/${questionId}/getSubmissions`,
     USER_INFO: (userId: string | number) => `/userInfo/${userId}`,
-    SOLVED_QUESTIONS: (userId: string | number) => `/${userId}/getSubmiteedQuestionIds`,
   },
   LANGUAGE: {
     BASE: '/language',
-    DROPDOWN: '/language/dropdown',
     DETAILS: (id: string | number) => `/language/${id}`,
   },
   EXECUTION: {
@@ -64,7 +60,6 @@ export const API_ENDPOINTS = {
       STATUS: (id: string | number) => `/admin/institutions/${id}/status`,
     },
     PUBLIC: {
-      BASE: '/institutions',
       SEARCH: '/institutions/search',
       DETAILS: (id: string | number) => `/institutions/${id}`,
     },

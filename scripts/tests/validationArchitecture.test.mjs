@@ -239,8 +239,8 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
     it('adminCompanySchema validates name, optional website, and optional logo', () => {
       assert.doesNotThrow(() => adminCompanySchema.parse({
         name: 'Google LLC',
-        websiteUrl: 'https://careers.google.com',
-        logoUrl: '/logos/google.png',
+        website: 'https://careers.google.com',
+        logo: '/logos/google.png',
         isActive: true,
       }));
 

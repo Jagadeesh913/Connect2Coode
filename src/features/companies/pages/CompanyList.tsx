@@ -240,8 +240,8 @@ export const CompanyList: React.FC = () => {
                   <div className="absolute -right-3 -top-3 w-32 h-32 opacity-[0.06] dark:opacity-[0.07] text-slate-900 dark:text-white pointer-events-none select-none overflow-hidden flex items-center justify-center">
                     <CompanyBrandLogo
                       name={company.name}
-                      logo={company.logo || company.logoUrl || undefined}
-                      website={company.website || company.websiteUrl || undefined}
+                      logo={company.logo || undefined}
+                      website={company.website || undefined}
                       className="w-full h-full"
                       watermark
                     />
@@ -253,8 +253,8 @@ export const CompanyList: React.FC = () => {
                       <div className="w-12 h-12 flex items-center justify-start shrink-0">
                         <CompanyBrandLogo
                           name={company.name}
-                          logo={company.logo || company.logoUrl || undefined}
-                          website={company.website || company.websiteUrl || undefined}
+                          logo={company.logo || undefined}
+                          website={company.website || undefined}
                           className="w-10 h-10"
                         />
                       </div>

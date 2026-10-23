@@ -136,8 +136,8 @@ export const AdminCompanies: React.FC = () => {
       const payload: CompanyItem = {
         id: formData.id ?? null,
         name: formData.name.trim(),
-        websiteUrl: formData.websiteUrl ? formData.websiteUrl.trim() : '',
-        logoUrl: formData.logoUrl ? formData.logoUrl.trim() : '',
+        website: formData.website ? formData.website.trim() : '',
+        logo: formData.logo ? formData.logo.trim() : '',
         description: formData.description ? formData.description.trim() : '',
         isActive: formData.isActive ?? true,
       };
@@ -159,7 +159,7 @@ export const AdminCompanies: React.FC = () => {
     return (
       c.name?.toLowerCase().includes(q) ||
       c.description?.toLowerCase().includes(q) ||
-      c.websiteUrl?.toLowerCase().includes(q)
+      c.website?.toLowerCase().includes(q)
     );
   });
 
@@ -179,8 +179,8 @@ export const AdminCompanies: React.FC = () => {
             <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
               <CompanyBrandLogo
                 name={row.name}
-                logo={row.logoUrl}
-                website={row.websiteUrl}
+                logo={row.logo}
+                website={row.website}
                 className="w-full h-full object-contain"
               />
             </div>
@@ -188,15 +188,15 @@ export const AdminCompanies: React.FC = () => {
               <span className="font-bold text-slate-900 dark:text-white truncate">
                 {row.name}
               </span>
-              {row.websiteUrl ? (
+              {row.website ? (
                 <a
-                  href={row.websiteUrl}
+                  href={row.website}
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono truncate"
                 >
-                  <span className="truncate">{row.websiteUrl.replace(/^https?:\/\//, '')}</span>
+                  <span className="truncate">{row.website.replace(/^https?:\/\//, '')}</span>
                   <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                 </a>
               ) : (
@@ -390,8 +390,8 @@ export const AdminCompanies: React.FC = () => {
                   <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
                     <CompanyBrandLogo
                       name={c.name}
-                      logo={c.logoUrl}
-                      website={c.websiteUrl}
+                      logo={c.logo}
+                      website={c.website}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -420,16 +420,16 @@ export const AdminCompanies: React.FC = () => {
                 )}
 
                 <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                  {c.websiteUrl ? (
+                  {c.website ? (
                     <a
-                      href={c.websiteUrl}
+                      href={c.website}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[150px]"
                     >
                       <Globe className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{c.websiteUrl.replace(/^https?:\/\//, '')}</span>
+                      <span className="truncate">{c.website.replace(/^https?:\/\//, '')}</span>
                     </a>
                   ) : (
                     <span className="text-slate-400 text-[11px] italic">No URL</span>

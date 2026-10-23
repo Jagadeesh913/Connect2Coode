@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { RootState } from '../../../app/store';
-import { userScopedStorage } from '../../../core/storage/userScopedStorage';
-import { userQuestionService } from '../../../services/userQuestionService';
+import { userQuestionService, type UserBookmarkQuestionResponse } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 
 export type BookmarkType = 'PROBLEM' | 'COMPANY' | 'APTITUDE';
@@ -26,20 +25,6 @@ export interface BookmarkState {
   pendingToggleKeys: Record<string, boolean>;
 }
 
-const LOCAL_STORAGE_KEY = 'myjo_bookmarks';
-
-const loadBookmarksFromStorage = (): BookmarkItem[] => {
-  try {
-    const saved = userScopedStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) {
-      return JSON.parse(saved);
-    }
-  } catch (e) {
-    console.error('Failed to load bookmarks from storage', e);
-  }
-  return [];
-};
-
 const getInitialActiveUserId = (): string | number | null => {
   try {
     const user = tokenStorage.getUser();
@@ -50,7 +35,9 @@ const getInitialActiveUserId = (): string | number | null => {
 };
 
 const initialState: BookmarkState = {
-  bookmarks: loadBookmarksFromStorage(),
+  // Bookmark records are server-owned. Keeping a browser copy made an
+  // authenticated user's list stale after a refresh or account change.
+  bookmarks: [],
   loading: false,
   error: null,
   currentRequestId: null,
@@ -75,7 +62,6 @@ export const fetchBookmarks = createAsyncThunk<
 >(
   'bookmarks/fetchList',
   async (_, { getState }) => {
-    const local = loadBookmarksFromStorage();
     const state = getState() as RootState;
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
@@ -84,38 +70,35 @@ export const fetchBookmarks = createAsyncThunk<
       try {
         const serverBookmarks = await userQuestionService.getBookmarkedQuestions(userId);
         if (Array.isArray(serverBookmarks)) {
-          const mappedServer: BookmarkItem[] = serverBookmarks.map((item: any) => ({
-            id: `bm-q-${item.questionId || item.id}`,
-            itemId: String(item.questionId || item.id),
+          const mappedServer: BookmarkItem[] = serverBookmarks.map((item: UserBookmarkQuestionResponse) => ({
+            id: `bm-q-${item.questionId}`,
+            itemId: String(item.questionId),
             type: 'PROBLEM' as const,
-            title: item.title || item.questionTitle || `Problem #${item.questionId || item.id}`,
-            difficulty: item.difficulty || item.difficultyLevel,
-            category: item.category || item.topic,
-            savedAt: item.savedAt || new Date().toISOString(),
+            // GET /users/{userId}/questions/bookmarks exposes title and
+            // difficulty. Do not synthesize unobserved aliases.
+            title: item.title,
+            difficulty: item.difficulty,
+            savedAt: new Date().toISOString(),
           }));
-
-          // Preserve non-problem bookmarks (e.g. COMPANY, APTITUDE) from client storage
-          const nonProblemBookmarks = local.filter((b) => b.type !== 'PROBLEM');
-          const merged = [...mappedServer, ...nonProblemBookmarks];
           return {
             userId,
-            bookmarks: merged,
+            bookmarks: mappedServer,
             fetchedAt: Date.now(),
           };
         }
       } catch {
         return {
           userId,
-          bookmarks: local,
+          bookmarks: [],
           fetchedAt: Date.now(),
-          warning: 'Could not refresh bookmarks. Your saved data is still shown.',
+          warning: 'Could not refresh bookmarks from the server.',
         };
       }
     }
 
     return {
       userId: userId || null,
-      bookmarks: local,
+      bookmarks: [],
       fetchedAt: Date.now(),
     };
   },

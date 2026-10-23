@@ -24,13 +24,13 @@ import {
   Edit3,
 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
+import {
+  hasExactlyOneCorrectOption,
+  normalizeApiMcqOptions,
+  serializeMcqOptions,
+} from '../utils/mcqPayload';
 
-interface OptionFormState {
-  id?: number;
-  optionLabel: string;
-  optionText: string;
-  isCorrect: boolean;
-}
+type OptionFormState = import('../utils/mcqPayload').EditableMcqOption;
 
 interface SubjectTopicItem {
   id: number;
@@ -122,8 +122,7 @@ export const AdminMcqs: React.FC = () => {
       try {
         const compRes = await companyService.getCompanies();
         if (!isMounted) return;
-        const raw = (compRes.data as any)?.data || compRes.data;
-        setCompanies(Array.isArray(raw) ? raw : []);
+        setCompanies(Array.isArray(compRes.data) ? compRes.data : []);
       } catch (err) {
         console.warn('Failed to load MCQ filter references from API:', err);
       }
@@ -205,84 +204,26 @@ export const AdminMcqs: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      const rawData: any = (response?.data as any)?.data || response?.data || response;
-      const contentList: McqQuestion[] = Array.isArray(rawData?.content)
-        ? rawData.content
-        : Array.isArray(rawData)
-        ? rawData
-        : Array.isArray(rawData?.data)
-        ? rawData.data
+      const pageData = response.data;
+      const contentList: McqQuestion[] = Array.isArray(pageData?.content)
+        ? pageData.content
         : [];
 
-      const total = typeof rawData?.totalElements === 'number'
-        ? rawData.totalElements
-        : typeof rawData?.total === 'number'
-        ? rawData.total
+      const total = typeof pageData?.totalElements === 'number'
+        ? pageData.totalElements
         : contentList.length;
 
-      const computedPages = typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
-        ? rawData.totalPages
+      const computedPages = typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
+        ? pageData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
 
       const normalizedContentList: McqQuestion[] = contentList.map((item) => {
         if (!Array.isArray(item.options) || item.options.length === 0) {
           return item;
         }
-        const hasServerCorrect = item.options.some(
-          (o: any) =>
-            o.isCorrect === true ||
-            String(o.isCorrect).toLowerCase() === 'true' ||
-            o.isCorrect === 1 ||
-            o.correct === true ||
-            String(o.correct).toLowerCase() === 'true' ||
-            o.correct === 1 ||
-            o.is_correct === true ||
-            String(o.is_correct).toLowerCase() === 'true' ||
-            o.is_correct === 1
-        );
-        const targetCorrectOption =
-          item.correctOption ||
-          (item as any).answer ||
-          (item as any).correctAnswer;
-
-        const normalizedOpts = item.options.map((opt: any, idx: number) => {
-          const label = opt.optionLabel || String.fromCharCode(65 + idx);
-          const resolvedText = String(
-            opt.optionText ?? opt.optionValue ?? opt.value ?? opt.text ?? opt.option ?? ''
-          );
-
-          let isCorrect = false;
-          if (hasServerCorrect) {
-            isCorrect = Boolean(
-              opt.isCorrect === true ||
-              String(opt.isCorrect).toLowerCase() === 'true' ||
-              opt.isCorrect === 1 ||
-              opt.correct === true ||
-              String(opt.correct).toLowerCase() === 'true' ||
-              opt.correct === 1 ||
-              opt.is_correct === true ||
-              String(opt.is_correct).toLowerCase() === 'true' ||
-              opt.is_correct === 1
-            );
-          } else if (targetCorrectOption) {
-            isCorrect =
-              String(label).toUpperCase() === String(targetCorrectOption).toUpperCase() ||
-              Boolean(resolvedText && String(resolvedText).trim().toLowerCase() === String(targetCorrectOption).trim().toLowerCase());
-          } else {
-            isCorrect = idx === 0;
-          }
-
-          return {
-            id: opt.id ? Number(opt.id) : undefined,
-            optionLabel: label,
-            optionText: resolvedText,
-            isCorrect,
-          };
-        });
-
         return {
           ...item,
-          options: normalizedOpts,
+          options: normalizeApiMcqOptions(item.options),
         };
       });
 
@@ -333,7 +274,7 @@ export const AdminMcqs: React.FC = () => {
       let authoritativeMcq = mcq;
       try {
         const detailRes = await adminMcqService.getMcqById(mcq.id);
-        const detailData: any = (detailRes?.data as any)?.data || detailRes?.data;
+        const detailData = detailRes.data;
         if (detailData && typeof detailData === 'object' && detailData.id) {
           authoritativeMcq = { ...mcq, ...detailData };
         }
@@ -355,61 +296,7 @@ export const AdminMcqs: React.FC = () => {
           ? authoritativeMcq.options
           : synthesizeMcqOptions(authoritativeMcq);
 
-      const targetCorrectOption =
-        authoritativeMcq.correctOption ||
-        authoritativeMcq.answer ||
-        (authoritativeMcq as any).correctAnswer;
-
-      const hasExplicitCorrect = authoritativeOpts.some(
-        (o: any) =>
-          o.isCorrect === true ||
-          String(o.isCorrect).toLowerCase() === 'true' ||
-          o.isCorrect === 1 ||
-          o.correct === true ||
-          String(o.correct).toLowerCase() === 'true' ||
-          o.correct === 1 ||
-          o.is_correct === true ||
-          String(o.is_correct).toLowerCase() === 'true' ||
-          o.is_correct === 1
-      );
-
-      const mapped: OptionFormState[] = authoritativeOpts.map((o: any, idx: number) => {
-        const label = o.optionLabel || String.fromCharCode(65 + idx);
-        const text = String(o.optionText ?? o.optionValue ?? o.value ?? o.text ?? o.option ?? '');
-        let isCorrect = false;
-
-        if (hasExplicitCorrect) {
-          isCorrect = Boolean(
-            o.isCorrect === true ||
-            String(o.isCorrect).toLowerCase() === 'true' ||
-            o.isCorrect === 1 ||
-            o.correct === true ||
-            String(o.correct).toLowerCase() === 'true' ||
-            o.correct === 1 ||
-            o.is_correct === true ||
-            String(o.is_correct).toLowerCase() === 'true' ||
-            o.is_correct === 1
-          );
-        } else if (targetCorrectOption) {
-          isCorrect =
-            String(label).toUpperCase() === String(targetCorrectOption).toUpperCase() ||
-            Boolean(text && String(text).trim().toLowerCase() === String(targetCorrectOption).trim().toLowerCase());
-        } else {
-          isCorrect = idx === 0;
-        }
-
-        const optId = o.id ? Number(o.id) : undefined;
-        return {
-          id: optId,
-          optionLabel: label,
-          optionText: text,
-          isCorrect,
-        };
-      });
-
-      if (!mapped.some((m) => m.isCorrect) && mapped.length > 0) {
-        mapped[0].isCorrect = true;
-      }
+      const mapped = normalizeApiMcqOptions(authoritativeOpts);
 
       if (mapped.length > 0) {
         setFormOptions(mapped);
@@ -443,9 +330,8 @@ export const AdminMcqs: React.FC = () => {
       return;
     }
 
-    const hasCorrect = filledOptions.some((o) => o.isCorrect === true);
-    if (!hasCorrect) {
-      toast.error('Please mark at least one option as the correct answer');
+    if (!hasExactlyOneCorrectOption(filledOptions)) {
+      toast.error('Select exactly one correct option');
       return;
     }
 
@@ -453,22 +339,7 @@ export const AdminMcqs: React.FC = () => {
     try {
       const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
 
-      const selectedCorrectOption = filledOptions.find((o) => o.isCorrect);
-      const correctOptionLabel = selectedCorrectOption?.optionLabel || 'A';
-      const correctOptionText = selectedCorrectOption?.optionText.trim() || '';
-
-      // Clean payload strictly adhering to Spring Boot POST /api/v1/admin/mcq contract
-      const mappedOptions = filledOptions.map((o, idx) => {
-        const isOptionCorrect = Boolean(o.isCorrect);
-        return {
-          ...(o.id ? { id: Number(o.id), optionId: Number(o.id) } : {}),
-          optionLabel: o.optionLabel || String.fromCharCode(65 + idx),
-          optionText: o.optionText.trim(),
-          isCorrect: isOptionCorrect,
-          correct: isOptionCorrect,
-          is_correct: isOptionCorrect,
-        };
-      });
+      const mappedOptions = serializeMcqOptions(filledOptions);
 
       const payload: AdminCreateMcqPayload = {
         ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
@@ -482,15 +353,12 @@ export const AdminMcqs: React.FC = () => {
         question: formQuestion.trim(),
         explanation: formExplanation.trim() || undefined,
         isActive: true,
-        correctOption: correctOptionLabel,
-        correctAnswer: correctOptionText,
-        answer: correctOptionText,
         options: mappedOptions,
       };
 
       if (editingMcq) {
         const res = await adminMcqService.updateMcq(editingMcq.id, payload);
-        const updatedRaw: any = (res?.data as any)?.data || res?.data;
+        const updatedRaw = res.data;
 
         // Immediate optimistic update with the selected correct option
         setMcqs((prev) =>
@@ -504,9 +372,6 @@ export const AdminMcqs: React.FC = () => {
                     ...opt,
                     isCorrect: Boolean(opt.isCorrect),
                   })),
-                  correctOption: correctOptionLabel,
-                  correctAnswer: correctOptionText,
-                  answer: correctOptionText,
                 }
               : item
           )
@@ -646,7 +511,7 @@ export const AdminMcqs: React.FC = () => {
               if (!row.options || row.options.length === 0) {
                 try {
                   const detailRes = await adminMcqService.getMcqById(row.id);
-                  const detailData: any = (detailRes?.data as any)?.data || detailRes?.data;
+                  const detailData = detailRes.data;
                   if (detailData && Array.isArray(detailData.options) && detailData.options.length > 0) {
                     setSelectedMcq((prev) => (prev?.id === row.id ? { ...prev, ...detailData } : prev));
                   }

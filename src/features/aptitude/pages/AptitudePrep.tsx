@@ -520,25 +520,19 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
       if (controller.signal.aborted) return;
 
-      const rawData: any = (response?.data as any)?.data || response?.data || response;
-      const contentList: McqQuestion[] = Array.isArray(rawData?.content)
-        ? rawData.content
-        : Array.isArray(rawData)
-        ? rawData
-        : Array.isArray(rawData?.data)
-        ? rawData.data
+      const pageData = response.data;
+      const contentList: McqQuestion[] = Array.isArray(pageData?.content)
+        ? pageData.content
         : [];
 
       const total =
-        typeof rawData?.totalElements === 'number'
-          ? rawData.totalElements
-          : typeof rawData?.total === 'number'
-          ? rawData.total
+        typeof pageData?.totalElements === 'number'
+          ? pageData.totalElements
           : contentList.length;
 
       const computedPages =
-        typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
-          ? rawData.totalPages
+        typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
+          ? pageData.totalPages
           : Math.max(1, Math.ceil(total / pageSize));
 
       setQuestions(contentList);

@@ -79,7 +79,7 @@ export const AdminQuestions: React.FC = () => {
       try {
         const compRes = await adminCompanyService.getCompanies();
         if (!active) return;
-        const compList = compRes?.data || (Array.isArray(compRes) ? compRes : []);
+        const compList = compRes.data;
         setCompanies(Array.isArray(compList) ? compList : []);
       } catch (err) {
         console.warn('Failed to load company filter data:', err);
@@ -125,15 +125,11 @@ export const AdminQuestions: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      const rawData: any = (res?.data as any)?.data || res?.data || res;
+      const pageData = res.data;
 
       const contentList: QuestionPayload[] = (
-        Array.isArray(rawData?.content)
-          ? rawData.content
-          : Array.isArray(rawData)
-          ? rawData
-          : Array.isArray(rawData?.data)
-          ? rawData.data
+        Array.isArray(pageData?.content)
+          ? pageData.content
           : []
       ).map((item: any) => {
         const finalCompanies = item.companies;
@@ -149,14 +145,12 @@ export const AdminQuestions: React.FC = () => {
         };
       });
 
-      const total = typeof rawData?.totalElements === 'number'
-        ? rawData.totalElements
-        : typeof rawData?.total === 'number'
-        ? rawData.total
+      const total = typeof pageData?.totalElements === 'number'
+        ? pageData.totalElements
         : contentList.length;
 
-      const computedPages = typeof rawData?.totalPages === 'number' && rawData.totalPages > 0
-        ? rawData.totalPages
+      const computedPages = typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
+        ? pageData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
 
       setQuestions(contentList);
@@ -217,7 +211,7 @@ export const AdminQuestions: React.FC = () => {
       setIsDetailsOpen(true);
       try {
         const res = await adminQuestionService.getQuestionById(qId);
-        const detailedData = (res as any)?.data || res;
+        const detailedData = res.data;
         if (detailedData) {
           const cases = (detailedData.testCases && detailedData.testCases.length > 0)
             ? detailedData.testCases

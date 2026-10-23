@@ -4,26 +4,22 @@ import type { ApiResponse } from '../core/types/api';
 
 export interface UserBookmarkQuestionResponse {
   questionId: number;
-  title?: string;
-  difficulty?: string;
-  category?: string;
-  [key: string]: unknown;
+  title: string;
+  difficulty: string;
 }
 
 export interface UserSubmittedQuestionItem {
   questionId: number;
-  questionName?: string;
-  difficultyLevel?: string;
-  submittedDate?: string;
-  [key: string]: unknown;
+  questionName: string;
+  difficultyLevel: string;
+  submittedDate: string;
 }
 
 export interface UserAttemptedQuestionItem {
   questionId: number;
-  title?: string;
-  difficulty?: string;
-  submittedDate?: string;
-  [key: string]: unknown;
+  title: string;
+  difficulty: string;
+  submittedDate: string;
 }
 
 export interface UserQuestionSubmissionItem {
@@ -36,7 +32,6 @@ export interface UserQuestionSubmissionItem {
   passedTestCases: number;
   status: string | null;
   submittedAt: string;
-  [key: string]: unknown;
 }
 
 export type UserQuestionProgressResponse = UserSubmittedQuestionItem;

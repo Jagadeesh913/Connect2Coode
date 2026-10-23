@@ -364,8 +364,8 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
               <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 p-2.5 flex items-center justify-center shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xs">
                 <CompanyBrandLogo
                   name={company.name}
-                  logo={company.logoUrl}
-                  website={company.websiteUrl}
+                  logo={company.logo}
+                  website={company.website}
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -384,14 +384,14 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                     </AdminBadge>
                   </div>
 
-                  {company.websiteUrl && (
+                  {company.website && (
                     <a
-                      href={company.websiteUrl}
+                      href={company.website}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono truncate flex items-center gap-1 shrink-0"
                     >
-                      <span>{company.websiteUrl.replace(/^https?:\/\//, '')}</span>
+                      <span>{company.website.replace(/^https?:\/\//, '')}</span>
                       <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
                   )}
@@ -459,7 +459,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                       <Globe className="w-3 h-3 text-blue-500" /> Web Presence
                     </span>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate mt-0.5">
-                      {company.websiteUrl || 'No official URL configured'}
+                      {company.website || 'No official URL configured'}
                     </span>
                   </div>
                 </div>

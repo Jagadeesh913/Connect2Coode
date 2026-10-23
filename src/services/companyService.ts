@@ -40,7 +40,7 @@ export const companyService = {
         : [];
 
       const mappedContent = content.map((item: any) => {
-        const name = item.name || item.companyName || '';
+        const name = typeof item.name === 'string' ? item.name : '';
         const safeSlug =
           item.slug ||
           (item.id ? String(item.id) : name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
@@ -50,10 +50,8 @@ export const companyService = {
           id: item.id ?? safeSlug,
           name,
           slug: safeSlug,
-          logo: item.logo || item.logoUrl || '',
-          logoUrl: item.logoUrl || item.logo || '',
-          website: item.website || item.websiteUrl || '',
-          websiteUrl: item.websiteUrl || item.website || '',
+          logo: typeof item.logo === 'string' ? item.logo : '',
+          website: typeof item.website === 'string' ? item.website : '',
         };
       });
 
@@ -83,7 +81,7 @@ export const companyService = {
         const raw = fallbackRes?.data || fallbackRes;
         const list = Array.isArray(raw) ? raw : Array.isArray(raw?.content) ? raw.content : [];
         const mappedList = list.map((item: any) => {
-          const name = item.name || item.companyName || '';
+          const name = typeof item.name === 'string' ? item.name : '';
           const safeSlug =
             item.slug ||
             (item.id ? String(item.id) : name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
@@ -92,8 +90,8 @@ export const companyService = {
             id: item.id ?? safeSlug,
             name,
             slug: safeSlug,
-            logo: item.logo || item.logoUrl || '',
-            logoUrl: item.logoUrl || item.logo || '',
+            logo: typeof item.logo === 'string' ? item.logo : '',
+            website: typeof item.website === 'string' ? item.website : '',
           };
         });
 
@@ -239,7 +237,7 @@ export const companyService = {
       const compData = res?.data || res;
 
       if (compData && (compData.id || compData.name)) {
-        const name = compData.name || compData.companyName || '';
+        const name = typeof compData.name === 'string' ? compData.name : '';
         const safeSlug =
           compData.slug ||
           (compData.id ? String(compData.id) : '') ||
@@ -346,7 +344,7 @@ export const companyService = {
         }
 
         for (const item of list) {
-          const problem = mapProblemDto(item, { fallbackCompany: nameStr });
+          const problem = mapProblemDto(item);
           const normalizedTitle = problem.title.toLowerCase().trim();
           if (!seenTitles.has(normalizedTitle)) {
             seenTitles.add(normalizedTitle);
@@ -391,7 +389,7 @@ export const companyService = {
         }
 
         for (const item of list) {
-          const problem = mapProblemDto(item, { fallbackCompany: nameStr });
+          const problem = mapProblemDto(item);
           const normalizedTitle = problem.title.toLowerCase().trim();
           if (!seenTitles.has(normalizedTitle)) {
             seenTitles.add(normalizedTitle);

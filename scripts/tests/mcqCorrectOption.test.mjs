@@ -26,8 +26,37 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 const { synthesizeMcqOptions } = await import('../../src/features/aptitude/utils/mcqUtils.ts');
+const {
+  normalizeApiMcqOptions,
+  serializeMcqOptions,
+  hasExactlyOneCorrectOption,
+} = await import('../../src/features/admin/utils/mcqPayload.ts');
 
 describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () => {
+  it('serializes an admin update using only the documented option-level isCorrect contract', () => {
+    const payload = serializeMcqOptions([
+      { id: 101, optionLabel: 'A', optionText: '15', isCorrect: false },
+      { id: 102, optionLabel: 'B', optionText: '20', isCorrect: true },
+    ]);
+
+    assert.deepEqual(payload, [
+      { id: 101, optionLabel: 'A', optionText: '15', isCorrect: false },
+      { id: 102, optionLabel: 'B', optionText: '20', isCorrect: true },
+    ]);
+    assert.equal(hasExactlyOneCorrectOption(payload), true);
+    assert.equal(hasExactlyOneCorrectOption([{ optionLabel: 'A', optionText: '15', isCorrect: false }]), false);
+  });
+
+  it('does not treat legacy aliases or top-level answer fields as an API option correctness signal', () => {
+    const options = normalizeApiMcqOptions([
+      { id: 101, optionLabel: 'A', optionText: '15', isCorrect: false, correct: true },
+      { id: 102, optionLabel: 'B', optionText: '20', isCorrect: true, is_correct: false },
+    ]);
+
+    assert.equal(options[0].isCorrect, false);
+    assert.equal(options[1].isCorrect, true);
+  });
+
   it('correctly identifies option B when user edits MCQ and sets option A to isCorrect: false and option B to isCorrect: true, even with stale correctOption: "A"', () => {
     const mcq = {
       id: 42,
@@ -60,26 +89,26 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
     assert.equal(correctOptions[0].optionText, '20');
   });
 
-  it('supports boolean equivalents (string "true" / "false", 1 / 0) for isCorrect on options', () => {
-    const mcqWithStringBooleans = {
+  it('uses only boolean isCorrect values returned by the option DTO', () => {
+    const mcqWithUnverifiedAliases = {
       id: 43,
       question: 'Identify binary flag correctly',
       options: [
-        { id: 201, optionLabel: 'A', optionText: 'First', isCorrect: 'false' },
-        { id: 202, optionLabel: 'B', optionText: 'Second', isCorrect: 'false' },
-        { id: 203, optionLabel: 'C', optionText: 'Third', isCorrect: 'true' },
-        { id: 204, optionLabel: 'D', optionText: 'Fourth', isCorrect: 0 },
+        { id: 201, optionLabel: 'A', optionText: 'First', isCorrect: false, correct: true },
+        { id: 202, optionLabel: 'B', optionText: 'Second', isCorrect: false, is_correct: true },
+        { id: 203, optionLabel: 'C', optionText: 'Third', isCorrect: true },
+        { id: 204, optionLabel: 'D', optionText: 'Fourth', isCorrect: false },
       ],
     };
 
-    const options = synthesizeMcqOptions(mcqWithStringBooleans);
+    const options = synthesizeMcqOptions(mcqWithUnverifiedAliases);
     const correctOpt = options.find((o) => o.isCorrect === true);
     assert.ok(correctOpt, 'Must find a correct option');
     assert.equal(correctOpt.optionLabel, 'C');
     assert.equal(correctOpt.optionText, 'Third');
   });
 
-  it('falls back to correctOption only when options have no explicit isCorrect flags', () => {
+  it('does not fabricate correctness from a stale top-level correctOption', () => {
     const legacyMcq = {
       id: 44,
       question: 'Legacy question with only correctOption',
@@ -93,9 +122,6 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
     };
 
     const options = synthesizeMcqOptions(legacyMcq);
-    const correctOpt = options.find((o) => o.isCorrect === true);
-    assert.ok(correctOpt);
-    assert.equal(correctOpt.optionLabel, 'C');
-    assert.equal(correctOpt.optionText, 'Green');
+    assert.equal(options.some((option) => option.isCorrect), false);
   });
 });

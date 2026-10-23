@@ -44,8 +44,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
     defaultValues: {
       id: null,
       name: '',
-      websiteUrl: '',
-      logoUrl: '',
+      website: '',
+      logo: '',
       description: '',
       isActive: true,
     },
@@ -56,8 +56,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
       reset({
         id: typeof initialData.id === 'number' ? initialData.id : (initialData.id ? Number(initialData.id) || null : null),
         name: initialData.name || '',
-        websiteUrl: initialData.websiteUrl || (initialData as any).website || '',
-        logoUrl: initialData.logoUrl || (initialData as any).logo || '',
+        website: initialData.website || '',
+        logo: initialData.logo || '',
         description: initialData.description || '',
         isActive: initialData.isActive ?? true,
       });
@@ -65,8 +65,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
       reset({
         id: null,
         name: '',
-        websiteUrl: '',
-        logoUrl: '',
+        website: '',
+        logo: '',
         description: '',
         isActive: true,
       });
@@ -75,8 +75,8 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
   const handleSelectPreset = (company: CompanyItem) => {
     setValue('name', company.name, { shouldValidate: true, shouldDirty: true });
-    setValue('logoUrl', company.logoUrl || '', { shouldValidate: true, shouldDirty: true });
-    setValue('websiteUrl', company.websiteUrl || '', { shouldValidate: true, shouldDirty: true });
+    setValue('logo', company.logo || '', { shouldValidate: true, shouldDirty: true });
+    setValue('website', company.website || '', { shouldValidate: true, shouldDirty: true });
   };
 
   const handleFormSubmit = (data: CompanyFormData) => {
@@ -86,9 +86,9 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
     });
   };
 
-  const currentLogoUrl = watch('logoUrl');
+  const currentLogoUrl = watch('logo');
   const currentName = watch('name');
-  const currentWebsite = watch('websiteUrl');
+  const currentWebsite = watch('website');
 
   return (
     <AdminModal
@@ -173,16 +173,16 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             <Globe className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
             <input
               type="url"
-              {...register('websiteUrl')}
+              {...register('website')}
               placeholder="https://careers.google.com"
               className={`w-full pl-10 pr-3.5 py-2.5 text-xs font-semibold rounded-xl border ${
-                errors.websiteUrl
+                errors.website
                   ? 'border-rose-500 bg-rose-50/20'
                   : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80'
               } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all font-mono`}
             />
           </div>
-          <FormFieldError error={errors.websiteUrl?.message} />
+          <FormFieldError error={errors.website?.message} />
         </div>
 
         {/* Logo URL with Live Preview */}
@@ -206,17 +206,17 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             <div className="flex-1">
               <input
                 type="url"
-                {...register('logoUrl')}
+                {...register('logo')}
                 placeholder="https://example.com/logo.png"
                 className={`w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border ${
-                  errors.logoUrl
+                  errors.logo
                     ? 'border-rose-500 bg-rose-50/20'
                     : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80'
                 } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all font-mono`}
               />
             </div>
           </div>
-          <FormFieldError error={errors.logoUrl?.message} />
+          <FormFieldError error={errors.logo?.message} />
         </div>
 
         {/* Description / Hiring Notes */}

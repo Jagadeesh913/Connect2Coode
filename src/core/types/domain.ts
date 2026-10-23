@@ -13,12 +13,10 @@ export interface Company {
   name: string;
   slug?: string;
   logo?: string;
-  logoUrl?: string;
   industry?: string;
   problemCount?: number;
   description?: string;
   website?: string;
-  websiteUrl?: string;
   headquarters?: string;
   isActive?: boolean;
   difficultyBreakdown?: {
@@ -59,6 +57,8 @@ export interface Problem {
   qpfRefGroupCode?: string;
   qpfRefCode?: string;
   qpfRefName?: string;
+  questionPlatform?: string;
+  platformName?: string;
   examPlatform?: string;
   questionHints?: QuestionHint[];
   hints?: string[];
@@ -366,9 +366,6 @@ export interface McqQuestion {
   question: string;
   explanation?: string | null;
   isActive?: boolean;
-  correctOption?: string | null;
-  correctAnswer?: string | null;
-  answer?: string | null;
   options: McqOption[];
 }
 
@@ -398,17 +395,11 @@ export interface AdminCreateMcqPayload {
   question: string;
   explanation?: string;
   isActive?: boolean;
-  correctOption?: string | null;
-  correctAnswer?: string | null;
-  answer?: string | null;
   options: Array<{
     id?: number;
-    optionId?: number;
     optionLabel: string;
     optionText: string;
     isCorrect: boolean;
-    correct?: boolean;
-    is_correct?: boolean;
   }>;
 }
 

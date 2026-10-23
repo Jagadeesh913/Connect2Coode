@@ -50,8 +50,8 @@ export type AdminInstitutionFormData = z.infer<typeof adminInstitutionSchema>;
 export const adminCompanySchema = z.object({
   id: z.number().nullable().optional(),
   name: requiredTextRule('Company name', 2),
-  websiteUrl: optionalUrlRule('Website URL'),
-  logoUrl: optionalUrlRule('Logo image URL', true),
+  website: optionalUrlRule('Website URL'),
+  logo: optionalUrlRule('Logo image URL', true),
   description: z.string().trim().optional(),
   isActive: z.boolean().default(true),
 });

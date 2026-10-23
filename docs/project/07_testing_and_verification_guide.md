@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 215 tests passed, 0 failed on 2026-10-23.
+- **Current verified run**: 219 tests passed, 0 failed on 2026-10-23.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -14,7 +14,7 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | Suite File | Scope & Tested Contracts | Tests Count |
 | :--- | :--- | :---: |
 | [`apiClient.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiClient.test.mjs) | Base URL normalization, trimming slashes, localhost rejection in prod, default backend fallback. | 13 |
-| [`apiIntegration.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiIntegration.test.mjs) | Endpoint formats, user-question validation, language mapping/cache invalidation, custom-input payloads, and execution-response normalization. | 17 |
+| [`apiIntegration.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiIntegration.test.mjs) | Endpoint formats, user-question validation, strict captured language DTO mapping/cache invalidation, question fallback request discipline, custom-input payloads, and execution-response normalization. | 19 |
 | [`assessmentIntegrity.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/assessmentIntegrity.test.mjs) | Assessment shortcut restrictions while preserving typing, undo, and Run/Submit shortcuts. | 2 |
 | [`authSession.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/authSession.test.mjs) | JWT claims, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 18 |
 | [`batch4Remediation.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/batch4Remediation.test.mjs) | Error mapping, status codes (400-504), server leak detection (`org.springframework`, Hibernate). | 24 |
@@ -23,13 +23,13 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`companyResilience.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/companyResilience.test.mjs) | Company fallbacks, canonical question contracts, mutation error propagation. | 15 |
 | [`googleOAuthLifecycle.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/googleOAuthLifecycle.test.mjs) | Google OAuth, Redux auth lifecycle, single-flight refresh, open-redirect prevention. | 14 |
 | [`institutionManagement.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/institutionManagement.test.mjs) | AISHE uppercase transforms, university affiliation logic, status toggle. | 9 |
-| [`mcqCorrectOption.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority over stale top-level `correctOption`. | 3 |
+| [`mcqCorrectOption.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, and stale-field rejection. | 5 |
 | [`problemExecution.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, hook cancellation lifecycle. | 13 |
 | [`problemSliceAbortRecovery.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 12 |
 | [`taskRemediationVerification.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping and canonical cookie/memory token storage. | 2 |
 | [`userInfoProfile.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts and exact `jwtToken` payloads across services. | 12 |
 | [`validationArchitecture.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
-| **Total** | **All 16 test suites** | **215 / 215 Passing** |
+| **Total** | **All 16 test suites** | **219 / 219 Passing** |
 
 ---
 
@@ -82,7 +82,7 @@ Executes `tsc -p tsconfig.json --noEmit`. Expected: Exits with code 0.
 ```bash
 npm test
 ```
-Executes all 16 suites in `scripts/tests/`. Expected: `215 pass, 0 fail`.
+Executes all 16 suites in `scripts/tests/`. Expected: `219 pass, 0 fail`.
 
 ### 4. Production Build
 ```bash

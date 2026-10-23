@@ -263,8 +263,8 @@ export const CompanyExamDetails: React.FC = () => {
                   <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-slate-50 dark:bg-[#111A2E] border border-slate-200 dark:border-slate-700/80 p-2.5 flex items-center justify-center shrink-0 shadow-sm">
                     <CompanyBrandLogo
                       name={company?.name || details.exam.examName}
-                      logo={company?.logo || company?.logoUrl || undefined}
-                      website={company?.website || company?.websiteUrl || undefined}
+                      logo={company?.logo || undefined}
+                      website={company?.website || undefined}
                       className="w-full h-full object-contain"
                     />
                   </div>

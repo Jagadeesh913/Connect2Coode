@@ -58,15 +58,17 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/company
    * Saves a new company (id: null) or updates an existing company (id: number).
-   * Request Payload: { "id": null, "name": "...", "websiteUrl": "...", "logoUrl": "...", "description": "...", "isActive": true, "jwtToken": "..." }
+   * The read DTO exposes `website` and `logo`. The write DTO has not been
+   * safely live-verified, so preserve those exact field names rather than
+   * inventing client-only URL aliases.
    */
   async saveOrUpdateCompany(payload: CompanyItem): Promise<ApiResponse<Company>> {
     const token = tokenStorage.getAccessToken();
     const formattedPayload = {
       id: payload.id ? Number(payload.id) : null,
       name: payload.name.trim(),
-      websiteUrl: payload.websiteUrl || (payload as any).website || '',
-      logoUrl: payload.logoUrl || (payload as any).logo || '',
+      website: payload.website || '',
+      logo: payload.logo || '',
       description: payload.description || '',
       isActive: payload.isActive ?? true,
       jwtToken: token,

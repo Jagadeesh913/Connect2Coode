@@ -209,8 +209,8 @@ export const CompanyDetails: React.FC = () => {
       pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
     }, controller.signal).then((res) => {
       if (controller.signal.aborted) return;
-      const raw = (res?.data as any)?.data || res?.data || res;
-      const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
+      const pageData = res.data;
+      const list = Array.isArray(pageData?.content) ? pageData.content : [];
       setMcqsBySection((prev) => ({ ...prev, [activeSection]: list }));
     }).catch((err) => {
       if (!controller.signal.aborted) setMcqError(err?.message || 'Unable to load questions.');
@@ -457,8 +457,8 @@ export const CompanyDetails: React.FC = () => {
             <div className="w-18 h-18 sm:w-22 sm:h-22 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200/80 dark:border-slate-700/80 p-3 flex items-center justify-center shrink-0 shadow-xs">
               <CompanyBrandLogo
                 name={company.name}
-                logo={company.logo || company.logoUrl}
-                website={company.website || company.websiteUrl}
+                logo={company.logo}
+                website={company.website}
                 className="w-12 h-12 sm:w-14 sm:h-14"
               />
             </div>
@@ -489,9 +489,9 @@ export const CompanyDetails: React.FC = () => {
                   </span>
                 )}
 
-                {(company.website || company.websiteUrl) && (
+                {company.website && (
                   <a
-                    href={company.website || company.websiteUrl}
+                    href={company.website}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-2xs transition-colors"
