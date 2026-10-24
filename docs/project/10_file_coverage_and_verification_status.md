@@ -197,12 +197,12 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/companies/*` | Company, exam, role, section modals | `VERIFIED` | Admin authoring modals. |
 | `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics; code runner now freezes editor during execution and reports backend pass/fail verdicts. |
 | `components/institutions/*` | Institution details, form, status modals | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
-| `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Failed test-case saves remain visible errors; admin code tester freezes editor and reports returned verdicts, but live admin API remains unverified. |
+| `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Dynamic reference library bindings (DIFF, TOPIC, QPF, TESTCASETYPE), sequential displayOrder on hints, and testcase assertions verified; live admin mutation remains backend-owned. |
 | `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses totalElements, never sample-derived global difficulty totals, and surfaces partial metric failures. |
 | `pages/AdminCompanies.tsx` | Company CRUD page | `VERIFIED` | Admin company management. |
 | `pages/AdminInstitutions.tsx` | Institution directory management | `RUNTIME-VERIFIED` | Strict pages, authoritative edit details, clamped pagination, and complete university options. |
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `VERIFIED` | Compiler registry management. |
-| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, page clamping, and option-level correctness are tested. |
+| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, reference name payload attachment, page clamping, and option-level correctness are tested. |
 | `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, full test case retrieval (both visible and hidden) on Manage Test Cases, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
 

@@ -362,18 +362,30 @@ export const AdminMcqs: React.FC = () => {
     setSubmitting(true);
     try {
       const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
-
       const mappedOptions = serializeMcqOptions(filledOptions);
+
+      const matchedSubject = subjects.find((s) => s.refCode === formSubjectRefCode);
+      const matchedTopic = subjectTopics.find(
+        (t) => t.refCode.toUpperCase() === formTopicRefCode.toUpperCase()
+      );
+      const matchedDifficulty = difficulties.find((d) => d.refCode === formDifficultyRefCode);
+      const matchedCompany = formCompanyId
+        ? companies.find((c) => String(c.id) === String(formCompanyId))
+        : null;
 
       const payload: AdminCreateMcqPayload = {
         ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
         subjectGroupCode: 'SUBJECT',
         subjectRefCode: formSubjectRefCode,
+        subjectRefName: matchedSubject?.refName || '',
         topicGroupCode,
         topicRefCode: formTopicRefCode,
+        topicRefName: matchedTopic?.refName || '',
         difficultyGroupCode: 'DIFF',
         difficultyRefCode: formDifficultyRefCode,
+        difficultyRefName: matchedDifficulty?.refName || '',
         companyId: formCompanyId ? Number(formCompanyId) : null,
+        companyName: matchedCompany?.name || null,
         question: formQuestion.trim(),
         explanation: formExplanation.trim() || undefined,
         isActive: true,

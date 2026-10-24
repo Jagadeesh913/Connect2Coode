@@ -587,8 +587,13 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       askedDate: isOwn && data.askedDate && data.askedDate.trim() !== '' ? data.askedDate.trim() : null,
       leetCodeUrl: !isOwn && data.leetCodeUrl ? data.leetCodeUrl.trim() : '',
       gfgUrl: !isOwn && data.gfgUrl ? data.gfgUrl.trim() : '',
-      hackerRankUrl: !isOwn && data.hackerRankUrl ? data.hackerRankUrl.trim() : '',
-      questionHints: hints.filter((h) => h.hintText.trim() !== ''),
+      questionHints: hints
+        .filter((h) => h.hintText.trim() !== '')
+        .map((h, idx) => ({
+          id: h.id ?? null,
+          hintText: h.hintText.trim(),
+          displayOrder: idx + 1,
+        })),
       testCases: sanitizedTestCases,
       companies: resolvedCompanies,
     });

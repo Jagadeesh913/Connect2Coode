@@ -387,11 +387,15 @@ export interface AdminCreateMcqPayload {
   id?: number;
   subjectGroupCode: string;
   subjectRefCode: string;
+  subjectRefName?: string;
   topicGroupCode: string;
   topicRefCode: string;
+  topicRefName?: string;
   difficultyGroupCode: string;
   difficultyRefCode: string;
+  difficultyRefName?: string;
   companyId?: number | null;
+  companyName?: string | null;
   question: string;
   explanation?: string;
   isActive?: boolean;

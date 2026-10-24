@@ -420,7 +420,9 @@ export const AdminQuestions: React.FC = () => {
             displayOrder: idx + 1,
             typeRefGroupCode: 'TESTCASETYPE',
             typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
-            typeRefName: tc.typeRefName,
+            typeRefName:
+              tc.typeRefName ||
+              (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
         } catch (tcErr: any) {
