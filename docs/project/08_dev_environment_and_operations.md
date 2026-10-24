@@ -26,8 +26,8 @@
 | `VITE_SHOW_COMING_SOON` | `true` (defaults to true) | Feature flag routing unimplemented routes (`/interviews`, `/roadmaps/:slug`) to `<ComingSoon />`. Set to `false` to preview draft implementations. |
 
 > [!IMPORTANT]
-> **No Localhost API Target**:
-> `src/core/api/apiClient.ts` will explicitly reject `localhost` or `127.0.0.1` as an API base URL and fallback to `https://api.connect2code.in/api/v1`. The backend service runs on the cloud host only.
+> **Production Environment Safeguard**:
+> In deployed production builds, `src/core/api/apiClient.ts` strictly rejects `localhost`, `127.0.0.1`, or relative paths without host, falling back to `https://api.connect2code.in/api/v1` to ensure static hosting resilience. In local development or preview mode, relative paths (e.g. `/api/v1` for the Vite proxy) and local development backends (e.g. `http://localhost:8080/api/v1`) are fully supported.
 
 
 ---
@@ -124,6 +124,7 @@ steps:
   - run: npm run verify:architecture
   - run: npm run verify:docs
   - run: npm audit --audit-level=high
+  - run: npm test
   - run: npx --yes -p typescript@5.9.3 tsc -p tsconfig.json --noEmit
   - run: npm run build
   - run: node scripts/smoke-preview.mjs

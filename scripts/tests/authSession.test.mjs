@@ -108,6 +108,39 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(isJwtAdmin(userToken), false);
     });
 
+    it('REGRESSION: strictly rejects partial/substring admin claims (e.g. NOT_ADMIN, SUBADMIN, ADMINISTRATOR)', () => {
+      // 1. Single role claims
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'NOT_ADMIN' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ Role: 'NOT_ADMIN' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMIN_READER' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'SUBADMIN' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMINISTRATOR' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'COMPANY_ADMIN' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'NOT_ROLE_ADMIN' })), false);
+
+      // 2. Roles array claims
+      assert.equal(isJwtAdmin(createMockJwt({ roles: ['USER', 'NOT_ADMIN'] })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ Roles: ['SUBADMIN', 'GUEST'] })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ roles: ['ADMIN_ASSISTANT'] })), false);
+
+      // 3. Authorities array claims
+      assert.equal(isJwtAdmin(createMockJwt({ authorities: ['NOT_ADMIN'] })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'NOT_ADMIN' }] })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'ROLE_NOT_ADMIN' }] })), false);
+
+      // 4. Scope claims
+      assert.equal(isJwtAdmin(createMockJwt({ scope: 'read write NOT_ADMIN' })), false);
+      assert.equal(isJwtAdmin(createMockJwt({ scope: 'ADMIN_READ' })), false);
+
+      // 5. Valid exact admin claims still succeed
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMIN' })), true);
+      assert.equal(isJwtAdmin(createMockJwt({ role: 'ROLE_ADMIN' })), true);
+      assert.equal(isJwtAdmin(createMockJwt({ roles: ['USER', 'ADMIN'] })), true);
+      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'ROLE_ADMIN' }] })), true);
+      assert.equal(isJwtAdmin(createMockJwt({ authorities: ['ROLE_ADMIN'] })), true);
+      assert.equal(isJwtAdmin(createMockJwt({ scope: 'read write ROLE_ADMIN' })), true);
+    });
+
     it('rejects expired JWT tokens even if role is ADMIN', () => {
       const pastTimestamp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
       const expiredToken = createMockJwt({ role: 'ADMIN', exp: pastTimestamp });

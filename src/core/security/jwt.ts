@@ -83,10 +83,12 @@ export function isTokenValid(token: string | null | undefined): boolean {
   return !isJwtExpired(payload);
 }
 
+export const APPROVED_ADMIN_ROLES: readonly string[] = ['ADMIN', 'ROLE_ADMIN'];
+
 /**
  * Checks whether the JWT contains claims indicating an admin role.
  * Used for client-side UI navigation gating only.
- * Checks role, Role, roles, Roles, authorities, and scope claims.
+ * Checks role, Role, roles, Roles, authorities, and scope claims with exact approved roles.
  */
 export function isJwtAdmin(token: string | null | undefined): boolean {
   const payload = decodeJwtPayload(token);
@@ -97,7 +99,7 @@ export function isJwtAdmin(token: string | null | undefined): boolean {
   const matchesAdmin = (val: unknown): boolean => {
     if (typeof val !== 'string') return false;
     const upper = val.toUpperCase().trim();
-    return upper === 'ADMIN' || upper === 'ROLE_ADMIN' || upper.includes('ADMIN');
+    return upper === 'ADMIN' || upper === 'ROLE_ADMIN';
   };
 
   // 1. Check primary single role claims (e.g. { role: "ADMIN" } or { Role: "ADMIN" })

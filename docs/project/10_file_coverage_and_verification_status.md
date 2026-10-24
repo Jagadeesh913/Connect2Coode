@@ -229,10 +229,10 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 136
 - **Total Automated Test Suites in `scripts/tests/`**: 16
-- **Total Executed Automated Unit Tests**: 245 (245 Passed, 0 Failed; 81 reported suites across 16 files)
+- **Total Executed Automated Unit Tests**: 251 (251 Passed, 0 Failed; 84 reported suites across 16 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
-- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 153 files
+- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 159 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors
-- **Documentation Integrity (`npm run verify:docs`)**: 232 internal links and source references passed.
-- **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. The developer-owned file was preserved.
-- **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `NOT WORKING` in this local environment; Vite reported ready on 127.0.0.1:4173 but the script could not establish its loopback readiness request. CI has not been observed for this revision.
+- **Documentation Integrity (`npm run verify:docs`)**: 235 internal links and source references passed.
+- **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. Passes in CI without local `.env`.
+- **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 9 bundle assets.

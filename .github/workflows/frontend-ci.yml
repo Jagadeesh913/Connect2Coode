@@ -43,6 +43,9 @@ jobs:
       - name: Dependency audit
         run: npm audit --audit-level=high
 
+      - name: Run automated test suites
+        run: npm test
+
       - name: Typecheck
         run: npx --yes -p typescript@5.9.3 tsc -p tsconfig.json --noEmit
 

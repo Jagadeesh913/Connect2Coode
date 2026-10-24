@@ -6,9 +6,14 @@
 - **Canonical API Base URL**: `https://api.connect2code.in/api/v1`
 - **Base URL Resolution Logic** ([`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts)):
   ```ts
-  export const resolveDeploymentApiBaseUrl = (rawUrl?: string | null, _isLocal: boolean = false): string => {
+  export const resolveDeploymentApiBaseUrl = (rawUrl?: string | null, isLocal?: boolean): string => {
     const resolved = resolveApiBaseUrl(rawUrl);
-    // In all environments, ALL API calls strictly target the live backend origin
+    const isLocalEnv = typeof isLocal === 'boolean' ? isLocal : ...;
+
+    // In local dev/preview: preserve relative paths (/api/v1) for Vite proxy and local backends (localhost)
+    if (isLocalEnv) return resolved;
+
+    // In deployed production: guard against localhost/relative paths and fallback to canonical backend
     if (resolved.includes('localhost') || resolved.includes('127.0.0.1') || !resolved.startsWith('http')) {
       return DEFAULT_API_BASE_URL; // 'https://api.connect2code.in/api/v1'
     }

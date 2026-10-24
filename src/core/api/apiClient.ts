@@ -55,12 +55,32 @@ export const getBackendOrigin = (rawUrl?: string | null): string => {
 
 export const resolveDeploymentApiBaseUrl = (
   rawUrl?: string | null,
-  _isLocal: boolean = false
+  isLocal?: boolean
 ): string => {
   const resolved = resolveApiBaseUrl(rawUrl);
 
-  // In all environments, ALL API calls must strictly
-  // target the live backend origin https://api.connect2code.in/api/v1 and NEVER localhost.
+  const isLocalEnv =
+    typeof isLocal === 'boolean'
+      ? isLocal
+      : typeof import.meta !== 'undefined' && import.meta.env
+      ? Boolean(import.meta.env.DEV || import.meta.env.MODE === 'development' || import.meta.env.MODE === 'preview')
+      : typeof window !== 'undefined'
+      ? window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+      : false;
+
+  // In local development or preview environments:
+  // - Support relative API paths (e.g. '/api/v1') so the Vite dev/preview proxy routes requests.
+  // - Support local development servers (e.g. 'http://localhost:8080/api/v1' or 'http://127.0.0.1:8080/api/v1').
+  // - Support custom absolute backend URLs.
+  // - Default safely to canonical production backend if unconfigured or empty.
+  if (isLocalEnv) {
+    return resolved;
+  }
+
+  // In deployed production environments (e.g. Vercel static SPA):
+  // - Guard against accidentally baking localhost or loopback addresses into client production bundles.
+  // - Guard against relative API paths when the static host lacks an API reverse proxy.
+  // - Fallback safely to the canonical production backend.
   if (
     resolved.includes('localhost') ||
     resolved.includes('127.0.0.1') ||
