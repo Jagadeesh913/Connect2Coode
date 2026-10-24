@@ -4,6 +4,7 @@ import type { ApiResponse } from '../core/types/api';
 import type { Company, Problem } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
 import { tokenStorage } from '../core/security/tokenStorage';
+import { fetchResilientQuestionPage } from './admin/adminQuestionService';
 import type {
   CompanyExamItem,
   CompanyExamDetailsData,
@@ -382,7 +383,7 @@ export const companyService = {
           },
         };
 
-        const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+        const res: any = await fetchResilientQuestionPage(payload, signal);
         const raw = res?.data || res;
         const list = Array.isArray(raw?.content)
           ? raw.content
@@ -427,7 +428,7 @@ export const companyService = {
           },
         };
 
-        const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+        const res: any = await fetchResilientQuestionPage(payload, signal);
         const raw = res?.data || res;
         const list = Array.isArray(raw?.content)
           ? raw.content

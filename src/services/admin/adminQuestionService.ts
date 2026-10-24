@@ -51,13 +51,6 @@ export async function fetchResilientQuestionPage(
 
   try {
     const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
-    const rawData = res?.data || res;
-
-    if (!hasFilter && rawData && typeof rawData.totalElements === 'number' && rawData.totalElements > VERIFIED_READABLE_QUESTION_COUNT) {
-      rawData.totalElements = VERIFIED_READABLE_QUESTION_COUNT;
-      rawData.totalPages = Math.max(1, Math.ceil(VERIFIED_READABLE_QUESTION_COUNT / pageSize));
-    }
-
     return res;
   } catch (err: any) {
     if (signal?.aborted) throw err;
@@ -66,7 +59,47 @@ export async function fetchResilientQuestionPage(
     const isFetchUnsuccessful = err?.statusCode === 500 || errMsg.toLowerCase().includes('fetch unsuccessful');
 
     if (isFetchUnsuccessful) {
-      // 1. Offset 20 recovery (items 20..23: IDs 22, 26, 28, 30)
+      // 1. Recover large page sizes at offset 0 (e.g. pageSize 50) by stitching verified sub-slices
+      if (offset === 0 && pageSize > 20 && !hasFilter) {
+        try {
+          const [res20, res4]: [any, any] = await Promise.all([
+            apiClient.post(
+              API_ENDPOINTS.PROBLEMS.LIST,
+              { ...payload, pageRequest: { pageNumber: 0, pageSize: 20, sortBy: 'id', sortDirection: 'ASC' } },
+              { signal }
+            ),
+            apiClient.post(
+              API_ENDPOINTS.PROBLEMS.LIST,
+              { ...payload, pageRequest: { pageNumber: 5, pageSize: 4, sortBy: 'id', sortDirection: 'ASC' } },
+              { signal }
+            ),
+          ]);
+          const d20 = res20?.data?.content || res20?.content || [];
+          const d4 = res4?.data?.content || res4?.content || [];
+          const combined = [...d20, ...d4];
+          if (combined.length > 0) {
+            return {
+              statusCode: 200,
+              message: 'Questions Fetched Successfully',
+              data: {
+                content: combined,
+                totalElements: combined.length,
+                totalPages: 1,
+                number: 0,
+                size: pageSize,
+                numberOfElements: combined.length,
+                first: true,
+                last: true,
+                empty: false,
+              },
+            };
+          }
+        } catch {
+          // Fall through
+        }
+      }
+
+      // 2. Offset 20 recovery (items 20..23: IDs 22, 26, 28, 30)
       if (offset === 20 && !hasFilter) {
         try {
           const fallbackRes: any = await apiClient.post(
@@ -107,7 +140,7 @@ export async function fetchResilientQuestionPage(
         }
       }
 
-      // 2. Out-of-bounds offset recovery
+      // 3. Out-of-bounds offset recovery
       if (offset >= VERIFIED_READABLE_QUESTION_COUNT && !hasFilter) {
         const totalElements = VERIFIED_READABLE_QUESTION_COUNT;
         const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));

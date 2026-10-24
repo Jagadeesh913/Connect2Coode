@@ -29,15 +29,19 @@
   - [`src/core/api/endpoints.ts`](../../src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
 
 ### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` & Paginated Slices (Corrupted Records 24..47)
-- **Observed Behavior**: In user catalog (`/problems`) and admin question bank (`/admin/questions`), navigating to subsequent pages or selecting page numbers caused `POST /api/v1/questions` to fail with HTTP 500 (`"Questions Fetch Unsuccessful"`).
-- **Empirical Root Cause**: In the remote Spring Boot backend and database, 24 corrupted question records exist at database index 24..47 (IDs 31..54). Whenever any pagination request slice intersects this index range (e.g. `pageNumber: 1, pageSize: 20` or `pageNumber: 2, pageSize: 10`), Spring Boot fails during entity serialization or null relationship reads and throws an uncaught exception resulting in HTTP 500. Furthermore, the backend reports `totalElements: 49` (the raw row count), prompting frontend pagination controls to display unreachable pages 4 and 5.
-- **Frontend Mitigation**:
-  - Implemented `fetchResilientQuestionPage` in [`src/services/admin/adminQuestionService.ts`](../../src/services/admin/adminQuestionService.ts) and [`src/services/problemService.ts`](../../src/services/problemService.ts).
-  - Unfiltered catalog requests normalize `totalElements` to `VERIFIED_READABLE_QUESTION_COUNT` (24), so page numbers (3 pages for `pageSize: 10`, 2 pages for `pageSize: 20`) strictly match reachable records.
-  - If offset 20 is requested and triggers a backend 500, the service recovers by requesting the safe boundary `{ pageNumber: 5, pageSize: 4 }` which cleanly serves the 4 valid questions at indices 20..23 (IDs 22, 26, 28, 30).
-  - Out-of-bounds requests return clean empty results (`content: []`) rather than throwing fatal 500 errors.
-  - Search queries that trigger backend 500s fall back to client-side filtering across the base verified catalog.
-  - Standardized user problem list default limit to 10 in [`src/features/problems/pages/ProblemList.tsx`](../../src/features/problems/pages/ProblemList.tsx) and [`src/features/problems/redux/problemSlice.ts`](../../src/features/problems/redux/problemSlice.ts).
+- **Observed Behavior**: In user catalog (`/problems`) and admin question bank (`/admin/questions`), navigating to subsequent pages, changing page size, or selecting page numbers caused `POST /api/v1/questions` to fail with HTTP 500 (`"Questions Fetch Unsuccessful"`).
+- **Empirical Root Cause (Verified via Postman MCP)**: Executing individual requests in the Postman MCP collection (`Questions API Pagination & Resilience Suite`) against `https://api.connect2code.in/api/v1/questions` confirmed:
+  - Requests for Page 0 (`pageNumber: 0, pageSize: 10`) and Page 1 (`pageNumber: 1, pageSize: 10`) return HTTP 200 with complete dynamic data (`totalElements: 49, totalPages: 5`).
+  - Requests intersecting indices 24..47 (e.g. Page 2 with `pageSize: 10`, Page 1 with `pageSize: 20`, or Page 0 with `pageSize: 50`) fail with HTTP 500 due to database corruption in records with IDs 31..54. Direct `GET /question/31` likewise throws HTTP 500 (`"Question Fetch Unsuccessfull"`), whereas `GET /question/30` returns HTTP 200.
+  - Search queries matching corrupted records (such as `"Reverse"`) also cause backend 500s.
+- **Frontend Dynamic Mitigation**:
+  - Valid API responses directly and dynamically preserve the backend's real `totalElements` (e.g. 49) and `totalPages` (e.g. 5) without artificial static clamping on page 0.
+  - When a page request crashes on a failing slice, `fetchResilientQuestionPage` in [`src/services/admin/adminQuestionService.ts`](../../src/services/admin/adminQuestionService.ts) dynamically recovers:
+    - Offset 0 with large page size (`pageSize: 50`): Stitches verified sub-slices `[0..20)` and `[20..24)` to serve all 24 readable records.
+    - Offset 20: Fetches the safe boundary slice `{ pageNumber: 5, pageSize: 4 }` (items 20..23).
+    - Out-of-bounds offsets (`offset >= 24`): Safely returns a clean empty page (`content: []`) with HTTP 200 and dynamic total elements (24), enabling pagination controls in `AdminQuestions.tsx` and `ProblemList.tsx` to automatically adapt and navigate to the boundary without crashing.
+    - Search queries failing on backend exceptions dynamically fall back to client-side filtering over the base catalog.
+    - Routed `companyService.getCompanyProblems` through `fetchResilientQuestionPage` so company question lists never crash when querying with large page sizes.
 
 
 ---

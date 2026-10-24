@@ -35,7 +35,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
   });
 
   describe('1. Unfiltered Catalog Page Normalization', () => {
-    it('normalizes totalElements to 24 and recomputes totalPages for unfiltered queries', async () => {
+    it('preserves real dynamic API totalElements and totalPages directly from API response on success', async () => {
       const originalPost = apiClient.post;
       try {
         apiClient.post = async () => ({
@@ -58,9 +58,51 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
         });
 
-        assert.equal(res.data.totalElements, 24, 'Unfiltered catalog must cap totalElements to 24');
-        assert.equal(res.data.totalPages, 3, 'totalPages must be 3 for pageSize 10 with 24 total elements');
+        assert.equal(res.data.totalElements, 49, 'Valid API queries must dynamically preserve backend totalElements');
+        assert.equal(res.data.totalPages, 5, 'Valid API queries must dynamically preserve backend totalPages');
         assert.equal(res.data.content.length, 10);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('recovers pageSize: 50 at offset 0 by stitching verified slices when backend 500s', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          if (payload.pageRequest?.pageSize === 50) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload.pageRequest?.pageSize === 20 && payload.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'OK',
+              data: { content: Array.from({ length: 20 }, (_, i) => ({ id: i + 1 })) },
+            };
+          }
+          if (payload.pageRequest?.pageSize === 4 && payload.pageRequest?.pageNumber === 5) {
+            return {
+              statusCode: 200,
+              message: 'OK',
+              data: { content: Array.from({ length: 4 }, (_, i) => ({ id: 21 + i })) },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: null,
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 24);
+        assert.equal(res.data.totalElements, 24);
       } finally {
         apiClient.post = originalPost;
       }
