@@ -14,7 +14,7 @@
 ### Files
 - [`.env.example`](../../.env.example): Checked into git. Reference template for required configuration keys.
 - [`.env.production`](../../.env.production): Checked into git. Production deployment configuration.
-- [`.env`](../../.env): Ignored by git in `.gitignore`. Local environment override.
+- `.env`: Ignored by git in `.gitignore`. Local environment override.
 
 ### Environment Variable Contract
 
