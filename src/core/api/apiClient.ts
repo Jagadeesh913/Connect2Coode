@@ -77,7 +77,7 @@ export const resolveDeploymentApiBaseUrl = (
     return resolved;
   }
 
-  // In deployed production environments (e.g. Vercel static SPA):
+  // In deployed production environments (e.g. static production SPA):
   // - Guard against accidentally baking localhost or loopback addresses into client production bundles.
   // - Guard against relative API paths when the static host lacks an API reverse proxy.
   // - Fallback safely to the canonical production backend.
