@@ -56,8 +56,10 @@ export const AdminCompanies: React.FC = () => {
     try {
       const res = await adminCompanyService.getCompanies(controller.signal);
       if (controller.signal.aborted) return;
-      const list = res?.data || (Array.isArray(res) ? res : []);
-      setCompanies(Array.isArray(list) ? list : []);
+      if (!Array.isArray(res?.data)) {
+        throw new Error('Unexpected company list response format');
+      }
+      setCompanies(res.data);
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const msg = getActionableErrorMessage(err, 'Failed to fetch companies list.');

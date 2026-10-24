@@ -21,6 +21,16 @@ export interface ExecutionReadinessParams {
   selectedLanguage: ExecutionLanguageLike | null;
 }
 
+export const resolveExecutionLanguageName = (
+  languages: Array<ExecutionLanguageLike & { name?: string; languageName?: string }>,
+  languageId: number
+): string => {
+  const language = languages.find(
+    (item) => item.id === languageId || item.referenceId === languageId
+  );
+  return language?.name || language?.languageName || `Language #${languageId}`;
+};
+
 /**
  * Resolves the active integer question ID for code execution, submissions,
  * and markSolved state synchronization.

@@ -76,8 +76,9 @@ export const fetchUserInfoThunk = createAsyncThunk<
       }
       if (force) return true;
       if (
-        state.profile.userInfo &&
-        String(state.profile.userInfo.userId ?? '') === String(userId)
+        sameUser &&
+        state.profile.userInfoRequestId === null &&
+        state.profile.userInfoError === null
       ) {
         return false;
       }
@@ -132,6 +133,11 @@ const profileSlice = createSlice({
       })
       // fetchUserInfo
       .addCase(fetchUserInfoThunk.pending, (state, action) => {
+        const isNewUser =
+          String(state.activeUserInfoUserId ?? '') !== String(action.meta.arg.userId);
+        if (isNewUser) {
+          state.userInfo = null;
+        }
         state.userInfoLoading = true;
         state.userInfoError = null;
         state.userInfoRequestId = action.meta.requestId;
@@ -142,7 +148,12 @@ const profileSlice = createSlice({
         state.userInfoLoading = false;
         state.userInfoRequestId = null;
         state.activeUserInfoUserId = action.meta.arg.userId;
-        state.userInfo = action.payload.data;
+        state.userInfo = action.payload.data
+          ? {
+              ...action.payload.data,
+              userId: action.payload.data.userId ?? action.payload.userId,
+            }
+          : null;
       })
       .addCase(fetchUserInfoThunk.rejected, (state, action) => {
         if (state.userInfoRequestId !== action.meta.requestId) return;
@@ -181,6 +192,31 @@ const profileSlice = createSlice({
           state.userInfoError = null;
           state.userInfoRequestId = null;
           state.activeUserInfoUserId = null;
+        }
+      )
+      .addMatcher(
+        (action) =>
+          action.type === 'auth/login/fulfilled' ||
+          action.type === 'auth/loginWithGoogleRefreshToken/fulfilled' ||
+          action.type === 'auth/setAuthenticatedSession' ||
+          action.type === 'auth/initializeAuth',
+        (state, action: any) => {
+          const nextUser = action.payload?.user || action.payload?.savedUser || action.payload;
+          const nextUserId = nextUser?.id ?? null;
+          const profileBelongsToNextUser =
+            state.profile?.id != null && String(state.profile.id) === String(nextUserId ?? '');
+          const userInfoBelongsToNextUser =
+            state.activeUserInfoUserId != null &&
+            String(state.activeUserInfoUserId) === String(nextUserId ?? '');
+
+          if (!profileBelongsToNextUser) state.profile = null;
+          if (!userInfoBelongsToNextUser) {
+            state.userInfo = null;
+            state.userInfoLoading = false;
+            state.userInfoError = null;
+            state.userInfoRequestId = null;
+            state.activeUserInfoUserId = nextUserId;
+          }
         }
       );
   },

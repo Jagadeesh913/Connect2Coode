@@ -22,11 +22,13 @@
 | :--- | :--- | :--- |
 | `VITE_API_BASE_URL` | `https://api.connect2code.in/api/v1` | Root API base URL targeting the remote Spring Boot backend. |
 | `VITE_APP_NAME` | `Connect 2 Code` | Platform application name display. |
+| `VITE_BRANDFETCH_CLIENT_ID` | Empty (optional) | Public Brandfetch client ID used for domain-derived company logos after bundled assets. When omitted, the cascade continues with Simple Icons, the official-site favicon, and a deterministic monogram. Never put a secret key in a `VITE_` variable. |
 | `VITE_SHOW_COMING_SOON` | `true` (defaults to true) | Feature flag routing unimplemented routes (`/interviews`, `/roadmaps/:slug`) to `<ComingSoon />`. Set to `false` to preview draft implementations. |
 
 > [!IMPORTANT]
 > **No Localhost API Target**:
 > `src/core/api/apiClient.ts` will explicitly reject `localhost` or `127.0.0.1` as an API base URL and fallback to `https://api.connect2code.in/api/v1`. The backend service runs on the cloud host only.
+
 
 ---
 
@@ -135,7 +137,7 @@ steps:
 ## 6. Documentation and Performance Evidence
 
 - `npm run verify:docs` runs `scripts/verify-documentation.mjs`. It is required in CI and validates the canonical `AGENTS.md` plus `docs/project/` links, repository-path references, and common unredacted-secret patterns.
-- The 2026-10-22 production build completed successfully after the dependency/API-state audit. Its Vite entry bundle was **429.89 kB / 121.27 kB gzip**; route modules remain lazy-loaded. The largest route/support chunks observed were `AdminModal` (**130.96 kB / 43.00 kB gzip**, including Framer Motion and loaded only by admin routes), `AdminQuestions` (**66.62 kB / 14.42 kB gzip**), and `ProblemDetails` (**55.53 kB / 11.04 kB gzip**; Monaco itself is loaded by its wrapper at runtime). These are build artifacts, not a load-capacity result.
+- The 2026-10-24 production build completed successfully after the dependency/API-state audit and Zod 4 security migration. Its Vite entry bundle was **464.34 kB / 134.19 kB gzip**; route modules remain lazy-loaded. The largest route/support chunks observed were `AdminModal` (**131.54 kB / 43.20 kB gzip**, including Framer Motion and loaded only by admin routes), `AdminQuestions` (**68.05 kB / 14.99 kB gzip**), and `ProblemDetails` (**58.17 kB / 12.27 kB gzip**; Monaco itself is loaded by its wrapper at runtime). These are build artifacts, not a load-capacity result.
 
 ### 5,000-Concurrent-User Evaluation Plan
 

@@ -46,6 +46,17 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
   // F-036: AdminRoute Role Check Relies on Signed JWT Claims (Not LocalStorage)
   // =========================================================================
   describe('F-036: Signed JWT Claims & Admin Authorization', () => {
+    it('admin gating, guest redirects, and navigation do not trust mutable cached role metadata', async () => {
+      const fs = await import('node:fs');
+      const adminRouteSource = fs.readFileSync('src/core/guards/AdminRoute.tsx', 'utf8');
+      const guestRouteSource = fs.readFileSync('src/core/guards/GuestRoute.tsx', 'utf8');
+      const navbarSource = fs.readFileSync('src/shared/components/ui/Navbar.tsx', 'utf8');
+      assert.match(adminRouteSource, /if \(!isJwtAdmin\(token\)\)/);
+      assert.match(guestRouteSource, /if \(isJwtAdmin\(token\)\)/);
+      assert.match(navbarSource, /isAdmin = isLoggedIn && isJwtAdmin\(token\)/);
+      assert.doesNotMatch(`${adminRouteSource}\n${guestRouteSource}\n${navbarSource}`, /isUserRoleAdmin|userRole\.includes\('ADMIN'\)|role\.includes\('ADMIN'\)/);
+    });
+
     it('accurately decodes claims from valid base64url JWT', () => {
       const payload = { sub: '42', email: 'admin@c2c.test', role: 'ADMIN' };
       const token = createMockJwt(payload);

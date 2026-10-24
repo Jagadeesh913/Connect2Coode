@@ -14,22 +14,22 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | Suite File | Scope & Tested Contracts | Tests Count |
 | :--- | :--- | :---: |
 | [`apiClient.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiClient.test.mjs) | Base URL normalization, trimming slashes, localhost rejection in prod, default backend fallback. | 13 |
-| [`apiIntegration.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiIntegration.test.mjs) | Endpoint formats, user-question validation, strict captured language DTO mapping/cache invalidation, question fallback request discipline, custom-input payloads, and execution-response normalization. | 19 |
+| [`apiIntegration.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/apiIntegration.test.mjs) | Endpoint formats, strict list response validation, user-question validation, captured language DTO mapping/cache invalidation, question fallback discipline, custom-input payloads, and execution verdicts. | 21 |
 | [`assessmentIntegrity.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/assessmentIntegrity.test.mjs) | Assessment shortcut restrictions while preserving typing, undo, and Run/Submit shortcuts. | 2 |
-| [`authSession.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/authSession.test.mjs) | JWT claims, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 18 |
+| [`authSession.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/authSession.test.mjs) | JWT claims, JWT-only admin authorization, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 19 |
 | [`batch4Remediation.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/batch4Remediation.test.mjs) | Error mapping, status codes (400-504), server leak detection (`org.springframework`, Hibernate). | 24 |
-| [`batch6Governance.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/batch6Governance.test.mjs) | Route guards, storage boundaries, bookmark identity/concurrency, and cross-user stale Redux responses. | 26 |
-| [`companyLogos.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/companyLogos.test.mjs) | SVG asset presence, canonical alias resolution, monogram initial fallback. | 7 |
+| [`batch6Governance.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/batch6Governance.test.mjs) | Route guards, storage boundaries, bookmark/progress/profile failure behavior, modal accessibility, and cross-user stale Redux responses. | 34 |
+| [`companyLogos.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/companyLogos.test.mjs) | Bundled asset presence/reachability, canonical aliases, legal-suffix normalization, domain validation, provider ordering, and monogram fallback. | 12 |
 | [`companyResilience.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/companyResilience.test.mjs) | Company fallbacks, canonical question contracts, mutation error propagation. | 15 |
 | [`googleOAuthLifecycle.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/googleOAuthLifecycle.test.mjs) | Google OAuth, Redux auth lifecycle, single-flight refresh, open-redirect prevention. | 14 |
 | [`institutionManagement.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/institutionManagement.test.mjs) | AISHE uppercase transforms, university affiliation logic, status toggle. | 9 |
-| [`mcqCorrectOption.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, and stale-field rejection. | 5 |
-| [`problemExecution.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, hook cancellation lifecycle. | 13 |
+| [`mcqCorrectOption.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, stale-field rejection, and aptitude category URL parsing. | 7 |
+| [`problemExecution.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, and hook cancellation lifecycle. | 15 |
 | [`problemSliceAbortRecovery.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 12 |
-| [`taskRemediationVerification.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping and canonical cookie/memory token storage. | 2 |
-| [`userInfoProfile.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts and exact `jwtToken` payloads across services. | 12 |
+| [`taskRemediationVerification.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, and pagination semantics. | 9 |
+| [`userInfoProfile.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
-| **Total** | **All 16 test suites** | **219 / 219 Passing** |
+| **Total** | **All 16 test files (81 reported suites)** | **245 / 245 Passing** |
 
 ---
 

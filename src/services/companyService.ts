@@ -37,7 +37,11 @@ export const companyService = {
         ? rawData.content
         : Array.isArray(rawData)
         ? rawData
-        : [];
+        : null;
+
+      if (!content) {
+        throw new Error('Unexpected companies response format');
+      }
 
       const mappedContent = content.map((item: any) => {
         const name = typeof item.name === 'string' ? item.name : '';
@@ -79,7 +83,10 @@ export const companyService = {
         // Fallback to GET /company if list route returns 404
         const fallbackRes: any = await apiClient.get(API_ENDPOINTS.COMPANY.BASE, { signal });
         const raw = fallbackRes?.data || fallbackRes;
-        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.content) ? raw.content : [];
+        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.content) ? raw.content : null;
+        if (!list) {
+          throw new Error('Unexpected companies fallback response format');
+        }
         const mappedList = list.map((item: any) => {
           const name = typeof item.name === 'string' ? item.name : '';
           const safeSlug =
@@ -145,6 +152,44 @@ export const companyService = {
   },
 
   /**
+   * Loads the complete company catalog so client-side search and industry
+   * filters operate across every server page, not only the visible page.
+   */
+  async getAllCompanies(signal?: AbortSignal): Promise<ApiResponse<Company[]>> {
+    const firstPage = await this.getCompaniesPaginated(
+      { pageNumber: 0, pageSize: 100, sortBy: 'name', sortDirection: 'ASC' },
+      signal
+    );
+    const pages: PaginatedData<CompanyItem>[] = [firstPage.data];
+    const totalPages = Math.max(1, Number(firstPage.data.totalPages) || 1);
+
+    for (let pageNumber = 1; pageNumber < totalPages; pageNumber += 1) {
+      signal?.throwIfAborted();
+      const response = await this.getCompaniesPaginated(
+        { pageNumber, pageSize: 100, sortBy: 'name', sortDirection: 'ASC' },
+        signal
+      );
+      pages.push(response.data);
+    }
+
+    const seen = new Set<string>();
+    const companies = pages.flatMap((page) => page.content).filter((company) => {
+      const key = String(company.id ?? company.slug ?? company.name).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    return {
+      statusCode: 200,
+      message: 'Companies Fetched Successfully',
+      data: companies,
+      errors: null,
+      timestamp: firstPage.timestamp,
+    };
+  },
+
+  /**
    * POST /api/v1/company/:companyId/exams/list
    * Fetches exams associated with a company
    */
@@ -168,11 +213,15 @@ export const companyService = {
         { signal }
       );
       const rawData = res?.data || res;
-      const content: CompanyExamItem[] = Array.isArray(rawData?.content)
+      const content = Array.isArray(rawData?.content)
         ? rawData.content
         : Array.isArray(rawData)
         ? rawData
-        : [];
+        : null;
+
+      if (!content) {
+        throw new Error('Unexpected company exams response format');
+      }
 
       return {
         statusCode: 200,
@@ -211,6 +260,10 @@ export const companyService = {
         { signal }
       );
       const rawData = res?.data || res;
+
+      if (!rawData || typeof rawData !== 'object') {
+        throw new Error('Unexpected company exam details response format');
+      }
 
       return {
         statusCode: 200,

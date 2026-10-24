@@ -75,6 +75,7 @@ export const AdminMcqs: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [selectedMcq, setSelectedMcq] = useState<McqQuestion | null>(null);
   const [editingMcq, setEditingMcq] = useState<McqQuestion | null>(null);
+  const [viewLoadingId, setViewLoadingId] = useState<number | null>(null);
   const [editingLoadingId, setEditingLoadingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
@@ -205,9 +206,10 @@ export const AdminMcqs: React.FC = () => {
       if (controller.signal.aborted) return;
 
       const pageData = response.data;
-      const contentList: McqQuestion[] = Array.isArray(pageData?.content)
-        ? pageData.content
-        : [];
+      if (!pageData || !Array.isArray(pageData.content)) {
+        throw new Error('Unexpected MCQ list response format');
+      }
+      const contentList: McqQuestion[] = pageData.content;
 
       const total = typeof pageData?.totalElements === 'number'
         ? pageData.totalElements
@@ -216,6 +218,11 @@ export const AdminMcqs: React.FC = () => {
       const computedPages = typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
         ? pageData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
+
+      if (total > 0 && pageNumber >= computedPages) {
+        setPageNumber(computedPages - 1);
+        return;
+      }
 
       const normalizedContentList: McqQuestion[] = contentList.map((item) => {
         if (!Array.isArray(item.options) || item.options.length === 0) {
@@ -271,47 +278,57 @@ export const AdminMcqs: React.FC = () => {
   const handleOpenEditModal = async (mcq: McqQuestion) => {
     setEditingLoadingId(mcq.id);
     try {
-      let authoritativeMcq = mcq;
       try {
         const detailRes = await adminMcqService.getMcqById(mcq.id);
         const detailData = detailRes.data;
-        if (detailData && typeof detailData === 'object' && detailData.id) {
-          authoritativeMcq = { ...mcq, ...detailData };
+        if (!detailData || typeof detailData !== 'object' || !detailData.id) {
+          throw new Error(`MCQ #${mcq.id} returned an invalid detail response`);
         }
-      } catch (err) {
-        console.warn('Could not load authoritative detailed options for MCQ #' + mcq.id, err);
-      }
+        const authoritativeMcq = { ...mcq, ...detailData };
 
-      setEditingMcq(authoritativeMcq);
-      const subj = authoritativeMcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || '';
-      setFormSubjectRefCode(subj);
-      setFormTopicRefCode(authoritativeMcq.topicRefCode || '');
-      setFormDifficultyRefCode(authoritativeMcq.difficultyRefCode || difficulties[0]?.refCode || '');
-      setFormCompanyId(authoritativeMcq.companyId ? String(authoritativeMcq.companyId) : '');
-      setFormQuestion(cleanQuestionText(authoritativeMcq.question) || authoritativeMcq.question || '');
-      setFormExplanation(authoritativeMcq.explanation || '');
+        setEditingMcq(authoritativeMcq);
+        const subj = authoritativeMcq.subjectRefCode?.toUpperCase() || subjects[0]?.refCode || '';
+        setFormSubjectRefCode(subj);
+        setFormTopicRefCode(authoritativeMcq.topicRefCode || '');
+        setFormDifficultyRefCode(authoritativeMcq.difficultyRefCode || difficulties[0]?.refCode || '');
+        setFormCompanyId(authoritativeMcq.companyId ? String(authoritativeMcq.companyId) : '');
+        setFormQuestion(cleanQuestionText(authoritativeMcq.question) || authoritativeMcq.question || '');
+        setFormExplanation(authoritativeMcq.explanation || '');
 
-      const authoritativeOpts: any[] =
-        Array.isArray(authoritativeMcq.options) && authoritativeMcq.options.length > 0
-          ? authoritativeMcq.options
-          : synthesizeMcqOptions(authoritativeMcq);
+        const authoritativeOpts: any[] =
+          Array.isArray(authoritativeMcq.options) && authoritativeMcq.options.length > 0
+            ? authoritativeMcq.options
+            : synthesizeMcqOptions(authoritativeMcq);
 
-      const mapped = normalizeApiMcqOptions(authoritativeOpts);
+        const mapped = normalizeApiMcqOptions(authoritativeOpts);
 
-      if (mapped.length > 0) {
+        if (mapped.length === 0) {
+          throw new Error(`MCQ #${mcq.id} has no editable options in its detail response`);
+        }
         setFormOptions(mapped);
-      } else {
-        setFormOptions([
-          { optionLabel: 'A', optionText: '', isCorrect: true },
-          { optionLabel: 'B', optionText: '', isCorrect: false },
-          { optionLabel: 'C', optionText: '', isCorrect: false },
-          { optionLabel: 'D', optionText: '', isCorrect: false },
-        ]);
+        setIsCreateModalOpen(true);
+      } catch (err: any) {
+        toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ data for editing.'));
       }
-
-      setIsCreateModalOpen(true);
     } finally {
       setEditingLoadingId(null);
+    }
+  };
+
+  const handleOpenViewModal = async (mcq: McqQuestion) => {
+    setViewLoadingId(mcq.id);
+    try {
+      const detailRes = await adminMcqService.getMcqById(mcq.id);
+      const detailData = detailRes.data;
+      if (!detailData || typeof detailData !== 'object' || !detailData.id) {
+        throw new Error(`MCQ #${mcq.id} returned an invalid detail response`);
+      }
+      setSelectedMcq({ ...mcq, ...detailData });
+      setIsViewModalOpen(true);
+    } catch (err: any) {
+      toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ details.'));
+    } finally {
+      setViewLoadingId(null);
     }
   };
 
@@ -407,7 +424,7 @@ export const AdminMcqs: React.FC = () => {
       toast.success(`MCQ #${selectedMcq.id} deleted successfully`);
       setIsDeleteModalOpen(false);
       setSelectedMcq(null);
-      fetchMcqs();
+      await fetchMcqs();
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to delete MCQ'));
     } finally {
@@ -423,23 +440,68 @@ export const AdminMcqs: React.FC = () => {
     return 'neutral';
   };
 
+  const getDifficultyNumberColor = (difficulty?: string | null) => {
+    if (!difficulty) return 'text-slate-400 dark:text-slate-500';
+    const d = difficulty.toLowerCase().trim();
+    if (d.includes('easy')) {
+      return 'text-emerald-600 dark:text-emerald-400 font-bold';
+    }
+    if (d.includes('medium') || d.includes('med')) {
+      return 'text-amber-500 dark:text-orange-400 font-bold';
+    }
+    if (d.includes('hard')) {
+      return 'text-rose-600 dark:text-rose-400 font-bold';
+    }
+    if (d.includes('basic') || d.includes('school')) {
+      return 'text-sky-500 dark:text-sky-400 font-bold';
+    }
+    return 'text-slate-500 dark:text-slate-400 font-bold';
+  };
+
   const columns: Column<McqQuestion>[] = [
     {
-      header: 'Identifier',
-      accessorKey: 'id',
-      className: 'w-20 font-mono text-slate-400 font-semibold',
-      cell: (row) => <span>#{row.id}</span>,
+      header: '#',
+      className: 'w-16 text-center font-mono font-semibold shrink-0',
+      cell: (row) => {
+        const diff = row.difficultyRefName || row.difficultyRefCode || '';
+        const colorClass = getDifficultyNumberColor(diff);
+        return (
+          <span
+            className={`font-mono text-xs font-semibold ${colorClass}`}
+            title={`MCQ ID: #${row.id} • Difficulty: ${diff || 'Standard'}`}
+          >
+            #{row.id}
+          </span>
+        );
+      },
     },
     {
       header: 'Question Statement',
       className: 'min-w-[280px]',
       cell: (row) => {
         const cleanStatement = cleanQuestionText(row.question);
+        const isInactive = row.isActive === false || String((row as any)?.isActive) === 'false' || String((row as any)?.status).toLowerCase() === 'inactive';
         return (
-          <div className="flex flex-col gap-1 max-w-xl">
-            <span className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
-              {cleanStatement}
-            </span>
+          <div
+            className={`flex flex-col gap-1 max-w-xl transition-colors ${
+              isInactive
+                ? 'p-2 rounded-xl border border-rose-400/80 dark:border-rose-500/70 bg-rose-50/40 dark:bg-rose-950/20'
+                : ''
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className="font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug"
+                title={cleanStatement}
+              >
+                {cleanStatement}
+              </span>
+              {isInactive && (
+                <span className="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                  Inactive
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
               {row.subjectRefName && (
                 <span className="font-semibold text-blue-600 dark:text-blue-400">
@@ -464,15 +526,6 @@ export const AdminMcqs: React.FC = () => {
           </div>
         );
       },
-    },
-    {
-      header: 'Difficulty',
-      className: 'w-28',
-      cell: (row) => (
-        <AdminBadge variant={getDifficultyVariant(row.difficultyRefName || row.difficultyRefCode)} size="sm">
-          {row.difficultyRefName || row.difficultyRefCode || 'Standard'}
-        </AdminBadge>
-      ),
     },
     {
       header: 'Correct Answer',
@@ -505,27 +558,20 @@ export const AdminMcqs: React.FC = () => {
       cell: (row) => (
         <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
           <button
-            onClick={async () => {
-              setSelectedMcq(row);
-              setIsViewModalOpen(true);
-              if (!row.options || row.options.length === 0) {
-                try {
-                  const detailRes = await adminMcqService.getMcqById(row.id);
-                  const detailData = detailRes.data;
-                  if (detailData && Array.isArray(detailData.options) && detailData.options.length > 0) {
-                    setSelectedMcq((prev) => (prev?.id === row.id ? { ...prev, ...detailData } : prev));
-                  }
-                } catch (err) {
-                  console.warn('Failed to load detailed options for viewing MCQ #' + row.id, err);
-                }
-              }
-            }}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+            type="button"
+            onClick={() => handleOpenViewModal(row)}
+            disabled={viewLoadingId === row.id}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
             title="View Details"
           >
-            <Eye className="w-3.5 h-3.5" />
+            {viewLoadingId === row.id ? (
+              <RotateCw className="w-3.5 h-3.5 animate-spin text-blue-600" />
+            ) : (
+              <Eye className="w-3.5 h-3.5" />
+            )}
           </button>
           <button
+            type="button"
             onClick={() => handleOpenEditModal(row)}
             disabled={editingLoadingId === row.id}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
@@ -538,6 +584,7 @@ export const AdminMcqs: React.FC = () => {
             )}
           </button>
           <button
+            type="button"
             onClick={() => {
               setSelectedMcq(row);
               setIsDeleteModalOpen(true);

@@ -35,7 +35,7 @@ export const AdminDashboard: React.FC = () => {
     setError(null);
 
     try {
-      const [probRes, compRes, instRes, mcqRes] = await Promise.allSettled([
+      const [probRes, compRes, instRes, mcqRes, easyRes, medRes, hardRes] = await Promise.allSettled([
         adminQuestionService.getQuestions(
           {
             level: null,
@@ -44,7 +44,7 @@ export const AdminDashboard: React.FC = () => {
             searchText: null,
             pageRequest: {
               pageNumber: 0,
-              pageSize: 1000,
+              pageSize: 10,
               sortBy: 'id',
               sortDirection: 'ASC',
             },
@@ -54,6 +54,51 @@ export const AdminDashboard: React.FC = () => {
         adminCompanyService.getCompanies(controller.signal),
         adminInstitutionService.getInstitutions({ page: 0, size: 1 }, controller.signal),
         adminMcqService.getMcqs({ pageRequest: { pageNumber: 0, pageSize: 1 } }, controller.signal),
+        adminQuestionService.getQuestions(
+          {
+            level: [1],
+            companies: null,
+            topic: null,
+            searchText: null,
+            pageRequest: {
+              pageNumber: 0,
+              pageSize: 1,
+              sortBy: 'id',
+              sortDirection: 'ASC',
+            },
+          },
+          controller.signal
+        ),
+        adminQuestionService.getQuestions(
+          {
+            level: [2],
+            companies: null,
+            topic: null,
+            searchText: null,
+            pageRequest: {
+              pageNumber: 0,
+              pageSize: 1,
+              sortBy: 'id',
+              sortDirection: 'ASC',
+            },
+          },
+          controller.signal
+        ),
+        adminQuestionService.getQuestions(
+          {
+            level: [3],
+            companies: null,
+            topic: null,
+            searchText: null,
+            pageRequest: {
+              pageNumber: 0,
+              pageSize: 1,
+              sortBy: 'id',
+              sortDirection: 'ASC',
+            },
+          },
+          controller.signal
+        ),
       ]);
 
       if (controller.signal.aborted) return;
@@ -66,27 +111,24 @@ export const AdminDashboard: React.FC = () => {
       let totalInstitutions = 0;
       let totalMcqs = 0;
 
-      // 1. Questions breakdown
+      // 1. Total Problems
       if (probRes.status === 'fulfilled' && probRes.value) {
         const pageData = probRes.value.data;
         const questionsList = Array.isArray(pageData?.content) ? pageData.content : [];
 
         totalProblems = pageData?.totalElements ?? questionsList.length;
+      }
 
-        questionsList.forEach((q: any) => {
-          const diffName = String(
-            q.difficultyName || ''
-          ).toUpperCase();
-          const diffId = q.difficultyId;
-
-          if (diffId === 1 || diffName.includes('EASY') || diffName.includes('BASIC')) {
-            easyCount++;
-          } else if (diffId === 2 || diffName.includes('MEDIUM') || diffName.includes('MED')) {
-            mediumCount++;
-          } else if (diffId === 3 || diffName.includes('HARD')) {
-            hardCount++;
-          }
-        });
+      // 1b. Difficulty counts come only from their dedicated filtered queries.
+      // A single catalog page is not a valid substitute for global totals.
+      if (easyRes.status === 'fulfilled' && typeof easyRes.value?.data?.totalElements === 'number') {
+        easyCount = easyRes.value.data.totalElements;
+      }
+      if (medRes.status === 'fulfilled' && typeof medRes.value?.data?.totalElements === 'number') {
+        mediumCount = medRes.value.data.totalElements;
+      }
+      if (hardRes.status === 'fulfilled' && typeof hardRes.value?.data?.totalElements === 'number') {
+        hardCount = hardRes.value.data.totalElements;
       }
 
       // 2. Companies
@@ -109,14 +151,20 @@ export const AdminDashboard: React.FC = () => {
           pageData?.totalElements ?? pageData?.content?.length ?? 0;
       }
 
-      const failures = [probRes, compRes, instRes, mcqRes].map((result, index) => result.status === 'rejected' ? ['problems', 'companies', 'institutions', 'MCQs'][index] : null).filter(Boolean);
+      const failures = [probRes, compRes, instRes, mcqRes, easyRes, medRes, hardRes]
+        .map((result, index) =>
+          result.status === 'rejected'
+            ? ['problems', 'companies', 'institutions', 'MCQs', 'easy totals', 'medium totals', 'hard totals'][index]
+            : null
+        )
+        .filter(Boolean);
       setError(failures.length ? 'Could not refresh ' + failures.join(', ') + '. Previous values, if available, are retained.' : null);
       setHasData(true);
       setStats((previous) => ({
         totalProblems: probRes.status === 'fulfilled' ? totalProblems : previous.totalProblems,
-        easyCount: probRes.status === 'fulfilled' ? easyCount : previous.easyCount,
-        mediumCount: probRes.status === 'fulfilled' ? mediumCount : previous.mediumCount,
-        hardCount: probRes.status === 'fulfilled' ? hardCount : previous.hardCount,
+        easyCount: easyRes.status === 'fulfilled' ? easyCount : previous.easyCount,
+        mediumCount: medRes.status === 'fulfilled' ? mediumCount : previous.mediumCount,
+        hardCount: hardRes.status === 'fulfilled' ? hardCount : previous.hardCount,
         totalCompanies: compRes.status === 'fulfilled' ? totalCompanies : previous.totalCompanies,
         totalInstitutions: instRes.status === 'fulfilled' ? totalInstitutions : previous.totalInstitutions,
         totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
@@ -124,6 +172,7 @@ export const AdminDashboard: React.FC = () => {
     } catch (err) {
       if (controller.signal.aborted) return;
       console.warn('Dashboard fetch error:', err);
+      setError('Dashboard metrics could not be refreshed. Previous values, if available, are retained.');
     } finally {
       if (!controller.signal.aborted) {
         setLoading(false);

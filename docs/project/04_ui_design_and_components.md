@@ -98,7 +98,7 @@ All generic components reside in [`src/shared/components/ui/`](file:///c:/Users/
 | **`Badge`** | `src/shared/components/ui/Badge.tsx` | Status pill with variants (`default`, `success`, `warning`, `danger`, `info`, `purple`). Used for difficulty tiers and test case results. |
 | **`Navbar`** | `src/shared/components/ui/Navbar.tsx` | Sticky top navigation bar with search trigger, navigation links, theme toggle, user avatar dropdown, and mobile menu drawer. |
 | **`Footer`** | `src/shared/components/ui/Footer.tsx` | Footer with platform links, social channels, copyright, and brand tagline ("CODE TOGETHER CONNECT FOREVER"). |
-| **`Pagination`** | `src/shared/components/ui/Pagination.tsx` | Accessible pagination control with previous/next arrows, page number buttons, and boundary truncation. |
+| **`Pagination`** | `src/shared/components/ui/Pagination.tsx` | Accessible pagination control with non-submitting buttons, previous/next arrows, labeled page numbers, `aria-current="page"`, and boundary truncation. |
 | **`PageLoading`** | `src/shared/components/ui/PageLoading.tsx` | Full-screen or container loading state with animated brand logo pulse and gradient spinner. |
 | **`Skeleton`** | `src/shared/components/ui/Skeleton.tsx` | Shimmer placeholder for cards, tables, and text lines during data fetching. |
 | **`EmptyState`** | `src/shared/components/ui/EmptyState.tsx` | Clean empty state placeholder with customizable icon, title, description, and action button. |
@@ -106,7 +106,9 @@ All generic components reside in [`src/shared/components/ui/`](file:///c:/Users/
 | **`RequestStatus`** | `src/shared/components/ui/RequestStatus.tsx` | Multi-state wrapper handling loading, error, and empty states before rendering child content. |
 | **`ConfirmDialog`** | `src/shared/components/ui/ConfirmDialog.tsx` | Modal confirmation dialog for destructive actions (e.g. deleting a question or institution). |
 
-`src/features/admin/components/AdminModal.tsx` is the shared admin-form modal. It uses Framer Motion only for its mount/unmount backdrop and dialog transition, and disables those transitions when the operating system requests reduced motion. Other components should not add animation unless it communicates a real state change.
+`src/features/admin/components/AdminModal.tsx` is the shared admin-form modal. It exposes dialog semantics, an accessible title, initial focus, tab containment, focus restoration, and body-scroll locking. It uses Framer Motion only for its mount/unmount backdrop and dialog transition, and disables those transitions when the operating system requests reduced motion. Other components should not add animation unless it communicates a real state change.
+
+In `PracticePage`, `AdminQuestions`, and `AdminMcqs`, the table layout combines the question identifier and difficulty tier into a single unified `#` column using `getDifficultyNumberColor` (e.g. emerald for Easy/Basic, amber for Medium, rose for Hard, sky for Basic). Inactive items (`isActive === false`) render their question container with a distinct red rounded border (`border-rose-400 dark:border-rose-500 rounded-xl`) accompanied by an explicit `Inactive` badge, while preserving readable standard font weight and color for the problem statement.
 
 ## 5. Coding Workspace Behavior
 
@@ -123,6 +125,10 @@ Assessment integrity controls in [`src/shared/hooks/useAssessmentIntegrity.ts`](
 
 Located in [`src/features/companies/utils/companyLogoRegistry.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/companies/utils/companyLogoRegistry.ts) and [`src/features/companies/components/CompanyBrandLogo.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/companies/components/CompanyBrandLogo.tsx):
 - **121 SVG/PNG Assets**: Stored in `public/companies/`.
-- **Zero External Dependencies**: Logos are loaded locally from the frontend origin, immune to third-party CDN downtime or broken backend URLs.
-- **Canonical Alias Map**: Resolves company variations (e.g. `tcs`, `tata`, `tcs ion`, `tata consultancy services` -> `/companies/tcs.svg`).
-- **Initial Monogram Fallback**: If an unmapped company is queried, `CompanyBrandLogo` generates a deterministic monogram badge with the company's initials and a consistent color scheme.
+- **Local-First Resolution**: All curated definitions plus the previously unreachable bundled PNG/SVG assets are addressable by normalized company name. Local assets are always attempted first and do not create remote requests when they load.
+- **Dynamic Fallback Cascade**: For companies outside the bundle, the component tries an optional domain-based Brandfetch image (when `VITE_BRANDFETCH_CLIENT_ID` is configured), a Simple Icons CDN slug, and the validated official website favicon. Failed candidates advance automatically without leaving a broken image.
+- **Untrusted Backend Logo Isolation**: Arbitrary `logo`/`logoUrl` values returned by the backend are not used as image sources. The API `website` field is parsed to a hostname; localhost, bare hostnames, and IP addresses are rejected.
+- **Canonical Alias Map**: Resolves company variations and legal suffixes (for example `tcs`, `tata`, `tcs ion`, and `tata consultancy services` to `/companies/tcs.svg`).
+- **Professional Monogram Fallback**: If every image source fails, `CompanyBrandLogo` renders a deterministic two-letter gradient badge with accessible labeling. Company watermarks reuse local art in a monochrome treatment.
+
+The cascade is designed for broad dynamic coverage, but **95% coverage is not asserted by repository tests**. Brandfetch advertises 95%+ core-brand coverage; that external claim and production CDN availability must be validated with the deployed client ID and the production company dataset. The deterministic monogram remains the guaranteed terminal state.

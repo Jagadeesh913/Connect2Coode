@@ -60,7 +60,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
     - `GET /{userId}/getAPttemptedQuestionIds`
     - Merges remote cloud states with local scoped storage.
 - **Request ownership**: `currentRequestId` plus `loadingUserId` allow a newly authenticated user to supersede an in-flight request for the previous user; late fulfilled/rejected actions are ignored.
-- **Partial failure**: One successful endpoint is retained with a warning. If both endpoints fail, hydration rejects and leaves the last known state visible.
+- **Failure handling**: A new user scope clears the previous account's data as soon as hydration starts. One successful endpoint is retained with a warning; if both endpoints fail, the reducer uses that user's scoped local progress and exposes a warning instead of leaking the prior account or presenting an unexplained blank state.
 
 ### 5. `bookmarkSlice` ([`src/features/bookmarks/redux/bookmarkSlice.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/bookmarks/redux/bookmarkSlice.ts))
 - **Responsibilities**: User's bookmarked problems.
@@ -68,12 +68,14 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Identity**: A bookmark is keyed by both `type` and `itemId`; for example, `PROBLEM:1` and `APTITUDE:1` are distinct.
 - **Mutation concurrency**: `pendingToggleKeys` deduplicates only an identical in-flight mutation. Fulfilled mutations update the current array item-by-item instead of replacing it with a stale thunk snapshot, so concurrent toggles for different items cannot overwrite each other.
 - **Server boundary**: Authenticated problem bookmarks use the API. COMPANY/APTITUDE bookmarks remain an explicitly scoped browser-only fallback because no matching backend contract was found.
+- **Failure handling**: A failed server refresh remains rejected, preserves the active user's last known problem bookmarks, restores only scoped COMPANY/APTITUDE items, and exposes the error. Browser persistence filters out server-owned problem bookmarks.
 
 ### 6. `profileSlice` ([`src/features/profile/redux/profileSlice.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/profile/redux/profileSlice.ts))
 - **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` academic/personal fields. Activity metrics belong to `progressSlice`.
 - **Persistence boundary**: Academic records are server-derived and held only in Redux/component memory for the active session. `ProfileSettings` no longer caches them in `localStorage`.
 - **Single source of truth**: `ProfileSettings` renders academic data directly from the slice rather than maintaining a second component copy.
 - **Request ownership**: Fetch and save actions carry a request ID and user ID. A late fetch for an old user, or a fetch superseded by a save, cannot overwrite current academic data.
+- **Empty response caching and account switches**: A valid API `null` is cached for that user to prevent duplicate requests. Auth transitions clear the previous user's record immediately, and an omitted response `userId` is filled from the requested route identity before reducer ownership checks.
 
 ### 7. `referenceSlice` ([`src/features/references/redux/referenceSlice.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/references/redux/referenceSlice.ts))
 - **Responsibilities**: Shared API taxonomy for `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, dynamic subject groups, `GENDER`, `LANG`, and `TESTCASETYPE`.

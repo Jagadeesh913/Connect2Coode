@@ -127,7 +127,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 
 `ProblemDetails` invalidates and refetches submission history after a completed user submission. It does not synthesize a local history row or store submitted source code/results in browser storage.
 
-`executionService` normalizes only the execution response fields returned by the API (`totalTestCases`, pass/fail counts, optional runtime/memory, and `testCases`) so incomplete envelopes render safely without fabricated cases. It does not turn an empty/malformed response into an accepted result.
+`executionService` normalizes only the execution response fields returned by the API (`totalTestCases`, pass/fail counts, optional runtime/memory, and `testCases`). A successful HTTP response must still contain a recognizable verdict, and solved/success UI requires at least one executed and passed test with zero failures; zero-test or malformed responses are rejected instead of being reported as accepted.
 
 ### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -166,6 +166,8 @@ The following fields were captured from the configured production API using the 
 | `GET /institutions/search` | `id`, `name`, `institutionType`, `state`, `district` |
 | `GET /admin/institutions`, `GET /admin/institutions/{id}` | `id`, `aisheCode`, `name`, `institutionType`, `state`, `district`, `website`, `yearOfEstablishment`, `location`, `collegeType`, `management`, `universityId`, `universityName`, `universityType`, `isActive`, audit timestamps/IDs |
 
+Live MCQ verification on 2026-10-23 found that this is a record-level data boundary: a ten-record `POST /mcq` response had option counts `4, 4, 4, 0, 0, 0, 0, 0, 0, 0`, and an affected record's `GET /mcq/4` returned the same empty `options` array. The aptitude renderer intentionally shows no selectable answers for those records; it must not manufacture option text or correctness from question-level aliases.
+
 ### G. Endpoint Coverage Boundary
 
 `src/core/api/endpoints.ts` contains only routes with a current service caller. The unused `company/{id}/problems`, `question/{id}/submit`, `/institutions` base, `/language/dropdown`, and duplicate solved-question constant were removed during the source audit rather than represented as working integrations. `/language/dropdown` was captured but intentionally omitted because it supplies only `id` and `name`, whereas code execution requires the `referenceId` supplied by `GET /language`. Read-only routes listed above have direct production evidence. `GET /institutions/{id}` and `GET /question/{id}/testCases` returned `401` under the authenticated temporary account; `GET /question/{id}` returned a backend `500` for a current catalog ID. Create, update, delete, refresh, reset, and execution requests are preserved at their existing callers but remain `PARTIALLY VERIFIED` until a disposable non-production fixture is available; this audit did not mutate production data.
@@ -188,7 +190,7 @@ The following fields were captured from the configured production API using the 
 
 Academic records are server-owned: `ProfileSettings` reads and writes them through `/userInfo/{userId}` and does not retain an offline `localStorage` copy. A legacy `c2c_user_academic_<userId>` value is removed when that profile is opened.
 
-Problem bookmarks are also server-owned. `bookmarkSlice` hydrates only `questionId`, `title`, and `difficulty` from `GET /users/{userId}/questions/bookmarks`; it does not restore, merge, or fall back to browser storage. A failed read is shown as an empty/error state rather than another account's stale bookmarks.
+Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, `title`, and `difficulty` from `GET /users/{userId}/questions/bookmarks`; a failed refresh preserves the active user's last known server list and exposes an error instead of replacing it with a false empty success. COMPANY/APTITUDE bookmarks have no observed API contract and are therefore retained only in `userScopedStorage`; server-owned problem bookmarks are excluded from browser persistence.
 
 `GET` and `PUT /user/profile` are not used: archived direct probes returned 401 for every available credential and identified the route as unmapped. The client therefore does not fabricate successful identity or avatar mutations in browser storage. Name/email remain session-owned and read-only; avatar editing is disabled. Personal fields supported by `userInfo` are saved only when the required academic fields already exist, so the client never invents registration, college, or year values to satisfy the POST contract.
 
@@ -212,7 +214,7 @@ Problem bookmarks are also server-owned. `bookmarkSlice` hydrates only `question
 | `/language` | `POST` | `ADMIN_ONLY` | Registers or updates language compiler configuration. |
 | `/language/{id}` | `DELETE` | `ADMIN_ONLY` | Soft deletes language compiler configuration. |
 
-The response interceptor returns the backend `ApiResponse<T>` envelope itself, not an Axios response wrapper. Services therefore consume `response.data` exactly once. Reference groups and compiler dropdowns use 30-minute Redux TTLs, in-flight deduplication, and request ownership; an API-confirmed empty list is cacheable. Successful language create/update/delete operations invalidate both Redux and execution-service caches so Monaco/code execution cannot retain an obsolete compiler mapping. Public institution-search failures are surfaced to the autocomplete instead of being converted into a false successful empty result.
+The response interceptor returns the backend `ApiResponse<T>` envelope itself, not an Axios response wrapper. Services therefore consume `response.data` exactly once. List services reject malformed successful payloads rather than silently converting them into empty arrays. Reference groups and compiler dropdowns use 30-minute Redux TTLs, in-flight deduplication, and request ownership; an API-confirmed empty list is cacheable. Successful language create/update/delete operations invalidate both Redux and execution-service caches so Monaco/code execution cannot retain an obsolete compiler mapping. Public institution-search failures are surfaced to the autocomplete instead of being converted into a false successful empty result.
 
 ---
 

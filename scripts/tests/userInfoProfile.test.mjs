@@ -91,6 +91,16 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.college, 'ABC Engineering College');
       assert.equal(res.data.bio, 'Java developer and coding enthusiast');
     });
+
+    it('scopes a valid profile response to the requested user when userId is omitted', async () => {
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: { id: 7, regNumber: 'C2C-89', college: 'Example College' },
+      });
+
+      const res = await profileService.getUserInfo(89);
+      assert.equal(res.data.userId, 89);
+    });
   });
 
   describe('profileService.saveUserInfo', () => {
@@ -332,6 +342,39 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
+    });
+  });
+
+  describe('company catalog pagination', () => {
+    it('loads and de-duplicates every backend page for global client filters', async () => {
+      const requestedPages = [];
+      apiClient.post = async (_url, payload) => {
+        requestedPages.push(payload.pageNumber);
+        return {
+          statusCode: 200,
+          data: {
+            content: payload.pageNumber === 0
+              ? [{ id: 1, name: 'Alpha' }, { id: 2, name: 'Beta' }]
+              : [{ id: 2, name: 'Beta' }, { id: 3, name: 'Gamma' }],
+            pageNumber: payload.pageNumber,
+            pageSize: 100,
+            totalElements: 3,
+            totalPages: 2,
+          },
+        };
+      };
+
+      const response = await companyService.getAllCompanies();
+      assert.deepEqual(requestedPages, [0, 1]);
+      assert.deepEqual(response.data.map((company) => company.name), ['Alpha', 'Beta', 'Gamma']);
+    });
+
+    it('rejects malformed catalog responses instead of reporting an empty company list', async () => {
+      apiClient.post = async () => ({ statusCode: 200, data: { unexpected: true } });
+      await assert.rejects(
+        () => companyService.getAllCompanies(),
+        /Unexpected companies response format/
+      );
     });
   });
 });

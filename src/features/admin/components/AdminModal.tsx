@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 
@@ -24,20 +24,44 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   maxWidth = 'xl',
 }) => {
   const shouldReduceMotion = useReducedMotion();
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
       }
+      if (e.key === 'Tab' && isOpen && dialogRef.current) {
+        const focusable = Array.from(
+          dialogRef.current.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     if (isOpen) {
+      const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
+      const focusTimer = window.setTimeout(() => closeButtonRef.current?.focus(), 0);
+      return () => {
+        window.clearTimeout(focusTimer);
+        document.body.style.overflow = previousOverflow;
+        window.removeEventListener('keydown', handleKeyDown);
+      };
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return undefined;
   }, [isOpen, onClose]);
 
   const widthClasses = {
@@ -71,6 +95,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
       {/* Modal Dialog */}
       <motion.div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
         className={`relative w-full bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] z-10 text-left font-sans ${widthClasses[maxWidth]}`}
         initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.95, y: 8 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -86,7 +114,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
               </div>
             )}
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
+              <h3 id={titleId} className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
                 {title}
               </h3>
               {subtitle && (
@@ -97,6 +125,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
             </div>
           </div>
           <button
+            ref={closeButtonRef}
+            type="button"
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-slate-700 dark:text-slate-500 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer shrink-0"
             aria-label="Close modal"

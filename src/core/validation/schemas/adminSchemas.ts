@@ -19,7 +19,7 @@ export const adminInstitutionSchema = z
     aisheCode: aisheCodeRule,
     name: nameRule('Institution name', 2),
     institutionType: z.enum(['COLLEGE', 'UNIVERSITY'], {
-      required_error: 'Select an institution type (COLLEGE or UNIVERSITY).',
+      error: 'Select an institution type (COLLEGE or UNIVERSITY).',
     }),
     universityId: z.number().nullable().optional(),
     state: requiredTextRule('State', 2),
@@ -109,10 +109,10 @@ export type AdminTestCaseFormData = z.infer<typeof adminTestCaseSchema>;
 export const adminLanguageSchema = z.object({
   id: z.number().optional(),
   referenceId: z
-    .number({ invalid_type_error: 'Select a valid language from the list.' })
+    .number({ error: 'Select a valid language from the list.' })
     .min(1, 'Select a valid language from the list.'),
   judge0LanguageId: z
-    .number({ invalid_type_error: 'Enter a valid numeric Judge0 Language ID.' })
+    .number({ error: 'Enter a valid numeric Judge0 Language ID.' })
     .min(1, 'Judge0 Language ID must be greater than 0.'),
   version: z.string().trim().optional(),
   isActive: z.boolean().default(true),

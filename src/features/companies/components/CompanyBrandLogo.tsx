@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   resolveCompanyLogo,
   getCompanyFallback,
+  getCompanyLogoCandidates,
 } from '../utils/companyLogoRegistry';
 
 export interface CompanyBrandLogoProps {
@@ -19,29 +20,55 @@ export interface CompanyBrandLogoProps {
  * Production-Quality Company Brand Logo Component
  *
  * Guarantees:
- * - Completely ignores backend logoUrl/logo (Frontend-only local mapping)
- * - Reference source: WorldVectorLogo vector assets served locally
+ * - Ignores untrusted backend logoUrl/logo values
+ * - Prefers reviewed local assets, then domain-derived/reviewed providers
  * - Preserves exact aspect ratio via object-fit: contain
  * - Responsive, accessible, and supports dark-mode
- * - Zero external API latency; optimized for 2,000+ concurrent users
  * - Deterministic, elegant monogram fallback on missing or failed assets
  */
 export const CompanyBrandLogo: React.FC<CompanyBrandLogoProps> = ({
   name,
+  website,
   className = 'w-10 h-10',
   watermark = false,
   loading = 'lazy',
   alt,
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const sourceKey = `${name}\u0000${website || ''}`;
+  const [failureState, setFailureState] = useState({ sourceKey, index: 0 });
+  const candidateIndex = failureState.sourceKey === sourceKey ? failureState.index : 0;
   const def = resolveCompanyLogo(name);
   const fallback = getCompanyFallback(name);
   const norm = (name || '').toLowerCase().trim();
+  const candidates = useMemo(
+    () => getCompanyLogoCandidates(name, website, import.meta.env.VITE_BRANDFETCH_CLIENT_ID),
+    [name, website]
+  );
+  const candidate = candidates[candidateIndex];
+  const advanceCandidate = () => {
+    setFailureState((current) => ({
+      sourceKey,
+      index: current.sourceKey === sourceKey ? current.index + 1 : 1,
+    }));
+  };
 
   // --------------------------------------------------------------------------
   // 1. Watermark Silhouette Rendering (Uses currentColor for seamless blending)
   // --------------------------------------------------------------------------
   if (watermark) {
+    if (def && candidateIndex === 0) {
+      return (
+        <img
+          src={def.assetPath}
+          alt=""
+          className={`${className} object-contain grayscale brightness-0 dark:invert`}
+          loading={loading}
+          decoding="async"
+          aria-hidden="true"
+          onError={advanceCandidate}
+        />
+      );
+    }
     if (norm.includes('google')) {
       return (
         <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
@@ -143,20 +170,25 @@ export const CompanyBrandLogo: React.FC<CompanyBrandLogoProps> = ({
   }
 
   // --------------------------------------------------------------------------
-  // 2. Local Vector Asset from WorldVectorLogo Registry
+  // 2. Local-first logo cascade, followed by reviewed domain/CDN sources.
   // --------------------------------------------------------------------------
-  if (def && !imageError) {
-    const isDarkInvert = Boolean(def.darkInvert);
+  if (candidate) {
+    const isDarkInvert = candidate.source === 'local' && Boolean(def?.darkInvert);
 
     return (
-      <div className={`${className} relative flex items-center justify-center overflow-hidden shrink-0`}>
+      <div
+        className={`${className} relative flex items-center justify-center overflow-hidden shrink-0`}
+        data-logo-source={candidate.source}
+      >
         <img
-          src={def.assetPath}
-          alt={alt || `${def.displayName} logo`}
-          className={`w-full h-full object-contain ${isDarkInvert ? 'dark:brightness-0 dark:invert transition-all' : ''}`}
+          key={candidate.src}
+          src={candidate.src}
+          alt={alt || `${def?.displayName || name} logo`}
+          className={`w-full h-full object-contain drop-shadow-[0_1px_1px_rgba(15,23,42,0.12)] ${isDarkInvert ? 'dark:brightness-0 dark:invert transition-all' : ''}`}
           loading={loading}
           decoding="async"
-          onError={() => setImageError(true)}
+          referrerPolicy="strict-origin-when-cross-origin"
+          onError={advanceCandidate}
         />
       </div>
     );
@@ -167,12 +199,14 @@ export const CompanyBrandLogo: React.FC<CompanyBrandLogoProps> = ({
   // --------------------------------------------------------------------------
   return (
     <div
-      className={`rounded-xl bg-gradient-to-tr ${fallback.gradientClass} text-white font-black flex items-center justify-center text-sm shadow-xs select-none shrink-0 ${className}`}
+      className={`relative isolate overflow-hidden rounded-[28%] bg-gradient-to-br ${fallback.gradientClass} text-white font-black flex items-center justify-center text-sm shadow-[0_6px_18px_-8px_rgba(15,23,42,0.75)] ring-1 ring-white/25 select-none shrink-0 ${className}`}
       title={name}
       role="img"
       aria-label={name ? `${name} logo` : 'Company logo'}
+      data-logo-source="monogram"
     >
-      <span>{fallback.initial}</span>
+      <span className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(255,255,255,0.32),transparent_36%)]" aria-hidden="true" />
+      <span className="relative tracking-[-0.08em] drop-shadow-sm">{fallback.initial}</span>
     </div>
   );
 };
@@ -188,52 +222,29 @@ export interface CompanyCircleBadgeProps {
 
 /**
  * Compact circular company icon badge for table rows, cards, and avatar groups.
- * Completely frontend-only and preserves exact logo proportions with object-fit: contain.
+ * Preserves exact logo proportions with object-fit: contain.
  */
 export const CompanyCircleBadge: React.FC<CompanyCircleBadgeProps> = ({
   name,
+  website,
   className = '',
   sizeClassName = 'w-7 h-7',
   loading = 'lazy',
 }) => {
-  const [imageError, setImageError] = useState(false);
-  const def = resolveCompanyLogo(name);
-  const fallback = getCompanyFallback(name);
-
-  const renderBadgeContent = () => {
-    // 1. Locally resolved vector asset
-    if (def && !imageError) {
-      const isDarkInvert = Boolean(def.darkInvert);
-      return (
-        <img
-          src={def.assetPath}
-          alt={name ? `${name} icon` : 'Company icon'}
-          className={`w-full h-full object-contain rounded-full ${isDarkInvert ? 'dark:brightness-0 dark:invert' : ''}`}
-          loading={loading}
-          decoding="async"
-          onError={() => setImageError(true)}
-        />
-      );
-    }
-
-    // 2. Deterministic monogram fallback
-    return (
-      <div
-        className={`w-full h-full rounded-full bg-gradient-to-tr ${fallback.gradientClass} text-white font-extrabold flex items-center justify-center text-[10px] select-none`}
-      >
-        <span>{fallback.initial}</span>
-      </div>
-    );
-  };
-
   return (
     <div
-      className={`${sizeClassName} rounded-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 p-1 flex items-center justify-center shrink-0 shadow-2xs hover:scale-115 hover:z-20 hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden ${className}`}
+      className={`${sizeClassName} rounded-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 p-1 flex items-center justify-center shrink-0 shadow-2xs hover:scale-105 hover:z-20 hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden ${className}`}
       title={name}
       role="img"
       aria-label={name ? `${name} badge` : 'Company badge'}
     >
-      {renderBadgeContent()}
+      <CompanyBrandLogo
+        name={name}
+        website={website}
+        className="h-full w-full"
+        loading={loading}
+        alt={name ? `${name} icon` : 'Company icon'}
+      />
     </div>
   );
 };

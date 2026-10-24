@@ -1,5 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
@@ -40,6 +40,7 @@ export const AdminInstitutions: React.FC = () => {
   const [stateFilter, setStateFilter] = useState<string>('');
   const districtFilter = '';
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [availableUniversities, setAvailableUniversities] = useState<InstitutionItem[]>([]);
 
   // Debounced Filter Values
   const [debouncedQuery, setDebouncedQuery] = useState<string>('');
@@ -63,6 +64,7 @@ export const AdminInstitutions: React.FC = () => {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
   const [selectedInstitution, setSelectedInstitution] = useState<InstitutionItem | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
+  const [editingInstitutionId, setEditingInstitutionId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [formServerError, setFormServerError] = useState<{ field?: string; message: string } | null>(null);
 
@@ -98,17 +100,21 @@ export const AdminInstitutions: React.FC = () => {
       const responseData: any = res?.data || res;
 
       if (responseData && Array.isArray(responseData.content)) {
+        const computedPages = Math.max(1, Number(responseData.totalPages) || 1);
+        const total = Number(responseData.totalElements) || responseData.content.length;
+        if (total > 0 && page >= computedPages) {
+          setPage(computedPages - 1);
+          return;
+        }
         setInstitutions(responseData.content);
-        setTotalPages(responseData.totalPages || 1);
-        setTotalElements(responseData.totalElements || responseData.content.length);
+        setTotalPages(computedPages);
+        setTotalElements(total);
       } else if (Array.isArray(responseData)) {
         setInstitutions(responseData);
         setTotalPages(Math.max(1, Math.ceil(responseData.length / size)));
         setTotalElements(responseData.length);
       } else {
-        setInstitutions([]);
-        setTotalPages(1);
-        setTotalElements(0);
+        throw new Error('Unexpected institutions response format');
       }
     } catch (err: any) {
       if (controller.signal.aborted) return;
@@ -128,10 +134,20 @@ export const AdminInstitutions: React.FC = () => {
     };
   }, [fetchInstitutions]);
 
-  // Derived list of universities for parent affiliation select
-  const availableUniversities = useMemo(() => {
-    return institutions.filter((inst) => inst.institutionType === 'UNIVERSITY');
-  }, [institutions]);
+  useEffect(() => {
+    const controller = new AbortController();
+    adminInstitutionService
+      .getAllInstitutions({ type: 'UNIVERSITY', activeOnly: true }, controller.signal)
+      .then((response) => {
+        if (!controller.signal.aborted) setAvailableUniversities(response.data);
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted) {
+          toast.error(getActionableErrorMessage(err, 'Unable to load university options.'));
+        }
+      });
+    return () => controller.abort();
+  }, []);
 
   const inspectionId = useRef(0);
   useEffect(() => () => { inspectionId.current++; }, []);
@@ -161,8 +177,19 @@ export const AdminInstitutions: React.FC = () => {
 
   const handleOpenEdit = async (inst: InstitutionItem) => {
     setFormServerError(null);
-    setSelectedInstitution(inst);
-    setIsFormOpen(true);
+    setEditingInstitutionId(inst.id);
+    try {
+      const response = await adminInstitutionService.getInstitutionById(inst.id);
+      if (!response.data?.id) {
+        throw new Error(`Institution #${inst.id} returned an invalid detail response`);
+      }
+      setSelectedInstitution(response.data);
+      setIsFormOpen(true);
+    } catch (err: any) {
+      toast.error(getActionableErrorMessage(err, 'Unable to load complete institution data for editing.'));
+    } finally {
+      setEditingInstitutionId(null);
+    }
   };
 
   const handleOpenStatusModal = (inst: InstitutionItem) => {
@@ -319,10 +346,12 @@ export const AdminInstitutions: React.FC = () => {
           </button>
           <button
             onClick={() => handleOpenEdit(row)}
+            disabled={editingInstitutionId !== null}
+            aria-label={editingInstitutionId === row.id ? `Loading ${row.name} for editing` : `Edit ${row.name}`}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
             title="Edit Institution"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {editingInstitutionId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={() => handleOpenStatusModal(row)}

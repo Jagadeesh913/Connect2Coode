@@ -22,29 +22,7 @@ export const adminCompanyService = {
    * Fetches company list from backend database with JWT token in request payload.
    */
   async getCompanies(signal?: AbortSignal): Promise<ApiResponse<Company[]>> {
-    const token = tokenStorage.getAccessToken();
-    const payload = {
-      pageNumber: 0,
-      pageSize: 100,
-      sortBy: 'name',
-      sortDirection: 'ASC',
-      jwtToken: token,
-    };
-    const res: any = await apiClient.post(API_ENDPOINTS.COMPANY.LIST, payload, { signal });
-    const rawData = res?.data || res;
-    const content = Array.isArray(rawData?.content)
-      ? rawData.content
-      : Array.isArray(rawData)
-      ? rawData
-      : [];
-
-    return {
-      statusCode: 200,
-      message: res?.message || 'Companies Fetched Successfully',
-      data: content,
-      errors: null,
-      timestamp: res?.timestamp || new Date().toISOString(),
-    };
+    return companyService.getAllCompanies(signal);
   },
 
   /**

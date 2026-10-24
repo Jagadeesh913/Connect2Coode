@@ -1,5 +1,18 @@
 import type { McqQuestion } from '../../../core/types/domain';
 
+export type AptitudeSubjectCode = 'APTITUDE' | 'REASONING' | 'VERBAL' | 'PSEUDOCODE';
+
+export const parseAptitudeSubjectCode = (
+  raw: string | null | undefined
+): AptitudeSubjectCode => {
+  if (!raw) return 'APTITUDE';
+  const upper = raw.toUpperCase().trim();
+  if (upper === 'REASONING' || upper === 'LOGICAL') return 'REASONING';
+  if (upper === 'VERBAL') return 'VERBAL';
+  if (upper === 'PSEUDOCODE' || upper === 'PSEUDO') return 'PSEUDOCODE';
+  return 'APTITUDE';
+};
+
 export interface SynthesizedOption {
   id: number;
   optionLabel: string;

@@ -39,6 +39,8 @@ export const institutionService = {
         list = rawData;
       } else if (rawData && typeof rawData === 'object' && Array.isArray(rawData.data)) {
         list = rawData.data;
+      } else {
+        throw new Error('Unexpected institution search response format');
       }
 
       return {

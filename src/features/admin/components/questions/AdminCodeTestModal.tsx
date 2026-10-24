@@ -6,7 +6,7 @@ import Editor from '@monaco-editor/react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { ExecutionResultData } from '../../../../services/executionService';
+import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
 import {
@@ -190,7 +190,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed sample test cases');
-      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+      if (isExecutionResultSuccessful(data)) {
         toast.success('All sample test cases passed.');
       } else {
         toast.error(`${data.failedTestCases} sample test case(s) failed.`);
@@ -229,7 +229,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed all test cases');
-      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+      if (isExecutionResultSuccessful(data)) {
         toast.success('All validation test cases passed.');
       } else {
         toast.error(`${data.failedTestCases} validation test case(s) failed.`);

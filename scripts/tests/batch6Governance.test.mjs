@@ -47,6 +47,8 @@ const referenceModule = await import('../../src/features/references/redux/refere
 const { default: referenceReducer, fetchReferenceGroup } = referenceModule;
 const languageModule = await import('../../src/features/languages/redux/languageSlice.ts');
 const { default: languageReducer, fetchLanguages } = languageModule;
+const { configureStore } = await import('@reduxjs/toolkit');
+const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
 
 describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & Automation', () => {
 
@@ -106,13 +108,21 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.match(code, /addCase\(fetchBookmarks\.rejected,\s*\(state,\s*action\)\s*=>\s*\{[\s\S]*?state\.loading\s*=\s*false/, 'fetchBookmarks.rejected must set loading to false');
     });
 
-    it('verifies logout and login auth transitions reset bookmark state to prevent cross-account data leakage', () => {
+    it('verifies auth transitions reset bookmarks and browser-only types use scoped storage', () => {
       const slicePath = path.resolve(process.cwd(), 'src/features/bookmarks/redux/bookmarkSlice.ts');
       const code = fs.readFileSync(slicePath, 'utf8');
       assert.match(code, /auth\/logout\/fulfilled/, 'bookmarkSlice must handle auth/logout/fulfilled');
       assert.match(code, /auth\/logout\/rejected/, 'bookmarkSlice must handle auth/logout/rejected');
       assert.match(code, /auth\/login\/fulfilled/, 'bookmarkSlice must handle auth/login/fulfilled');
-      assert.doesNotMatch(code, /userScopedStorage|localStorage|loadBookmarksFromStorage/, 'bookmarkSlice must keep server-owned bookmarks out of browser persistence');
+      assert.match(code, /userScopedStorage/, 'browser-only bookmark types must use user-scoped storage');
+      assert.match(code, /item\.type === 'APTITUDE' \|\| item\.type === 'COMPANY'/, 'only unsupported browser-only types may hydrate locally');
+
+      const middlewareCode = fs.readFileSync(
+        path.resolve(process.cwd(), 'src/app/clientPersistenceMiddleware.ts'),
+        'utf8'
+      );
+      assert.match(middlewareCode, /type === 'APTITUDE' \|\| type === 'COMPANY'/);
+      assert.match(middlewareCode, /\.filter\(isLocalOnlyBookmark\)/);
     });
 
     // =========================================================================
@@ -279,6 +289,33 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.deepEqual(state.bookmarks, retryBookmarks);
     });
 
+    it('preserves known server bookmarks and restores scoped local-only bookmarks on refresh failure', () => {
+      const problem = { id: 'bm-q-1', itemId: '1', type: 'PROBLEM', title: 'Two Sum', savedAt: '2026-01-01' };
+      const aptitude = { id: 'bm-aptitude-7', itemId: '7', type: 'APTITUDE', title: 'Ratios', savedAt: '2026-01-02' };
+      let state = {
+        ...bookmarkReducer(undefined, { type: '@@init' }),
+        activeUserId: 'user-A',
+        bookmarks: [problem],
+        loading: true,
+        currentRequestId: 'req-A',
+      };
+
+      state = bookmarkReducer(state, {
+        type: fetchBookmarks.rejected.type,
+        payload: {
+          userId: 'user-A',
+          localBookmarks: [aptitude],
+          message: 'Network unavailable',
+        },
+        meta: { requestId: 'req-A', aborted: false, condition: false },
+        error: {},
+      });
+
+      assert.deepEqual(state.bookmarks, [problem, aptitude]);
+      assert.equal(state.error, 'Network unavailable');
+      assert.equal(state.loading, false);
+    });
+
     it('exact sequence: duplicate requests are prevented while loading', async () => {
       const dispatched = [];
       const fakeDispatch = (action) => dispatched.push(action);
@@ -378,6 +415,9 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
 
       assert.match(code, /AnimatePresence/, 'AdminModal must coordinate mount/unmount transitions');
       assert.match(code, /useReducedMotion/, 'AdminModal must respect reduced-motion preferences');
+      assert.match(code, /role="dialog"/, 'AdminModal must expose dialog semantics');
+      assert.match(code, /aria-modal="true"/, 'AdminModal must expose modal semantics');
+      assert.match(code, /e\.key === 'Tab'/, 'AdminModal must keep keyboard focus inside the active dialog');
     });
   });
 
@@ -399,6 +439,58 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
 
       assert.deepEqual(state.solvedByProblemId, {});
       assert.equal(state.currentRequestId, 'progress-B');
+    });
+
+    it('clears populated progress immediately when a different account begins hydration', () => {
+      let state = progressReducer(undefined, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-A', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.fulfilled.type,
+        payload: {
+          solved: { 42: true },
+          attempted: { 43: true },
+          solvedItems: [{ questionId: 42 }],
+          attemptedItems: [{ questionId: 43 }],
+          userId: 'A',
+          fetchedAt: 10,
+          warning: null,
+        },
+        meta: { requestId: 'progress-A', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-B', arg: { userId: 'B' } },
+      });
+
+      assert.deepEqual(state.solvedByProblemId, {});
+      assert.deepEqual(state.attemptedByProblemId, {});
+      assert.deepEqual(state.solvedItems, []);
+      assert.deepEqual(state.attemptedItems, []);
+      assert.equal(state.lastFetchedUserId, 'B');
+    });
+
+    it('keeps user-scoped local progress visible when both server progress requests fail', async () => {
+      const originalSolved = userQuestionService.getSolvedQuestions;
+      const originalAttempted = userQuestionService.getAttemptedQuestions;
+      userQuestionService.getSolvedQuestions = async () => { throw new Error('offline'); };
+      userQuestionService.getAttemptedQuestions = async () => { throw new Error('offline'); };
+      const store = configureStore({
+        reducer: {
+          progress: progressReducer,
+          auth: () => ({ isAuthenticated: true, user: { id: 'A' } }),
+        },
+      });
+
+      try {
+        const result = await store.dispatch(hydrateProgress({ userId: 'A', force: true }));
+        assert.equal(result.type, hydrateProgress.fulfilled.type);
+        assert.match(store.getState().progress.error, /Showing locally saved progress/);
+      } finally {
+        userQuestionService.getSolvedQuestions = originalSolved;
+        userQuestionService.getAttemptedQuestions = originalAttempted;
+      }
     });
 
     it('ignores late academic-profile responses after a newer user owns the request', () => {
@@ -433,6 +525,37 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
 
       assert.equal(state.userInfo?.regNumber, 'C2C-63');
       assert.equal('data' in state.userInfo, false);
+    });
+
+    it('injects the requested user ID when a valid profile response omits it', () => {
+      let state = profileReducer(undefined, {
+        type: fetchUserInfoThunk.pending.type,
+        meta: { requestId: 'profile-current', arg: { userId: 63 } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserInfoThunk.fulfilled.type,
+        payload: { userId: 63, data: { regNumber: 'C2C-63' } },
+        meta: { requestId: 'profile-current', arg: { userId: 63 } },
+      });
+
+      assert.equal(state.userInfo?.userId, 63);
+    });
+
+    it('clears cached profile data when a different account becomes active', () => {
+      const previousState = {
+        ...profileReducer(undefined, { type: '@@init' }),
+        profile: { id: 'A', email: 'a@example.test' },
+        userInfo: { userId: 'A', regNumber: 'A-1' },
+        activeUserInfoUserId: 'A',
+      };
+      const state = profileReducer(previousState, {
+        type: 'auth/setAuthenticatedSession',
+        payload: { user: { id: 'B', email: 'b@example.test' } },
+      });
+
+      assert.equal(state.profile, null);
+      assert.equal(state.userInfo, null);
+      assert.equal(state.activeUserInfoUserId, 'B');
     });
   });
 

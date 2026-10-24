@@ -604,6 +604,55 @@ for (const def of COMPANY_LOGO_DEFINITIONS) {
 }
 
 /**
+ * Bundled assets that predate the curated metadata registry. Keeping this
+ * manifest explicit makes every shipped asset reachable at runtime and lets
+ * Vite/static hosts cache the files indefinitely without directory listing.
+ */
+export const ADDITIONAL_LOCAL_ASSETS: Readonly<Record<string, string>> = {
+  affirm: '/companies/affirm.png',
+  'akuna-capital': '/companies/akuna-capital.png',
+  alibaba: '/companies/alibaba.svg',
+  appdynamics: '/companies/appdynamics.png',
+  audible: '/companies/audible.svg',
+  'capital-one': '/companies/capital-one.png',
+  citadel: '/companies/citadel.png',
+  citrix: '/companies/citrix.svg',
+  cohesity: '/companies/cohesity.svg',
+  coursera: '/companies/coursera.png',
+  'cruise-automation': '/companies/cruise-automation.png',
+  'data-bricks': '/companies/data-bricks.png',
+  databricks: '/companies/data-bricks.png',
+  doordash: '/companies/doordash.png',
+  dropbox: '/companies/dropbox.png',
+  ebay: '/companies/ebay.png',
+  hulu: '/companies/hulu.png',
+  intuit: '/companies/intuit.png',
+  lyft: '/companies/lyft.png',
+  mathworks: '/companies/mathworks.png',
+  snapchat: '/companies/snapchat.png',
+  splunk: '/companies/splunk.png',
+  square: '/companies/square.png',
+  sumologic: '/companies/sumologic.png',
+  tableau: '/companies/tableau.png',
+  tencent: '/companies/tencent.png',
+  tripadvisor: '/companies/tripadvisor.png',
+  triplebyte: '/companies/triplebyte.png',
+  twilio: '/companies/twilio.png',
+  twitch: '/companies/twitch.png',
+  'two-sigma': '/companies/two-sigma.png',
+  visa: '/companies/visa.png',
+  vmware: '/companies/vmware.png',
+  wayfair: '/companies/wayfair.png',
+  wish: '/companies/wish.png',
+  yahoo: '/companies/yahoo.png',
+  yandex: '/companies/yandex.png',
+  yelp: '/companies/yelp.png',
+  zenefits: '/companies/zenefits.png',
+  zillow: '/companies/zillow.png',
+  zulily: '/companies/zulily.png',
+};
+
+/**
  * Normalizes raw company names by removing noise, legal entities, and punctuation.
  */
 export function normalizeCompanySearchKey(rawName: string | undefined | null): string {
@@ -611,9 +660,28 @@ export function normalizeCompanySearchKey(rawName: string | undefined | null): s
   return rawName
     .toLowerCase()
     .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, ' ')
-    .replace(/\b(inc|ltd|limited|pvt|corp|corporation|technologies|technology|solutions|services|group|co|consulting)\b/g, '')
+    .replace(/\b(incorporated|inc|llc|llp|plc|ltd|limited|private|pvt|corp|corporation|technologies|technology|solutions|services|group|co|company|consulting|holdings|international|global|india)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+export function toCompanyAssetSlug(rawName: string | undefined | null): string {
+  return normalizeCompanySearchKey(rawName)
+    .replace(/\band\b/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function createLocalAssetDefinition(rawName: string, slug: string, assetPath: string): CompanyLogoDefinition {
+  return {
+    slug,
+    displayName: rawName.trim(),
+    assetPath,
+    brandColor: '#2563EB',
+    badgeBg: 'bg-slate-900',
+    badgeText: 'text-white',
+    aliases: [rawName],
+  };
 }
 
 /**
@@ -643,7 +711,78 @@ export function resolveCompanyLogo(rawName: string | undefined | null): CompanyL
     }
   }
 
+  // 4. Reach bundled assets that do not need bespoke brand metadata.
+  const assetSlug = toCompanyAssetSlug(trimmed);
+  const assetPath = ADDITIONAL_LOCAL_ASSETS[assetSlug];
+  if (assetPath) {
+    return createLocalAssetDefinition(rawName, assetSlug, assetPath);
+  }
+
   return null;
+}
+
+export function extractCompanyDomain(website: string | undefined | null): string | null {
+  if (!website || typeof website !== 'string') return null;
+  const candidate = website.trim();
+  if (!candidate) return null;
+
+  try {
+    const url = new URL(/^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`);
+    const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
+    if (
+      !hostname.includes('.') ||
+      hostname === 'localhost' ||
+      /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)
+    ) {
+      return null;
+    }
+    return hostname;
+  } catch {
+    return null;
+  }
+}
+
+export interface CompanyLogoCandidate {
+  src: string;
+  source: 'local' | 'brandfetch' | 'official-favicon' | 'simple-icons';
+}
+
+/**
+ * Builds a deterministic, deduplicated logo cascade. Arbitrary backend logo
+ * URLs are intentionally excluded; remote candidates use a validated company
+ * domain or a fixed, reviewed brand CDN.
+ */
+export function getCompanyLogoCandidates(
+  name: string | undefined | null,
+  website: string | undefined | null,
+  brandfetchClientId?: string | null
+): CompanyLogoCandidate[] {
+  const candidates: CompanyLogoCandidate[] = [];
+  const local = resolveCompanyLogo(name);
+  if (local) candidates.push({ src: local.assetPath, source: 'local' });
+
+  const domain = extractCompanyDomain(website);
+  const clientId = brandfetchClientId?.trim();
+  if (domain && clientId) {
+    candidates.push({
+      src: `https://cdn.brandfetch.io/${encodeURIComponent(domain)}?c=${encodeURIComponent(clientId)}`,
+      source: 'brandfetch',
+    });
+  }
+  const iconSlug = toCompanyAssetSlug(name).replace(/-/g, '');
+  if (iconSlug && !local) {
+    candidates.push({
+      src: `https://cdn.simpleicons.org/${encodeURIComponent(iconSlug)}`,
+      source: 'simple-icons',
+    });
+  }
+  if (domain) {
+    candidates.push({ src: `https://${domain}/favicon.ico`, source: 'official-favicon' });
+  }
+
+  return candidates.filter(
+    (candidate, index, all) => all.findIndex((item) => item.src === candidate.src) === index
+  );
 }
 
 /**
@@ -685,13 +824,31 @@ export function getCompanyFallback(name: string | undefined | null): {
   }
   const idx = Math.abs(hash) % FALLBACK_GRADIENTS.length;
 
-  // Extract up to 2 uppercase initials if acronym, or 1 letter
-  const words = clean.split(/\s+/).filter(Boolean);
+  // Extract up to two meaningful initials; legal suffixes should not become a
+  // company's visual identity.
+  const ignoredWords = new Set([
+    'private',
+    'pvt',
+    'limited',
+    'ltd',
+    'inc',
+    'incorporated',
+    'llc',
+    'llp',
+    'plc',
+    'corp',
+    'corporation',
+    'company',
+    'co',
+  ]);
+  const words = clean
+    .split(/[^a-z0-9]+/i)
+    .filter((word) => word && !ignoredWords.has(word.toLowerCase()));
   let initial = 'C';
-  if (words.length >= 2 && words[0].length <= 4) {
+  if (words.length >= 2) {
     initial = (words[0][0] + words[1][0]).toUpperCase();
   } else {
-    initial = clean.charAt(0).toUpperCase();
+    initial = (words[0]?.slice(0, 2) || clean.charAt(0)).toUpperCase();
   }
 
   return {

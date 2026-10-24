@@ -86,6 +86,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-center">
         {/* First Page */}
         <button
+          type="button"
           onClick={() => onPageChange(1)}
           disabled={safeCurrentPage === 1}
           aria-label="First page"
@@ -97,6 +98,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {/* Previous Page */}
         <button
+          type="button"
           onClick={() => onPageChange(Math.max(1, safeCurrentPage - 1))}
           disabled={safeCurrentPage === 1}
           aria-label="Previous page"
@@ -121,7 +123,10 @@ export const Pagination: React.FC<PaginationProps> = ({
             return (
               <button
                 key={p}
+                type="button"
                 onClick={() => onPageChange(p)}
+                aria-label={`Page ${p}`}
+                aria-current={isActive ? 'page' : undefined}
                 className={`min-w-8 h-8 sm:min-w-9 sm:h-9 px-2 sm:px-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center justify-center ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-xs font-extrabold ring-2 ring-blue-600/30'
@@ -136,6 +141,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {/* Next Page */}
         <button
+          type="button"
           onClick={() => onPageChange(Math.min(safeTotalPages, safeCurrentPage + 1))}
           disabled={safeCurrentPage >= safeTotalPages}
           aria-label="Next page"
@@ -148,6 +154,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {/* Last Page */}
         <button
+          type="button"
           onClick={() => onPageChange(safeTotalPages)}
           disabled={safeCurrentPage >= safeTotalPages}
           aria-label="Last page"

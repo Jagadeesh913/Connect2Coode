@@ -99,7 +99,7 @@ export const hydrateProgress = createAsyncThunk<
   { state: RootState; rejectValue: string }
 >(
   'progress/hydrate',
-  async (arg, { getState, rejectWithValue, signal }) => {
+  async (arg, { getState, signal }) => {
     const canonical = loadInitialProgress();
     const state = getState() as RootState;
     const requestedUserId = typeof arg === 'object' && arg ? arg.userId : undefined;
@@ -116,8 +116,20 @@ export const hydrateProgress = createAsyncThunk<
         userQuestionService.getAttemptedQuestions(userId, signal),
       ]);
 
+      if (signal.aborted) {
+        throw solvedRes.status === 'rejected' ? solvedRes.reason : attemptedRes.status === 'rejected' ? attemptedRes.reason : new DOMException('Aborted', 'AbortError');
+      }
+
       if (solvedRes.status === 'rejected' && attemptedRes.status === 'rejected') {
-        return rejectWithValue('Unable to refresh problem progress.');
+        return {
+          solved: canonical,
+          attempted: attemptedMap,
+          solvedItems,
+          attemptedItems,
+          userId,
+          fetchedAt: Date.now(),
+          warning: 'Unable to refresh problem progress. Showing locally saved progress where available.',
+        };
       }
 
       if (solvedRes.status === 'fulfilled' && Array.isArray(solvedRes.value)) {
@@ -217,12 +229,26 @@ const problemProgressSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(hydrateProgress.pending, (state, action) => {
-        state.loading = true;
-        state.currentRequestId = action.meta.requestId;
-        state.loadingUserId =
+        const requestedUserId =
           typeof action.meta.arg === 'object' && action.meta.arg
             ? action.meta.arg.userId ?? null
             : state.lastFetchedUserId;
+        const isNewScope =
+          String(state.lastFetchedUserId ?? '') !== String(requestedUserId ?? '');
+
+        if (isNewScope) {
+          // Never render the previous account's progress while the next scope loads
+          // or if its refresh fails.
+          state.solvedByProblemId = {};
+          state.attemptedByProblemId = {};
+          state.solvedItems = [];
+          state.attemptedItems = [];
+          state.lastFetchedAt = null;
+          state.lastFetchedUserId = requestedUserId;
+        }
+        state.loading = true;
+        state.currentRequestId = action.meta.requestId;
+        state.loadingUserId = requestedUserId;
         state.error = null;
       })
       .addCase(hydrateProgress.fulfilled, (state, action) => {

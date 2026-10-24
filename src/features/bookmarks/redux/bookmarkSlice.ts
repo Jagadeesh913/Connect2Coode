@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { RootState } from '../../../app/store';
 import { userQuestionService, type UserBookmarkQuestionResponse } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
+import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 
 export type BookmarkType = 'PROBLEM' | 'COMPANY' | 'APTITUDE';
 
@@ -25,6 +26,48 @@ export interface BookmarkState {
   pendingToggleKeys: Record<string, boolean>;
 }
 
+interface BookmarkFetchFailure {
+  userId: string | number | null;
+  localBookmarks: BookmarkItem[];
+  message: string;
+}
+
+const BOOKMARK_STORAGE_KEY = 'myjo_bookmarks';
+
+const readLocalBookmarks = (): BookmarkItem[] => {
+  try {
+    const raw = userScopedStorage.getItem(BOOKMARK_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is BookmarkItem =>
+      Boolean(
+        item &&
+        typeof item === 'object' &&
+        typeof item.id === 'string' &&
+        typeof item.itemId === 'string' &&
+        (item.type === 'APTITUDE' || item.type === 'COMPANY') &&
+        typeof item.title === 'string' &&
+        typeof item.savedAt === 'string'
+      )
+    );
+  } catch {
+    return [];
+  }
+};
+
+const mergeBookmarks = (
+  serverBookmarks: BookmarkItem[],
+  localBookmarks: BookmarkItem[]
+): BookmarkItem[] => {
+  const merged = [...serverBookmarks];
+  localBookmarks.forEach((item) => {
+    if (!merged.some((bookmark) => isBookmarkItem(bookmark, item.itemId, item.type))) {
+      merged.push(item);
+    }
+  });
+  return merged;
+};
+
 const getInitialActiveUserId = (): string | number | null => {
   try {
     const user = tokenStorage.getUser();
@@ -35,9 +78,9 @@ const getInitialActiveUserId = (): string | number | null => {
 };
 
 const initialState: BookmarkState = {
-  // Bookmark records are server-owned. Keeping a browser copy made an
-  // authenticated user's list stale after a refresh or account change.
-  bookmarks: [],
+  // Problem bookmarks are server-owned. Aptitude/company bookmarks have no
+  // backend endpoint and remain isolated in user-scoped browser storage.
+  bookmarks: readLocalBookmarks(),
   loading: false,
   error: null,
   currentRequestId: null,
@@ -56,19 +99,20 @@ export const isBookmarkItem = (
 ): boolean => item.type === type && String(item.itemId) === String(itemId);
 
 export const fetchBookmarks = createAsyncThunk<
-  { userId: string | number | null; bookmarks: BookmarkItem[]; fetchedAt: number; warning?: string },
+  { userId: string | number | null; bookmarks: BookmarkItem[]; fetchedAt: number },
   { force?: boolean } | boolean | void,
-  { state: RootState }
+  { state: RootState; rejectValue: BookmarkFetchFailure }
 >(
   'bookmarks/fetchList',
-  async (_, { getState }) => {
+  async (_, { getState, rejectWithValue, signal }) => {
     const state = getState() as RootState;
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
+    const localBookmarks = readLocalBookmarks();
 
     if (isAuthenticated && userId) {
       try {
-        const serverBookmarks = await userQuestionService.getBookmarkedQuestions(userId);
+        const serverBookmarks = await userQuestionService.getBookmarkedQuestions(userId, signal);
         if (Array.isArray(serverBookmarks)) {
           const mappedServer: BookmarkItem[] = serverBookmarks.map((item: UserBookmarkQuestionResponse) => ({
             id: `bm-q-${item.questionId}`,
@@ -82,23 +126,23 @@ export const fetchBookmarks = createAsyncThunk<
           }));
           return {
             userId,
-            bookmarks: mappedServer,
+            bookmarks: mergeBookmarks(mappedServer, localBookmarks),
             fetchedAt: Date.now(),
           };
         }
-      } catch {
-        return {
+      } catch (error: any) {
+        if (signal.aborted) throw error;
+        return rejectWithValue({
           userId,
-          bookmarks: [],
-          fetchedAt: Date.now(),
-          warning: 'Could not refresh bookmarks from the server.',
-        };
+          localBookmarks,
+          message: error?.message || 'Could not refresh bookmarks from the server.',
+        });
       }
     }
 
     return {
       userId: userId || null,
-      bookmarks: [],
+      bookmarks: localBookmarks,
       fetchedAt: Date.now(),
     };
   },
@@ -232,7 +276,7 @@ const bookmarkSlice = createSlice({
         state.currentRequestId = null;
         state.bookmarks = bookmarks;
         state.lastFetchedAt = action.payload.fetchedAt;
-        state.error = action.payload.warning || null;
+        state.error = null;
       })
       .addCase(fetchBookmarks.rejected, (state, action) => {
         const isCurrent = state.currentRequestId === action.meta.requestId;
@@ -241,10 +285,24 @@ const bookmarkSlice = createSlice({
           return;
         }
 
+        const failure = action.payload && typeof action.payload === 'object'
+          ? action.payload as BookmarkFetchFailure
+          : undefined;
+        const targetUserId = failure?.userId != null ? String(failure.userId) : null;
+        const currentUserId = state.activeUserId != null ? String(state.activeUserId) : null;
+        if (failure && targetUserId !== currentUserId) return;
+
         state.loading = false;
         state.currentRequestId = null;
         if (action.meta.aborted) return;
-        state.error = (action.payload as string) || action.error.message || 'Failed to fetch bookmarks';
+        if (failure) {
+          const existingServerBookmarks = state.bookmarks.filter((item) => item.type === 'PROBLEM');
+          state.bookmarks = mergeBookmarks(existingServerBookmarks, failure.localBookmarks);
+        }
+        state.error = failure?.message ||
+          (typeof action.payload === 'string' ? action.payload : null) ||
+          action.error.message ||
+          'Failed to fetch bookmarks';
       })
       .addCase(toggleBookmarkItem.pending, (state, action) => {
         const type = action.meta.arg.type || 'PROBLEM';

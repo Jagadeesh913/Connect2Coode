@@ -56,6 +56,42 @@ export const adminInstitutionService = {
     });
   },
 
+  async getAllInstitutions(
+    params: Omit<InstitutionFilterParams, 'page' | 'size'> = {},
+    signal?: AbortSignal
+  ): Promise<ApiResponse<Institution[]>> {
+    const first = await this.getInstitutions({ ...params, page: 0, size: 100 }, signal);
+    if (Array.isArray(first.data)) {
+      return { ...first, data: first.data };
+    }
+    if (!first.data || !Array.isArray(first.data.content)) {
+      throw new Error('Unexpected institutions response format');
+    }
+
+    const pages: Institution[][] = [first.data.content];
+    const totalPages = Math.max(1, Number(first.data.totalPages) || 1);
+    for (let page = 1; page < totalPages; page += 1) {
+      signal?.throwIfAborted();
+      const response = await this.getInstitutions({ ...params, page, size: 100 }, signal);
+      if (Array.isArray(response.data)) {
+        pages.push(response.data);
+      } else if (response.data && Array.isArray(response.data.content)) {
+        pages.push(response.data.content);
+      } else {
+        throw new Error('Unexpected institutions response format');
+      }
+    }
+
+    const seen = new Set<string>();
+    const data = pages.flat().filter((institution) => {
+      const key = String(institution.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return { ...first, data };
+  },
+
   /**
    * GET /api/v1/admin/institutions/{id}
    * Returns complete institution details, including affiliated university info.

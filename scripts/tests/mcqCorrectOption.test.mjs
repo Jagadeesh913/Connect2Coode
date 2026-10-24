@@ -25,7 +25,7 @@ export async function resolve(specifier, context, nextResolve) {
 
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
-const { synthesizeMcqOptions } = await import('../../src/features/aptitude/utils/mcqUtils.ts');
+const { synthesizeMcqOptions, parseAptitudeSubjectCode } = await import('../../src/features/aptitude/utils/mcqUtils.ts');
 const {
   normalizeApiMcqOptions,
   serializeMcqOptions,
@@ -33,6 +33,13 @@ const {
 } = await import('../../src/features/admin/utils/mcqPayload.ts');
 
 describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () => {
+  it('maps URL category aliases deterministically for back/forward navigation', () => {
+    assert.equal(parseAptitudeSubjectCode('quantitative'), 'APTITUDE');
+    assert.equal(parseAptitudeSubjectCode('logical'), 'REASONING');
+    assert.equal(parseAptitudeSubjectCode('verbal'), 'VERBAL');
+    assert.equal(parseAptitudeSubjectCode('pseudo'), 'PSEUDOCODE');
+  });
+
   it('serializes an admin update using only the documented option-level isCorrect contract', () => {
     const payload = serializeMcqOptions([
       { id: 101, optionLabel: 'A', optionText: '15', isCorrect: false },
@@ -123,5 +130,15 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
 
     const options = synthesizeMcqOptions(legacyMcq);
     assert.equal(options.some((option) => option.isCorrect), false);
+  });
+
+  it('keeps an API question with an empty options array unanswerable instead of inventing choices', () => {
+    const options = synthesizeMcqOptions({
+      id: 4,
+      question: 'A server-side MCQ record without persisted options',
+      options: [],
+    });
+
+    assert.deepEqual(options, []);
   });
 });

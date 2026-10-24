@@ -93,7 +93,7 @@ export const yearRule = (
   z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
     z
-      .number({ invalid_type_error: `${fieldName} must be a valid number.` })
+      .number({ error: `${fieldName} must be a valid number.` })
       .int(`${fieldName} must be a whole year.`)
       .min(minYear, `${fieldName} must be ${minYear} or later.`)
       .max(maxYear, `${fieldName} cannot exceed ${maxYear}.`)
@@ -107,7 +107,7 @@ export const optionalYearRule = (
   z.preprocess(
     (val) => (val === '' || val === null || val === undefined ? null : Number(val)),
     z
-      .number({ invalid_type_error: `${fieldName} must be a valid number.` })
+      .number({ error: `${fieldName} must be a valid number.` })
       .int(`${fieldName} must be a whole year.`)
       .min(minYear, `${fieldName} must be ${minYear} or later.`)
       .max(maxYear, `${fieldName} cannot exceed ${maxYear}.`)

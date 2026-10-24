@@ -5,8 +5,10 @@ import { mcqService } from '../../../services/mcqService';
 import type { McqQuestion } from '../../../core/types/domain';
 import {
   cleanQuestionText,
+  parseAptitudeSubjectCode,
   synthesizeMcqOptions,
 } from '../utils/mcqUtils';
+import type { AptitudeSubjectCode } from '../utils/mcqUtils';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { Skeleton, AptitudeQuestionSkeleton } from '../../../shared/components/ui/Skeleton';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -16,8 +18,6 @@ import { Lock } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 export type AptitudeItem = McqQuestion;
-
-export type AptitudeSubjectCode = 'APTITUDE' | 'REASONING' | 'VERBAL' | 'PSEUDOCODE';
 
 export interface AptitudePrepProps {
   defaultCategory?: 'quantitative' | 'reasoning' | 'verbal' | 'logical' | 'pseudocode' | string;
@@ -327,17 +327,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Parse category from URL query param
-  const parseSubjectCode = (raw: string | null | undefined): AptitudeSubjectCode => {
-    if (!raw) return 'APTITUDE';
-    const upper = raw.toUpperCase().trim();
-    if (upper === 'REASONING' || upper === 'LOGICAL') return 'REASONING';
-    if (upper === 'VERBAL') return 'VERBAL';
-    if (upper === 'PSEUDOCODE' || upper === 'PSEUDO') return 'PSEUDOCODE';
-    return 'APTITUDE';
-  };
-
-  const initialSubject = parseSubjectCode(searchParams.get('category') || defaultCategory);
+  const initialSubject = parseAptitudeSubjectCode(searchParams.get('category') || defaultCategory);
   const [activeSubject, setActiveSubject] = useState<AptitudeSubjectCode>(initialSubject);
 
   // Search & Filter State (Draft vs Applied Architecture)
@@ -390,6 +380,26 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   }, [subjectReferences]);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Browser back/forward and direct query-string changes must update the
+  // active category rather than leaving stale results on screen.
+  useEffect(() => {
+    const urlSubject = parseAptitudeSubjectCode(searchParams.get('category') || defaultCategory);
+    if (urlSubject === activeSubject) return;
+    abortControllerRef.current?.abort();
+    setQuestions([]);
+    setTotalElements(0);
+    setError(null);
+    setActiveSubject(urlSubject);
+    setDraftSearch('');
+    setAppliedSearch('');
+    setDraftDifficulties([]);
+    setAppliedDifficulties([]);
+    setDraftTopicIds([]);
+    setAppliedTopicIds([]);
+    setTopicSearch('');
+    setCurrentPage(1);
+  }, [activeSubject, defaultCategory, searchParams]);
 
   // Detect unapplied changes between draft and applied filters
   const hasUnappliedChanges = useMemo(() => {
@@ -521,9 +531,10 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       if (controller.signal.aborted) return;
 
       const pageData = response.data;
-      const contentList: McqQuestion[] = Array.isArray(pageData?.content)
-        ? pageData.content
-        : [];
+      if (!pageData || !Array.isArray(pageData.content)) {
+        throw new Error('Unexpected aptitude question response format');
+      }
+      const contentList: McqQuestion[] = pageData.content;
 
       const total =
         typeof pageData?.totalElements === 'number'
@@ -534,6 +545,11 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
         typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
           ? pageData.totalPages
           : Math.max(1, Math.ceil(total / pageSize));
+
+      if (total > 0 && currentPage > computedPages) {
+        setCurrentPage(computedPages);
+        return;
+      }
 
       setQuestions(contentList);
       setCommittedPage(currentPage);

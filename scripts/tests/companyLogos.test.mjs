@@ -26,8 +26,11 @@ const rootDir = path.resolve(__dirname, '../../');
 // Import company logo registry
 const {
   COMPANY_LOGO_DEFINITIONS,
+  ADDITIONAL_LOCAL_ASSETS,
   resolveCompanyLogo,
   normalizeCompanySearchKey,
+  extractCompanyDomain,
+  getCompanyLogoCandidates,
   getCompanyFallback,
 } = await import('../../src/features/companies/utils/companyLogoRegistry.ts');
 
@@ -56,6 +59,16 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
             `SVG file for ${def.displayName} must specify viewBox for scalable aspect ratio`
           );
         }
+      }
+    });
+
+    it('makes every additional bundled logo asset reachable and verifies it exists', () => {
+      assert.ok(Object.keys(ADDITIONAL_LOCAL_ASSETS).length >= 40);
+
+      for (const [slug, assetPath] of Object.entries(ADDITIONAL_LOCAL_ASSETS)) {
+        const fullDiskPath = path.join(rootDir, 'public', assetPath.replace(/^\//, ''));
+        assert.ok(fs.existsSync(fullDiskPath), `Bundled asset must exist: ${assetPath}`);
+        assert.equal(resolveCompanyLogo(slug)?.assetPath, assetPath, `${slug} must resolve locally`);
       }
     });
   });
@@ -156,6 +169,7 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
       assert.equal(normalizeCompanySearchKey('Wipro Limited'), 'wipro');
       assert.equal(normalizeCompanySearchKey('TCS Pvt Ltd'), 'tcs');
       assert.equal(normalizeCompanySearchKey('Accenture Solutions'), 'accenture');
+      assert.equal(normalizeCompanySearchKey('Databricks India Private Limited'), 'databricks');
     });
   });
 
@@ -188,6 +202,42 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
       const res = resolveCompanyLogo('Google');
       assert.equal(res?.assetPath, '/companies/google.svg');
       assert.ok(!res?.assetPath.includes('http'), 'Resolved asset path must be local relative path');
+    });
+  });
+
+  describe('5. Dynamic Provider Cascade', () => {
+    it('normalizes only valid public company website domains', () => {
+      assert.equal(extractCompanyDomain('https://www.example.com/careers'), 'example.com');
+      assert.equal(extractCompanyDomain('linear.app'), 'linear.app');
+      assert.equal(extractCompanyDomain('http://localhost:5173'), null);
+      assert.equal(extractCompanyDomain('http://127.0.0.1/logo'), null);
+      assert.equal(extractCompanyDomain('not a url'), null);
+    });
+
+    it('uses reviewed local assets without unnecessary remote requests', () => {
+      assert.deepEqual(getCompanyLogoCandidates('Google', 'https://google.com', 'client-id'), [
+        { src: '/companies/google.svg', source: 'local' },
+        { src: 'https://cdn.brandfetch.io/google.com?c=client-id', source: 'brandfetch' },
+        { src: 'https://google.com/favicon.ico', source: 'official-favicon' },
+      ]);
+    });
+
+    it('falls back through Brandfetch, Simple Icons, and the official-site favicon', () => {
+      assert.deepEqual(getCompanyLogoCandidates('Linear', 'https://linear.app', 'public-client'), [
+        {
+          src: 'https://cdn.brandfetch.io/linear.app?c=public-client',
+          source: 'brandfetch',
+        },
+        { src: 'https://cdn.simpleicons.org/linear', source: 'simple-icons' },
+        { src: 'https://linear.app/favicon.ico', source: 'official-favicon' },
+      ]);
+    });
+
+    it('works without provider configuration and never consumes arbitrary backend logo URLs', () => {
+      assert.deepEqual(getCompanyLogoCandidates('Linear', 'https://linear.app'), [
+        { src: 'https://cdn.simpleicons.org/linear', source: 'simple-icons' },
+        { src: 'https://linear.app/favicon.ico', source: 'official-favicon' },
+      ]);
     });
   });
 });

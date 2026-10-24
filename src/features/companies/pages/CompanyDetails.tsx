@@ -20,6 +20,7 @@ import { CompanyExamCard } from '../components/CompanyExamCard';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { GraduationCap, Code2 } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -27,7 +28,7 @@ interface SectionConfig {
   id: CompanySection;
   label: string;
   icon: string;
-  subjectId: number | null;
+  subjectCode: string | null;
   subjectName?: string;
   description: string;
 }
@@ -37,14 +38,14 @@ const SECTIONS: SectionConfig[] = [
     id: 'coding',
     label: 'Coding Problems',
     icon: 'fa-solid fa-code',
-    subjectId: null,
+    subjectCode: null,
     description: 'Algorithmic and programming challenges',
   },
   {
     id: 'aptitude',
     label: 'Aptitude',
     icon: 'fa-solid fa-calculator',
-    subjectId: 30,
+    subjectCode: 'APTITUDE',
     subjectName: 'Quantitative Aptitude',
     description: 'Numbers, arithmetic, percentages and ratios',
   },
@@ -52,7 +53,7 @@ const SECTIONS: SectionConfig[] = [
     id: 'reasoning',
     label: 'Reasoning',
     icon: 'fa-solid fa-brain',
-    subjectId: 32,
+    subjectCode: 'REASONING',
     subjectName: 'Logical Reasoning',
     description: 'Patterns, deductions, series and problem solving',
   },
@@ -60,7 +61,7 @@ const SECTIONS: SectionConfig[] = [
     id: 'verbal',
     label: 'Verbal',
     icon: 'fa-solid fa-file-lines',
-    subjectId: 33,
+    subjectCode: 'VERBAL',
     subjectName: 'Verbal Ability',
     description: 'Grammar, vocabulary, and reading comprehension',
   },
@@ -68,7 +69,7 @@ const SECTIONS: SectionConfig[] = [
     id: 'pseudocode',
     label: 'Pseudocode',
     icon: 'fa-solid fa-laptop-code',
-    subjectId: 31,
+    subjectCode: 'PSEUDOCODE',
     subjectName: 'Pseudocode',
     description: 'Logic execution, loops, recursion, and tracing',
   },
@@ -93,6 +94,11 @@ export const CompanyDetails: React.FC = () => {
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
+  const {
+    items: subjectReferences,
+    loading: subjectsLoading,
+    error: subjectsError,
+  } = useReferenceGroup('SUBJECT');
 
   // Section Selection (Coding, Aptitude, Reasoning, Verbal, Pseudocode)
   const [activeSection, setActiveSection] = useState<CompanySection>('coding');
@@ -199,18 +205,31 @@ export const CompanyDetails: React.FC = () => {
   // Load only the selected section; errors settle independently and are retryable.
   useEffect(() => {
     if (!companyId || activeSection === 'coding') return;
+    const subjectCode = SECTIONS.find((section) => section.id === activeSection)?.subjectCode;
+    const subjectId = subjectReferences.find(
+      (subject) => String(subject.refCode).toUpperCase() === subjectCode
+    )?.id;
+    if (!subjectId) {
+      setMcqsLoading(subjectsLoading);
+      if (!subjectsLoading) {
+        setMcqError(subjectsError || `Subject reference ${subjectCode || ''} is unavailable.`);
+      }
+      return;
+    }
     const controller = new AbortController();
-    const subjectIds = { aptitude: 30, reasoning: 32, verbal: 33, pseudocode: 31 };
     setMcqsLoading(true);
     setMcqError(null);
     mcqService.getMcqList({
-      subject: [subjectIds[activeSection]], companies: [Number(companyId)],
+      subject: [Number(subjectId)], companies: [Number(companyId)],
       difficulty: [], topic: [], searchText: '',
       pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
     }, controller.signal).then((res) => {
       if (controller.signal.aborted) return;
       const pageData = res.data;
-      const list = Array.isArray(pageData?.content) ? pageData.content : [];
+      if (!pageData || !Array.isArray(pageData.content)) {
+        throw new Error('Unexpected company MCQ response format');
+      }
+      const list = pageData.content;
       setMcqsBySection((prev) => ({ ...prev, [activeSection]: list }));
     }).catch((err) => {
       if (!controller.signal.aborted) setMcqError(err?.message || 'Unable to load questions.');
@@ -218,7 +237,7 @@ export const CompanyDetails: React.FC = () => {
       if (!controller.signal.aborted) setMcqsLoading(false);
     });
     return () => controller.abort();
-  }, [companyId, activeSection, mcqRetry]);
+  }, [companyId, activeSection, mcqRetry, subjectReferences, subjectsError, subjectsLoading]);
 
   const currentKey = company ? `${company.id ?? ''}-${company.name ?? ''}` : null;
   const isQuestionsLoading =

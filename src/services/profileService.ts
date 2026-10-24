@@ -48,6 +48,7 @@ export const profileService = {
     const normalizedData: UserInfoData | null = rawData
       ? {
           ...rawData,
+          userId: rawData.userId ?? userId,
           college: rawData.college || rawData.collegeName || '',
           collegeName: rawData.collegeName || rawData.college || '',
         }

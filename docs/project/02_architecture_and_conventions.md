@@ -146,7 +146,7 @@ sequenceDiagram
 3. **Icons & UI Assets**:
    - Use `lucide-react` for standard UI iconography.
    - Use `<BrandLogo />` for all Connect2Code branding.
-   - Use `<CompanyBrandLogo />` for recruiter logos (served locally from `public/companies/`).
+   - Use `<CompanyBrandLogo />` for recruiter logos. It serves known brands from `public/companies/` and owns the reviewed dynamic fallback cascade; feature components must not render backend logo URLs directly.
 4. **Form Management**:
    - Use `react-hook-form` with `@hookform/resolvers/zod`.
    - Pass validation schemas from `src/core/validation/`.

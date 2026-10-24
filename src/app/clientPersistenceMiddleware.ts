@@ -16,6 +16,12 @@ const PROGRESS_ACTIONS = new Set([
   'progress/markSolved/fulfilled',
 ]);
 
+const isLocalOnlyBookmark = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object' || !('type' in item)) return false;
+  const type = (item as { type?: unknown }).type;
+  return type === 'APTITUDE' || type === 'COMPANY';
+};
+
 /**
  * Browser persistence belongs in middleware, after reducers produce the next
  * state. This keeps Redux reducers deterministic and prevents stale thunk
@@ -33,9 +39,10 @@ export const clientPersistenceMiddleware: Middleware = (storeApi) => (next) => (
 
   try {
     if (BOOKMARK_ACTIONS.has(actionType)) {
+      const localOnlyBookmarks = (state.bookmarks?.bookmarks || []).filter(isLocalOnlyBookmark);
       userScopedStorage.setItem(
         BOOKMARK_STORAGE_KEY,
-        JSON.stringify(state.bookmarks?.bookmarks || [])
+        JSON.stringify(localOnlyBookmarks)
       );
     }
     if (PROGRESS_ACTIONS.has(actionType)) {

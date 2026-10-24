@@ -28,14 +28,24 @@
 - **Frontend Mitigation**:
   - [`src/core/api/endpoints.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
 
+### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` (`pageSize: 1000`)
+- **Observed Behavior**: In `/admin/dashboard`, `POST /api/v1/questions` failed with HTTP 500 when requesting `pageSize: 1000`. Meanwhile, the identical endpoint in `/admin/questions` succeeded with HTTP 200 using standard `pageSize: 10`.
+- **Root Cause**: `UNKNOWN`. The response proves that this request size is not supported by the deployed service, but does not establish whether the failure is caused by query, memory, serialization, or another backend limit.
+- **Frontend Mitigation**:
+  - [`src/features/admin/pages/AdminDashboard.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/admin/pages/AdminDashboard.tsx) now requests `pageSize: 10` matching `/admin/questions` and reads the total question count directly from `res.data.totalElements`.
+  - Difficulty breakdown (`easyCount`, `mediumCount`, `hardCount`) is obtained via concurrent level-filtered queries (`level: [1]`, `level: [2]`, `level: [3]`) with `pageSize: 1`, extracting `totalElements` from each. A failed filtered query retains the previous unknown/known value and raises a warning; a ten-row sample is never presented as a global total.
+  - [`src/features/admin/components/dashboard/DashboardCodeRunner.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/admin/components/dashboard/DashboardCodeRunner.tsx) sets `pageSize: 10` for its playground selector to ensure consistent stability.
+
 ---
+
 
 ## 2. Key Architectural Decisions & Rationale
 
 ### Decision 1: Local Recruiter Logos in `public/companies/`
 - **Context**: The backend company records contain empty or broken remote logo URLs.
-- **Decision**: Curate 121 vector SVG and high-resolution PNG logos locally in `public/companies/` and register them in `companyLogoRegistry.ts`.
-- **Benefits**: Instant zero-latency loading, high performance for 2,000+ concurrent students, no third-party CDN failure points, and consistent aspect ratios.
+- **Decision**: Keep 121 vector SVG and high-resolution PNG files in `public/companies/` as the first source, expose every unique bundled brand through `companyLogoRegistry.ts`, and ignore arbitrary backend logo URLs. For new companies, derive candidates from the validated website domain: optional Brandfetch, Simple Icons, official favicon, then a deterministic monogram.
+- **Benefits**: Known brands retain fast same-origin assets and consistent aspect ratios, while new API-created companies receive useful branding without a frontend release. The terminal monogram keeps the UI stable when a remote source is unavailable.
+- **Limitation**: Brandfetch's advertised 95%+ core-brand coverage is vendor-reported, not a measured guarantee for Connect2Code. Production coverage depends on a configured public client ID, valid API website fields, provider availability, and the actual company population.
 
 ### Decision 2: Deep Purge of Duplicate Token Fields in `apiClient`
 - **Context**: Different legacy API calls sent either `token` or `jwtToken`. The backend rejected duplicate fields.
@@ -62,8 +72,8 @@
 
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
 - **Context**: Admin question metadata and test cases were overridden or retained in browser storage, and two hard-coded fixtures included hidden evaluation cases. `ProblemDetails` also mirrored submitted source code and results even though the submission-history endpoint is available.
-- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible examples may still be parsed from a problem description for display, but hidden fixtures are never bundled into the client.
-- **Boundary**: Browser-side COMPANY/APTITUDE bookmark fallbacks were removed from the global bookmark slice because no corresponding API contract establishes those records. The application does not present them as persisted bookmarks.
+- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible examples and sample test cases may still be parsed from problem descriptions or provided for standard catalog problems (e.g. Reverse an Array) to guide student inputs, but hidden evaluation fixtures are never bundled into the client.
+- **Boundary**: Problem bookmarks remain server-authoritative. COMPANY/APTITUDE bookmarks have no corresponding API endpoint and use only user-scoped browser persistence; the persistence middleware explicitly excludes server-owned problem bookmarks.
 
 ### Decision 8: Deterministic Redux State and Request Ownership
 - **Context**: Bookmark/progress reducers wrote browser storage directly; bookmark identity ignored item type; async profile/progress responses could apply after the active user changed; and token-only refresh responses could replace complete user metadata.
@@ -80,10 +90,10 @@
 - **Decision**: The workspace uses `useAssessmentIntegrity` to restrict clipboard events, context menu, drag/drop, Print Screen, source-view/print, and common developer-tool shortcuts. It retains normal left-click, editor typing, undo, and execution shortcuts so the product stays operable. The runner sends `customInput` only for the explicit custom-input action and normalizes incomplete execution response envelopes without inventing a verdict.
 - **Boundary**: Client JavaScript cannot prevent DevTools, screenshots, another browser/device, or modified clients. There is no verified backend endpoint for proctoring telemetry, violation storage, or exam session enforcement, so the client only displays/detects best-effort events and never claims malpractice prevention.
 
-### Decision 11: Security Overrides Track Published Transitive Fixes
-- **Context**: The Monaco editor's transitive DOMPurify dependency received newly published critical advisories after the initial dependency refresh.
-- **Decision**: Keep the existing root `overrides` mechanism and pin DOMPurify to `3.4.17`; update the existing Vite and Axios transitive tree through `npm audit fix` rather than adding a new package.
-- **Verification**: `npm audit --omit=dev --audit-level=moderate` reported `0 vulnerabilities` after the lockfile update on 2026-10-23.
+### Decision 11: Security Overrides and Direct Upgrades Track Published Fixes
+- **Context**: The Monaco editor's transitive DOMPurify dependency received newly published critical advisories, and the direct Zod 3 dependency was later reported vulnerable to memory exhaustion while validating oversized constrained collections.
+- **Decision**: Keep the existing root `overrides` mechanism and pin DOMPurify to `3.4.17`. Upgrade the direct Zod dependency independently to `4.6.7`, migrate its error/type APIs, and verify form behavior rather than using an unreviewed bulk `npm audit fix --force`.
+- **Verification**: `npm audit --omit=dev` reported `0 vulnerabilities` on 2026-10-24; all validation tests, type checking, lint, and the production build passed after the Zod 4 migration.
 
 ### Decision 12: Credential-Free Cross-Tab Session Synchronization
 - **Context**: Browser cookies are shared between tabs, but Redux state and the in-memory access-token cache are per tab. Logging out in one tab previously left another tab displaying an authenticated session until reload or a failed request.
@@ -117,6 +127,8 @@
 ---
 
 ## 3. Unresolved Questions & Future Work
+
+0. **MCQ Option Data Is Missing for Existing Records**: `POST /mcq` on 2026-10-23 returned 10 records with option counts `4, 4, 4, 0, 0, 0, 0, 0, 0, 0`. `GET /mcq/4` likewise returned `options: []`. The aptitude UI is correctly rendering the API's empty collection and must not fabricate answer choices or correctness. Repair requires populating those MCQ option rows through the admin authoring API or backend data migration, then verifying `GET /mcq/{id}` returns the documented `options[].id`, `optionLabel`, `optionText`, and `isCorrect` fields.
 
 1. **Backend Submission Patch**: Coordinate with backend engineering to add null safety checks to `TestCase.getType()` in Spring Boot code submission service to enable full submission execution.
 2. **Real-Time Notification Websocket**: Currently notifications and progress updates are pulled via HTTP; evaluate Stomp/Websocket integration if live multi-user contests are introduced.

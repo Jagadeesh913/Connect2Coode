@@ -28,8 +28,6 @@ export const CompanyList: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [pageNumber, setPageNumber] = useState<number>(0);
   const [pageSize] = useState<number>(24);
-  const [totalPages, setTotalPages] = useState<number>(1);
-  const [totalElements, setTotalElements] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,27 +37,15 @@ export const CompanyList: React.FC = () => {
 
   const requestSequence = useRef(0);
   const loadCompanies = useCallback(
-    async (page: number, signal?: AbortSignal) => {
+    async (signal?: AbortSignal) => {
       const requestId = ++requestSequence.current;
       setLoading(true);
       setError(null);
       try {
-        const res = await companyService.getCompaniesPaginated(
-          {
-            pageNumber: page,
-            pageSize,
-            sortBy: 'name',
-            sortDirection: 'ASC',
-          },
-          signal
-        );
+        const res = await companyService.getAllCompanies(signal);
 
         if (signal?.aborted || requestId !== requestSequence.current) return;
-        const data = res.data;
-        setCompanies(data.content || []);
-        setPageNumber(data.pageNumber ?? page);
-        setTotalPages(data.totalPages ?? 1);
-        setTotalElements(data.totalElements ?? data.content?.length ?? 0);
+        setCompanies(res.data);
       } catch (err: any) {
         if (requestId !== requestSequence.current || err?.name === 'CanceledError' || signal?.aborted) return;
         setError(err?.message || 'Failed to fetch companies');
@@ -67,16 +53,16 @@ export const CompanyList: React.FC = () => {
         if (!signal?.aborted && requestId === requestSequence.current) setLoading(false);
       }
     },
-    [pageSize]
+    []
   );
 
   useEffect(() => {
     const controller = new AbortController();
-    loadCompanies(pageNumber, controller.signal);
+    loadCompanies(controller.signal);
     return () => {
       controller.abort();
     };
-  }, [pageNumber, loadCompanies]);
+  }, [loadCompanies]);
 
   // Extract industries dynamically
   const availableIndustries = useMemo(() => {
@@ -106,6 +92,23 @@ export const CompanyList: React.FC = () => {
       return matchesSearch && matchesIndustry;
     });
   }, [companies, searchTerm, selectedIndustry]);
+
+  const totalElements = filteredCompanies.length;
+  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+  const visibleCompanies = useMemo(
+    () => filteredCompanies.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize),
+    [filteredCompanies, pageNumber, pageSize]
+  );
+
+  useEffect(() => {
+    setPageNumber(0);
+  }, [searchTerm, selectedIndustry]);
+
+  useEffect(() => {
+    if (pageNumber >= totalPages) {
+      setPageNumber(totalPages - 1);
+    }
+  }, [pageNumber, totalPages]);
 
   return (
     <div className="w-full flex flex-col items-center pb-20 font-sans bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 overflow-x-hidden">
@@ -148,10 +151,14 @@ export const CompanyList: React.FC = () => {
           </div>
 
           {/* Real Count Badge */}
-          {totalElements > 0 && (
+          {companies.length > 0 && (
             <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111A2E] text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 text-xs font-semibold shrink-0">
               <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>{totalElements} Companies</span>
+              <span>
+                {totalElements === companies.length
+                  ? `${companies.length} Companies`
+                  : `${totalElements} of ${companies.length} Companies`}
+              </span>
             </div>
           )}
 
@@ -182,7 +189,7 @@ export const CompanyList: React.FC = () => {
         </div>
 
         {/* 3. COMPANIES 4-COLUMN RESPONSIVE GRID */}
-        <RequestStatus pending={loading} error={companies.length ? error : null} onRetry={() => loadCompanies(pageNumber)} />
+        <RequestStatus pending={loading} error={companies.length ? error : null} onRetry={() => loadCompanies()} />
         {loading && companies.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             <CompanyCardSkeleton count={8} />
@@ -206,7 +213,7 @@ export const CompanyList: React.FC = () => {
             <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mb-6">{error}</p>
             <button
               type="button"
-              onClick={() => loadCompanies(pageNumber)}
+              onClick={() => loadCompanies()}
               className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm shadow-md transition-all cursor-pointer"
             >
               Retry Loading
@@ -227,7 +234,7 @@ export const CompanyList: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredCompanies.map((company) => {
+            {visibleCompanies.map((company) => {
               const companyTargetId = company.id || company.slug;
 
               return (

@@ -33,8 +33,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const userInitials = userDisplayName.slice(0, 2).toUpperCase();
 
   const token = tokenStorage.getAccessToken();
-  const userRole = String(currentUser?.role || reduxUser?.role || '').toUpperCase();
-  const isAdmin = isLoggedIn && (userRole === 'ADMIN' || userRole === 'ROLE_ADMIN' || userRole.includes('ADMIN') || isJwtAdmin(token));
+  const isAdmin = isLoggedIn && isJwtAdmin(token);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

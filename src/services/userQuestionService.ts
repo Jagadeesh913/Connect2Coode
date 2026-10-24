@@ -36,6 +36,21 @@ export interface UserQuestionSubmissionItem {
 
 export type UserQuestionProgressResponse = UserSubmittedQuestionItem;
 
+const extractArrayResponse = <T>(response: unknown, label: string): T[] => {
+  const envelope = response && typeof response === 'object'
+    ? response as Record<string, unknown>
+    : null;
+  const data = envelope?.data;
+
+  if (Array.isArray(response)) return response as T[];
+  if (Array.isArray(data)) return data as T[];
+  if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).data)) {
+    return (data as Record<string, unknown>).data as T[];
+  }
+
+  throw new Error(`Unexpected ${label} response format`);
+};
+
 /**
  * Service for user-scoped question interactions:
  * - Bookmarks: POST/DELETE/GET /api/v1/users/{userId}/questions/...
@@ -76,19 +91,19 @@ export const userQuestionService = {
   /**
    * GET /api/v1/users/{userId}/questions/bookmarks
    * Retrieves all bookmarked questions for the user.
-   * Returns empty array if none found or response format varies.
+   * A valid empty response is an empty array. Malformed successful responses
+   * are rejected so the UI cannot misreport a transport/contract failure as
+   * "no bookmarks".
    */
   async getBookmarkedQuestions(
-    userId: string | number
+    userId: string | number,
+    signal?: AbortSignal
   ): Promise<UserBookmarkQuestionResponse[]> {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId));
-    const data = res?.data || res;
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
+    const res: any = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId), { signal });
+    return extractArrayResponse<UserBookmarkQuestionResponse>(res, 'bookmarks');
   },
 
   /**
@@ -103,10 +118,7 @@ export const userQuestionService = {
       return [];
     }
     const res: any = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
-    const data = res?.data || res;
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
+    return extractArrayResponse<UserSubmittedQuestionItem>(res, 'solved questions');
   },
 
   /**
@@ -131,10 +143,7 @@ export const userQuestionService = {
       return [];
     }
     const res: any = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
-    const data = res?.data || res;
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
+    return extractArrayResponse<UserAttemptedQuestionItem>(res, 'attempted questions');
   },
 
   /**
@@ -143,17 +152,16 @@ export const userQuestionService = {
    */
   async getQuestionSubmissions(
     userId: string | number,
-    questionId: string | number
+    questionId: string | number,
+    signal?: AbortSignal
   ): Promise<UserQuestionSubmissionItem[]> {
     if (!userId || !questionId) {
       return [];
     }
     const res: any = await apiClient.get(
-      API_ENDPOINTS.USER.QUESTION_SUBMISSIONS(userId, questionId)
+      API_ENDPOINTS.USER.QUESTION_SUBMISSIONS(userId, questionId),
+      { signal }
     );
-    const data = res?.data || res;
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.data)) return data.data;
-    return [];
+    return extractArrayResponse<UserQuestionSubmissionItem>(res, 'question submissions');
   },
 };

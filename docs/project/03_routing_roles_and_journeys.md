@@ -86,8 +86,8 @@ The application distinguishes between two primary user roles:
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
 | **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/ProtectedRoute.tsx) | Checks `isAuthenticated && isTokenValid(token)`. If loading, renders `<PageLoading />`. Saves attempted destination in `sessionStorage.getItem('post_auth_redirect')`. | Redirects to `/login` |
-| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/GuestRoute.tsx) | Verifies user is unauthenticated. If already logged in: redirects admins to `/admin/dashboard` and regular users to `/practice`. | Redirects to `/practice` or `/admin/dashboard` |
-| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/AdminRoute.tsx) | Evaluates `isAuthed`. If true, checks `isJwtAdmin(token)` or `user.role === 'ADMIN'`. Checks token claims (`role`, `Role`, `roles`, `authorities`, `scope`). | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
+| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/GuestRoute.tsx) | Verifies user is unauthenticated. If already logged in, signed JWT claims alone select `/admin/dashboard`; all other users go to `/practice`. | Redirects to `/practice` or `/admin/dashboard` |
+| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/AdminRoute.tsx) | Evaluates `isAuthed`. If true, requires `isJwtAdmin(token)` from signed token claims (`role`, `Role`, `roles`, `authorities`, `scope`). Cached user/profile role strings never authorize an admin route. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
 
 ---
 
@@ -115,7 +115,7 @@ The application distinguishes between two primary user roles:
 7. **Submission**: User clicks "Submit". Dispatches `POST /api/v1/submitCode`. On success, progress slice updates solved status and marks problem solved in `userScopedStorage`.
 
 ### Journey 3: Company Recruitment Exam Preparation
-1. **Directory Browse**: User visits `/companies`. 121 recruiter brand logos load instantly from `public/companies/` via `CompanyBrandLogo`.
+1. **Directory Browse**: User visits `/companies`. `CompanyBrandLogo` resolves the 121 bundled recruiter assets first, then uses the documented dynamic provider cascade for companies outside the local registry.
 2. **Company Blueprint**: User selects TCS (`/companies/tcs`). Page queries `GET /api/v1/company/1` and `POST /api/v1/company/1/exams/list`.
 3. **Exam Selection**: User clicks "TCS NQT 2026" (`/companies/1/exams/10`).
 4. **Section Breakdown**: Displays exam rounds, durations, marks, and associated technical interview/coding questions.

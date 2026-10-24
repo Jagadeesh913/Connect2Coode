@@ -201,9 +201,9 @@ export const UserProfilePage: React.FC = () => {
     const collegeName = userInfo?.college || profile?.collegeName;
     if (!collegeName || (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase())) return;
 
-    let isCancelled = false;
-    institutionService.searchInstitutions(collegeName).then((res) => {
-      if (isCancelled) return;
+    const controller = new AbortController();
+    institutionService.searchInstitutions(collegeName, controller.signal).then((res) => {
+      if (controller.signal.aborted) return;
       const list = res?.data || [];
       if (list.length > 0) {
         const cleanedQuery = collegeName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -227,7 +227,7 @@ export const UserProfilePage: React.FC = () => {
     }).catch(() => {});
 
     return () => {
-      isCancelled = true;
+      controller.abort();
     };
   }, [userInfo?.college, profile?.collegeName, institution?.name]);
 

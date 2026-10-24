@@ -58,7 +58,9 @@ export const AdminQuestions: React.FC = () => {
   const [targetQuestionForTestCases, setTargetQuestionForTestCases] = useState<QuestionPayload | null>(null);
   const [targetQuestionForTestCode, setTargetQuestionForTestCode] = useState<{ id: number | string; title: string; difficultyRefName?: string } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const detailRequestId = useRef(0);
 
   // Search Debouncing
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -127,10 +129,12 @@ export const AdminQuestions: React.FC = () => {
 
       const pageData = res.data;
 
+      if (!pageData || !Array.isArray(pageData.content)) {
+        throw new Error('Unexpected question list response format');
+      }
+
       const contentList: QuestionPayload[] = (
-        Array.isArray(pageData?.content)
-          ? pageData.content
-          : []
+        pageData.content
       ).map((item: any) => {
         const finalCompanies = item.companies;
         const finalPlatform = item.questionPlatform || item.qpfRefName || item.platformName;
@@ -152,6 +156,11 @@ export const AdminQuestions: React.FC = () => {
       const computedPages = typeof pageData?.totalPages === 'number' && pageData.totalPages > 0
         ? pageData.totalPages
         : Math.max(1, Math.ceil(total / pageSize));
+
+      if (total > 0 && pageNumber >= computedPages) {
+        setPageNumber(computedPages - 1);
+        return;
+      }
 
       setQuestions(contentList);
       setTotalElements(total);
@@ -175,85 +184,52 @@ export const AdminQuestions: React.FC = () => {
   }, [fetchQuestions]);
 
   const handleInspect = async (questionOrId: QuestionPayload | string | number) => {
-    let questionRow: QuestionPayload | null = null;
-    let qId: string | number;
-
-    if (typeof questionOrId === 'object' && questionOrId !== null) {
-      questionRow = questionOrId;
-      qId = questionOrId.id || '';
-    } else {
-      qId = questionOrId;
-      questionRow = questions.find((q) => String(q.id) === String(qId)) || null;
-    }
-
-    if (questionRow) {
-      const cases = (questionRow.testCases && questionRow.testCases.length > 0)
-        ? questionRow.testCases
-        : extractTestCasesFromProblem(questionRow);
-      const enrichedRow: QuestionPayload = {
-        ...questionRow,
+    const qId = typeof questionOrId === 'object' ? questionOrId.id : questionOrId;
+    if (!qId) return;
+    const requestId = ++detailRequestId.current;
+    setSelectedQuestion(null);
+    setDetailsLoading(true);
+    setIsDetailsOpen(true);
+    try {
+      const res = await adminQuestionService.getQuestionById(qId);
+      if (requestId !== detailRequestId.current) return;
+      const detailedData = res.data;
+      const cases = (detailedData.testCases && detailedData.testCases.length > 0)
+        ? detailedData.testCases
+        : extractTestCasesFromProblem(detailedData);
+      setSelectedQuestion({
+        ...detailedData,
         testCases: cases,
-        constraints: questionRow.constraints || extractConstraintsFromDescription(questionRow.description),
-      };
-      setSelectedQuestion(enrichedRow);
-      setIsDetailsOpen(true);
-
-      // Asynchronously enrich with live execution test cases if still empty
-      if (cases.length === 0 && qId) {
-        adminQuestionService.getTestCases(qId).then((fetchedCases) => {
-          if (fetchedCases && fetchedCases.length > 0) {
-            setSelectedQuestion((prev) => (String(prev?.id) === String(qId) ? { ...prev!, testCases: fetchedCases } : prev));
-          }
-        }).catch(() => {});
-      }
-    } else if (qId) {
-      setDetailsLoading(true);
-      setIsDetailsOpen(true);
-      try {
-        const res = await adminQuestionService.getQuestionById(qId);
-        const detailedData = res.data;
-        if (detailedData) {
-          const cases = (detailedData.testCases && detailedData.testCases.length > 0)
-            ? detailedData.testCases
-            : extractTestCasesFromProblem(detailedData);
-          setSelectedQuestion({
-            ...detailedData,
-            testCases: cases,
-            constraints: detailedData.constraints || extractConstraintsFromDescription(detailedData.description),
-          });
-        }
-      } catch (err: any) {
-        toast.error(getActionableErrorMessage(err, 'Failed to load question statement.'));
-      } finally {
-        setDetailsLoading(false);
-      }
+        constraints: detailedData.constraints || extractConstraintsFromDescription(detailedData.description),
+      });
+    } catch (err: any) {
+      if (requestId !== detailRequestId.current) return;
+      setIsDetailsOpen(false);
+      toast.error(getActionableErrorMessage(err, 'Failed to load question statement.'));
+    } finally {
+      if (requestId === detailRequestId.current) setDetailsLoading(false);
     }
   };
 
   const handleEditClick = async (question: QuestionPayload) => {
     if (!question.id) return;
-    const initialCases = (question.testCases && question.testCases.length > 0)
-      ? question.testCases
-      : extractTestCasesFromProblem(question);
-
-    const enriched: QuestionPayload = {
-      ...question,
-      testCases: initialCases,
-      constraints: question.constraints || extractConstraintsFromDescription(question.description),
-    };
-    setSelectedQuestion(enriched);
-    setIsFormOpen(true);
-
-    // If initial test cases were empty, fetch them asynchronously and update form
-    if (initialCases.length === 0) {
-      try {
-        const fetchedCases = await adminQuestionService.getTestCases(question.id);
-        if (fetchedCases && fetchedCases.length > 0) {
-          setSelectedQuestion((prev) => (prev ? { ...prev, testCases: fetchedCases } : prev));
-        }
-      } catch {
-        // Form remains usable
-      }
+    setEditingQuestionId(question.id);
+    try {
+      const response = await adminQuestionService.getQuestionById(question.id);
+      const detail = response.data;
+      const cases = (detail.testCases && detail.testCases.length > 0)
+        ? detail.testCases
+        : extractTestCasesFromProblem(detail);
+      setSelectedQuestion({
+        ...detail,
+        testCases: cases,
+        constraints: detail.constraints || extractConstraintsFromDescription(detail.description),
+      });
+      setIsFormOpen(true);
+    } catch (err: any) {
+      toast.error(getActionableErrorMessage(err, 'Unable to load complete question data for editing.'));
+    } finally {
+      setEditingQuestionId(null);
     }
   };
 
@@ -412,7 +388,20 @@ export const AdminQuestions: React.FC = () => {
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
         } catch (tcErr: any) {
-          console.warn('Backend rejected test case attachment:', tcErr);
+          setSelectedQuestion({
+            ...questionPayload,
+            ...(savedQuestion && typeof savedQuestion === 'object' ? savedQuestion : {}),
+            id: targetQuestionId,
+            testCases: formData.testCases,
+          });
+          await fetchQuestions();
+          toast.error(
+            getActionableErrorMessage(
+              tcErr,
+              'Question saved, but its test cases were not attached. The form remains open so you can retry.'
+            )
+          );
+          return;
         }
       }
 
@@ -426,20 +415,45 @@ export const AdminQuestions: React.FC = () => {
     }
   };
 
-  const getDifficultyVariant = (diff?: string) => {
-    const d = (diff || '').toLowerCase();
-    if (d.includes('easy') || d.includes('basic')) return 'easy';
-    if (d.includes('med')) return 'medium';
-    if (d.includes('hard')) return 'hard';
-    return 'neutral';
+  const getDifficultyNumberColor = (difficulty?: string | null) => {
+    if (!difficulty) return 'text-slate-400 dark:text-slate-500';
+    const d = difficulty.toLowerCase().trim();
+    if (d.includes('easy')) {
+      return 'text-emerald-600 dark:text-emerald-400 font-bold';
+    }
+    if (d.includes('medium') || d.includes('med')) {
+      return 'text-amber-500 dark:text-orange-400 font-bold';
+    }
+    if (d.includes('hard')) {
+      return 'text-rose-600 dark:text-rose-400 font-bold';
+    }
+    if (d.includes('basic') || d.includes('school')) {
+      return 'text-sky-500 dark:text-sky-400 font-bold';
+    }
+    return 'text-slate-500 dark:text-slate-400 font-bold';
   };
 
   const columns: Column<QuestionPayload>[] = [
     {
-      header: 'Identifier',
-      accessorKey: 'id',
-      className: 'w-20 font-mono text-slate-400 font-semibold',
-      cell: (row) => <span>#{row.id}</span>,
+      header: '#',
+      className: 'w-16 text-center font-mono font-semibold shrink-0',
+      cell: (row: any) => {
+        const diff =
+          row.difficultyRefName ||
+          row.difficultyName ||
+          row.difficulty ||
+          row.difficultyRefCode ||
+          '';
+        const colorClass = getDifficultyNumberColor(diff);
+        return (
+          <span
+            className={`font-mono text-xs font-semibold ${colorClass}`}
+            title={`Question ID: ${row.id} • Difficulty: ${diff || 'Unknown'}`}
+          >
+            #{row.id}
+          </span>
+        );
+      },
     },
     {
       header: 'Problem Title',
@@ -452,35 +466,29 @@ export const AdminQuestions: React.FC = () => {
           row.examPlatform ||
           row.platform ||
           (row.isOwnProblem ? 'Custom In-House' : 'Connect 2 Code');
+        const isInactive = row.isActive === false || row.isActive === 0 || row.isActive === 'false' || (row.status && String(row.status).toLowerCase() === 'inactive');
         return (
-          <div className="flex flex-col min-w-0">
-            <span className="font-bold text-slate-900 dark:text-white truncate">
-              {row.title}
-            </span>
+          <div
+            className={`flex flex-col min-w-0 transition-colors ${
+              isInactive
+                ? 'p-2 rounded-xl border border-rose-400/80 dark:border-rose-500/70 bg-rose-50/40 dark:bg-rose-950/20'
+                : ''
+            }`}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-bold text-slate-900 dark:text-white truncate" title={row.title}>
+                {row.title}
+              </span>
+              {isInactive && (
+                <span className="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
+                  Inactive
+                </span>
+              )}
+            </div>
             <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
               Platform: {platform}
             </span>
           </div>
-        );
-      },
-    },
-    {
-      header: 'Difficulty',
-      className: 'w-28',
-      cell: (row: any) => {
-        const diff =
-          row.difficultyRefName ||
-          row.difficultyName ||
-          row.difficulty ||
-          row.difficultyRefCode ||
-          'Medium';
-        return (
-          <AdminBadge
-            variant={getDifficultyVariant(diff)}
-            size="sm"
-          >
-            {diff}
-          </AdminBadge>
         );
       },
     },
@@ -548,10 +556,12 @@ export const AdminQuestions: React.FC = () => {
           </button>
           <button
             onClick={() => handleEditClick(row)}
+            disabled={editingQuestionId !== null}
+            aria-label={editingQuestionId === row.id ? `Loading question ${row.id} for editing` : `Edit question ${row.id}`}
             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
             title="Edit Problem"
           >
-            <Edit3 className="w-3.5 h-3.5" />
+            {editingQuestionId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={() => {

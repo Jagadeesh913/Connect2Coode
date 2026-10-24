@@ -11,15 +11,14 @@ const GuardLoader = PageLoading;
  * AdminRoute Guard (F-036)
  * Restricts access to Admin Frontend routes (/admin/*).
  * Verifies that the user is authenticated AND possesses an ADMIN role
- * verified strictly from cryptographically signed JWT payload claims,
- * preventing privilege escalation via client-mutable localStorage.
+ * derived strictly from active JWT payload claims rather than mutable cached
+ * profile metadata. The backend remains authoritative for real authorization.
  */
 export const AdminRoute: React.FC = () => {
   const location = useLocation();
   const status = useAppSelector((state) => state.auth.status);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const token = useAppSelector((state) => state.auth.token) || tokenStorage.getAccessToken();
-  const user = useAppSelector((state) => state.auth.user) || tokenStorage.getUser();
 
   // 1. Prevent premature redirect during asynchronous startup session restoration
   if (status === 'LOADING') {
@@ -32,12 +31,9 @@ export const AdminRoute: React.FC = () => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. Check Admin Role Authorization strictly from signed JWT claims and verified session metadata
-  const userRole = String(user?.role || '').toUpperCase();
-  const isUserRoleAdmin = userRole === 'ADMIN' || userRole === 'ROLE_ADMIN' || userRole.includes('ADMIN');
-  const isAdmin = isJwtAdmin(token) || isUserRoleAdmin;
-
-  if (!isAdmin) {
+  // 3. Client-side admin routing is derived only from the active token claims.
+  // The cached user profile is browser-mutable metadata and must never grant access.
+  if (!isJwtAdmin(token)) {
     return <Navigate to="/practice" replace />;
   }
 

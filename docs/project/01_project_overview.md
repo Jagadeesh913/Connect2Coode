@@ -26,7 +26,7 @@ The application combines:
 | **Routing** | React Router | `^7.18.2` | Data-router (`createBrowserRouter`) with lazy page code splitting and guards. |
 | **HTTP Transport** | Axios | `^1.19.0` | Unified client instance (`src/core/api/apiClient.ts`) with refresh interceptors. |
 | **Code Editor** | Monaco Editor | `^4.7.0` | VS Code-grade in-browser code editor via `@monaco-editor/react`. |
-| **Schema Validation** | Zod | `^3.25.76` | Runtime form & payload validation paired with `@hookform/resolvers`. |
+| **Schema Validation** | Zod | `4.6.7` | Runtime form and payload validation paired with `@hookform/resolvers`; pinned above the constrained-collection memory-exhaustion advisory. |
 | **Forms** | React Hook Form| `^7.84.0` | Performant, uncontrolled form management with automatic error mapping. |
 | **Form Resolver** | `@hookform/resolvers` | `^5.5.7` | Connects Zod schemas to React Hook Form on auth, profile, language, institution, company, and question forms. |
 | **Animation** | Framer Motion | `^12.43.0` | Scoped to the shared admin modal and honors reduced-motion preference. |

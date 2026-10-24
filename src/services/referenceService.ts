@@ -10,6 +10,13 @@ export const referenceService = {
     refGroupCode: string,
     signal?: AbortSignal
   ): Promise<ApiResponse<ReferenceItem[]>> {
-    return apiClient.get(API_ENDPOINTS.REFERENCE.GROUP(refGroupCode), { signal });
+    const response: ApiResponse<ReferenceItem[]> = await apiClient.get(
+      API_ENDPOINTS.REFERENCE.GROUP(refGroupCode),
+      { signal }
+    );
+    if (!Array.isArray(response.data)) {
+      throw new Error(`Unexpected ${refGroupCode} reference response format`);
+    }
+    return response;
   },
 };

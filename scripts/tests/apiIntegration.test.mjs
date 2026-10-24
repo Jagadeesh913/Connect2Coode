@@ -27,7 +27,11 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 
 const { API_ENDPOINTS } = await import('../../src/core/api/endpoints.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
-const { executionService, normalizeExecutionResult } = await import('../../src/services/executionService.ts');
+const {
+  executionService,
+  normalizeExecutionResult,
+  isExecutionResultSuccessful,
+} = await import('../../src/services/executionService.ts');
 const { adminLanguageService } = await import('../../src/services/admin/adminLanguageService.ts');
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
 const { questionService } = await import('../../src/services/questionService.ts');
@@ -118,6 +122,27 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       assert.deepEqual(emptyUser, []);
       const emptyQ = await userQuestionService.getQuestionSubmissions(63, null);
       assert.deepEqual(emptyQ, []);
+    });
+
+    it('rejects malformed successful list responses instead of reporting false empty states', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({ statusCode: 200, data: { unexpected: true } });
+      try {
+        await assert.rejects(
+          () => userQuestionService.getBookmarkedQuestions(63),
+          /Unexpected bookmarks response format/
+        );
+        await assert.rejects(
+          () => userQuestionService.getSolvedQuestions(63),
+          /Unexpected solved questions response format/
+        );
+        await assert.rejects(
+          () => userQuestionService.getQuestionSubmissions(63, 9),
+          /Unexpected question submissions response format/
+        );
+      } finally {
+        apiClient.get = originalGet;
+      }
     });
   });
 
@@ -326,6 +351,49 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
           errorMessage: undefined,
         }],
       });
+    });
+
+    it('rejects missing verdicts and accepts only a complete passing result', () => {
+      assert.throws(
+        () => normalizeExecutionResult({ message: 'ok' }),
+        /returned no test verdict/
+      );
+      assert.equal(
+        isExecutionResultSuccessful({
+          totalTestCases: 0,
+          passedTestCases: 0,
+          failedTestCases: 0,
+          testCases: [],
+        }),
+        false
+      );
+      assert.equal(
+        isExecutionResultSuccessful({
+          totalTestCases: 2,
+          passedTestCases: 1,
+          failedTestCases: 0,
+          testCases: [],
+        }),
+        false
+      );
+      assert.equal(
+        isExecutionResultSuccessful({
+          totalTestCases: 2,
+          passedTestCases: 1,
+          failedTestCases: 1,
+          testCases: [],
+        }),
+        false
+      );
+      assert.equal(
+        isExecutionResultSuccessful({
+          totalTestCases: 2,
+          passedTestCases: 2,
+          failedTestCases: 0,
+          testCases: [],
+        }),
+        true
+      );
     });
 
     it('sends custom input only when the API-supported field is non-empty', async () => {

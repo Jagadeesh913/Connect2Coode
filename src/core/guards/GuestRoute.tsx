@@ -10,7 +10,6 @@ const GuardLoader = PageLoading;
 export const GuestRoute: React.FC = () => {
   const status = useAppSelector((state) => state.auth.status);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const currentUser = useAppSelector((state) => state.auth.user) || tokenStorage.getUser();
   const token = useAppSelector((state) => state.auth.token) || tokenStorage.getAccessToken();
 
   // Prevent flashing login/signup views while verifying existing session
@@ -21,9 +20,7 @@ export const GuestRoute: React.FC = () => {
   const isAuthed = isAuthenticated && isTokenValid(token);
 
   if (isAuthed) {
-    const role = String(currentUser?.role || '').toUpperCase();
-    const isAdmin = role === 'ADMIN' || role === 'ROLE_ADMIN' || role.includes('ADMIN') || isJwtAdmin(token);
-    if (isAdmin) {
+    if (isJwtAdmin(token)) {
       return <Navigate to="/admin/dashboard" replace />;
     }
     return <Navigate to="/practice" replace />;

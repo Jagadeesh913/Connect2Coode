@@ -14,7 +14,7 @@ import { toast } from 'react-hot-toast';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { decodeJwtPayload, isJwtAdmin } from '../../../core/security/jwt';
+import { isJwtAdmin } from '../../../core/security/jwt';
 
 import {
   loginSchema,
@@ -167,20 +167,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         toast.success(`Welcome ${userName}`);
 
         const token = userObj?.accessToken || userObj?.token || tokenStorage.getAccessToken();
-        const jwtPayload = decodeJwtPayload(token);
-        const rawRole =
-          userObj?.role ||
-          userObj?.Role ||
-          userObj?.user?.role ||
-          userObj?.user?.Role ||
-          jwtPayload?.Role ||
-          jwtPayload?.role;
-        const userRole = String(rawRole || '').toUpperCase();
-        const isAdmin =
-          userRole === 'ADMIN' ||
-          userRole === 'ROLE_ADMIN' ||
-          userRole.includes('ADMIN') ||
-          isJwtAdmin(token);
+        const isAdmin = isJwtAdmin(token);
 
         if (onCloseModal) {
           onCloseModal();
@@ -270,7 +257,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     e.preventDefault();
     const parseResult = forgotPasswordStep1Schema.safeParse({ email: forgotEmail });
     if (!parseResult.success) {
-      setForgotOtpError(parseResult.error.errors[0]?.message || 'Enter your email address.');
+      setForgotOtpError(parseResult.error.issues[0]?.message || 'Enter your email address.');
       return;
     }
     setForgotOtpError('');
@@ -321,7 +308,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     });
 
     if (!parseResult.success) {
-      parseResult.error.errors.forEach((err) => {
+      parseResult.error.issues.forEach((err) => {
         const path = err.path[0];
         if (path === 'otp') setForgotCodeError(err.message);
         else if (path === 'newPassword') setForgotNewPasswordError(err.message);

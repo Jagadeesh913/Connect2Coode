@@ -99,14 +99,187 @@ export function parseTestCasesFromMarkdown(
 }
 
 /**
+ * Canonical visible sample test cases for standard foundational problems
+ * when neither the server payload nor the description embeds examples.
+ * Note: Contains ONLY visible sample test cases (isHidden: false);
+ * hidden evaluation cases remain server-owned.
+ */
+function getStandardSampleCases(
+  numericId?: number,
+  title?: string
+): QuestionTestCase[] {
+  const normTitle = (title || '').toLowerCase().trim();
+
+  // Problem 3: Reverse an Array
+  if (
+    numericId === 3 ||
+    (normTitle.includes('reverse') && normTitle.includes('array'))
+  ) {
+    return [
+      {
+        id: 1,
+        questionId: numericId || 3,
+        input: '6\n1 4 3 2 6 5',
+        expectedOutput: '5 6 2 3 4 1',
+        explanation: 'The elements of the array are reversed in-place.',
+        isHidden: false,
+        displayOrder: 1,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 2,
+        questionId: numericId || 3,
+        input: '3\n4 5 2',
+        expectedOutput: '2 5 4',
+        explanation: 'Reversing array [4, 5, 2] yields [2, 5, 4].',
+        isHidden: false,
+        displayOrder: 2,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 3,
+        questionId: numericId || 3,
+        input: '5\n1 2 3 4 5',
+        expectedOutput: '5 4 3 2 1',
+        explanation: 'The reverse of [1, 2, 3, 4, 5] is [5, 4, 3, 2, 1].',
+        isHidden: false,
+        displayOrder: 3,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+    ];
+  }
+
+  // Problem 1: Find Largest Element in Array
+  if (
+    numericId === 1 ||
+    (normTitle.includes('largest') && !normTitle.includes('second'))
+  ) {
+    return [
+      {
+        id: 1,
+        questionId: numericId || 1,
+        input: '5\n1 2 3 4 5',
+        expectedOutput: '5',
+        explanation: '5 is the largest element in [1, 2, 3, 4, 5]',
+        isHidden: false,
+        displayOrder: 1,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 2,
+        questionId: numericId || 1,
+        input: '6\n8 10 5 7 9 2',
+        expectedOutput: '10',
+        explanation: '10 is the largest integer in the array',
+        isHidden: false,
+        displayOrder: 2,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 3,
+        questionId: numericId || 1,
+        input: '4\n-1 -2 -3 -4',
+        expectedOutput: '-1',
+        explanation: '-1 is the largest element among negative integers',
+        isHidden: false,
+        displayOrder: 3,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+    ];
+  }
+
+  // Problem 2: Second Largest Element
+  if (
+    numericId === 2 ||
+    normTitle.includes('second largest') ||
+    normTitle.includes('second smallest')
+  ) {
+    return [
+      {
+        id: 1,
+        questionId: numericId || 2,
+        input: '5\n1 2 3 4 5',
+        expectedOutput: '4',
+        explanation: '4 is the second largest distinct element',
+        isHidden: false,
+        displayOrder: 1,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 2,
+        questionId: numericId || 2,
+        input: '5\n10 10 10 10 10',
+        expectedOutput: '-1',
+        explanation: 'No distinct second largest element exists',
+        isHidden: false,
+        displayOrder: 2,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+    ];
+  }
+
+  // Problem 4: Sum of Array Elements
+  if (
+    numericId === 4 ||
+    (normTitle.includes('sum') && normTitle.includes('array'))
+  ) {
+    return [
+      {
+        id: 1,
+        questionId: numericId || 4,
+        input: '5\n1 2 3 4 5',
+        expectedOutput: '15',
+        explanation: 'Sum of elements is 1 + 2 + 3 + 4 + 5 = 15',
+        isHidden: false,
+        displayOrder: 1,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+      {
+        id: 2,
+        questionId: numericId || 4,
+        input: '4\n10 20 30 40',
+        expectedOutput: '100',
+        explanation: '10 + 20 + 30 + 40 = 100',
+        isHidden: false,
+        displayOrder: 2,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: 'SAMPLE',
+        typeRefName: 'Visible Sample Test Case',
+      },
+    ];
+  }
+
+  return [];
+}
+
+/**
  * Robust test cases resolver for any DSA problem.
  * Evaluates in order:
  * 1. Explicit question.testCases (if non-empty)
  * 2. question.examples array
  * 3. Extracted test cases from question description
+ * 4. Fallback visible sample cases for standard foundational problems
  */
 export function extractTestCasesFromProblem(
-  question?: (Partial<Question> & { examples?: any[] }) | null
+  question?: (Partial<Question> & { examples?: any[]; title?: string }) | null
 ): QuestionTestCase[] {
   if (!question) return [];
 
@@ -154,6 +327,12 @@ export function extractTestCasesFromProblem(
     if (parsed.length > 0) {
       return parsed;
     }
+  }
+
+  // 4. Standard foundational visible sample test cases fallback
+  const standardCases = getStandardSampleCases(numericId, question.title);
+  if (standardCases.length > 0) {
+    return standardCases;
   }
 
   return [];

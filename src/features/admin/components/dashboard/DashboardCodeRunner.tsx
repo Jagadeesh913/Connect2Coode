@@ -6,7 +6,7 @@ import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { ExecutionResultData } from '../../../../services/executionService';
+import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
 import {
@@ -125,7 +125,7 @@ export const DashboardCodeRunner: React.FC = () => {
     setResourcesError(null);
     void dispatch(fetchLanguages(resourcesRetry > 0 ? { force: true } : undefined));
     Promise.allSettled([
-      adminQuestionService.getQuestions({ level: null, companies: null, topic: null, searchText: null, pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' } }),
+      adminQuestionService.getQuestions({ level: null, companies: null, topic: null, searchText: null, pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' } }),
     ]).then(([questionResult]) => {
       if (!active) return;
       const failures: string[] = [];
@@ -221,7 +221,7 @@ export const DashboardCodeRunner: React.FC = () => {
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Executed Sample Test Cases Successfully');
-      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+      if (isExecutionResultSuccessful(data)) {
         toast.success('All sample test cases passed.');
       } else {
         toast.error(`${data.failedTestCases} sample test case(s) failed.`);
@@ -265,7 +265,7 @@ export const DashboardCodeRunner: React.FC = () => {
       const data = (res as any)?.data || res;
       setResult(data);
       setExecutionMessage((res as any)?.message || 'Validated against All Test Cases');
-      if (data.failedTestCases === 0 && data.passedTestCases > 0) {
+      if (isExecutionResultSuccessful(data)) {
         toast.success('All validation test cases passed.');
       } else {
         toast.error(`${data.failedTestCases} validation test case(s) failed.`);

@@ -87,7 +87,7 @@ export const OAuthCallback: React.FC = () => {
             }
           } catch {}
 
-          const isAdmin = isJwtAdmin(token) || String(user?.role || '').toUpperCase().includes('ADMIN');
+          const isAdmin = isJwtAdmin(token);
           if (destination === '/practice' && isAdmin) {
             destination = '/admin/dashboard';
           }

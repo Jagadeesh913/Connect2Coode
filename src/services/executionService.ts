@@ -12,7 +12,20 @@ export type LanguageDropdownItem = Language;
 export type ExecutionResultData = ExecutionResult;
 
 export const normalizeExecutionResult = (value: unknown): ExecutionResultData => {
-  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('The execution service returned an invalid result');
+  }
+
+  const raw = value as Record<string, unknown>;
+  const hasVerdictData =
+    raw.totalTestCases !== undefined ||
+    raw.passedTestCases !== undefined ||
+    raw.failedTestCases !== undefined ||
+    Array.isArray(raw.testCases);
+  if (!hasVerdictData) {
+    throw new Error('The execution service returned no test verdict');
+  }
+
   const testCases = Array.isArray(raw.testCases) ? raw.testCases : [];
   const passedTestCases = Number(raw.passedTestCases ?? 0);
   const failedTestCases = Number(raw.failedTestCases ?? 0);
@@ -39,6 +52,12 @@ export const normalizeExecutionResult = (value: unknown): ExecutionResultData =>
     }),
   };
 };
+
+export const isExecutionResultSuccessful = (result: ExecutionResultData): boolean =>
+  result.totalTestCases > 0 &&
+  result.passedTestCases > 0 &&
+  result.failedTestCases === 0 &&
+  result.passedTestCases >= result.totalTestCases;
 
 let cachedLanguages: LanguageDropdownItem[] | null = null;
 let languageFetchPromise: Promise<LanguageDropdownItem[]> | null = null;

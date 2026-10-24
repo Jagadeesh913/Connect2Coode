@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
 import type { UserInfoData } from '../../../../core/types/domain';
 import { academicDetailsSchema, AcademicDetailsFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
@@ -37,7 +38,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
     watch,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<AcademicDetailsFormData>({
+  } = useForm<z.input<typeof academicDetailsSchema>, unknown, AcademicDetailsFormData>({
     resolver: zodResolver(academicDetailsSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',

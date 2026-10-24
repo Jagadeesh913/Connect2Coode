@@ -34,12 +34,12 @@ export const academicDetailsSchema = z
     degree: z.string().trim().optional().or(z.literal('')),
     branch: z.string().trim().optional().or(z.literal('')),
     joinedYear: z.coerce
-      .number({ invalid_type_error: 'Please select a valid joined year' })
+      .number({ error: 'Please select a valid joined year' })
       .int()
       .min(1990, 'Joined year cannot be earlier than 1990')
       .max(currentYear + 2, 'Joined year cannot be in the future'),
     passedOutYear: z.coerce
-      .number({ invalid_type_error: 'Please select a valid graduation year' })
+      .number({ error: 'Please select a valid graduation year' })
       .int()
       .min(1990, 'Graduation year cannot be earlier than 1990')
       .max(currentYear + 10, 'Graduation year cannot exceed 10 years in the future'),
@@ -62,7 +62,7 @@ export type AcademicDetailsFormData = z.infer<typeof academicDetailsSchema>;
  */
 export const institutionSelectionSchema = z.object({
   id: z
-    .number({ invalid_type_error: 'Select your college or university from the search results.' })
+    .number({ error: 'Select your college or university from the search results.' })
     .min(1, 'Select your college or university from the search results.'),
   name: requiredTextRule('College or university name', 2),
   aisheCode: z.string().trim().optional(),

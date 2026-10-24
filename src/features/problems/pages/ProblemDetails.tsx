@@ -11,6 +11,7 @@ import { openAuthModal } from '../../auth/redux/authSlice';
 import { fetchLanguages } from '../../languages/redux/languageSlice';
 import {
   executionService,
+  isExecutionResultSuccessful,
   LanguageDropdownItem,
   ExecutionResultData,
 } from '../../../services/executionService';
@@ -19,6 +20,7 @@ import { NotFound } from '../../../shared/components/errors/NotFound';
 import {
   resolveActiveQuestionId,
   canExecuteProblem,
+  resolveExecutionLanguageName,
 } from '../utils/problemExecution';
 import { toast } from 'react-hot-toast';
 import { userQuestionService } from '../../../services/userQuestionService';
@@ -47,6 +49,7 @@ interface SubmissionRecord {
   runtimeMs?: number | string;
   memoryMb?: number | string;
   language: string;
+  languageId: number;
   timestamp: string;
   sourceCode?: string;
 }
@@ -244,7 +247,7 @@ export const ProblemDetails: React.FC = () => {
   languagesRef.current = languages;
 
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
     setSubmissionsHistory([]);
     setLoadingSubmissions(false);
 
@@ -261,18 +264,12 @@ export const ProblemDetails: React.FC = () => {
           setLoadingSubmissions(true);
           const serverSubs = await userQuestionService.getQuestionSubmissions(
             user.id,
-            activeQuestionId
+            activeQuestionId,
+            controller.signal
           );
-          if (isMounted && Array.isArray(serverSubs)) {
+          if (!controller.signal.aborted && Array.isArray(serverSubs)) {
             const mappedRecords: SubmissionRecord[] = serverSubs.map((sub) => {
-              const langObj = languagesRef.current.find((l) => l.id === sub.languageId);
-              const langName =
-                langObj?.name ||
-                (sub.languageId === 5
-                  ? 'Java'
-                  : sub.languageId === 6
-                  ? 'Python'
-                  : `Language #${sub.languageId}`);
+              const langName = resolveExecutionLanguageName(languagesRef.current, sub.languageId);
               const isAccepted =
                 sub.status === 'Accepted' ||
                 (sub.totalTestCases > 0 && sub.passedTestCases === sub.totalTestCases);
@@ -295,6 +292,7 @@ export const ProblemDetails: React.FC = () => {
                 passedTestCases: sub.passedTestCases,
                 totalTestCases: sub.totalTestCases,
                 language: langName,
+                languageId: sub.languageId,
                 timestamp: `${dateStr} ${timeStr}`.trim(),
                 sourceCode: sub.sourceCode,
               };
@@ -302,9 +300,9 @@ export const ProblemDetails: React.FC = () => {
             setSubmissionsHistory(mappedRecords);
           }
         } catch {
-          if (isMounted) setSubmissionsError('Unable to refresh submissions. Please retry.');
+          if (!controller.signal.aborted) setSubmissionsError('Unable to refresh submissions. Please retry.');
         } finally {
-          if (isMounted) setLoadingSubmissions(false);
+          if (!controller.signal.aborted) setLoadingSubmissions(false);
         }
       }
     };
@@ -312,9 +310,19 @@ export const ProblemDetails: React.FC = () => {
     loadSubmissions();
 
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [activeQuestionId, user?.id, submissionsRetry]);
+
+  useEffect(() => {
+    if (languages.length === 0) return;
+    setSubmissionsHistory((records) =>
+      records.map((record) => ({
+        ...record,
+        language: resolveExecutionLanguageName(languages, record.languageId),
+      }))
+    );
+  }, [languages]);
 
   // Map language name to Monaco language
   const monacoLang = useMemo(() => {
@@ -505,7 +513,7 @@ export const ProblemDetails: React.FC = () => {
     try {
       const result: ExecutionResultData = await executionService.runCode(payload, controller.signal);
       if (controller.signal.aborted) return;
-      if (result.failedTestCases === 0 && result.passedTestCases > 0) {
+      if (isExecutionResultSuccessful(result)) {
         toast.success('Sample test cases passed!');
       } else {
         toast.error(`${result.failedTestCases} sample case(s) failed`);
@@ -571,10 +579,7 @@ export const ProblemDetails: React.FC = () => {
     try {
       const result: ExecutionResultData = await executionService.submitCode(payload, controller.signal);
       if (controller.signal.aborted) return;
-      const isAccepted =
-        (result.failedTestCases === 0 || !result.failedTestCases) &&
-        result.passedTestCases > 0 &&
-        (result.totalTestCases === undefined || result.passedTestCases >= result.totalTestCases);
+      const isAccepted = isExecutionResultSuccessful(result);
 
       if (isAccepted) {
         toast.success('Accepted! All test cases passed!');
@@ -639,6 +644,7 @@ export const ProblemDetails: React.FC = () => {
     if (!cases || cases.length === 0) {
       cases = extractTestCasesFromProblem({
         id: problem?.id ? Number(problem.id) : (activeQuestionId ?? undefined),
+        title: problem?.title,
         description: problem?.description,
         testCases: problem?.testCases,
         examples: problem?.examples,
@@ -1416,7 +1422,7 @@ export const ProblemDetails: React.FC = () => {
                   {executionResult && (
                     <span
                       className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
-                        executionResult.failedTestCases === 0
+                        isExecutionResultSuccessful(executionResult)
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400'
                           : 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400'
                       }`}
@@ -1588,14 +1594,14 @@ export const ProblemDetails: React.FC = () => {
                           <div className="flex items-center gap-3">
                             <span
                               className={`text-xs font-bold px-3 py-1 rounded-full ${
-                                executionResult.failedTestCases === 0
+                                isExecutionResultSuccessful(executionResult)
                                   ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                                   : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
                               }`}
                             >
                               {lastExecutionMode === 'custom'
-                                ? (executionResult.failedTestCases === 0 ? '✓ Custom Run Completed' : '✗ Custom Run Failed')
-                                : (executionResult.failedTestCases === 0 ? '✓ Sample Cases Passed' : '✗ Sample Cases Failed')}
+                                ? (isExecutionResultSuccessful(executionResult) ? '✓ Custom Run Completed' : '✗ Custom Run Failed')
+                                : (isExecutionResultSuccessful(executionResult) ? '✓ Sample Cases Passed' : '✗ Sample Cases Failed')}
                             </span>
                             <span className="text-xs text-slate-600 dark:text-slate-400">
                               Passed: <strong className="text-slate-900 dark:text-white">{executionResult.passedTestCases}/{executionResult.totalTestCases}</strong>
@@ -1681,7 +1687,7 @@ export const ProblemDetails: React.FC = () => {
                     {/* SUBMIT VERDICT VIEW */}
                     {lastExecutionMode === 'submit' && executionResult && (
                       <div className="space-y-4 animate-fade-in">
-                        {executionResult.failedTestCases === 0 ? (
+                        {isExecutionResultSuccessful(executionResult) ? (
                           <div className="p-6 bg-gradient-to-br from-white dark:from-[#0F172A] to-emerald-50 dark:to-emerald-950/20 border border-emerald-500/30 rounded-3xl flex flex-col gap-5 shadow-xs">
                             <div className="flex items-center gap-4">
                               <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl shadow-sm">
