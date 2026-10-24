@@ -353,6 +353,79 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         questionService.addTestCases = originalAddTestCases;
       }
     });
+
+    it('adminQuestionService.getTestCases loads all test cases including hidden evaluation cases from question details', async () => {
+      const originalGetById = questionService.getById;
+      const originalApiClientGet = apiClient.get;
+
+      // Mock apiClient.get for /question/10/testCases to fail (triggering details fallback)
+      apiClient.get = async (url) => {
+        if (url.includes('/testCases')) {
+          const err = new Error('Not Found');
+          err.statusCode = 404;
+          throw err;
+        }
+        return originalApiClientGet(url);
+      };
+
+      questionService.getById = async (id) => {
+        return {
+          statusCode: 200,
+          message: 'OK',
+          data: {
+            id: Number(id),
+            title: 'Sample Problem',
+            description: 'Example 1:\nInput: 1\nOutput: 2',
+            testCases: [
+              { id: 1, input: '1', expectedOutput: '2', explanation: 'Sample 1', isHidden: false, displayOrder: 1, typeRefGroupCode: 'TESTCASETYPE', typeRefCode: 'SAMPLE' },
+              { id: 2, input: '10', expectedOutput: '20', explanation: '', isHidden: true, displayOrder: 2, typeRefGroupCode: 'TESTCASETYPE', typeRefCode: 'NECESSARY' },
+              { id: 3, input: '-5', expectedOutput: '-10', explanation: '', isHidden: true, displayOrder: 3, typeRefGroupCode: 'TESTCASETYPE', typeRefCode: 'NECESSARY' },
+            ],
+          },
+        };
+      };
+
+      try {
+        const cases = await adminQuestionService.getTestCases(10);
+        assert.equal(cases.length, 3, 'Must return all 3 test cases, not just the single visible example');
+        assert.equal(cases[0].isHidden, false);
+        assert.equal(cases[1].isHidden, true);
+        assert.equal(cases[2].isHidden, true);
+      } finally {
+        questionService.getById = originalGetById;
+        apiClient.get = originalApiClientGet;
+      }
+    });
+
+    it('adminQuestionService.getTestCases uses direct testCases endpoint when available', async () => {
+      const originalApiClientGet = apiClient.get;
+      let directCalled = false;
+
+      apiClient.get = async (url) => {
+        if (url.includes('/question/42/testCases')) {
+          directCalled = true;
+          return {
+            statusCode: 200,
+            message: 'OK',
+            data: [
+              { id: 101, input: '100', expectedOutput: '200', isHidden: false },
+              { id: 102, input: '300', expectedOutput: '600', isHidden: true },
+            ],
+          };
+        }
+        return originalApiClientGet(url);
+      };
+
+      try {
+        const cases = await adminQuestionService.getTestCases(42);
+        assert.equal(directCalled, true, 'Direct testCases endpoint must be attempted');
+        assert.equal(cases.length, 2);
+        assert.equal(cases[0].input, '100');
+        assert.equal(cases[1].isHidden, true);
+      } finally {
+        apiClient.get = originalApiClientGet;
+      }
+    });
   });
 
   describe('F-007: Editorial Unavailability Empty State Logic (Real Production getProblemEditorial)', () => {

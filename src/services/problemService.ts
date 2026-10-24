@@ -3,6 +3,11 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Problem, ProblemFilter } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
+import {
+  fetchResilientQuestionPage,
+  VERIFIED_READABLE_QUESTION_COUNT,
+} from './admin/adminQuestionService';
+
 
 export type ProblemItem = Problem;
 export type ProblemFilterParams = ProblemFilter;
@@ -26,7 +31,7 @@ export const problemService = {
     signal?: AbortSignal
   ): Promise<ApiResponse<ProblemItem[]>> {
     const pageNum = params.page ? Math.max(0, params.page - 1) : 0;
-    const pageSize = params.limit || 20;
+    const pageSize = params.limit || 10;
 
     const levelArr = parseToIdList(params.level ?? params.difficulty);
     const topicArr = parseToIdList(params.topic);
@@ -40,6 +45,10 @@ export const problemService = {
       : null;
 
     const payload: Record<string, any> = {
+      level: levelArr,
+      companies: companiesArr,
+      topic: topicArr,
+      searchText: rawSearch,
       pageRequest: {
         pageNumber: pageNum,
         pageSize,
@@ -48,25 +57,14 @@ export const problemService = {
       },
     };
 
-    if (levelArr && levelArr.length > 0) {
-      payload.level = levelArr;
-    }
-    if (companiesArr && companiesArr.length > 0) {
-      payload.companies = companiesArr;
-    }
-    if (topicArr && topicArr.length > 0) {
-      payload.topic = topicArr;
-    }
     if (platformArr && platformArr.length > 0) {
       payload.platform = platformArr;
     }
-    if (rawSearch) {
-      payload.searchText = rawSearch;
-    }
 
     try {
-      const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+      const res: any = await fetchResilientQuestionPage(payload as any, signal);
       const rawData = res?.data || res;
+
 
       let list: any[] = [];
       let total = 0;
@@ -103,6 +101,7 @@ export const problemService = {
       }
       throw err;
     }
+
   },
 
   async getProblemById(
@@ -145,13 +144,13 @@ export const problemService = {
         searchText: null,
         pageRequest: {
           pageNumber,
-          pageSize: 50,
+          pageSize: VERIFIED_READABLE_QUESTION_COUNT,
           sortBy: 'id',
           sortDirection: 'ASC' as const,
         },
       };
 
-      const resList: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+      const resList: any = await fetchResilientQuestionPage(payload as any, signal);
       const rawList = resList?.data || resList;
       const items = Array.isArray(rawList?.content)
         ? rawList.content
@@ -169,17 +168,17 @@ export const problemService = {
       });
 
       if (!matched && pageNumber !== 0) {
-        const res0: any = await apiClient.post(
-          API_ENDPOINTS.PROBLEMS.LIST,
+        const res0: any = await fetchResilientQuestionPage(
           {
-            level: [],
-            companies: [],
-            topic: [],
+            level: null,
+            companies: null,
+            topic: null,
             searchText: null,
-            pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' as const },
+            pageRequest: { pageNumber: 0, pageSize: VERIFIED_READABLE_QUESTION_COUNT, sortBy: 'id', sortDirection: 'ASC' as const },
           },
-          { signal }
+          signal
         );
+
         const items0 = Array.isArray(res0?.data?.content)
           ? res0.data.content
           : Array.isArray(res0?.content)

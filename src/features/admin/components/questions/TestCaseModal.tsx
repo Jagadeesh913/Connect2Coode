@@ -56,6 +56,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
+  const [casesLoading, setCasesLoading] = useState<boolean>(false);
 
   // Fetch existing test cases & TESTCASETYPE Reference Library from backend on modal open
   useEffect(() => {
@@ -65,16 +66,16 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     setLoadError(null);
 
     const initModal = async () => {
+      setCasesLoading(true);
       try {
-        // Fetch existing test cases for the question.
         let existingCases: QuestionTestCase[] = [];
 
-        // Check question object first (e.g. from table or parsed from description)
-        if (question) {
-          existingCases = extractTestCasesFromProblem(question);
+        // 1. Authoritative cases already supplied on the question object (e.g. from handleManageTestCases)
+        if (Array.isArray(question?.testCases) && question.testCases.length > 0) {
+          existingCases = question.testCases;
         }
 
-        // Fetch the authoritative question-details payload when row data has no cases.
+        // 2. Fetch authoritative test cases directly from the API when not already attached
         if (existingCases.length === 0 && questionId) {
           try {
             const fetched = await adminQuestionService.getTestCases(questionId);
@@ -84,6 +85,11 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           } catch {
             if (isMounted) setLoadError('Unable to load existing test cases. Retry before saving.');
           }
+        }
+
+        // 3. Fallback: extract visible examples from problem description only when backend returns no records
+        if (existingCases.length === 0 && question) {
+          existingCases = extractTestCasesFromProblem(question);
         }
 
         if (isMounted) {
@@ -106,6 +112,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
         }
       } catch (err) {
         console.warn('Failed to load existing test cases:', err);
+      } finally {
+        if (isMounted) setCasesLoading(false);
       }
     };
 
@@ -251,7 +259,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={submitting || typesLoading || Boolean(typesError) || Boolean(loadError) || testCaseTypes.length === 0}
+              disabled={submitting || typesLoading || casesLoading || Boolean(typesError) || Boolean(loadError) || testCaseTypes.length === 0}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center gap-2"
             >
               {submitting ? 'Saving Test Cases...' : `Save ${testCases.length} Test Cases`}
@@ -262,7 +270,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     >
       <div className="space-y-4 font-sans text-left">
         <RequestStatus
-          pending={typesLoading}
+          pending={typesLoading || casesLoading}
           error={typesError || loadError}
           onRetry={() => {
             void retryTypes();
@@ -270,7 +278,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           }}
           label="Loading test cases…"
         />
-        {typesLoading ? (
+        {typesLoading || casesLoading ? (
           <div className="flex items-center justify-center p-8 text-slate-500 gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
             <span>Loading Test Case Types &amp; Existing Records...</span>

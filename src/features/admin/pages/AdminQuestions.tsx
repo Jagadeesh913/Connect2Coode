@@ -59,6 +59,7 @@ export const AdminQuestions: React.FC = () => {
   const [targetQuestionForTestCode, setTargetQuestionForTestCode] = useState<{ id: number | string; title: string; difficultyRefName?: string } | null>(null);
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | number | null>(null);
+  const [loadingTestCasesId, setLoadingTestCasesId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const detailRequestId = useRef(0);
 
@@ -230,6 +231,41 @@ export const AdminQuestions: React.FC = () => {
       toast.error(getActionableErrorMessage(err, 'Unable to load complete question data for editing.'));
     } finally {
       setEditingQuestionId(null);
+    }
+  };
+
+  const handleManageTestCases = async (question: QuestionPayload) => {
+    if (!question.id) return;
+    setLoadingTestCasesId(question.id);
+    try {
+      const response = await adminQuestionService.getQuestionById(question.id);
+      const detail = response.data;
+      let cases = (detail.testCases && detail.testCases.length > 0)
+        ? detail.testCases
+        : [];
+      if (cases.length === 0) {
+        try {
+          const fetchedCases = await adminQuestionService.getTestCases(question.id);
+          if (fetchedCases && fetchedCases.length > 0) {
+            cases = fetchedCases;
+          }
+        } catch {
+          // ignore fallback
+        }
+      }
+      if (cases.length === 0) {
+        cases = extractTestCasesFromProblem(detail);
+      }
+      setTargetQuestionForTestCases({
+        ...detail,
+        testCases: cases,
+        constraints: detail.constraints || extractConstraintsFromDescription(detail.description),
+      });
+      setIsTestCaseOpen(true);
+    } catch (err: any) {
+      toast.error(getActionableErrorMessage(err, 'Unable to load test cases for this problem.'));
+    } finally {
+      setLoadingTestCasesId(null);
     }
   };
 
@@ -564,23 +600,13 @@ export const AdminQuestions: React.FC = () => {
             {editingQuestionId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
           </button>
           <button
-            onClick={() => {
-              if (row.id) {
-                const enrichedRow: QuestionPayload = {
-                  ...row,
-                  testCases: (row.testCases && row.testCases.length > 0)
-                    ? row.testCases
-                    : extractTestCasesFromProblem(row),
-                  constraints: row.constraints || extractConstraintsFromDescription(row.description),
-                };
-                setTargetQuestionForTestCases(enrichedRow);
-                setIsTestCaseOpen(true);
-              }
-            }}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-400 transition-colors shadow-2xs cursor-pointer"
+            onClick={() => handleManageTestCases(row)}
+            disabled={editingQuestionId !== null || loadingTestCasesId !== null}
+            aria-label={loadingTestCasesId === row.id ? `Loading test cases for question ${row.id}` : `Manage test cases for question ${row.id}`}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
             title="Manage Test Cases"
           >
-            <Layers className="w-3.5 h-3.5" />
+            {loadingTestCasesId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={() => {

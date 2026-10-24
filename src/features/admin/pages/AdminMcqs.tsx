@@ -1,5 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
@@ -37,6 +37,8 @@ interface SubjectTopicItem {
   refCode: string;
   refName: string;
 }
+
+const EMPTY_FILTER_IDS: number[] = [];
 
 // Resolves the Reference Library group code for a given subject dynamically from API structure
 const resolveTopicGroupCode = (subjectCode: string): string => {
@@ -105,6 +107,27 @@ export const AdminMcqs: React.FC = () => {
     [topicReferences]
   );
 
+  // Keep the unfiltered query stable while reference groups hydrate. Depending
+  // directly on the changing arrays recreated the list callback and canceled
+  // the first /mcq request even though its payload had not changed.
+  const selectedSubjectIds = useMemo(() => {
+    if (!selectedSubject) return EMPTY_FILTER_IDS;
+    const match = subjects.find(
+      (subject) => String(subject.refCode).toUpperCase() === selectedSubject.toUpperCase()
+    );
+    const id = Number(match?.id);
+    return Number.isFinite(id) ? [id] : EMPTY_FILTER_IDS;
+  }, [selectedSubject, subjects]);
+
+  const selectedDifficultyIds = useMemo(() => {
+    if (!selectedDifficulty) return EMPTY_FILTER_IDS;
+    const match = difficulties.find(
+      (difficulty) => String(difficulty.refCode).toUpperCase() === selectedDifficulty.toUpperCase()
+    );
+    const id = Number(match?.id);
+    return Number.isFinite(id) ? [id] : EMPTY_FILTER_IDS;
+  }, [selectedDifficulty, difficulties]);
+
   const searchAbortRef = useRef<AbortController | null>(null);
 
   // Debounce search
@@ -169,27 +192,11 @@ export const AdminMcqs: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    let subjectIds: number[] = [];
-    if (selectedSubject) {
-      const match = subjects.find(
-        (s) => String(s.refCode).toUpperCase() === selectedSubject.toUpperCase()
-      );
-      if (match?.id) subjectIds = [match.id];
-    }
-
-    let difficultyIds: number[] = [];
-    if (selectedDifficulty) {
-      const diffMatch = difficulties.find(
-        (d) => String(d.refCode).toUpperCase() === selectedDifficulty.toUpperCase()
-      );
-      if (diffMatch?.id) difficultyIds = [diffMatch.id];
-    }
-
     try {
       const response = await adminMcqService.getMcqs(
         {
-          subject: subjectIds,
-          difficulty: difficultyIds,
+          subject: selectedSubjectIds,
+          difficulty: selectedDifficultyIds,
           companies: [],
           topic: null,
           searchText: debouncedSearch || undefined,
@@ -246,7 +253,7 @@ export const AdminMcqs: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [selectedSubject, selectedDifficulty, debouncedSearch, pageNumber, pageSize, subjects, difficulties]);
+  }, [debouncedSearch, pageNumber, pageSize, selectedDifficultyIds, selectedSubjectIds]);
 
   useEffect(() => {
     fetchMcqs();

@@ -30,6 +30,8 @@ interface QuestionTypeItem {
   count: number;
 }
 
+const EMPTY_REFERENCE_IDS: number[] = [];
+
 const SUBJECT_CONFIG: Record<
   AptitudeSubjectCode,
   {
@@ -464,6 +466,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
   // Resolve selected difficulty names against the live DIFF reference group.
   const selectedDifficultyIds = useMemo(() => {
+    if (appliedDifficulties.length === 0) return EMPTY_REFERENCE_IDS;
     const selected = new Set(appliedDifficulties.map((value) => value.toUpperCase()));
     return difficultyReferences
       .filter((item) =>

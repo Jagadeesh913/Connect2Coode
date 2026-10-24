@@ -25,7 +25,7 @@ export const ProblemList: React.FC = () => {
 
   const [searchInput, setSearchInput] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const pageSize = 20;
+  const pageSize = 10;
 
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 

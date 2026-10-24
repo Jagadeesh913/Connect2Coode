@@ -200,4 +200,18 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(explicitButtonTypes, buttonCount);
     assert.match(paginationSource, /aria-current=\{isActive \? 'page' : undefined\}/);
   });
+
+  it('does not cancel the initial unfiltered MCQ query when reference groups hydrate', async () => {
+    const fs = await import('node:fs');
+    const aptitudeSource = fs.readFileSync('src/features/aptitude/pages/AptitudePrep.tsx', 'utf-8');
+    const adminMcqsSource = fs.readFileSync('src/features/admin/pages/AdminMcqs.tsx', 'utf-8');
+
+    assert.match(aptitudeSource, /if \(appliedDifficulties\.length === 0\) return EMPTY_REFERENCE_IDS/);
+    assert.match(adminMcqsSource, /if \(!selectedSubject\) return EMPTY_FILTER_IDS/);
+    assert.match(adminMcqsSource, /if \(!selectedDifficulty\) return EMPTY_FILTER_IDS/);
+    assert.match(
+      adminMcqsSource,
+      /\}, \[debouncedSearch, pageNumber, pageSize, selectedDifficultyIds, selectedSubjectIds\]\);/
+    );
+  });
 });

@@ -66,7 +66,7 @@ const initialState: ProblemState = {
   pagination: {
     page: 1,
     total: 0,
-    limit: 20,
+    limit: 10,
     totalPages: 1,
   },
   activeListKey: null,
@@ -95,8 +95,9 @@ const getProblemListKey = (params?: ProblemFilter): string =>
     companies: normalizeFilterValue(params?.companies ?? params?.company),
     platform: normalizeFilterValue(params?.platform ?? params?.platforms ?? params?.qpf),
     page: params?.page ?? 1,
-    limit: params?.limit ?? 20,
+    limit: params?.limit ?? 10,
   });
+
 
 const getProblemDetailKey = (id: string | number): string => String(id).trim().toLowerCase();
 
@@ -183,7 +184,8 @@ export const fetchProblems = createAsyncThunk(
       const res = await problemService.getProblems(sanitizedParams, signal);
       const problems = Array.isArray(res.data) ? res.data : [];
       const total = res.meta?.total ?? problems.length;
-      const limit = res.meta?.limit ?? params?.limit ?? 20;
+      const limit = res.meta?.limit ?? params?.limit ?? 10;
+
 
       return {
         key,

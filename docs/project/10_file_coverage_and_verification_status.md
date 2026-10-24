@@ -176,7 +176,7 @@ Every first-party source file has been inspected and assigned a verified status 
 ### D. Aptitude Feature (`src/features/aptitude/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | URL category changes synchronize filters; list payloads are strict and pages clamp/refetch. |
+| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | URL category changes synchronize filters; initial list requests remain stable while references hydrate; payloads are strict and pages clamp/refetch. |
 | `utils/mcqUtils.ts` | MCQ option response mapper and correct-option resolver | `RUNTIME-VERIFIED` | Uses only `id`, `optionLabel`, `optionText`, and boolean `isCorrect`; it does not infer correctness from aliases or question-level answer text. |
 
 ### E. Admin Hub (`src/features/admin/`)
@@ -202,8 +202,8 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/AdminCompanies.tsx` | Company CRUD page | `VERIFIED` | Admin company management. |
 | `pages/AdminInstitutions.tsx` | Institution directory management | `RUNTIME-VERIFIED` | Strict pages, authoritative edit details, clamped pagination, and complete university options. |
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `VERIFIED` | Compiler registry management. |
-| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, authoritative view/edit data, page clamping, and option-level correctness are tested. |
-| `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
+| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, page clamping, and option-level correctness are tested. |
+| `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, full test case retrieval (both visible and hidden) on Manage Test Cases, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
 
 ### F. Profile, Bookmarks, Landing, Settings, Roadmaps
@@ -228,11 +228,12 @@ Every first-party source file has been inspected and assigned a verified status 
 ## 9. Verification Summary & Audit Totals
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 136
-- **Total Automated Test Suites in `scripts/tests/`**: 16
-- **Total Executed Automated Unit Tests**: 251 (251 Passed, 0 Failed; 84 reported suites across 16 files)
+- **Total Automated Test Suites in `scripts/tests/`**: 17
+- **Total Executed Automated Unit Tests**: 261 (261 Passed, 0 Failed; 88 reported suites across 17 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
-- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 159 files
+- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 160 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors
 - **Documentation Integrity (`npm run verify:docs`)**: 235 internal links and source references passed.
 - **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. Passes in CI without local `.env`.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 9 bundle assets.
+

@@ -120,7 +120,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/questions` | `POST` | `USER_OR_ADMIN` | Paginated search: `{ level: number[], companies: number[], topic: number[], searchText: string, pageRequest: { pageNumber, pageSize, sortBy, sortDirection } }` |
 | `/question/{id}` | `GET` | `USER_OR_ADMIN` | Numeric problem detail route. A request for a current catalog ID returned a backend `HttpResponseException` on 2026-10-23; callers retain the catalog fallback and this endpoint is not currently runtime-verified. |
 | `/question` | `POST` | `ADMIN_ONLY` | Creates/updates problem with title, description, constraints, hints, and tax references. |
-| `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). A direct `GET` to this path returned `401` for the temporary authenticated account on 2026-10-23, so catalog fallback does not issue it as a speculative read. Test cases, including hidden cases, remain backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
+| `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). Direct `GET` is attempted by `adminQuestionService.getTestCases` for admins and falls back to question details. Catalog fallback does not issue speculative test-case reads. Test cases, including hidden cases, remain backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
 
 ### C. Code Execution Engine ([`src/services/executionService.ts`](../../src/services/executionService.ts))
 | Endpoint | Method | Access | Description / Payload |

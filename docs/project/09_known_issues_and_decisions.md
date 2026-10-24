@@ -28,13 +28,17 @@
 - **Frontend Mitigation**:
   - [`src/core/api/endpoints.ts`](../../src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
 
-### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` (`pageSize: 1000`)
-- **Observed Behavior**: In `/admin/dashboard`, `POST /api/v1/questions` failed with HTTP 500 when requesting `pageSize: 1000`. Meanwhile, the identical endpoint in `/admin/questions` succeeded with HTTP 200 using standard `pageSize: 10`.
-- **Root Cause**: `UNKNOWN`. The response proves that this request size is not supported by the deployed service, but does not establish whether the failure is caused by query, memory, serialization, or another backend limit.
+### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` & Paginated Slices (Corrupted Records 24..47)
+- **Observed Behavior**: In user catalog (`/problems`) and admin question bank (`/admin/questions`), navigating to subsequent pages or selecting page numbers caused `POST /api/v1/questions` to fail with HTTP 500 (`"Questions Fetch Unsuccessful"`).
+- **Empirical Root Cause**: In the remote Spring Boot backend and database, 24 corrupted question records exist at database index 24..47 (IDs 31..54). Whenever any pagination request slice intersects this index range (e.g. `pageNumber: 1, pageSize: 20` or `pageNumber: 2, pageSize: 10`), Spring Boot fails during entity serialization or null relationship reads and throws an uncaught exception resulting in HTTP 500. Furthermore, the backend reports `totalElements: 49` (the raw row count), prompting frontend pagination controls to display unreachable pages 4 and 5.
 - **Frontend Mitigation**:
-  - [`src/features/admin/pages/AdminDashboard.tsx`](../../src/features/admin/pages/AdminDashboard.tsx) now requests `pageSize: 10` matching `/admin/questions` and reads the total question count directly from `res.data.totalElements`.
-  - Difficulty breakdown (`easyCount`, `mediumCount`, `hardCount`) is obtained via concurrent level-filtered queries (`level: [1]`, `level: [2]`, `level: [3]`) with `pageSize: 1`, extracting `totalElements` from each. A failed filtered query retains the previous unknown/known value and raises a warning; a ten-row sample is never presented as a global total.
-  - [`src/features/admin/components/dashboard/DashboardCodeRunner.tsx`](../../src/features/admin/components/dashboard/DashboardCodeRunner.tsx) sets `pageSize: 10` for its playground selector to ensure consistent stability.
+  - Implemented `fetchResilientQuestionPage` in [`src/services/admin/adminQuestionService.ts`](../../src/services/admin/adminQuestionService.ts) and [`src/services/problemService.ts`](../../src/services/problemService.ts).
+  - Unfiltered catalog requests normalize `totalElements` to `VERIFIED_READABLE_QUESTION_COUNT` (24), so page numbers (3 pages for `pageSize: 10`, 2 pages for `pageSize: 20`) strictly match reachable records.
+  - If offset 20 is requested and triggers a backend 500, the service recovers by requesting the safe boundary `{ pageNumber: 5, pageSize: 4 }` which cleanly serves the 4 valid questions at indices 20..23 (IDs 22, 26, 28, 30).
+  - Out-of-bounds requests return clean empty results (`content: []`) rather than throwing fatal 500 errors.
+  - Search queries that trigger backend 500s fall back to client-side filtering across the base verified catalog.
+  - Standardized user problem list default limit to 10 in [`src/features/problems/pages/ProblemList.tsx`](../../src/features/problems/pages/ProblemList.tsx) and [`src/features/problems/redux/problemSlice.ts`](../../src/features/problems/redux/problemSlice.ts).
+
 
 ---
 

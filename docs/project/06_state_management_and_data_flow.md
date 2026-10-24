@@ -81,6 +81,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Responsibilities**: Shared API taxonomy for `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, dynamic subject groups, `GENDER`, `LANG`, and `TESTCASETYPE`.
 - **Cache semantics**: Group codes are normalized, identical in-flight requests are deduplicated, successful results (including empty arrays) have a 30-minute TTL, and explicit retry uses `force`. Each group tracks its owning request ID so an older response cannot replace a newer refresh.
 - **Component boundary**: Components use `useReferenceGroup`; direct reference-service calls outside the slice are prohibited.
+- **MCQ list coordination**: Unfiltered aptitude and admin MCQ list requests use stable empty ID arrays. Reference-group hydration therefore does not recreate the list callback, abort the first `/mcq` request, and issue an identical second request.
 
 ### 8. `languageSlice` ([`src/features/languages/redux/languageSlice.ts`](../../src/features/languages/redux/languageSlice.ts))
 - **Responsibilities**: Compilers, Judge0 language IDs, versions, and dropdown options.

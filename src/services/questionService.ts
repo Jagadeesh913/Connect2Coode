@@ -45,7 +45,24 @@ export const questionService = {
    */
   async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
     const response = await this.getById(id, signal);
-    return extractTestCasesFromProblem(response.data);
+    const detail = response.data;
+    if (Array.isArray(detail?.testCases) && detail.testCases.length > 0) {
+      const valid = detail.testCases.filter(
+        (tc) => tc && (tc.input?.trim() || tc.expectedOutput?.trim())
+      );
+      if (valid.length > 0) {
+        return valid.map((tc, idx) => ({
+          ...tc,
+          displayOrder: tc.displayOrder || idx + 1,
+          typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',
+          typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
+          typeRefName:
+            tc.typeRefName ||
+            (tc.isHidden ? 'Hidden Evaluation Test Case' : 'Visible Sample Test Case'),
+        }));
+      }
+    }
+    return extractTestCasesFromProblem(detail);
   },
 
   async addTestCases(
