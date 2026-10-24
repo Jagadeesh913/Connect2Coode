@@ -7,7 +7,7 @@
 - **Root Cause**: In the remote Spring Boot backend, the submission evaluator attempts to read `getType().getRefName()` on test case entities without verifying nullability or handling incomplete test case fixtures in the database.
 - **Frontend Mitigation**:
   - Sample test case execution (`POST /runCode` and `POST /admin/testCode`) works reliably and evaluates properly.
-  - The frontend maps HTTP 500 cleanly via [`src/core/validation/serverErrorMapper.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/validation/serverErrorMapper.ts) so no raw Java stack traces are exposed to users.
+  - The frontend maps HTTP 500 cleanly via [`src/core/validation/serverErrorMapper.ts`](../../src/core/validation/serverErrorMapper.ts) so no raw Java stack traces are exposed to users.
 
 ### 2. Numeric Question Details vs Text Slugs & Specific Question 500s
 - **Verified Behavior**: The archived direct HTTP inventory records `GET /question/1` as `PASS`/`VERIFIED` and returning full question details. The earlier claim that every numeric details request returned 500 was stale.
@@ -26,15 +26,15 @@
   - `/{userId}/getSubmiteedQuestionIds` (note spelling `getSubmiteedQuestionIds`)
   - `/{userId}/getAPttemptedQuestionIds` (note spelling `getAPttemptedQuestionIds`)
 - **Frontend Mitigation**:
-  - [`src/core/api/endpoints.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
+  - [`src/core/api/endpoints.ts`](../../src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
 
 ### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` (`pageSize: 1000`)
 - **Observed Behavior**: In `/admin/dashboard`, `POST /api/v1/questions` failed with HTTP 500 when requesting `pageSize: 1000`. Meanwhile, the identical endpoint in `/admin/questions` succeeded with HTTP 200 using standard `pageSize: 10`.
 - **Root Cause**: `UNKNOWN`. The response proves that this request size is not supported by the deployed service, but does not establish whether the failure is caused by query, memory, serialization, or another backend limit.
 - **Frontend Mitigation**:
-  - [`src/features/admin/pages/AdminDashboard.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/admin/pages/AdminDashboard.tsx) now requests `pageSize: 10` matching `/admin/questions` and reads the total question count directly from `res.data.totalElements`.
+  - [`src/features/admin/pages/AdminDashboard.tsx`](../../src/features/admin/pages/AdminDashboard.tsx) now requests `pageSize: 10` matching `/admin/questions` and reads the total question count directly from `res.data.totalElements`.
   - Difficulty breakdown (`easyCount`, `mediumCount`, `hardCount`) is obtained via concurrent level-filtered queries (`level: [1]`, `level: [2]`, `level: [3]`) with `pageSize: 1`, extracting `totalElements` from each. A failed filtered query retains the previous unknown/known value and raises a warning; a ten-row sample is never presented as a global total.
-  - [`src/features/admin/components/dashboard/DashboardCodeRunner.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/admin/components/dashboard/DashboardCodeRunner.tsx) sets `pageSize: 10` for its playground selector to ensure consistent stability.
+  - [`src/features/admin/components/dashboard/DashboardCodeRunner.tsx`](../../src/features/admin/components/dashboard/DashboardCodeRunner.tsx) sets `pageSize: 10` for its playground selector to ensure consistent stability.
 
 ---
 
@@ -59,7 +59,7 @@
 
 ### Decision 4: Java Class Renaming to `Main` for Judge0
 - **Context**: Judge0 Java compiler expects a class with a `public static void main` method located in a class named `Main`. Students frequently write LeetCode-style code with `public class Solution`.
-- **Decision**: [`src/services/executionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/executionService.ts) automatically substitutes `public class Solution` with `public class Main` before dispatching code to `/runCode`.
+- **Decision**: [`src/services/executionService.ts`](../../src/services/executionService.ts) automatically substitutes `public class Solution` with `public class Main` before dispatching code to `/runCode`.
 
 ### Decision 5: Language Reference ID Mapping
 - **Context**: The database language table assigns IDs 1-4 (e.g. 1 = Java, 2 = C++, 3 = Python, 4 = C). However, the Judge0 execution engine expects Reference IDs 5-8 (5 = Java, 6 = C++, 7 = Python, 8 = C).

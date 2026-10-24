@@ -49,26 +49,23 @@ for (const relPath of docFiles) {
 
     totalReferencesChecked += 1;
 
-    // Handle file:/// absolute file links
+    // Disallow machine-specific absolute file:/// links
     if (rawTarget.startsWith('file:///')) {
-      let cleaned = rawTarget.replace(/^file:\/\/\/?/, '');
-      // Handle Windows drive paths like c:/Users/...
-      if (/^[a-zA-Z]:\//.test(cleaned)) {
-        cleaned = resolve(cleaned);
-      } else {
-        cleaned = resolve('/', cleaned);
-      }
-
-      if (!existsSync(cleaned)) {
-        failures.push(`[${relPath}] Broken file URI reference: ${rawTarget}`);
-      }
+      failures.push(`[${relPath}] Machine-specific absolute file URI not permitted in documentation: "${rawTarget}". Use repository-relative or file-relative markdown links instead.`);
       continue;
     }
 
-    // Handle relative markdown links (e.g. ./02_architecture_and_conventions.md or ../api/README.md)
+    // Handle relative markdown links (e.g. ./02_architecture_and_conventions.md, ../../src/... or docs/project/...)
     const targetWithoutAnchor = rawTarget.split('#')[0];
     if (targetWithoutAnchor) {
-      const resolvedTarget = resolve(docDir, targetWithoutAnchor);
+      let resolvedTarget = resolve(docDir, targetWithoutAnchor);
+      if (!existsSync(resolvedTarget)) {
+        const repoRelative = resolve(root, targetWithoutAnchor);
+        if (existsSync(repoRelative)) {
+          resolvedTarget = repoRelative;
+        }
+      }
+
       if (!existsSync(resolvedTarget)) {
         failures.push(`[${relPath}] Broken relative link: "${rawTarget}" -> target does not exist at ${resolvedTarget}`);
       }

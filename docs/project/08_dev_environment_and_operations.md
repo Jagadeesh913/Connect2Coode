@@ -12,9 +12,9 @@
 ## 2. Environment Configuration
 
 ### Files
-- [`.env.example`](file:///c:/Users/sakha/Pictures/Connect-2-code/.env.example): Checked into git. Reference template for required configuration keys.
-- [`.env.production`](file:///c:/Users/sakha/Pictures/Connect-2-code/.env.production): Checked into git. Production deployment configuration.
-- [`.env`](file:///c:/Users/sakha/Pictures/Connect-2-code/.env): Ignored by git in `.gitignore`. Local environment override.
+- [`.env.example`](../../.env.example): Checked into git. Reference template for required configuration keys.
+- [`.env.production`](../../.env.production): Checked into git. Production deployment configuration.
+- [`.env`](../../.env): Ignored by git in `.gitignore`. Local environment override.
 
 ### Environment Variable Contract
 
@@ -78,7 +78,7 @@ server: {
 
 Connect2Code is configured for deployment on Vercel or any SPA static web host.
 
-[`vercel.json`](file:///c:/Users/sakha/Pictures/Connect-2-code/vercel.json) defines edge proxy rewrites and SPA fallback:
+[`vercel.json`](../../vercel.json) defines edge proxy rewrites and SPA fallback:
 ```json
 {
   "rewrites": [
@@ -112,7 +112,7 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
 
 ## 5. Continuous Integration Pipeline (`frontend-ci.yml`)
 
-The GitHub Actions workflow [`.github/workflows/frontend-ci.yml`](file:///c:/Users/sakha/Pictures/Connect-2-code/.github/workflows/frontend-ci.yml) executes on every push and pull request to `main`:
+The GitHub Actions workflow [`.github/workflows/frontend-ci.yml`](../../.github/workflows/frontend-ci.yml) executes on every push and pull request to `main`:
 
 ```yaml
 steps:

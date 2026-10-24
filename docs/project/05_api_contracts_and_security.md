@@ -4,7 +4,7 @@
 
 - **Production API Origin**: `https://api.connect2code.in`
 - **Canonical API Base URL**: `https://api.connect2code.in/api/v1`
-- **Base URL Resolution Logic** ([`src/core/api/apiClient.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/api/apiClient.ts)):
+- **Base URL Resolution Logic** ([`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts)):
   ```ts
   export const resolveDeploymentApiBaseUrl = (rawUrl?: string | null, _isLocal: boolean = false): string => {
     const resolved = resolveApiBaseUrl(rawUrl);
@@ -72,7 +72,7 @@ sequenceDiagram
 Historically, some services sent a payload field named `token` while others sent `jwtToken`, or both. The backend strictly expects `jwtToken` and throws validation errors if duplicate or conflicting token fields are present.
 
 ### The Solution: Deep Purge in `apiClient.ts`
-[`src/core/api/apiClient.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/api/apiClient.ts) implements `purgeDuplicateTokenFields`:
+[`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts) implements `purgeDuplicateTokenFields`:
 ```ts
 function purgeDuplicateTokenFields(obj: any): void {
   if (!obj || typeof obj !== 'object' || obj instanceof FormData) return;
@@ -99,7 +99,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 
 ## 4. REST Endpoint Catalog & Method Mappings
 
-### A. Authentication Endpoints ([`src/services/authService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/authService.ts))
+### A. Authentication Endpoints ([`src/services/authService.ts`](../../src/services/authService.ts))
 | Endpoint | Method | Access | Request Body | Response Envelope |
 | :--- | :---: | :--- | :--- | :--- |
 | `/signUp` | `POST` | `PUBLIC` | `{ firstName, lastName, email, password, role: "USER", labelUserName, userName }` | `ApiResponse<AuthResponseData>` |
@@ -109,7 +109,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/auth/generatePasswordResetOtp` | `POST` | `PUBLIC` | `{ email }` | `ApiResponse<unknown>` |
 | `/auth/verifyPasswordResetOtp` | `POST` | `PUBLIC` | `{ email, otp, password }` | `ApiResponse<unknown>` |
 
-### B. Problems & Questions ([`src/services/problemService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/problemService.ts), [`src/services/questionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/questionService.ts))
+### B. Problems & Questions ([`src/services/problemService.ts`](../../src/services/problemService.ts), [`src/services/questionService.ts`](../../src/services/questionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/questions` | `POST` | `USER_OR_ADMIN` | Paginated search: `{ level: number[], companies: number[], topic: number[], searchText: string, pageRequest: { pageNumber, pageSize, sortBy, sortDirection } }` |
@@ -117,7 +117,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/question` | `POST` | `ADMIN_ONLY` | Creates/updates problem with title, description, constraints, hints, and tax references. |
 | `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). A direct `GET` to this path returned `401` for the temporary authenticated account on 2026-10-23, so catalog fallback does not issue it as a speculative read. Test cases, including hidden cases, remain backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
 
-### C. Code Execution Engine ([`src/services/executionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/executionService.ts))
+### C. Code Execution Engine ([`src/services/executionService.ts`](../../src/services/executionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/runCode` | `POST` | `USER_OR_ADMIN` | User RUN: executes visible sample test cases. Payload: `{ questionId: number, languageId: number (Ref ID 5-8), sourceCode: string, customInput?: string }`; `customInput` is included only for the explicit custom-input action. |
@@ -129,7 +129,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 
 `executionService` normalizes only the execution response fields returned by the API (`totalTestCases`, pass/fail counts, optional runtime/memory, and `testCases`). A successful HTTP response must still contain a recognizable verdict, and solved/success UI requires at least one executed and passed test with zero failures; zero-test or malformed responses are rejected instead of being reported as accepted.
 
-### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/admin/adminCompanyService.ts))
+### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](../../src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](../../src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/company/list` | `POST` | `USER_OR_ADMIN` | Paginated companies: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
@@ -141,7 +141,7 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/admin/examSection` | `POST` | `ADMIN_ONLY` | Creates or updates exam section / round (`sectionName`, `durationMinutes`, `totalMarks`). |
 | `/admin/companyExam` | `POST` | `ADMIN_ONLY` | Creates or updates company exam schedule (`examName`, `year`, `totalDurationMinutes`). |
 
-### E. Aptitude & MCQ Assessment ([`src/services/mcqService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/mcqService.ts))
+### E. Aptitude & MCQ Assessment ([`src/services/mcqService.ts`](../../src/services/mcqService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by subject, difficulty, company, search text with pagination. |
@@ -176,7 +176,7 @@ Live MCQ verification on 2026-10-23 found that this is a record-level data bound
 
 `apiClient` returns the backend envelope directly, so UI callers consume the payload exactly once through `response.data`; user and admin MCQ/question/dashboard views do not attempt nested `data.data` fallbacks. `POST /questions` rows are mapped only from the captured list fields. They are not converted into full `Question` detail records, because the list DTO lacks the reference and test-case fields required for authoring. When `GET /question/{id}` fails, the admin/detail UI reports that API failure instead of showing guessed taxonomy, platform, or test cases.
 
-### F. User Profile, Bookmarks & Academic Details ([`src/services/profileService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/profileService.ts), [`src/services/userQuestionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/userQuestionService.ts))
+### F. User Profile, Bookmarks & Academic Details ([`src/services/profileService.ts`](../../src/services/profileService.ts), [`src/services/userQuestionService.ts`](../../src/services/userQuestionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/userInfo/{userId}` | `GET` | `USER_OR_ADMIN` | Fetches academic details (regNumber, joinedYear, passedOutYear, college). |
@@ -194,7 +194,7 @@ Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, 
 
 `GET` and `PUT /user/profile` are not used: archived direct probes returned 401 for every available credential and identified the route as unmapped. The client therefore does not fabricate successful identity or avatar mutations in browser storage. Name/email remain session-owned and read-only; avatar editing is disabled. Personal fields supported by `userInfo` are saved only when the required academic fields already exist, so the client never invents registration, college, or year values to satisfy the POST contract.
 
-### G. Institution Directory ([`src/services/institutionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/institutionService.ts), [`src/services/admin/adminInstitutionService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/admin/adminInstitutionService.ts))
+### G. Institution Directory ([`src/services/institutionService.ts`](../../src/services/institutionService.ts), [`src/services/admin/adminInstitutionService.ts`](../../src/services/admin/adminInstitutionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/institutions/search` | `GET` | `PUBLIC` | Query param `?query=...` (min 3 chars). Autocomplete for college selection. |
@@ -205,7 +205,7 @@ Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, 
 | `/admin/institutions/{id}` | `PUT` | `ADMIN_ONLY` | Updates existing institution details. |
 | `/admin/institutions/{id}/status` | `PATCH` | `ADMIN_ONLY` | Soft toggle: `{ isActive: boolean }`. |
 
-### H. Compiler Languages & Taxonomy ([`src/services/referenceService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/referenceService.ts), [`src/services/admin/adminLanguageService.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/services/admin/adminLanguageService.ts))
+### H. Compiler Languages & Taxonomy ([`src/services/referenceService.ts`](../../src/services/referenceService.ts), [`src/services/admin/adminLanguageService.ts`](../../src/services/admin/adminLanguageService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/referenceLibrary/refGroupCode/{groupCode}` | `GET` | `USER_OR_ADMIN` | Returns API-owned taxonomy terms. Current callers request `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, subject-specific topic groups, `GENDER`, `LANG`, and `TESTCASETYPE`. |
@@ -222,6 +222,6 @@ The response interceptor returns the backend `ApiResponse<T>` envelope itself, n
 
 ### Error Sanitization (`serverErrorMapper.ts`)
 The backend is built with Java Spring Boot and Hibernate. When internal exceptions occur, raw error messages may contain Java package paths (`org.springframework`, `java.lang`), database table names, or SQL constraint violations.
-- [`src/core/validation/serverErrorMapper.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/validation/serverErrorMapper.ts) tests error text against `isInternalServerLeak()`.
+- [`src/core/validation/serverErrorMapper.ts`](../../src/core/validation/serverErrorMapper.ts) tests error text against `isInternalServerLeak()`.
 - If an internal leak is detected, it suppresses the technical trace and presents clean, actionable user feedback (e.g. *"Our servers encountered an issue while processing your request. Please try again shortly."*).
 - Prevents database column names, Java stack traces, and internal server topologies from being revealed to end users.

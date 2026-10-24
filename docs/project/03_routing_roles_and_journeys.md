@@ -2,7 +2,7 @@
 
 ## 1. Route Map & Route Architecture
 
-All routing is defined in [`src/routes/appRoutes.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/routes/appRoutes.tsx) using React Router v7 `createBrowserRouter`.
+All routing is defined in [`src/routes/appRoutes.tsx`](../../src/routes/appRoutes.tsx) using React Router v7 `createBrowserRouter`.
 
 ```mermaid
 graph TD
@@ -85,9 +85,9 @@ The application distinguishes between two primary user roles:
 
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
-| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/ProtectedRoute.tsx) | Checks `isAuthenticated && isTokenValid(token)`. If loading, renders `<PageLoading />`. Saves attempted destination in `sessionStorage.getItem('post_auth_redirect')`. | Redirects to `/login` |
-| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/GuestRoute.tsx) | Verifies user is unauthenticated. If already logged in, signed JWT claims alone select `/admin/dashboard`; all other users go to `/practice`. | Redirects to `/practice` or `/admin/dashboard` |
-| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/guards/AdminRoute.tsx) | Evaluates `isAuthed`. If true, requires `isJwtAdmin(token)` from signed token claims (`role`, `Role`, `roles`, `authorities`, `scope`). Cached user/profile role strings never authorize an admin route. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
+| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Checks `isAuthenticated && isTokenValid(token)`. If loading, renders `<PageLoading />`. Saves attempted destination in `sessionStorage.getItem('post_auth_redirect')`. | Redirects to `/login` |
+| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Verifies user is unauthenticated. If already logged in, signed JWT claims alone select `/admin/dashboard`; all other users go to `/practice`. | Redirects to `/practice` or `/admin/dashboard` |
+| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Evaluates `isAuthed`. If true, requires `isJwtAdmin(token)` from signed token claims (`role`, `Role`, `roles`, `authorities`, `scope`). Cached user/profile role strings never authorize an admin route. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
 
 ---
 

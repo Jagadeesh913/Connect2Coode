@@ -76,10 +76,10 @@ Connect-2-code/
 ## 2. Core Architectural Principles
 
 ### A. The Single API Transport Rule
-All HTTP communication MUST go through `apiClient` in [`src/core/api/apiClient.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/api/apiClient.ts).
+All HTTP communication MUST go through `apiClient` in [`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts).
 - **Prohibited**: Direct imports of `axios` outside `src/core/api/apiClient.ts`.
 - **Prohibited**: Direct calls to `window.fetch()` in UI components or feature code.
-- **Enforcement**: [`scripts/verify-architecture.mjs`](file:///c:/Users/sakha/Pictures/Connect-2-code/scripts/verify-architecture.mjs) scans all files in `src/` and fails CI if direct `axios` or `fetch()` calls exist.
+- **Enforcement**: [`scripts/verify-architecture.mjs`](../../scripts/verify-architecture.mjs) scans all files in `src/` and fails CI if direct `axios` or `fetch()` calls exist.
 
 ### B. Path Aliasing
 Use `@/` to import from `src/` where appropriate, configured in `vite.config.ts`:
@@ -97,7 +97,7 @@ resolve: {
 
 ### D. Safe Multi-Tenant Browser Storage
 Browser `localStorage` is shared across tabs and sessions. To prevent one user from seeing another user's bookmarks or solved problem progress:
-- Always use [`src/core/storage/userScopedStorage.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/core/storage/userScopedStorage.ts).
+- Always use [`src/core/storage/userScopedStorage.ts`](../../src/core/storage/userScopedStorage.ts).
 - It computes a fast 32-bit FNV-1a hash of the logged-in user's identity (`id:<userId>` or `email:<email>`), isolating stored keys as `c2c:user:<hash>:<key>`. Unauthenticated users use the `guest` scope.
 
 ---

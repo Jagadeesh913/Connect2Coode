@@ -2,7 +2,7 @@
 
 ## 1. Design System Tokens & CSS Architecture
 
-The visual architecture is implemented using **Tailwind CSS v4** combined with centralized CSS Custom Properties in [`src/index.css`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/index.css).
+The visual architecture is implemented using **Tailwind CSS v4** combined with centralized CSS Custom Properties in [`src/index.css`](../../src/index.css).
 
 ### Design Tokens
 
@@ -66,7 +66,7 @@ html.dark {
 
 ## 2. Theme Switching Mechanics
 
-Theme management is handled by [`src/shared/context/ThemeContext.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/shared/context/ThemeContext.tsx):
+Theme management is handled by [`src/shared/context/ThemeContext.tsx`](../../src/shared/context/ThemeContext.tsx):
 - **Default Theme**: `dark` mode.
 - **Storage Key**: `localStorage.getItem('c2c_theme')`.
 - **DOM Integration**: Automatically toggles `.dark` and `.light` class on the root `<html>` element.
@@ -76,20 +76,20 @@ Theme management is handled by [`src/shared/context/ThemeContext.tsx`](file:///c
 
 ## 3. Official Brand Assets & `<BrandLogo />` Policy
 
-As defined in [`.agents/rules/brand-logo.md`](file:///c:/Users/sakha/Pictures/Connect-2-code/.agents/rules/brand-logo.md):
+As defined in [`.agents/rules/brand-logo.md`](../../.agents/rules/brand-logo.md):
 - **Asset Files**:
   - Full Official Logo: `/logo.png` and `/logo-full.png` (Transparent PNG with 3D gradient ribbon `< >` / infinity loop mark, "CONNECTTOCODE" heading, and "CODE TOGETHER CONNECT FOREVER" tagline)
   - Horizontal Lockup: `/logo-horizontal.png`
   - Isolated Brand Mark: `/logo-mark.png` and `/logo-mark-transparent.png`
   - Favicons: `/favicon.ico`, `/favicon.svg`, `/favicon-32x32.png`, `/favicon-16x16.png`, `/apple-touch-icon.png`
-- **Component**: `<BrandLogo />` located at [`src/shared/components/ui/BrandLogo.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/shared/components/ui/BrandLogo.tsx). Supports variants: `mark` (default), `horizontal`, and `full`.
+- **Component**: `<BrandLogo />` located at [`src/shared/components/ui/BrandLogo.tsx`](../../src/shared/components/ui/BrandLogo.tsx). Supports variants: `mark` (default), `horizontal`, and `full`.
 - **Rule**: Never replace official logo assets with generic SVG code, emoji, or external image links.
 
 ---
 
 ## 4. Reusable Component Catalog
 
-All generic components reside in [`src/shared/components/ui/`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/shared/components/ui/):
+All generic components reside in [`src/shared/components/ui/`](../../src/shared/components/ui/):
 
 | Component | Path | Description & Props |
 | :--- | :--- | :--- |
@@ -116,14 +116,14 @@ In `PracticePage`, `AdminQuestions`, and `AdminMcqs`, the table layout combines 
 
 The workspace exposes the API-supported optional `customInput` field only from **Run with Custom Input**. Normal Run keeps the verified visible-test-case contract; Submit continues to use the full-evaluation endpoint. The admin code runners share the same language registry, disable duplicate actions during a request, and report the returned pass/fail count instead of showing a success toast for failed cases.
 
-Assessment integrity controls in [`src/shared/hooks/useAssessmentIntegrity.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/shared/hooks/useAssessmentIntegrity.ts) restrict the context menu, clipboard events, drag/drop, Print Screen, source-view/print, and common developer-tool shortcuts on the student coding workspace. Normal left-click interaction, typing, undo, and Run/Submit shortcuts remain enabled. These are browser-side deterrents, not a proctoring or security boundary; a real high-stakes assessment still requires server-side session policy, audit events, and authenticated proctoring.
+Assessment integrity controls in [`src/shared/hooks/useAssessmentIntegrity.ts`](../../src/shared/hooks/useAssessmentIntegrity.ts) restrict the context menu, clipboard events, drag/drop, Print Screen, source-view/print, and common developer-tool shortcuts on the student coding workspace. Normal left-click interaction, typing, undo, and Run/Submit shortcuts remain enabled. These are browser-side deterrents, not a proctoring or security boundary; a real high-stakes assessment still requires server-side session policy, audit events, and authenticated proctoring.
 
 
 ---
 
 ## 6. Recruiter Company Logo Registry
 
-Located in [`src/features/companies/utils/companyLogoRegistry.ts`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/companies/utils/companyLogoRegistry.ts) and [`src/features/companies/components/CompanyBrandLogo.tsx`](file:///c:/Users/sakha/Pictures/Connect-2-code/src/features/companies/components/CompanyBrandLogo.tsx):
+Located in [`src/features/companies/utils/companyLogoRegistry.ts`](../../src/features/companies/utils/companyLogoRegistry.ts) and [`src/features/companies/components/CompanyBrandLogo.tsx`](../../src/features/companies/components/CompanyBrandLogo.tsx):
 - **121 SVG/PNG Assets**: Stored in `public/companies/`.
 - **Local-First Resolution**: All curated definitions plus the previously unreachable bundled PNG/SVG assets are addressable by normalized company name. Local assets are always attempted first and do not create remote requests when they load.
 - **Dynamic Fallback Cascade**: For companies outside the bundle, the component tries an optional domain-based Brandfetch image (when `VITE_BRANDFETCH_CLIENT_ID` is configured), a Simple Icons CDN slug, and the validated official website favicon. Failed candidates advance automatically without leaving a broken image.
