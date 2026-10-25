@@ -45,6 +45,8 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - `listCache`: TTL 60 seconds, max 30 entries. Keys computed from sanitized filter JSON (`getProblemListKey`).
   - `detailCache`: TTL 5 minutes, max 40 entries. Keys based on normalized problem slug or ID.
   - LRU Trimming: `trimCache` evicts oldest cache entries when capacity is reached.
+- **Visible-query invariant**: When a page/filter request changes the list cache key, the reducer immediately swaps to a fresh matching cache entry or clears the visible rows and initializes pagination for the requested page. It never presents rows from the previous query under new controls. Same-query refreshes may retain their current rows while the refresh status is shown.
+- **Request ownership**: Only the latest list request may replace visible rows or release its loading state; superseded responses may warm their own cache entry but cannot overwrite the active query.
 
 ### 3. `companySlice` ([`src/features/companies/redux/companySlice.ts`](../../src/features/companies/redux/companySlice.ts))
 - **Responsibilities**: Recruiter directory list, selected company metadata, company-associated problems, exams list, and active exam blueprints.

@@ -67,7 +67,7 @@ export function AdminTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/60">
-            {loading && data.length === 0 ? Array.from({ length: 10 }, (_, row) => (
+            {loading ? Array.from({ length: 10 }, (_, row) => (
               <tr key={row} aria-hidden="true">
                 {columns.map((col, index) => <td key={index} className={`px-4 py-3.5 ${col.className || ''}`}><Skeleton className="h-7 w-full" /></td>)}
               </tr>
@@ -75,7 +75,14 @@ export function AdminTable<T>({
               <tr
                 key={keyExtractor(row)}
                 onClick={() => onRowClick && onRowClick(row)}
-                className={`hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors group text-slate-700 dark:text-slate-300 ${
+                tabIndex={onRowClick ? 0 : undefined}
+                onKeyDown={(event) => {
+                  if (onRowClick && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    onRowClick(row);
+                  }
+                }}
+                className={`hover:bg-blue-50/40 dark:hover:bg-blue-950/20 transition-colors group text-slate-700 dark:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 ${
                   onRowClick ? 'cursor-pointer' : ''
                 }`}
               >

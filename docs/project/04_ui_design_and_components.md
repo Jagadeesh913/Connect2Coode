@@ -81,7 +81,9 @@ As defined in [`.agents/rules/brand-logo.md`](../../.agents/rules/brand-logo.md)
   - Full Official Logo: `/logo.png` and `/logo-full.png` (Transparent PNG with 3D gradient ribbon `< >` / infinity loop mark, "CONNECTTOCODE" heading, and "CODE TOGETHER CONNECT FOREVER" tagline)
   - Horizontal Lockup: `/logo-horizontal.png`
   - Isolated Brand Mark: `/logo-mark.png` and `/logo-mark-transparent.png`
-  - Favicons: `/favicon.ico`, `/favicon.svg`, `/favicon-32x32.png`, `/favicon-16x16.png`, `/apple-touch-icon.png`
+  - Browser Icons: `/favicon.ico`, `/favicon.svg`, `/favicon-32x32.png`, `/favicon-16x16.png`, and the generated 180×180 `/apple-touch-icon.png`
+  - Installable App Icons: `/app-icon-192.png`, `/app-icon-512.png`, and safe-zone `/app-icon-maskable-512.png`, registered by `/site.webmanifest`
+  - Social Preview: `/social-card.png` (1200×630) built from the official horizontal lockup for Open Graph and Twitter/X cards
 - **Component**: `<BrandLogo />` located at [`src/shared/components/ui/BrandLogo.tsx`](../../src/shared/components/ui/BrandLogo.tsx). Supports variants: `mark` (default), `horizontal`, and `full`.
 - **Rule**: Never replace official logo assets with generic SVG code, emoji, or external image links.
 
@@ -94,23 +96,27 @@ All generic components reside in [`src/shared/components/ui/`](../../src/shared/
 | Component | Path | Description & Props |
 | :--- | :--- | :--- |
 | **`BrandLogo`** | `src/shared/components/ui/BrandLogo.tsx` | Official brand logo with variants (`mark`, `horizontal`, `full`) and custom sizes. |
-| **`Button`** | `src/shared/components/ui/Button.tsx` | Base button supporting variants (`primary`, `secondary`, `outline`, `ghost`, `danger`) and sizes (`sm`, `md`, `lg`). Handles loading spinners automatically. |
+| **`Button`** | `src/shared/components/ui/Button.tsx` | Base button supporting variants (`primary`, `secondary`, `outline`, `ghost`, `danger`) and sizes (`sm`, `md`, `lg`). Handles loading spinners automatically and defaults to `type="button"`; form submitters must opt in explicitly. |
 | **`Badge`** | `src/shared/components/ui/Badge.tsx` | Status pill with variants (`default`, `success`, `warning`, `danger`, `info`, `purple`). Used for difficulty tiers and test case results. |
 | **`Navbar`** | `src/shared/components/ui/Navbar.tsx` | Sticky top navigation bar with search trigger, navigation links, theme toggle, user avatar dropdown, and mobile menu drawer. |
 | **`Footer`** | `src/shared/components/ui/Footer.tsx` | Footer with platform links, social channels, copyright, and brand tagline ("CODE TOGETHER CONNECT FOREVER"). |
-| **`Pagination`** | `src/shared/components/ui/Pagination.tsx` | Accessible pagination control with non-submitting buttons, previous/next arrows, labeled page numbers, `aria-current="page"`, and boundary truncation. |
-| **`PageLoading`** | `src/shared/components/ui/PageLoading.tsx` | Full-screen or container loading state with animated brand logo pulse and gradient spinner. |
+| **`Pagination`** | `src/shared/components/ui/Pagination.tsx` | Accessible pagination control with non-submitting buttons, previous/next arrows, labeled page numbers, `aria-current="page"`, boundary truncation, and a pending lock that disables every page action while a request owns the result set. |
+| **`PageLoading`** | `src/shared/components/ui/PageLoading.tsx` | Route-aware, geometry-preserving shimmer fallback; every route receives a skeleton rather than blank or text-only lazy-loading content. |
 | **`Skeleton`** | `src/shared/components/ui/Skeleton.tsx` | Shimmer placeholder for cards, tables, and text lines during data fetching. |
 | **`EmptyState`** | `src/shared/components/ui/EmptyState.tsx` | Clean empty state placeholder with customizable icon, title, description, and action button. |
 | **`FormFieldError`** | `src/shared/components/ui/FormFieldError.tsx` | Consistent error message display for React Hook Form input validation. |
 | **`RequestStatus`** | `src/shared/components/ui/RequestStatus.tsx` | Multi-state wrapper handling loading, error, and empty states before rendering child content. |
-| **`ConfirmDialog`** | `src/shared/components/ui/ConfirmDialog.tsx` | Modal confirmation dialog for destructive actions (e.g. deleting a question or institution). |
+| **`ConfirmDialog`** | `src/shared/components/ui/ConfirmDialog.tsx` | Modal confirmation dialog for destructive actions. It uses unique accessible labels, initially focuses the safer cancel action, traps Tab focus, restores prior focus, locks body scroll, and blocks dismissal while busy. |
 
 `src/features/admin/components/AdminModal.tsx` is the shared admin-form modal. It exposes dialog semantics, an accessible title, initial focus, tab containment, focus restoration, and body-scroll locking. It uses Framer Motion only for its mount/unmount backdrop and dialog transition, and disables those transitions when the operating system requests reduced motion. Other components should not add animation unless it communicates a real state change.
 
 In `PracticePage`, `AdminQuestions`, and `AdminMcqs`, the table layout combines the question identifier and difficulty tier into a single unified `#` column using `getDifficultyNumberColor` (e.g. emerald for Easy/Basic, amber for Medium, rose for Hard, sky for Basic). Inactive items (`isActive === false`) render their question container with a distinct red rounded border (`border-rose-400 dark:border-rose-500 rounded-xl`) accompanied by an explicit `Inactive` badge, while preserving readable standard font weight and color for the problem statement.
 
-`DsaSheetPage` follows the practice and aptitude visual language with generated light/dark DSA hero banners, a two-path accessible tab toggle (rather than a select), and expandable section panels. Questions reuse shared `Badge`, `Skeleton`, `Button`, and `EmptyState` components. `AdminDsaSheets` uses the established `AdminPageHeader`, `AdminCard`, `AdminModal`, `AdminBadge`, and confirmation-dialog system instead of introducing a parallel admin visual language.
+`DsaSheetPage` follows the practice and aptitude visual language with uniform 2048x384 (16:3) generated light/dark DSA hero banners matching the Practice page aesthetic and dimensions, a two-path accessible tab toggle (rather than a select), and expandable section panels. Questions reuse shared `Badge`, `Skeleton`, `Button`, and `EmptyState` components. `AdminDsaSheets` uses the established `AdminPageHeader`, `AdminCard`, `AdminModal`, `AdminBadge`, and confirmation-dialog system instead of introducing a parallel admin visual language.
+
+Practice and aptitude filter choices are semantic toggle buttons with `aria-pressed` and visible keyboard focus. List pages replace rows with context-matched skeletons when an uncached filter/page query begins; controls that can issue competing page requests remain disabled until that query settles.
+
+`AdminTable` replaces every visible row with same-column shimmer cells whenever its owning request is pending, including refreshes with prior data. Clickable rows expose equivalent Enter/Space activation and visible focus. Detail modals use shaped skeletons for unavailable records and nested lists rather than text-only spinners.
 
 ## 5. Coding Workspace Behavior
 

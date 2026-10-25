@@ -76,6 +76,14 @@ graph TD
 
 ---
 
+### Route Metadata and Indexing Policy
+
+Every route resolves a unique title, description, canonical path, robots directive, Open Graph set, and Twitter/X card set through [`src/core/metadata/pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts). Titles use `Page Name | Connect2Code`. Public content routes are indexable; login/signup/reset pages are `noindex, follow`; OAuth, authenticated, admin, 404, and 500 surfaces are `noindex, nofollow`. Redirect aliases canonicalize to their destination (`/problems` to `/practice`, `/company-patterns` to `/companies`, and aptitude aliases to `/aptitude`). Dynamic problem, company, company-exam, and roadmap routes receive safe slug-derived metadata immediately; API-backed names and descriptions replace those fallbacks only when the response belongs to the current route.
+
+The metadata owner is mounted above all route branches in `AppRouterLayout`, so client navigation, deep-link hydration, guard redirects, errors, and unknown routes cannot retain tags from the previous page.
+
+---
+
 ## 2. User Roles & Authorization Guards
 
 The application distinguishes between two primary user roles:

@@ -10,7 +10,7 @@ import { toast } from 'react-hot-toast';
 
 export const BookmarksList: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { bookmarks, loading, error } = useAppSelector((state) => state.bookmarks);
+  const { bookmarks, loading, error, pendingToggleKeys } = useAppSelector((state) => state.bookmarks);
   const [filterType, setFilterType] = useState<'ALL' | 'PROBLEM' | 'APTITUDE' | 'COMPANY'>('ALL');
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
@@ -28,6 +28,7 @@ export const BookmarksList: React.FC = () => {
   const isBookmarksLoading = (loading || !hasFetchedOnce) && bookmarks.length === 0;
 
   const handleRemove = (itemId: string, type: BookmarkType) => {
+    if (pendingToggleKeys[`${type}:${itemId}`]) return;
     dispatch(toggleBookmarkItem({ itemId, type }))
       .unwrap()
       .then(() => {
@@ -109,7 +110,9 @@ export const BookmarksList: React.FC = () => {
           />
         ) : (
           <div className="flex flex-col gap-3.5">
-            {filteredBookmarks.map((bm) => (
+            {filteredBookmarks.map((bm) => {
+              const isRemoving = Boolean(pendingToggleKeys[`${bm.type}:${bm.itemId}`]);
+              return (
               <div
                 key={bm.id}
                 className="p-4 sm:p-5 border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0D1322] hover:border-blue-500/50 dark:hover:border-blue-500/50 rounded-2xl flex items-center justify-between gap-4 transition-all shadow-xs group"
@@ -145,15 +148,20 @@ export const BookmarksList: React.FC = () => {
                     <i className="fa-solid fa-arrow-up-right-from-square"></i>
                   </Link>
                   <button
+                    type="button"
                     onClick={() => handleRemove(bm.itemId, bm.type)}
-                    className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors text-sm cursor-pointer"
+                    disabled={isRemoving}
+                    aria-busy={isRemoving}
+                    aria-label={`Remove ${bm.title} bookmark`}
+                    className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors text-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                     title="Remove bookmark"
                   >
-                    <i className="fa-solid fa-trash-can"></i>
+                    <i className={`fa-solid ${isRemoving ? 'fa-spinner fa-spin' : 'fa-trash-can'}`}></i>
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -1,5 +1,13 @@
 # 09. Known Issues, Architectural Decisions & Trade-Offs
 
+## Client-rendered social crawler boundary (2026-10-25)
+
+- **Status**: `PARTIALLY VERIFIED`
+- **Decision**: The static Vite entry provides one complete branded Open Graph/Twitter fallback, while React owns route-specific tags after hydration. This is the strongest correct behavior available in the existing static SPA architecture without adding a server-rendering or prerender deployment layer.
+- **Boundary**: Browser navigation, deep-link refreshes, canonical URLs, and runtime tag replacement are locally verifiable. Social crawlers that do not execute JavaScript receive the branded site-level fallback rather than API-backed problem/company text. Route-specific unfurls for those crawlers require an approved SSR/prerender or edge HTML transformation design and a confirmed production frontend origin; neither is invented here.
+
+---
+
 ## 1. Known Backend Quirks & Observed Defects
 
 ### 1. `POST /api/v1/submitCode` NPE on `TestCase.getType()`
@@ -146,6 +154,19 @@
 ### Decision 17: Postman MCP Limitation Is Not Contract Evidence
 - **Context**: The required Postman MCP authentication succeeded, but `getEnabledTools` repeatedly returned an auth-handshake message and the discovered surface exposed workspace-resource operations rather than a live request sender.
 - **Decision**: No Postman collection, example, or summary was treated as contract authority. This repository retains only direct live read evidence and labels unexecuted mutation contracts as unverified.
+
+### Decision 18: Async Lists Own Their Visible Query
+
+- **Context**: Problem, aptitude, and admin catalog pages could retain records and totals from an earlier filter or page while a different request was pending. Rapid DSA admin selection changes could also allow a superseded section or question response to render under the new selection.
+- **Decision**: An uncached query clears mismatched visible records and renders its existing skeleton state; same-query refreshes may retain data. Page controls lock while pending. DSA admin reads abort superseded sheet, section, linked-question, and question-option requests, and mutation handlers reject duplicate submissions.
+- **Accessibility**: Filter choices are keyboard-operable toggle buttons. Shared destructive confirmations use safe initial focus, focus containment/restoration, unique accessible IDs, and scroll locking.
+- **Verification boundary**: Reducer transitions and source interaction contracts are automated. Live authenticated admin mutations and assistive-technology browser sessions remain `PARTIALLY VERIFIED`.
+
+### Decision 19: URL State, Scroll, and Loading Geometry
+
+- **Context**: Company search, industry, and pagination state was component-local, so browser back/forward discarded the user's catalog context. Several nested detail requests and the generic route fallback used text-only spinners, while the shared admin table retained stale rows during refreshes.
+- **Decision**: Company catalog controls now round-trip through query parameters and clamp invalid pages without polluting history. Explicit page changes scroll the result boundary into view, while React Router's `ScrollRestoration` remains authoritative for route back/forward restoration. Route chunks, admin refreshes, DSA hierarchy loads, company modal subresources, and detail records use geometry-matched shimmer states until the owning response arrives.
+- **Concurrency**: Problem queries begin in a layout effect so a changed URL cannot paint the previous query's rows for one frame. DSA hierarchy selection uses current-selection refs and abort ownership so a refresh cannot leave a downstream loader stuck.
 
 ---
 

@@ -28,6 +28,7 @@ import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
 import { useAssessmentIntegrity } from '../../../shared/hooks/useAssessmentIntegrity';
+import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 
 interface QuestionTestCase {
   id?: number;
@@ -368,12 +369,17 @@ export const ProblemDetails: React.FC = () => {
     }
   }, [serverLanguages]);
 
-  // Sync title
-  useEffect(() => {
-    if (problem?.title) {
-      document.title = `${problem.title} | Connect 2 Code`;
-    }
-  }, [problem?.title]);
+  usePageMetadata(
+    isProblemLoadedForRoute && problem?.title
+      ? {
+          title: problem.title,
+          description:
+            problem.description ||
+            `Solve ${problem.title} with the Connect2Code coding workspace and test cases.`,
+          type: 'article',
+        }
+      : null
+  );
 
   // Handle Editor Code Change
   const handleEditorChange = useCallback(

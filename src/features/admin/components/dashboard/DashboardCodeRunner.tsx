@@ -21,7 +21,6 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Loader2,
   Layers,
   Sparkles,
 } from 'lucide-react';
@@ -859,9 +858,10 @@ export const DashboardCodeRunner: React.FC = () => {
           {isStatementOpen && (
             <div className="p-4 pt-1 border-t border-slate-200/60 dark:border-slate-800/60 space-y-4 text-xs">
               {loadingQuestionDetails ? (
-                <div className="flex items-center gap-2 text-slate-400 py-3">
-                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                  <span>Loading problem details and test cases...</span>
+                <div role="status" aria-label="Loading problem details and test cases" className="space-y-3 py-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-4/5" />
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Skeleton className="h-20 w-full rounded-xl" /><Skeleton className="h-20 w-full rounded-xl" /></div>
                 </div>
               ) : selectedQuestionDetails ? (
                 <>

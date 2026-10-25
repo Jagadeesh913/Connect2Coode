@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -33,23 +33,60 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   icon,
 }) => {
-  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const busyRef = useRef(false);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const descriptionId = useId();
   const descText = description || message || '';
   const finalConfirmLabel = confirmText || confirmLabel;
   const finalCancelLabel = cancelText || cancelLabel;
   const isBusy = submitting || isLoading;
 
-  // Focus management and ESC key listener
+  useEffect(() => {
+    busyRef.current = isBusy;
+    onCloseRef.current = onClose;
+  }, [isBusy, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
 
+    const previouslyFocused = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
     const timer = setTimeout(() => {
-      confirmButtonRef.current?.focus();
+      cancelButtonRef.current?.focus();
     }, 50);
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !isBusy) {
-        onClose();
+      if (e.key === 'Escape' && !busyRef.current) {
+        onCloseRef.current();
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        const focusable = Array.from(
+          dialogRef.current?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+          ) ?? []
+        );
+        if (focusable.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -57,8 +94,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     return () => {
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
     };
-  }, [isOpen, isBusy, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -92,31 +131,31 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     <div
       role="alertdialog"
       aria-modal="true"
-      aria-labelledby="confirm-dialog-title"
-      aria-describedby="confirm-dialog-desc"
+      aria-labelledby={titleId}
+      aria-describedby={descText ? descriptionId : undefined}
+      aria-busy={isBusy}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in font-sans"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isBusy) onClose();
       }}
     >
-      <div className="w-full max-w-md bg-white dark:bg-neutral-900 border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl p-6 text-left transform transition-all animate-scale-in">
+      <div ref={dialogRef} className="w-full max-w-md bg-white dark:bg-neutral-900 border border-gray-200 dark:border-white/10 rounded-2xl shadow-2xl p-6 text-left transform transition-all animate-scale-in">
         <div className="flex items-start gap-4">
           <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${styles.iconBg}`}>
             <i className={`fa-solid ${icon || styles.defaultIcon} text-lg`} aria-hidden="true" />
           </div>
 
           <div className="flex-1">
-            <h3 id="confirm-dialog-title" className="text-base font-bold text-gray-900 dark:text-white leading-snug">
+            <h3 id={titleId} className="text-base font-bold text-gray-900 dark:text-white leading-snug">
               {title}
             </h3>
-            <p id="confirm-dialog-desc" className="text-xs text-gray-600 dark:text-gray-300 mt-2 leading-relaxed">
-              {descText}
-            </p>
+            {descText && <p id={descriptionId} className="text-xs text-gray-600 dark:text-gray-300 mt-2 leading-relaxed">{descText}</p>}
           </div>
         </div>
 
         <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-gray-100 dark:border-white/10">
           <button
+            ref={cancelButtonRef}
             type="button"
             onClick={onClose}
             disabled={isBusy}
@@ -125,7 +164,6 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             {finalCancelLabel}
           </button>
           <button
-            ref={confirmButtonRef}
             type="button"
             onClick={onConfirm}
             disabled={isBusy}

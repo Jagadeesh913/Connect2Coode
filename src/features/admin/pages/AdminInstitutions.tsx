@@ -66,6 +66,7 @@ export const AdminInstitutions: React.FC = () => {
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [editingInstitutionId, setEditingInstitutionId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
   const [formServerError, setFormServerError] = useState<{ field?: string; message: string } | null>(null);
 
   /**
@@ -78,6 +79,9 @@ export const AdminInstitutions: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setInstitutions([]);
+    setTotalElements(0);
+    setTotalPages(1);
     try {
       const activeParam =
         activeFilter === 'ACTIVE' ? true : activeFilter === 'INACTIVE' ? false : undefined;
@@ -198,6 +202,8 @@ export const AdminInstitutions: React.FC = () => {
   };
 
   const handleFormSubmit = async (values: InstitutionFormValues) => {
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     setFormServerError(null);
     try {
@@ -243,12 +249,14 @@ export const AdminInstitutions: React.FC = () => {
         toast.error(getActionableErrorMessage(err, 'Failed to save institution record.'));
       }
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const handleStatusToggleConfirm = async () => {
-    if (!selectedInstitution?.id) return;
+    if (!selectedInstitution?.id || mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       const nextStatus = !selectedInstitution.isActive;
@@ -261,6 +269,7 @@ export const AdminInstitutions: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to update institution status.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -499,6 +508,7 @@ export const AdminInstitutions: React.FC = () => {
           {/* Pagination */}
           {totalElements > 0 && (
             <Pagination
+              disabled={loading}
               currentPage={page + 1}
               totalPages={totalPages}
               totalElements={totalElements}

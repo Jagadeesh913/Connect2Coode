@@ -306,13 +306,31 @@ const problemSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchProblems.pending, (state, action) => {
+        const sanitizedFilters = sanitizeProblemFilters(action.meta.arg);
+        const nextKey = getProblemListKey(sanitizedFilters);
+        const isQueryChange = state.activeListKey !== nextKey;
+        if (isQueryChange) {
+          const cached = state.listCache[nextKey];
+          if (cached && isFresh(cached.fetchedAt, PROBLEM_LIST_CACHE_TTL_MS)) {
+            state.problems = cached.problems;
+            state.pagination = cached.pagination;
+          } else {
+            state.problems = [];
+            state.pagination = {
+              page: sanitizedFilters?.page ?? 1,
+              total: 0,
+              limit: sanitizedFilters?.limit ?? state.pagination.limit,
+              totalPages: 1,
+            };
+          }
+        }
         state.listLoading = true;
         state.loading = true;
         state.listRequestId = action.meta.requestId;
         state.currentRequestId = action.meta.requestId;
         state.error = null;
         state.listError = null;
-        state.activeListKey = getProblemListKey(sanitizeProblemFilters(action.meta.arg));
+        state.activeListKey = nextKey;
       })
       .addCase(fetchProblems.fulfilled, (state, action) => {
         const { key, problems, pagination, fetchedAt } = action.payload;

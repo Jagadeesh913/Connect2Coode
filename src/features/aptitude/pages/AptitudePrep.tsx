@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { mcqService } from '../../../services/mcqService';
@@ -364,6 +364,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
   const [sortBy, setSortBy] = useState<'default' | 'diff-asc' | 'diff-desc' | 'title-asc'>('default');
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const resultsRef = useRef<HTMLDivElement>(null);
   const pageSize = 8;
 
   // Data States
@@ -407,7 +408,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
   // Browser back/forward and direct query-string changes must update the
   // active category rather than leaving stale results on screen.
-  useEffect(() => {
+  useLayoutEffect(() => {
     const urlSubject = parseAptitudeSubjectCode(searchParams.get('category') || defaultCategory);
     if (urlSubject === activeSubject) return;
     abortControllerRef.current?.abort();
@@ -479,6 +480,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     abortControllerRef.current?.abort();
     setQuestions([]);
     setTotalElements(0);
+    setTotalPages(1);
     setLoading(true);
     setError(null);
     setActiveSubject(code);
@@ -637,6 +639,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
     setLoading(true);
     setError(null);
+    setQuestions([]);
 
     let sortField = 'id';
     let sortDir: 'ASC' | 'DESC' = 'ASC';
@@ -758,8 +761,20 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     );
   };
 
+  const beginQuestionTransition = () => {
+    abortControllerRef.current?.abort();
+    setQuestions([]);
+    setLoading(true);
+    setError(null);
+  };
+
   // APPLY FILTERS: Commits all staged draft filters and triggers backend API call
   const handleApplyFilters = () => {
+    if (!hasUnappliedChanges) {
+      if (isMobileFilterOpen) setIsMobileFilterOpen(false);
+      return;
+    }
+    beginQuestionTransition();
     setAppliedDifficulties([...draftDifficulties]);
     setAppliedTopicIds([...draftTopicIds]);
     setAppliedCompanyIds([...draftCompanyIds]);
@@ -780,6 +795,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   };
 
   const handleClearAll = () => {
+    beginQuestionTransition();
     setDraftDifficulties([]);
     setDraftTopicIds([]);
     setDraftCompanyIds([]);
@@ -798,24 +814,28 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   };
 
   const removeAppliedDifficulty = (diff: string) => {
+    beginQuestionTransition();
     setDraftDifficulties((prev) => prev.filter((d) => d !== diff));
     setAppliedDifficulties((prev) => prev.filter((d) => d !== diff));
     setCurrentPage(1);
   };
 
   const removeAppliedTopic = (id: number) => {
+    beginQuestionTransition();
     setDraftTopicIds((prev) => prev.filter((t) => t !== id));
     setAppliedTopicIds((prev) => prev.filter((t) => t !== id));
     setCurrentPage(1);
   };
 
   const removeAppliedCompany = (id: number) => {
+    beginQuestionTransition();
     setDraftCompanyIds((prev) => prev.filter((c) => c !== id));
     setAppliedCompanyIds((prev) => prev.filter((c) => c !== id));
     setCurrentPage(1);
   };
 
   const removeAppliedSubject = () => {
+    beginQuestionTransition();
     setDraftSubject(initialSubject);
     setActiveSubject(initialSubject);
     setSearchParams({ category: SUBJECT_CONFIG[initialSubject].urlParam });
@@ -823,9 +843,17 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   };
 
   const removeAppliedSearch = () => {
+    beginQuestionTransition();
     setDraftSearch('');
     setAppliedSearch('');
     setCurrentPage(1);
+  };
+
+  const handlePageChange = (page: number) => {
+    if (loading || page === currentPage) return;
+    beginQuestionTransition();
+    setCurrentPage(page);
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   return (
@@ -1060,10 +1088,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                   displayedQuestionTypes.map((t) => {
                     const isChecked = draftTopicIds.includes(t.id);
                     return (
-                      <label
+                      <button
+                        type="button"
                         key={t.id}
                         onClick={() => handleTopicToggle(t.id)}
-                        className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                        aria-pressed={isChecked}
+                        className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                           <span
@@ -1082,7 +1112,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                             {t.code}
                           </span>
                         )}
-                      </label>
+                      </button>
                     );
                   })
                 )}
@@ -1132,10 +1162,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 {displayedSubjects.map((subj) => {
                   const isSelected = draftSubject === subj.code;
                   return (
-                    <label
+                    <button
+                      type="button"
                       key={subj.code}
                       onClick={() => handleSubjectClick(subj.code)}
-                      className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                      aria-pressed={isSelected}
+                      className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                         <span
@@ -1152,7 +1184,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                       <span className="text-[10px] font-mono text-slate-400 ml-1 shrink-0">
                         {subj.code}
                       </span>
-                    </label>
+                    </button>
                   );
                 })}
               </div>
@@ -1203,10 +1235,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                   displayedCompanies.map((comp) => {
                     const isChecked = draftCompanyIds.includes(Number(comp.id));
                     return (
-                      <label
+                      <button
+                        type="button"
                         key={comp.id}
                         onClick={() => handleCompanyToggle(Number(comp.id))}
-                        className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                        aria-pressed={isChecked}
+                        className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                       >
                         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                           <span
@@ -1220,7 +1254,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                           </span>
                           <span className="truncate">{comp.name}</span>
                         </div>
-                      </label>
+                      </button>
                     );
                   })
                 )}
@@ -1240,7 +1274,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
           </div>
 
           {/* RIGHT COLUMN: SEARCH, SORT, ACTIVE FILTERS & QUESTIONS LIST */}
-          <div className="lg:col-span-9 w-full flex flex-col gap-3">
+          <div ref={resultsRef} className="lg:col-span-9 w-full flex flex-col gap-3 scroll-mt-24">
             
             {/* Top Bar: Search Input + Sort Dropdown */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
@@ -1283,6 +1317,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 <select
                   value={sortBy}
                   onChange={(e) => {
+                    beginQuestionTransition();
                     setSortBy(e.target.value as any);
                     setCurrentPage(1);
                   }}
@@ -1397,18 +1432,14 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
             {/* Questions Counter & Loading Status */}
             <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between min-h-[20px]">
-              {loading && totalElements === 0 ? (
+              {loading ? (
                 <Skeleton className="h-4 w-32 rounded-md" />
               ) : !isAuthenticated ? (
                 <span>0 Questions Found</span>
               ) : (
                 <span>{totalElements} Questions Found</span>
               )}
-              {loading && (
-                <span className="text-blue-500 flex items-center gap-1.5 font-medium">
-                  <i className="fa-solid fa-spinner fa-spin text-xs"></i> Loading...
-                </span>
-              )}
+              {loading && <Skeleton className="h-4 w-16 rounded-md" />}
             </div>
 
             {/* Questions List */}
@@ -1418,9 +1449,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               )}
               {subjectsError && (
                 <RequestStatus error={subjectsError} onRetry={retrySubjects} />
-              )}
-              {error && questions.length > 0 && (
-                <RequestStatus error={`${error} Showing previous results.`} onRetry={fetchQuestions} />
               )}
               {loading && questions.length === 0 ? (
                 <AptitudeQuestionSkeleton count={6} />
@@ -1473,12 +1501,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
             </div>
 
             {/* Pagination Matching Reference Layout */}
-            {isAuthenticated && totalPages > 1 && (
+            {isAuthenticated && !error && totalPages > 1 && (
               <div className="flex items-center justify-center gap-1.5 pt-6 pb-2">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={loading || currentPage === 1}
                   className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0D1322] text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center text-xs transition-colors disabled:opacity-40 cursor-pointer"
                   aria-label="Previous Page"
                 >
@@ -1513,7 +1541,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                       <button
                         key={pageNum}
                         type="button"
-                        onClick={() => setCurrentPage(pageNum)}
+                        onClick={() => handlePageChange(pageNum)}
+                        disabled={loading || currentPage === pageNum}
                         className={`w-8 h-8 rounded-lg font-bold text-xs flex items-center justify-center transition-colors cursor-pointer ${
                           currentPage === pageNum
                             ? 'bg-blue-600 text-white shadow-xs'
@@ -1527,8 +1556,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
 
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage >= totalPages}
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                  disabled={loading || currentPage >= totalPages}
                   className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0D1322] text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center text-xs transition-colors disabled:opacity-40 cursor-pointer"
                   aria-label="Next Page"
                 >

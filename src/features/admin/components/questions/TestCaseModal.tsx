@@ -1,18 +1,18 @@
 import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionTestCase } from '../../../../services/questionService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import { getActionableErrorMessage } from '../../../../core/validation';
 import { extractTestCasesFromProblem } from '../../utils/testCaseUtils';
 import {
   Layers,
   Plus,
   Trash2,
-  Loader2,
 } from 'lucide-react';
 import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 
@@ -53,6 +53,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     retry: retryTypes,
   } = useReferenceGroup('TESTCASETYPE', isOpen);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
@@ -204,6 +205,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       return;
     }
 
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     const payload: QuestionTestCase[] = testCases.map((tc, idx) => ({
       id: tc.id,
@@ -225,6 +228,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save test cases.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -279,9 +283,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           label="Loading test cases…"
         />
         {typesLoading || casesLoading ? (
-          <div className="flex items-center justify-center p-8 text-slate-500 gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            <span>Loading Test Case Types &amp; Existing Records...</span>
+          <div role="status" aria-label="Loading test cases" className="space-y-4">
+            {[0, 1].map((item) => <div key={item} className="space-y-3 rounded-2xl border border-slate-200/80 p-5 dark:border-slate-800/80"><Skeleton className="h-7 w-32" /><div className="grid grid-cols-1 gap-3 md:grid-cols-2"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div></div>)}
           </div>
         ) : (
           <div className="space-y-4">

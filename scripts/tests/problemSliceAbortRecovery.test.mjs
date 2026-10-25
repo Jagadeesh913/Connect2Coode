@@ -412,3 +412,49 @@ describe('BATCH-2A: F-041 Redux Abort-State Recovery & Request Ownership', () =>
     });
   });
 });
+
+describe('UX regression: visible problem data belongs to the active query', () => {
+  const seedVisiblePage = () => {
+    const pending = problemReducer(undefined, {
+      type: fetchProblems.pending.type,
+      meta: { requestId: 'seed-request', arg: { page: 1, limit: 20, searchText: 'arrays' } },
+    });
+    return problemReducer(pending, {
+      type: fetchProblems.fulfilled.type,
+      meta: { requestId: 'seed-request', arg: { page: 1, limit: 20, searchText: 'arrays' } },
+      payload: {
+        key: pending.activeListKey,
+        problems: [{ id: 1, title: 'Array Sum' }],
+        pagination: { page: 1, total: 1, limit: 20, totalPages: 1 },
+        fetchedAt: Date.now(),
+      },
+    });
+  };
+
+  it('clears the previous query rows as soon as an uncached query starts', () => {
+    const seeded = seedVisiblePage();
+    assert.equal(seeded.problems[0]?.title, 'Array Sum');
+
+    const next = problemReducer(seeded, {
+      type: fetchProblems.pending.type,
+      meta: { requestId: 'new-query', arg: { page: 2, limit: 20, searchText: 'graphs' } },
+    });
+
+    assert.deepEqual(next.problems, []);
+    assert.equal(next.pagination.page, 2);
+    assert.equal(next.pagination.total, 0);
+    assert.equal(next.listLoading, true);
+  });
+
+  it('keeps current rows visible for a same-query background refresh', () => {
+    const seeded = seedVisiblePage();
+    const refreshed = problemReducer(seeded, {
+      type: fetchProblems.pending.type,
+      meta: { requestId: 'same-query', arg: { page: 1, limit: 20, searchText: 'arrays' } },
+    });
+
+    assert.equal(refreshed.problems[0]?.title, 'Array Sum');
+    assert.equal(refreshed.pagination.total, 1);
+    assert.equal(refreshed.listLoading, true);
+  });
+});

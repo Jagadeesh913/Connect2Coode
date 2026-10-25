@@ -17,6 +17,7 @@ export const Button: React.FC<ButtonProps> = ({
   rightIcon,
   className = '',
   disabled,
+  type = 'button',
   ...props
 }) => {
   const baseStyles =
@@ -41,6 +42,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      type={type}
       className={`relative ${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
       disabled={disabled || isLoading}
       aria-busy={isLoading}

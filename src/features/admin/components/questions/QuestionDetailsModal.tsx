@@ -2,6 +2,7 @@ import React from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload } from '../../../../services/questionService';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import {
   Code2,
   Terminal,
@@ -10,7 +11,6 @@ import {
   Calendar,
   Layers,
   FileText,
-  Loader2,
 } from 'lucide-react';
 
 interface QuestionDetailsModalProps {
@@ -84,9 +84,11 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
       }
     >
       {loading ? (
-        <div className="flex items-center justify-center p-8 text-slate-500 gap-2 font-sans">
-          <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-          <span>Loading Question Statement...</span>
+        <div role="status" aria-label="Loading question details" className="space-y-4 p-2">
+          <div className="flex gap-2"><Skeleton className="h-6 w-20 rounded-full" /><Skeleton className="h-6 w-24 rounded-full" /></div>
+          <Skeleton className="h-5 w-2/3" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-16 w-full" />
         </div>
       ) : question ? (
         <div className="flex flex-col gap-5 font-sans text-xs">

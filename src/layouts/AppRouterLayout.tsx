@@ -14,6 +14,7 @@ import { tokenStorage } from '../core/security/tokenStorage';
 import { decodeJwtPayload, isJwtExpired } from '../core/security/jwt';
 import { subscribeToAuthSessionEvents } from '../core/security/authSessionSync';
 import { toast } from 'react-hot-toast';
+import { RouteMetadata } from '../core/metadata/RouteMetadata';
 
 /**
  * Root route shell (F-010, F-039):
@@ -128,9 +129,9 @@ export const AppRouterLayout: React.FC = () => {
   }, [dispatch, userId]);
 
   return (
-    <>
+    <RouteMetadata>
       <ScrollRestoration />
       <Outlet />
-    </>
+    </RouteMetadata>
   );
 };

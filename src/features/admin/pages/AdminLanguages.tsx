@@ -1,5 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -13,6 +13,7 @@ import {
 } from '../../../services/admin/adminLanguageService';
 import { toast } from 'react-hot-toast';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
+import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
 import {
   adminLanguageSchema,
@@ -55,6 +56,7 @@ export const AdminLanguages: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingLanguage, setEditingLanguage] = useState<AdminLanguageItem | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
   const {
     register,
     handleSubmit,
@@ -109,6 +111,8 @@ export const AdminLanguages: React.FC = () => {
   };
 
   const handleSaveLanguage = async (data: AdminLanguageFormData) => {
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       if (editingLanguage && editingLanguage.id) {
@@ -137,12 +141,14 @@ export const AdminLanguages: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save language.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
 
   const confirmDeactivateLanguage = async () => {
-    if (!languageToDeactivate?.id) return;
+    if (!languageToDeactivate?.id || mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmittingDeactivation(true);
     try {
       await adminLanguageService.deleteLanguage(languageToDeactivate.id);
@@ -153,6 +159,7 @@ export const AdminLanguages: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to deactivate language.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmittingDeactivation(false);
     }
   };
@@ -281,9 +288,7 @@ export const AdminLanguages: React.FC = () => {
             <span>Total Runtimes</span>
             <Languages className="w-4 h-4 text-blue-500" />
           </div>
-          <div className="text-2xl font-black text-slate-900 dark:text-white">
-            {languages.length}
-          </div>
+          {pageLoading && languages.length === 0 ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-black text-slate-900 dark:text-white">{languages.length}</div>}
           <span className="text-[11px] text-slate-400">Total registered languages</span>
         </div>
 
@@ -292,9 +297,7 @@ export const AdminLanguages: React.FC = () => {
             <span>Active in Judge0</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-            {activeCount}
-          </div>
+          {pageLoading && languages.length === 0 ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{activeCount}</div>}
           <span className="text-[11px] text-slate-400">Live execution endpoints</span>
         </div>
 
@@ -303,9 +306,7 @@ export const AdminLanguages: React.FC = () => {
             <span>Dropdown Mappings</span>
             <Terminal className="w-4 h-4 text-indigo-500" />
           </div>
-          <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">
-            {activeDropdown.length}
-          </div>
+          {pageLoading && languages.length === 0 ? <Skeleton className="h-8 w-16" /> : <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{activeDropdown.length}</div>}
           <span className="text-[11px] text-slate-400">User problem dropdown options</span>
         </div>
       </div>

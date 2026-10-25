@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems } from '../redux/problemSlice';
@@ -68,7 +68,7 @@ export const ProblemList: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchInput, rawPage, setSearchParams]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let active = true;
     if (!isAuthenticated) {
       setHasFetchedOnce(true);
@@ -311,6 +311,7 @@ export const ProblemList: React.FC = () => {
                 totalElements={pagination.total}
                 pageSize={pageSize}
                 onPageChange={handlePageChange}
+                disabled={loading}
               />
             </div>
           )}

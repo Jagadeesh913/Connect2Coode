@@ -2,6 +2,7 @@ import React from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import type { Institution } from '../../../../core/types/domain';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import {
   GraduationCap,
   Building2,
@@ -9,7 +10,6 @@ import {
   MapPin,
   Calendar,
   ExternalLink,
-  Loader2,
 } from 'lucide-react';
 
 interface InstitutionDetailsModalProps {
@@ -35,7 +35,7 @@ export const InstitutionDetailsModal: React.FC<InstitutionDetailsModalProps> = (
       subtitle={
         institution
           ? `AISHE: ${institution.aisheCode} • Database ID: #${institution.id}`
-          : 'Loading...'
+          : 'Institution information'
       }
       icon={<GraduationCap className="w-5 h-5" />}
       maxWidth="lg"
@@ -49,9 +49,10 @@ export const InstitutionDetailsModal: React.FC<InstitutionDetailsModalProps> = (
       }
     >
       {loading ? (
-        <div className="py-12 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-          <span>Retrieving full institution record...</span>
+        <div role="status" aria-label="Loading institution details" className="space-y-4 py-2">
+          <div className="flex gap-2"><Skeleton className="h-6 w-24 rounded-full" /><Skeleton className="h-6 w-20 rounded-full" /></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div>
+          <Skeleton className="h-14 w-full" />
         </div>
       ) : !institution ? (
         <div className="py-8 text-center text-xs text-slate-500">

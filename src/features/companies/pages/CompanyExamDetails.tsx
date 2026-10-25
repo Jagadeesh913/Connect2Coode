@@ -31,6 +31,7 @@ import {
   ArrowRight,
   Info,
 } from 'lucide-react';
+import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 
 export const CompanyExamDetails: React.FC = () => {
   const { companyId, examId, slug } = useParams<{
@@ -131,6 +132,21 @@ export const CompanyExamDetails: React.FC = () => {
     if (!details?.exam || siblingExams.length <= 1) return null;
     return siblingExams.find((e) => e.id !== details.exam.id) || null;
   }, [details, siblingExams]);
+
+  const hasCurrentExamMetadata = Boolean(
+    details?.exam && String(details.exam.id) === String(effectiveExamId)
+  );
+  usePageMetadata(
+    hasCurrentExamMetadata && details?.exam
+      ? {
+          title: `${details.exam.examName} Exam Pattern`,
+          description:
+            details.exam.description ||
+            `Review the ${details.exam.examName} placement exam pattern, sections, timing, roles, and preparation resources.`,
+          type: 'article',
+        }
+      : null
+  );
 
   // Helper for question type styling
   const getQuestionTypeBadge = (code?: string, name?: string) => {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { CompanyCardSkeleton } from '../../../shared/components/ui/Skeleton';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
@@ -26,14 +26,28 @@ export const CompanyList: React.FC = () => {
 
   // Pagination & Data State
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
-  const [pageNumber, setPageNumber] = useState<number>(0);
   const [pageSize] = useState<number>(24);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Client-side search & filter state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchTerm = searchParams.get('q') || '';
+  const selectedIndustry = searchParams.get('industry') || 'all';
+  const rawPage = searchParams.get('page');
+  const parsedPage = Number(rawPage || '1');
+  const pageNumber = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage - 1 : 0;
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  const updateCatalogParams = useCallback((updates: Record<string, string | null>, replace = false) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      Object.entries(updates).forEach(([key, value]) => {
+        if (!value) next.delete(key);
+        else next.set(key, value);
+      });
+      return next;
+    }, { replace, preventScrollReset: true });
+  }, [setSearchParams]);
 
   const requestSequence = useRef(0);
   const loadCompanies = useCallback(
@@ -101,14 +115,21 @@ export const CompanyList: React.FC = () => {
   );
 
   useEffect(() => {
-    setPageNumber(0);
-  }, [searchTerm, selectedIndustry]);
+    if (rawPage !== null && (!Number.isInteger(parsedPage) || parsedPage < 1)) {
+      updateCatalogParams({ page: '1' }, true);
+    }
+  }, [parsedPage, rawPage, updateCatalogParams]);
 
   useEffect(() => {
-    if (pageNumber >= totalPages) {
-      setPageNumber(totalPages - 1);
+    if (!loading && pageNumber >= totalPages) {
+      updateCatalogParams({ page: String(totalPages) }, true);
     }
-  }, [pageNumber, totalPages]);
+  }, [loading, pageNumber, totalPages, updateCatalogParams]);
+
+  const handlePageChange = (nextPage: number) => {
+    updateCatalogParams({ page: nextPage > 0 ? String(nextPage + 1) : null });
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <div className="w-full flex flex-col items-center pb-20 font-sans bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 min-h-screen transition-colors duration-200 overflow-x-hidden">
@@ -145,7 +166,7 @@ export const CompanyList: React.FC = () => {
               type="text"
               placeholder="Search companies by name or keyword..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => updateCatalogParams({ q: e.target.value || null, page: null }, true)}
               className="w-full bg-transparent pl-11 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
             />
           </div>
@@ -171,7 +192,7 @@ export const CompanyList: React.FC = () => {
               <div className="relative flex-1 sm:flex-initial">
                 <select
                   value={selectedIndustry}
-                  onChange={(e) => setSelectedIndustry(e.target.value)}
+                  onChange={(e) => updateCatalogParams({ industry: e.target.value === 'all' ? null : e.target.value, page: null })}
                   className="bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 appearance-none font-semibold w-full pr-8 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer"
                 >
                   <option value="all" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-white">
@@ -189,6 +210,7 @@ export const CompanyList: React.FC = () => {
         </div>
 
         {/* 3. COMPANIES 4-COLUMN RESPONSIVE GRID */}
+        <div ref={resultsRef} className="scroll-mt-24" />
         <RequestStatus pending={loading} error={companies.length ? error : null} onRetry={() => loadCompanies()} />
         {loading && companies.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -226,8 +248,7 @@ export const CompanyList: React.FC = () => {
               description="No company matches your current search or industry filter."
               actionText="Reset Filters"
               onAction={() => {
-                setSearchTerm('');
-                setSelectedIndustry('all');
+                updateCatalogParams({ q: null, industry: null, page: null });
               }}
               icon={<Building2 className="w-12 h-12 text-slate-400" />}
             />
@@ -240,6 +261,8 @@ export const CompanyList: React.FC = () => {
               return (
                 <div
                   key={company.id || company.name}
+                  role="group"
+                  aria-label={`View ${company.name} recruitment preparation`}
                   onClick={() => navigate(`/companies/${companyTargetId}`)}
                   className="group relative bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 rounded-2xl p-5 min-h-[230px] shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
                 >
@@ -332,7 +355,7 @@ export const CompanyList: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setPageNumber((p) => Math.max(0, p - 1))}
+                onClick={() => handlePageChange(Math.max(0, pageNumber - 1))}
                 disabled={pageNumber === 0}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] text-xs font-semibold text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >
@@ -346,7 +369,7 @@ export const CompanyList: React.FC = () => {
 
               <button
                 type="button"
-                onClick={() => setPageNumber((p) => Math.min(totalPages - 1, p + 1))}
+                onClick={() => handlePageChange(Math.min(totalPages - 1, pageNumber + 1))}
                 disabled={pageNumber >= totalPages - 1}
                 className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#111A2E] text-xs font-semibold text-slate-700 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
               >

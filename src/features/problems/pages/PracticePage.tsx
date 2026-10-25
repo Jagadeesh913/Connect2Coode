@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems, resetFilters } from '../redux/problemSlice';
@@ -55,6 +55,7 @@ export const PracticePage: React.FC = () => {
   const [showMoreCompanies, setShowMoreCompanies] = useState(false);
   const [showMorePlatforms, setShowMorePlatforms] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   // Sync draft states whenever URL params change
   useEffect(() => {
@@ -223,8 +224,8 @@ export const PracticePage: React.FC = () => {
 
   const [retryAttempt, setRetryAttempt] = useState(0);
 
-  // Fetch real problems from backend API (ONLY triggers when applied URL params or page change)
-  useEffect(() => {
+  // Start query transitions before paint so old rows never flash beneath new URL filters.
+  useLayoutEffect(() => {
     let active = true;
     if (!isAuthenticated) {
       setHasFetchedOnce(true);
@@ -331,6 +332,7 @@ export const PracticePage: React.FC = () => {
 
   const handlePageChange = (newPage: number) => {
     updatePracticeParams({ page: String(newPage) });
+    resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleBookmarkToggle = (
@@ -698,10 +700,12 @@ export const PracticePage: React.FC = () => {
                         draftPlatform.toLowerCase() === plat.refCode.toLowerCase() ||
                         draftPlatform.toLowerCase() === plat.refName.toLowerCase();
                       return (
-                        <label
+                        <button
+                          type="button"
                           key={plat.id}
                           onClick={() => handlePlatformClick(String(plat.id))}
-                          className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                          aria-pressed={isSelected}
+                          className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
                           <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                             <span
@@ -718,7 +722,7 @@ export const PracticePage: React.FC = () => {
                           <span className="text-[10px] font-mono text-slate-400 ml-1 shrink-0">
                             {plat.refCode}
                           </span>
-                        </label>
+                        </button>
                       );
                     })}
                 </div>
@@ -758,10 +762,12 @@ export const PracticePage: React.FC = () => {
                         draftTopic === String(topic.id) ||
                         draftTopic.toLowerCase() === topic.refName.toLowerCase();
                       return (
-                        <label
+                        <button
+                          type="button"
                           key={topic.id}
                           onClick={() => handleTopicClick(String(topic.id))}
-                          className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                          aria-pressed={isSelected}
+                          className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
                           <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                             <span
@@ -775,7 +781,7 @@ export const PracticePage: React.FC = () => {
                             </span>
                             <span className="truncate">{topic.refName}</span>
                           </div>
-                        </label>
+                        </button>
                       );
                     })}
                 </div>
@@ -812,16 +818,19 @@ export const PracticePage: React.FC = () => {
                     .slice(0, showMoreCompanies ? filteredCompanies.length : 8)
                     .map((comp) => {
                       const compId = String(comp.id || comp.slug || comp.name);
-                      const isSelected =
+                      const isSelected = Boolean(
                         draftCompany === compId ||
                         draftCompany === String(comp.id) ||
                         draftCompany.toLowerCase() === comp.name.toLowerCase() ||
-                        (comp.slug && draftCompany.toLowerCase() === comp.slug.toLowerCase());
+                        (comp.slug && draftCompany.toLowerCase() === comp.slug.toLowerCase())
+                      );
                       return (
-                        <label
+                        <button
+                          type="button"
                           key={compId}
                           onClick={() => handleCompanyClick(String(comp.id))}
-                          className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                          aria-pressed={isSelected}
+                          className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                         >
                           <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
                             <span
@@ -835,7 +844,7 @@ export const PracticePage: React.FC = () => {
                             </span>
                             <span className="truncate">{comp.name}</span>
                           </div>
-                        </label>
+                        </button>
                       );
                     })}
                 </div>
@@ -855,7 +864,7 @@ export const PracticePage: React.FC = () => {
           </div>
 
           {/* MAIN DATA TABLE (Right 9 cols on lg) */}
-          <div className="lg:col-span-9 flex flex-col gap-4">
+          <div ref={resultsRef} className="lg:col-span-9 flex flex-col gap-4 scroll-mt-24">
             {!isAuthenticated && displayedProblems.length === 0 ? (
               <EmptyState
                 title="Sign in to explore Problem Bank"

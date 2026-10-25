@@ -80,6 +80,7 @@ export const AdminMcqs: React.FC = () => {
   const [viewLoadingId, setViewLoadingId] = useState<number | null>(null);
   const [editingLoadingId, setEditingLoadingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
 
   // Form State
   const [formSubjectRefCode, setFormSubjectRefCode] = useState<string>('');
@@ -191,6 +192,9 @@ export const AdminMcqs: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setMcqs([]);
+    setTotalElements(0);
+    setTotalPages(1);
 
     try {
       const response = await adminMcqService.getMcqs(
@@ -359,6 +363,8 @@ export const AdminMcqs: React.FC = () => {
       return;
     }
 
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       const topicGroupCode = resolveTopicGroupCode(formSubjectRefCode);
@@ -429,14 +435,16 @@ export const AdminMcqs: React.FC = () => {
         )
       );
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
 
   // Handle Delete MCQ
   const handleDeleteConfirm = async () => {
-    if (!selectedMcq) return;
+    if (!selectedMcq || mutationPendingRef.current) return;
 
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       await adminMcqService.deleteMcq(selectedMcq.id);
@@ -447,6 +455,7 @@ export const AdminMcqs: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to delete MCQ'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -748,6 +757,7 @@ export const AdminMcqs: React.FC = () => {
           {/* Pagination */}
           {totalElements > 0 && (
             <Pagination
+              disabled={loading}
               currentPage={pageNumber + 1}
               totalPages={totalPages}
               totalElements={totalElements}

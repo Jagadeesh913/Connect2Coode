@@ -41,6 +41,7 @@ export const AdminCompanies: React.FC = () => {
   const [detailsLoading, setDetailsLoading] = useState<boolean>(false);
   const [editingCompanyId, setEditingCompanyId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
 
   /**
    * REAL API ONLY — GET /api/v1/company
@@ -133,6 +134,8 @@ export const AdminCompanies: React.FC = () => {
   };
 
   const handleSaveCompany = async (formData: CompanyFormData) => {
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       const payload: CompanyItem = {
@@ -151,6 +154,7 @@ export const AdminCompanies: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save company entity.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -376,8 +380,16 @@ export const AdminCompanies: React.FC = () => {
             return (
               <div
                 key={c.id || c.name}
+                role="button"
+                tabIndex={0}
                 onClick={() => c.id && handleInspect(c.id)}
-                className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 space-y-3.5 shadow-xs hover:shadow-md hover:border-blue-400/50 transition-all cursor-pointer group text-left"
+                onKeyDown={(event) => {
+                  if (c.id && event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+                    event.preventDefault();
+                    void handleInspect(c.id);
+                  }
+                }}
+                className="p-5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 space-y-3.5 shadow-xs hover:shadow-md hover:border-blue-400/50 transition-all cursor-pointer group text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">

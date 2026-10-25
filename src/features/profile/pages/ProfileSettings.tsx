@@ -57,6 +57,7 @@ export const UserProfilePage: React.FC = () => {
   const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
   const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
 
   // Institution display enrichment remains page-local; academic data lives in Redux.
   const [institution, setInstitution] = useState<Institution | null>(null);
@@ -255,6 +256,8 @@ export const UserProfilePage: React.FC = () => {
       return;
     }
 
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       await dispatch(
@@ -285,6 +288,7 @@ export const UserProfilePage: React.FC = () => {
       );
       toast.error(errorMsg);
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -297,6 +301,8 @@ export const UserProfilePage: React.FC = () => {
       return;
     }
 
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       const token = tokenStorage.getAccessToken();
@@ -350,6 +356,7 @@ export const UserProfilePage: React.FC = () => {
       );
       toast.error(errorMsg);
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };

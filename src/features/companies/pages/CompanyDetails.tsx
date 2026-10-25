@@ -21,6 +21,7 @@ import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { GraduationCap, Code2 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
+import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -139,6 +140,17 @@ export const CompanyDetails: React.FC = () => {
 
   const companyId = company?.id;
   const companyName = company?.name;
+
+  usePageMetadata(
+    company
+      ? {
+          title: `${company.name} Placement Preparation`,
+          description:
+            company.description ||
+            `Prepare for ${company.name} placement exams with hiring patterns, aptitude topics, and coding questions.`,
+        }
+      : null
+  );
 
   // Fetch Company Related Exams (API driven)
   useEffect(() => {
@@ -410,6 +422,14 @@ export const CompanyDetails: React.FC = () => {
             </Link>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (isDetailsLoading && !company) {
+    return (
+      <div aria-busy="true" className="min-h-screen bg-white pb-24 text-slate-900 dark:bg-[#070A13] dark:text-slate-100">
+        <CompanyDetailsSkeleton />
       </div>
     );
   }

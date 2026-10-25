@@ -64,6 +64,7 @@ export const AdminQuestions: React.FC = () => {
   const [editingQuestionId, setEditingQuestionId] = useState<string | number | null>(null);
   const [loadingTestCasesId, setLoadingTestCasesId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
+  const mutationPendingRef = useRef(false);
   const detailRequestId = useRef(0);
 
   // Search Debouncing
@@ -108,6 +109,9 @@ export const AdminQuestions: React.FC = () => {
 
     setLoading(true);
     setError(null);
+    setQuestions([]);
+    setTotalElements(0);
+    setTotalPages(1);
     try {
       const levelArr: number[] | null = selectedDifficulty && !isNaN(Number(selectedDifficulty)) ? [Number(selectedDifficulty)] : null;
       const topicArr: number[] | null = selectedTopic && !isNaN(Number(selectedTopic)) ? [Number(selectedTopic)] : null;
@@ -278,6 +282,8 @@ export const AdminQuestions: React.FC = () => {
   };
 
   const handleSaveQuestion = async (formData: QuestionFormData) => {
+    if (mutationPendingRef.current) return;
+    mutationPendingRef.current = true;
     setSubmitting(true);
     try {
       const questionId = formData.id ? Number(formData.id) : undefined;
@@ -465,6 +471,7 @@ export const AdminQuestions: React.FC = () => {
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save question entity.'));
     } finally {
+      mutationPendingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -791,6 +798,7 @@ export const AdminQuestions: React.FC = () => {
           {/* Pagination */}
           {totalElements > 0 && (
             <Pagination
+              disabled={loading}
               currentPage={pageNumber + 1}
               totalPages={totalPages}
               totalElements={totalElements}

@@ -124,7 +124,7 @@ sequenceDiagram
     Router->>Router: Evaluate current pathname & active route guard
 ```
 
-1. **`index.html`**: Defines the `<div id="root"></div>` container, loads Google Fonts (`Plus Jakarta Sans`, `Inter`, `JetBrains Mono`), and sets initial theme script to prevent light-theme flash.
+1. **`index.html`**: Defines the `<div id="root"></div>` container, branded favicon/manifest links, and a complete default SEO/social metadata set for the initial HTML response, then loads the application fonts.
 2. **`src/main.tsx`**: Obtains `#root`, validates DOM presence, and mounts `<App />` within React `StrictMode`.
 3. **`src/App.tsx`**: Wraps the tree with:
    - `<Provider store={store}>` (Redux)
@@ -133,6 +133,8 @@ sequenceDiagram
    - `<Toaster>` (react-hot-toast with custom glassmorphism styles)
    - `<AppErrorBoundary>` (catches runtime rendering crashes)
    - `<RouterProvider router={router} />` (React Router v7)
+
+`AppRouterLayout` mounts [`RouteMetadata`](../../src/core/metadata/RouteMetadata.tsx) around every route. [`pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts) owns the route defaults and canonical policy; dynamic problem, company, and company-exam pages use [`usePageMetadata`](../../src/core/metadata/usePageMetadata.ts) only after the loaded entity matches the current route. The override is keyed to React Router's navigation key so metadata from a previous detail page cannot survive client-side navigation.
 
 ---
 

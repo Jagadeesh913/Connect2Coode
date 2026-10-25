@@ -5,6 +5,7 @@ import { AdminBadge } from '../AdminBadge';
 import { CompanyItem, adminCompanyService } from '../../../../services/admin/adminCompanyService';
 import { companyService } from '../../../../services/companyService';
 import { CompanyBrandLogo } from '../../../companies/components/CompanyBrandLogo';
+import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import {
   CompanyExamFormModal,
   CompanyExamFormData,
@@ -31,7 +32,6 @@ import {
   Globe,
   Hash,
   Code2,
-  Loader2,
   FileText,
   GraduationCap,
   Plus,
@@ -353,9 +353,10 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
         }
       >
         {loading ? (
-          <div className="flex items-center justify-center p-8 text-slate-500 gap-2 font-sans">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-            <span>Loading Company Information...</span>
+          <div role="status" aria-label="Loading company information" className="space-y-4 p-2">
+            <div className="flex items-center gap-4"><Skeleton className="h-14 w-14 rounded-2xl" /><div className="flex-1 space-y-2"><Skeleton className="h-5 w-1/2" /><Skeleton className="h-3 w-3/4" /></div></div>
+            <Skeleton className="h-10 w-full rounded-xl" />
+            <Skeleton className="h-36 w-full rounded-2xl" />
           </div>
         ) : company ? (
           <div className="flex flex-col gap-4 font-sans text-xs">
@@ -472,18 +473,15 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                       <span>Tagged DSA Questions ({problems.length})</span>
                     </div>
                     <RequestStatus error={problemsError} onRetry={fetchProblems} />
-                    {problemsLoading && (
-                      <span className="text-[11px] text-slate-400 flex items-center gap-1 font-mono">
-                        <Loader2 className="w-3 h-3 animate-spin text-blue-600" /> Loading...
-                      </span>
-                    )}
                   </div>
 
-                  {problems.length === 0 && !problemsError ? (
+                  {problemsLoading ? (
+                    <div role="status" aria-label="Loading tagged questions" className="space-y-2">
+                      <Skeleton className="h-12 w-full rounded-xl" count={3} />
+                    </div>
+                  ) : problems.length === 0 && !problemsError ? (
                     <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl text-slate-500 italic text-xs text-center">
-                      {problemsLoading
-                        ? 'Fetching tagged questions...'
-                        : 'No DSA questions currently tagged to this company.'}
+                      No DSA questions currently tagged to this company.
                     </div>
                   ) : (
                     <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
@@ -556,9 +554,8 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                 {/* Exams List */}
                 <RequestStatus error={examsError} onRetry={fetchExams} />
                 {examsLoading && exams.length === 0 ? (
-                  <div className="flex items-center justify-center p-8 text-slate-500 gap-2 font-sans">
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                    <span>Loading company exams...</span>
+                  <div role="status" aria-label="Loading company exams" className="space-y-3">
+                    <Skeleton className="h-24 w-full rounded-2xl" count={3} />
                   </div>
                 ) : examsError && exams.length === 0 ? null : exams.length === 0 ? (
                   <div className="p-8 text-center rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-dashed border-slate-300 dark:border-slate-800 space-y-3">
@@ -660,9 +657,9 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                             <div className="p-4 border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 space-y-5">
                               <RequestStatus error={examErrors[exam.id]} onRetry={() => fetchExamDetails(exam.id)} />
                               {detailsLoading ? (
-                                <div className="flex items-center justify-center p-6 text-slate-500 gap-2 font-sans">
-                                  <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                                  <span>Loading exam roles & pattern...</span>
+                                <div role="status" aria-label="Loading exam roles and pattern" className="space-y-3 py-2">
+                                  <Skeleton className="h-16 w-full rounded-xl" />
+                                  <Skeleton className="h-28 w-full rounded-xl" />
                                 </div>
                               ) : examErrors[exam.id] && !details ? null : (
                                 <>

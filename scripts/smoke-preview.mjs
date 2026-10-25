@@ -2,11 +2,14 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const host = '127.0.0.1';
-const port = 4173;
+const port = Number(process.env.C2C_SMOKE_PORT || 4173);
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  throw new Error('C2C_SMOKE_PORT must be a valid TCP port number.');
+}
 const baseUrl = `http://${host}:${port}`;
 const routes = ['/', '/login', '/practice', '/problems/1', '/companies/tcs'];
 
-const server = spawn('npm', ['run', 'preview', '--', '--host', host, '--port', String(port)], {
+const server = spawn('npm', ['run', 'preview', '--', '--host', host, '--port', String(port), '--strictPort'], {
   stdio: ['ignore', 'pipe', 'pipe'],
   shell: true,
 });

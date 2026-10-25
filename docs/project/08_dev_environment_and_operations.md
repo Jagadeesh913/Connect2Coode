@@ -22,6 +22,7 @@
 | :--- | :--- | :--- |
 | `VITE_API_BASE_URL` | `https://api.connect2code.in/api/v1` | Root API base URL targeting the remote Spring Boot backend. |
 | `VITE_APP_NAME` | `Connect 2 Code` | Platform application name display. |
+| `VITE_SITE_URL` | Empty (optional) | Canonical frontend origin for deployed metadata, such as `https://app.example.com`. When omitted, the metadata manager uses the current browser origin; do not configure a path or an HTTP production URL. |
 | `VITE_BRANDFETCH_CLIENT_ID` | Empty (optional) | Public Brandfetch client ID used for domain-derived company logos after bundled assets. When omitted, the cascade continues with Simple Icons, the official-site favicon, and a deterministic monogram. Never put a secret key in a `VITE_` variable. |
 | `VITE_SHOW_COMING_SOON` | `true` (defaults to true) | Feature flag routing unimplemented routes (`/interviews`, `/roadmaps/:slug`) to `<ComingSoon />`. Set to `false` to preview draft implementations. |
 
@@ -107,6 +108,7 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
 ```
 - **SPA Fallback**: Rule `/(.*) -> /index.html` guarantees that deep URLs (e.g. `/problems/two-sum` or `/companies/tcs`) reload without HTTP 404 errors.
 - **Edge Proxy**: Rewrites `/api/*` and `/oauth2/*` directly to `https://api.connect2code.in`.
+- **Metadata on Deep Links**: `index.html` supplies branded default tags/icons before JavaScript loads. After hydration, `RouteMetadata` resolves the exact deep-link title, description, canonical URL, robots policy, and social tags using `VITE_SITE_URL` or the browser origin.
 
 ---
 
@@ -129,6 +131,8 @@ steps:
   - run: npm run build
   - run: node scripts/smoke-preview.mjs
 ```
+
+The smoke harness defaults to port 4173. Local runs may set `C2C_SMOKE_PORT` to another available port; strict-port startup prevents false timeouts caused by Vite silently selecting a different port.
 
 ### Operational Note on `.env` in Local vs CI
 - `npm run verify:architecture` checks if a `.env` file exists and fails if found.

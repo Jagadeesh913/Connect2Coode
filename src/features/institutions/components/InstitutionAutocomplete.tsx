@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { institutionService } from '../../../services/institutionService';
 import type { InstitutionOptionDTO } from '../../../core/types/domain';
+import { Skeleton } from '../../../shared/components/ui/Skeleton';
 
 export interface InstitutionAutocompleteProps {
   id?: string;
@@ -251,9 +252,13 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
       {isOpen && (
         <div className="absolute top-full left-0 right-0 mt-1.5 z-50 max-h-72 overflow-y-auto rounded-2xl border border-slate-200 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-2xl divide-y divide-slate-100 dark:divide-white/5 animate-fade-in">
           {loading && options.length === 0 && (
-            <div className="p-4 text-center text-xs text-slate-500 dark:text-gray-400 flex items-center justify-center gap-2">
-              <i className="fa-solid fa-spinner fa-spin text-blue-500"></i>
-              <span>Searching colleges & universities...</span>
+            <div role="status" aria-label="Searching institutions" className="space-y-3 p-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="flex items-center justify-between gap-3">
+                  <div className="flex-1 space-y-2"><Skeleton className="h-4 w-2/3" /><Skeleton className="h-3 w-1/3" /></div>
+                  <Skeleton className="h-5 w-20 rounded-md" />
+                </div>
+              ))}
             </div>
           )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -63,6 +63,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [loginSubmitting, setLoginSubmitting] = useState<boolean>(false);
+  const authActionPendingRef = useRef(false);
 
   // --------------------------------------------------------------------------
   // DIRECT SIGNUP STATE (NO OTP)
@@ -158,6 +159,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   // LOGIN SUBMIT
   // --------------------------------------------------------------------------
   const onLoginSubmit = async (data: LoginFormData) => {
+    if (authActionPendingRef.current) return;
+    authActionPendingRef.current = true;
     setLoginSubmitting(true);
     try {
       const result = await dispatch(loginUser(data));
@@ -209,6 +212,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         toast.error(getActionableErrorMessage(result.payload, 'Invalid email or password. Please verify and try again.'));
       }
     } finally {
+      authActionPendingRef.current = false;
       setLoginSubmitting(false);
     }
   };
@@ -217,6 +221,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   // DIRECT SIGNUP (NO OTP REQUIRED)
   // --------------------------------------------------------------------------
   const onSignupSubmit = async (data: SignupFormData) => {
+    if (authActionPendingRef.current) return;
+    authActionPendingRef.current = true;
     setSignupError('');
     setSignupLoading(true);
 
@@ -247,6 +253,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       const errMsg = getActionableErrorMessage(err, 'Failed to create account. Please try again.');
       setSignupError(errMsg);
       toast.error(errMsg);
+    } finally {
+      authActionPendingRef.current = false;
     }
   };
 
@@ -255,12 +263,14 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   // --------------------------------------------------------------------------
   const handleSendForgotOtp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authActionPendingRef.current) return;
     const parseResult = forgotPasswordStep1Schema.safeParse({ email: forgotEmail });
     if (!parseResult.success) {
       setForgotOtpError(parseResult.error.issues[0]?.message || 'Enter your email address.');
       return;
     }
     setForgotOtpError('');
+    authActionPendingRef.current = true;
     setForgotOtpLoading(true);
 
     try {
@@ -288,6 +298,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       const errMsg = getActionableErrorMessage(err, 'Failed to send OTP.');
       setForgotOtpError(errMsg);
       toast.error(errMsg);
+    } finally {
+      authActionPendingRef.current = false;
     }
   };
 
@@ -296,6 +308,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   // --------------------------------------------------------------------------
   const handleVerifyForgotOtpAndReset = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (authActionPendingRef.current) return;
     setForgotOtpError('');
     setForgotCodeError('');
     setForgotNewPasswordError('');
@@ -317,6 +330,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       return;
     }
 
+    authActionPendingRef.current = true;
     setForgotOtpLoading(true);
 
     try {
@@ -348,11 +362,14 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       setForgotOtpLoading(false);
       setForgotOtpError(err?.message || 'Error resetting password.');
       toast.error(err?.message || 'Error resetting password.');
+    } finally {
+      authActionPendingRef.current = false;
     }
   };
 
   const handleResendForgotOtp = async () => {
-    if (!forgotEmail.trim() || forgotOtpTimer > 0) return;
+    if (!forgotEmail.trim() || forgotOtpTimer > 0 || authActionPendingRef.current) return;
+    authActionPendingRef.current = true;
     setForgotOtpLoading(true);
     setForgotOtpError('');
     try {
@@ -368,6 +385,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     } catch (err: any) {
       setForgotOtpLoading(false);
       toast.error(err?.message || 'Failed to resend OTP.');
+    } finally {
+      authActionPendingRef.current = false;
     }
   };
 

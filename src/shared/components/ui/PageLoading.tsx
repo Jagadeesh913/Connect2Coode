@@ -21,8 +21,7 @@ export const PageLoading: React.FC = () => {
   } else if (/practice|dsa-sheet|admin/.test(pathname)) {
     content = <><Skeleton className="h-32 w-full" /><Skeleton className="h-12 w-full" /><Skeleton className="h-14 w-full" count={10} /></>;
   } else {
-    // Static pages only wait for their JavaScript; do not simulate a data request.
-    content = <div className="min-h-[60vh] flex items-center justify-center"><span>Loading page…</span></div>;
+    content = <><Skeleton className="h-10 w-64" /><Skeleton className="h-40 w-full" /><Skeleton className="h-20 w-full" count={4} /></>;
   }
   return <div role="status" aria-label="Loading page" aria-busy="true" className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">{content}</div>;
 };

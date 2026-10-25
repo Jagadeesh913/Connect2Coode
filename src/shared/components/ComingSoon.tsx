@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../context/ThemeContext';
@@ -33,10 +33,6 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ featureName }) => {
     if (path.includes('company-patterns')) return 'Company Patterns';
     return 'Feature';
   })();
-
-  useEffect(() => {
-    document.title = `${activeTitle} — Coming Soon | Connect 2 Code`;
-  }, [activeTitle]);
 
   const handleNotifySubmit = (e: React.FormEvent) => {
     e.preventDefault();

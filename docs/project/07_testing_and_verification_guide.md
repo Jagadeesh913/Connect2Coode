@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 267 tests passed, 0 failed on 2026-10-25.
+- **Current verified run**: 288 tests passed, 0 failed on 2026-10-25.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -24,12 +24,14 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`googleOAuthLifecycle.test.mjs`](../../scripts/tests/googleOAuthLifecycle.test.mjs) | Google OAuth, Redux auth lifecycle, single-flight refresh, open-redirect prevention. | 14 |
 | [`institutionManagement.test.mjs`](../../scripts/tests/institutionManagement.test.mjs) | AISHE uppercase transforms, university affiliation logic, status toggle. | 9 |
 | [`mcqCorrectOption.test.mjs`](../../scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, stale-field rejection, and aptitude category URL parsing. | 7 |
+| [`metadataAndBranding.test.mjs`](../../scripts/tests/metadataAndBranding.test.mjs) | Default head-tag uniqueness, icon/manifest dimensions, complete route metadata coverage, indexing policy, centralized title ownership, and dynamic detail overrides. | 6 |
 | [`problemExecution.test.mjs`](../../scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, and hook cancellation lifecycle. | 15 |
 | [`problemSliceAbortRecovery.test.mjs`](../../scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 12 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, pagination semantics, and stable initial MCQ requests. | 10 |
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
-| **Total** | **All 17 test files (89 reported suites)** | **267 / 267 Passing** |
+| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, and focus-safe shared controls. | 13 |
+| **Total** | **All 19 test files (91 reported suites)** | **288 / 288 Passing** |
 
 ---
 
@@ -82,7 +84,7 @@ Executes `tsc -p tsconfig.json --noEmit`. Expected: Exits with code 0.
 ```bash
 npm test
 ```
-Executes all test files in `scripts/tests/`. Current verified result: `267 pass, 0 fail`.
+Executes all test files in `scripts/tests/`. Current verified result: `282 pass, 0 fail`.
 
 ### 4. Production Build
 ```bash
@@ -94,7 +96,7 @@ Executes Vite production bundle build. Expected: Generates `dist/` bundle cleanl
 ```bash
 node scripts/smoke-preview.mjs
 ```
-Spawns Vite preview server on `http://127.0.0.1:4173`, fetches critical routes (`/`, `/login`, `/practice`, `/problems/1`, `/companies/tcs`), and verifies that JS/CSS assets load with HTTP 200 without SPA HTML fallbacks.
+Spawns Vite preview server on `http://127.0.0.1:4173`, fetches critical routes (`/`, `/login`, `/practice`, `/problems/1`, `/companies/tcs`), and verifies that JS/CSS assets load with HTTP 200 without SPA HTML fallbacks. Set `C2C_SMOKE_PORT` to an unused port when 4173 is occupied; the harness uses Vite's strict-port mode so it never polls a different port than the one actually started.
 
 ### 6. Architecture Verification
 ```bash

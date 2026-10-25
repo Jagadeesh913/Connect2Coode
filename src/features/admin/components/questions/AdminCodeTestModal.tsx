@@ -17,7 +17,6 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
-  Loader2,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
 import { fetchLanguages } from '../../../languages/redux/languageSlice';
@@ -312,9 +311,10 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           {isStatementOpen && (
             <div className="p-4 pt-0 border-t border-slate-200/60 dark:border-slate-800/60 space-y-3 text-xs leading-relaxed">
               {loadingDetails ? (
-                <div className="flex items-center gap-2 text-slate-400 py-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Loading statement details...</span>
+                <div role="status" aria-label="Loading problem statement" className="space-y-3 py-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-5/6" />
+                  <Skeleton className="h-16 w-full rounded-xl" />
                 </div>
               ) : questionDetails ? (
                 <>
