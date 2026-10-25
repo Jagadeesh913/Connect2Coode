@@ -1011,7 +1011,7 @@ export const PracticePage: React.FC = () => {
             </div>
 
             {/* Pagination Controls (Standardized 20 problems per page) */}
-            {!isProblemsLoading && totalPages > 0 && displayedProblems.length > 0 && (
+            {!isProblemsLoading && totalPages > 0 && (displayedProblems.length > 0 || (pagination?.total && pagination.total > 0)) && (
               <div className="pt-2">
                 <Pagination
                   currentPage={currentPage}

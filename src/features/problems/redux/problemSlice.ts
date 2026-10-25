@@ -298,6 +298,10 @@ const problemSlice = createSlice({
     setPaginationPage(state, action) {
       state.pagination.page = action.payload;
     },
+    invalidateProblemCache(state) {
+      state.listCache = {};
+      state.activeListKey = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -439,5 +443,5 @@ const problemSlice = createSlice({
   },
 });
 
-export const { setFilter, resetFilters, setPaginationPage } = problemSlice.actions;
+export const { setFilter, resetFilters, setPaginationPage, invalidateProblemCache } = problemSlice.actions;
 export default problemSlice.reducer;

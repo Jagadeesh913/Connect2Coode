@@ -25,8 +25,11 @@ import {
   Terminal,
 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
+import { useAppDispatch } from '../../../app/hooks';
+import { invalidateProblemCache } from '../../problems/redux/problemSlice';
 
 export const AdminQuestions: React.FC = () => {
+  const dispatch = useAppDispatch();
   const [questions, setQuestions] = useState<QuestionPayload[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -443,9 +446,22 @@ export const AdminQuestions: React.FC = () => {
         }
       }
 
+      dispatch(invalidateProblemCache());
+      const isCreate = !formData.id;
       toast.success(formData.id ? 'Question updated successfully!' : 'Question published successfully!');
       setIsFormOpen(false);
-      await fetchQuestions();
+
+      if (isCreate) {
+        // Automatically switch to the last page so the admin can immediately see the newly created problem
+        const targetLastPage = Math.max(0, Math.ceil((totalElements + 1) / pageSize) - 1);
+        if (targetLastPage === pageNumber) {
+          await fetchQuestions();
+        } else {
+          setPageNumber(targetLastPage);
+        }
+      } else {
+        await fetchQuestions();
+      }
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save question entity.'));
     } finally {

@@ -102,7 +102,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
 
         assert.equal(res.statusCode, 200);
         assert.equal(res.data.content.length, 24);
-        assert.equal(res.data.totalElements, 24);
+        assert.equal(res.data.totalElements, 50, 'Dynamic total elements must reflect actual live count');
       } finally {
         apiClient.post = originalPost;
       }
@@ -141,7 +141,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
   });
 
   describe('2. Offset 20 Backend 500 Recovery', () => {
-    it('recovers offset 20 (page 2 with pageSize 10) by fetching the safe slice at offset 20', async () => {
+    it('recovers offset 20 (page 2 with pageSize 10) by fetching the safe slice at offset 20 without capping to 24', async () => {
       const originalPost = apiClient.post;
       try {
         let calls = [];
@@ -163,8 +163,8 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 28, title: 'Automated Audit Verification' },
                   { id: 30, title: 'Testing on 22-10-2026' },
                 ],
-                totalElements: 49,
-                totalPages: 13,
+                totalElements: 50,
+                totalPages: 5,
                 number: 5,
                 size: 4,
               },
@@ -183,8 +183,8 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
 
         assert.equal(res.statusCode, 200);
         assert.equal(res.data.content.length, 4);
-        assert.equal(res.data.totalElements, 24);
-        assert.equal(res.data.totalPages, 3);
+        assert.equal(res.data.totalElements, 50, 'Must preserve dynamic totalElements 50 to allow forward navigation');
+        assert.equal(res.data.totalPages, 5, 'Must compute dynamic totalPages 5 for pageSize 10');
         assert.equal(res.data.content[0].id, 22);
         assert.equal(res.data.content[3].id, 30);
       } finally {
@@ -212,8 +212,8 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 28, title: 'Automated Audit Verification' },
                   { id: 30, title: 'Testing on 22-10-2026' },
                 ],
-                totalElements: 49,
-                totalPages: 13,
+                totalElements: 50,
+                totalPages: 5,
                 number: 5,
                 size: 4,
               },
@@ -226,8 +226,63 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
         assert.equal(res.statusCode, 200);
         assert.equal(res.data.length, 4);
         assert.equal(res.meta.page, 3);
-        assert.equal(res.meta.total, 24);
-        assert.equal(res.meta.totalPages, 3);
+        assert.equal(res.meta.total, 50);
+        assert.equal(res.meta.totalPages, 5);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('recovers newly created questions on the last page via micro-batching', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          // Standard page 4 (offset 40..49) fails because 40..47 are corrupt
+          if (payload.pageRequest?.pageSize === 10 && payload.pageRequest?.pageNumber === 4) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          // Micro-batching probes individual items with pageSize 1
+          if (payload.pageRequest?.pageSize === 1) {
+            const offset = payload.pageRequest.pageNumber;
+            if (offset >= 40 && offset <= 47) {
+              const err = new Error('Questions Fetch Unsuccessful');
+              err.statusCode = 500;
+              throw err;
+            }
+            if (offset === 48) {
+              return {
+                statusCode: 200,
+                message: 'OK',
+                data: { content: [{ id: 55, title: 'Longest Subarray With Sum K' }], totalElements: 50 },
+              };
+            }
+            if (offset === 49) {
+              return {
+                statusCode: 200,
+                message: 'OK',
+                data: { content: [{ id: 56, title: 'First Repeated Digit' }], totalElements: 50 },
+              };
+            }
+          }
+          throw new Error('Unexpected call: ' + JSON.stringify(payload));
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: null,
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 4, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 2, 'Recovers both healthy newly created questions');
+        assert.equal(res.data.content[0].id, 55);
+        assert.equal(res.data.content[1].id, 56);
+        assert.equal(res.data.totalElements, 50);
+        assert.equal(res.data.totalPages, 5);
       } finally {
         apiClient.post = originalPost;
       }
@@ -249,13 +304,13 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           companies: null,
           topic: null,
           searchText: null,
-          pageRequest: { pageNumber: 4, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+          pageRequest: { pageNumber: 6, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
         });
 
         assert.equal(res.statusCode, 200);
         assert.equal(res.data.content.length, 0);
-        assert.equal(res.data.totalElements, 24);
-        assert.equal(res.data.totalPages, 3);
+        assert.equal(res.data.totalElements, 50);
+        assert.equal(res.data.totalPages, 5);
         assert.equal(res.data.empty, true);
       } finally {
         apiClient.post = originalPost;

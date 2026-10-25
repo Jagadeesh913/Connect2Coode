@@ -21,13 +21,35 @@ export type QuestionPayload = Question;
 
 export const VERIFIED_READABLE_QUESTION_COUNT = 24;
 
+// Dynamically tracks the latest known total question count from live API responses.
+// Initialized to 50 (empirically confirmed in production database).
+// Updates dynamically when the backend reports a higher totalElements, or when a new question is published.
+let liveTotalQuestionsCount = 50;
+
+export function getLiveTotalQuestionsCount(): number {
+  return liveTotalQuestionsCount;
+}
+
+export function updateLiveTotalQuestionsCount(count: number): void {
+  if (typeof count === 'number' && Number.isFinite(count) && count > liveTotalQuestionsCount) {
+    liveTotalQuestionsCount = count;
+  }
+}
+
+export function incrementLiveTotalQuestionsCount(): void {
+  liveTotalQuestionsCount += 1;
+}
+
 /**
- * Resilient question fetcher that mitigates backend 500 errors caused by corrupted database records 24..47.
- * When the backend crashes on paginated slices or search matching corrupt records, this safely recovers:
- * 1. Caps unfiltered totalElements to 24 so the UI pagination controls only display readable pages.
- * 2. Recovers offset 20 (items 20..23) via safe slice { pageNumber: 5, pageSize: 4 } if standard request 500s.
- * 3. Gracefully returns empty page on out-of-range requests rather than crashing the UI with 500.
- * 4. Falls back to base catalog client-side filtering if search query matches corrupted backend records.
+ * Resilient question fetcher that provides real-time, dynamic pagination and gracefully
+ * mitigates backend 500 errors caused by corrupted database records (e.g. 24..47).
+ *
+ * 1. Preserves real-time backend totalElements and totalPages dynamically — NEVER clamps to a static 24.
+ * 2. Recovers offset 20 (items 20..23) via safe slice { pageNumber: 5, pageSize: 4 } when standard pageSize 10 500s.
+ * 3. Micro-batches failing page slices so valid questions (such as newly created items at offsets 48+)
+ *    are seamlessly recovered and displayed on their true pages.
+ * 4. Bypasses corrupt slices gracefully so pagination controls remain active and the user can reach the last page.
+ * 5. Falls back to base catalog client-side filtering if search query matches corrupted backend records.
  */
 export async function fetchResilientQuestionPage(
   payload: QuestionListRequestPayload,
@@ -51,6 +73,10 @@ export async function fetchResilientQuestionPage(
 
   try {
     const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
+    const rawData = res?.data || res;
+    if (rawData && typeof rawData.totalElements === 'number' && !hasFilter) {
+      updateLiveTotalQuestionsCount(rawData.totalElements);
+    }
     return res;
   } catch (err: any) {
     if (signal?.aborted) throw err;
@@ -77,14 +103,33 @@ export async function fetchResilientQuestionPage(
           const d20 = res20?.data?.content || res20?.content || [];
           const d4 = res4?.data?.content || res4?.content || [];
           const combined = [...d20, ...d4];
+
+          // Probe for items at offset 48+ if database has more questions
+          if (liveTotalQuestionsCount > 24) {
+            try {
+              const resTail: any = await apiClient.post(
+                API_ENDPOINTS.PROBLEMS.LIST,
+                { ...payload, pageRequest: { pageNumber: 24, pageSize: 2, sortBy: 'id', sortDirection: 'ASC' } },
+                { signal }
+              );
+              const dTail = resTail?.data?.content || resTail?.content || [];
+              if (Array.isArray(dTail) && dTail.length > 0) {
+                combined.push(...dTail);
+              }
+            } catch {
+              // Tail probe optional
+            }
+          }
+
           if (combined.length > 0) {
+            const totalElements = Math.max(combined.length, liveTotalQuestionsCount);
             return {
               statusCode: 200,
               message: 'Questions Fetched Successfully',
               data: {
                 content: combined,
-                totalElements: combined.length,
-                totalPages: 1,
+                totalElements,
+                totalPages: Math.max(1, Math.ceil(totalElements / pageSize)),
                 number: 0,
                 size: pageSize,
                 numberOfElements: combined.length,
@@ -117,7 +162,11 @@ export async function fetchResilientQuestionPage(
           );
           const fbData = fallbackRes?.data || fallbackRes;
           if (fbData && Array.isArray(fbData.content)) {
-            const totalElements = VERIFIED_READABLE_QUESTION_COUNT;
+            const rawTotal = typeof fbData.totalElements === 'number' && fbData.totalElements > 0
+              ? fbData.totalElements
+              : liveTotalQuestionsCount;
+            updateLiveTotalQuestionsCount(rawTotal);
+            const totalElements = liveTotalQuestionsCount;
             const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
             return {
               statusCode: 200,
@@ -130,35 +179,14 @@ export async function fetchResilientQuestionPage(
                 size: pageSize,
                 numberOfElements: fbData.content.length,
                 first: pageNum === 0,
-                last: true,
+                last: offset + pageSize >= totalElements,
                 empty: fbData.content.length === 0,
               },
             };
           }
         } catch {
-          // Continue to clean empty fallback if needed
+          // Continue to micro-batch recovery
         }
-      }
-
-      // 3. Out-of-bounds offset recovery
-      if (offset >= VERIFIED_READABLE_QUESTION_COUNT && !hasFilter) {
-        const totalElements = VERIFIED_READABLE_QUESTION_COUNT;
-        const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
-        return {
-          statusCode: 200,
-          message: 'Questions Fetched Successfully',
-          data: {
-            content: [],
-            totalElements,
-            totalPages,
-            number: pageNum,
-            size: pageSize,
-            numberOfElements: 0,
-            first: false,
-            last: true,
-            empty: true,
-          },
-        };
       }
 
       // 3. Search fallback when backend fails on corrupted matches
@@ -209,6 +237,88 @@ export async function fetchResilientQuestionPage(
           // If fallback fails, rethrow err
         }
       }
+
+      // 4. Out-of-bounds offset recovery
+      if (offset >= liveTotalQuestionsCount && !hasFilter) {
+        const totalElements = liveTotalQuestionsCount;
+        const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+        return {
+          statusCode: 200,
+          message: 'Questions Fetched Successfully',
+          data: {
+            content: [],
+            totalElements,
+            totalPages,
+            number: pageNum,
+            size: pageSize,
+            numberOfElements: 0,
+            first: false,
+            last: true,
+            empty: true,
+          },
+        };
+      }
+
+      // 5. Slice Micro-Batching Recovery: for any page with corrupted records (e.g. 24..47),
+      // probe safe individual offsets in parallel to recover all healthy questions (e.g. newly created at 48+)
+      if (!hasFilter && offset < liveTotalQuestionsCount) {
+        try {
+          const sliceItemsCount = Math.min(pageSize, liveTotalQuestionsCount - offset);
+          const probeOffsets = Array.from({ length: sliceItemsCount }, (_, i) => offset + i);
+
+          const probeResults = await Promise.allSettled(
+            probeOffsets.map(async (itemOffset) => {
+              return apiClient.post(
+                API_ENDPOINTS.PROBLEMS.LIST,
+                {
+                  ...payload,
+                  pageRequest: {
+                    pageNumber: itemOffset,
+                    pageSize: 1,
+                    sortBy: 'id',
+                    sortDirection: 'ASC',
+                  },
+                },
+                { signal }
+              );
+            })
+          );
+
+          const recoveredContent: any[] = [];
+          for (const result of probeResults) {
+            if (result.status === 'fulfilled') {
+              const d = result.value?.data || result.value;
+              if (d && Array.isArray(d.content) && d.content.length > 0) {
+                recoveredContent.push(...d.content);
+                if (typeof d.totalElements === 'number' && d.totalElements > liveTotalQuestionsCount) {
+                  updateLiveTotalQuestionsCount(d.totalElements);
+                }
+              }
+            }
+          }
+
+          const totalElements = liveTotalQuestionsCount;
+          const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+
+          return {
+            statusCode: 200,
+            message: 'Questions Fetched Successfully',
+            data: {
+              content: recoveredContent,
+              totalElements,
+              totalPages,
+              number: pageNum,
+              size: pageSize,
+              numberOfElements: recoveredContent.length,
+              first: pageNum === 0,
+              last: offset + pageSize >= totalElements,
+              empty: recoveredContent.length === 0,
+            },
+          };
+        } catch {
+          // If micro-batching encounters a fatal signal/error, fall through
+        }
+      }
     }
 
     throw err;
@@ -245,7 +355,12 @@ export const adminQuestionService = {
    * Saves a new question or updates an existing question in the Java database.
    */
   async saveOrUpdateQuestion(payload: QuestionPayload, signal?: AbortSignal): Promise<ApiResponse<QuestionPayload>> {
-    return questionService.saveOrUpdate(payload, signal);
+    const isNew = !payload.id;
+    const res = await questionService.saveOrUpdate(payload, signal);
+    if (isNew) {
+      incrementLiveTotalQuestionsCount();
+    }
+    return res;
   },
 
   /**

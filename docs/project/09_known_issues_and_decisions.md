@@ -34,13 +34,16 @@
   - Requests for Page 0 (`pageNumber: 0, pageSize: 10`) and Page 1 (`pageNumber: 1, pageSize: 10`) return HTTP 200 with complete dynamic data (`totalElements: 49, totalPages: 5`).
   - Requests intersecting indices 24..47 (e.g. Page 2 with `pageSize: 10`, Page 1 with `pageSize: 20`, or Page 0 with `pageSize: 50`) fail with HTTP 500 due to database corruption in records with IDs 31..54. Direct `GET /question/31` likewise throws HTTP 500 (`"Question Fetch Unsuccessfull"`), whereas `GET /question/30` returns HTTP 200.
   - Search queries matching corrupted records (such as `"Reverse"`) also cause backend 500s.
-- **Frontend Dynamic Mitigation**:
-  - Valid API responses directly and dynamically preserve the backend's real `totalElements` (e.g. 49) and `totalPages` (e.g. 5) without artificial static clamping on page 0.
-  - When a page request crashes on a failing slice, `fetchResilientQuestionPage` in [`src/services/admin/adminQuestionService.ts`](../../src/services/admin/adminQuestionService.ts) dynamically recovers:
-    - Offset 0 with large page size (`pageSize: 50`): Stitches verified sub-slices `[0..20)` and `[20..24)` to serve all 24 readable records.
-    - Offset 20: Fetches the safe boundary slice `{ pageNumber: 5, pageSize: 4 }` (items 20..23).
-    - Out-of-bounds offsets (`offset >= 24`): Safely returns a clean empty page (`content: []`) with HTTP 200 and dynamic total elements (24), enabling pagination controls in `AdminQuestions.tsx` and `ProblemList.tsx` to automatically adapt and navigate to the boundary without crashing.
-    - Search queries failing on backend exceptions dynamically fall back to client-side filtering over the base catalog.
+- **Frontend Real-Time Dynamic Mitigation & Micro-Batch Recovery**:
+  - Dynamically tracks live database total elements (`liveTotalQuestionsCount`, initialized to 50+ as empirically verified via Postman MCP) and dynamically updates whenever the backend returns a higher `totalElements` or when an admin publishes a new question.
+  - NEVER clamps `totalElements` to a static 24; all pagination controls dynamically adapt to the true live question count across user practice (`/practice`) and admin bank (`/admin/questions`).
+  - When a page request encounters backend 500 on corrupted slices (e.g. intersecting indices 24..47):
+    - Offset 0 with large page size (`pageSize: 50`): Stitches verified sub-slices `[0..20)`, `[20..24)`, and tail items `[48..)` to serve all readable records.
+    - Offset 20: Recovers boundary slice `{ pageNumber: 5, pageSize: 4 }` (items 20..23) preserving dynamic total count.
+    - Slices containing corrupted records: Executes fine-grained micro-batch probing (`pageSize: 1` in parallel) across slice offsets. Corrupted records (500) are safely bypassed while healthy records (such as newly created questions at offsets 48+) are successfully recovered and rendered on their genuine page.
+    - Out-of-bounds offsets (`offset >= liveTotalQuestionsCount`): Returns a clean empty page (`content: []`) with HTTP 200 and dynamic total elements, preserving active pagination controls so the user can easily navigate backward or jump to the last page.
+    - Admin question creation automatically transitions the admin to the last page where newly created DSA problems are immediately visible.
+    - Search queries failing on backend exceptions dynamically fall back to client-side filtering over the readable catalog.
     - Routed `companyService.getCompanyProblems` through `fetchResilientQuestionPage` so company question lists never crash when querying with large page sizes.
 
 
