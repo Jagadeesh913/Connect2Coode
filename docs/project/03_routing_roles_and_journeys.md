@@ -43,7 +43,7 @@ graph TD
 | `/signup` | `Signup` | Guest Only | `AuthLayout` | `GuestRoute` |
 | `/forgot-password` | `ForgotPassword` | Guest Only | `AuthLayout` | `GuestRoute` |
 | `/practice` | `PracticePage` | Public (with tracking) | `MainLayout` | None |
-| `/dsa-sheet` | `ProblemList` | Public (with tracking) | `MainLayout` | None |
+| `/dsa-sheet` | `DsaSheetPage` | Public (API auth is attached when available) | `MainLayout` | None |
 | `/problems/:slug` | `ProblemDetails` | Public (with tracking) | `MainLayout` | Monaco editor coding workspace |
 | `/problems` | Redirect -> `/practice` | Public | N/A | Instant Navigate replace |
 | `/companies` | `CompanyList` | Public | `MainLayout` | None |
@@ -70,6 +70,7 @@ graph TD
 | `/admin/companies` | `AdminCompanies` | Administrator | `AdminLayout` | `AdminRoute` |
 | `/admin/languages` | `AdminLanguages` | Administrator | `AdminLayout` | `AdminRoute` |
 | `/admin/institutions`| `AdminInstitutions`| Administrator | `AdminLayout` | `AdminRoute` |
+| `/admin/dsa-sheets` | `AdminDsaSheets` | Administrator | `AdminLayout` | `AdminRoute` |
 | `/500` | `ServerError` | Public | None | Server error fallback |
 | `*` | `NotFound` | Public | None | 404 catch-all |
 
@@ -102,17 +103,18 @@ The application distinguishes between two primary user roles:
 6. **Save Profile**: User saves academic details (passing year, graduation year, registration number). Dispatches `POST /api/v1/userInfo/{userId}` with `jwtToken`.
 
 ### Journey 2: DSA Problem Solving & Live Code Compilation
-1. **Catalog Navigation**: Student navigates to `/practice` or `/dsa-sheet`.
-2. **Filtering**: Selects topics (e.g. Arrays, Dynamic Programming), difficulty (Medium), and company (Amazon). Filter params are sanitized by `sanitizeProblemFilters` and cached in Redux.
-3. **Problem Details**: User clicks problem item, navigating to `/problems/two-sum`.
-4. **Catalog Fallback**: The client issues `POST /api/v1/questions` to locate problem metadata, seamlessly bypassing the buggy `GET /question/{id}` backend route.
-5. **Monaco Editor**: Student edits Java code. Editor auto-loads boilerplate with `public class Main`.
-6. **Sample Run**: User clicks "Run Code". Client prepares execution payload:
+1. **Catalog Navigation**: Student navigates to `/practice` for the general catalog or `/dsa-sheet` for an ordered learning path.
+2. **Sheet Navigation**: The DSA page fetches active sheets, top-level sections ordered by `displayOrder`, and loads linked questions when a section is opened.
+3. **Filtering**: On `/practice`, the student selects topics, difficulty, and company. On `/dsa-sheet`, search is applied to the loaded question metadata without inventing unreturned questions.
+4. **Problem Details**: User clicks a linked problem, navigating to `/problems/{questionId}`.
+5. **Catalog Fallback**: The client issues `POST /api/v1/questions` to locate problem metadata when the direct details route is degraded.
+6. **Monaco Editor**: Student edits Java code. Editor auto-loads boilerplate with `public class Main`.
+7. **Sample Run**: User clicks "Run Code". Client prepares execution payload:
    - Resolves Java Table ID (1) to backend Reference ID (5).
    - Verifies class name is `public class Main`.
    - Sends `POST /api/v1/runCode`.
    - Displays test case results (Passed / Failed, execution time, stdout) in terminal tabs.
-7. **Submission**: User clicks "Submit". Dispatches `POST /api/v1/submitCode`. On success, progress slice updates solved status and marks problem solved in `userScopedStorage`.
+8. **Submission**: User clicks "Submit". Dispatches `POST /api/v1/submitCode`. On success, progress slice updates solved status and marks problem solved in `userScopedStorage`.
 
 ### Journey 3: Company Recruitment Exam Preparation
 1. **Directory Browse**: User visits `/companies`. `CompanyBrandLogo` resolves the 121 bundled recruiter assets first, then uses the documented dynamic provider cascade for companies outside the local registry.

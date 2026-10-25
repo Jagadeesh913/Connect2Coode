@@ -36,6 +36,8 @@ const { adminLanguageService } = await import('../../src/services/admin/adminLan
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
 const { questionService } = await import('../../src/services/questionService.ts');
 const { problemService } = await import('../../src/services/problemService.ts');
+const { learningSheetService } = await import('../../src/services/learningSheetService.ts');
+const { adminLearningSheetService } = await import('../../src/services/admin/adminLearningSheetService.ts');
 
 describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   describe('1. Endpoint URL Formatting & Route Definitions', () => {
@@ -79,6 +81,63 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
     it('defines language registry endpoints', () => {
       assert.equal(API_ENDPOINTS.LANGUAGE.BASE, '/language');
       assert.equal(API_ENDPOINTS.LANGUAGE.DETAILS(1), '/language/1');
+    });
+
+    it('formats DSA learning sheet endpoints with their owning resource IDs', () => {
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.LIST, '/user/learningSheets');
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.SECTIONS(4), '/user/learningSheets/4/sections');
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.SECTION_QUESTIONS(8), '/user/learningSheet/section/8/questions');
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.ADMIN_SECTION_DELETE(8), '/admin/learningSheet/section/8');
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.ADMIN_QUESTION_DELETE(8, 12), '/admin/learningSheet/section/8/question/12');
+    });
+  });
+
+  describe('DSA learning sheet contracts', () => {
+    it('orders top-level sections and excludes nested sections from the supplied list contract', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: [
+          { id: 3, sheetId: 1, parentSectionId: null, sectionName: 'Arrays', displayOrder: 2, isActive: true },
+          { id: 4, sheetId: 1, parentSectionId: 3, sectionName: 'Nested', displayOrder: 1, isActive: true },
+          { id: 2, sheetId: 1, parentSectionId: null, sectionName: 'Prefix Sum', displayOrder: 1, isActive: true },
+        ],
+      });
+      try {
+        const sections = await learningSheetService.getSections(1);
+        assert.deepEqual(sections.map((section) => section.id), [2, 3]);
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('rejects malformed successful learning sheet payloads', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({ statusCode: 200, data: [{ id: 1, sheetName: 'Missing fields' }] });
+      try {
+        await assert.rejects(() => learningSheetService.getSheets(), /Unexpected learning sheets response format/);
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('sends a mutable body on DSA delete calls so apiClient can attach jwtToken', async () => {
+      const originalDelete = apiClient.delete;
+      const calls = [];
+      apiClient.delete = async (...args) => {
+        calls.push(args);
+        return { statusCode: 200, message: 'Deleted', data: null };
+      };
+      try {
+        await adminLearningSheetService.deleteSection(5);
+        await adminLearningSheetService.unlinkQuestion(5, 9);
+        assert.deepEqual(calls, [
+          ['/admin/learningSheet/section/5', { data: {} }],
+          ['/admin/learningSheet/section/5/question/9', { data: {} }],
+        ]);
+      } finally {
+        apiClient.delete = originalDelete;
+      }
     });
   });
 

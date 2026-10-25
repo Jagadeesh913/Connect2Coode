@@ -9,6 +9,7 @@ import {
   Building2,
   Languages,
   GraduationCap,
+  BookOpenCheck,
   ArrowLeft,
   X,
   ShieldCheck,
@@ -39,6 +40,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: 'Problem Bank',
     icon: Code2,
     description: 'DSA coding challenges',
+  },
+  {
+    to: '/admin/dsa-sheets',
+    label: 'DSA Sheets',
+    icon: BookOpenCheck,
+    description: 'Learning paths & sections',
   },
   {
     to: '/admin/mcqs',

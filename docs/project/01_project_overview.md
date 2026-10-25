@@ -10,7 +10,7 @@ The application combines:
 3. **Structured DSA Sheets**: Topic-wise curricula (Arrays, Strings, Trees, Graphs, Dynamic Programming) with difficulty categorization and real-time solved progress tracking.
 4. **Aptitude & MCQ Assessment Engine**: Multi-subject question banks covering Quantitative Aptitude, Logical Reasoning, Verbal Ability, and Pseudocode, featuring test simulation, review mode, and instant score computation.
 5. **Academic & User Profile Management**: User profile with degree, branch, passing year, AISHE college auto-complete, and performance metrics (solved counts, streak, accuracy).
-6. **Administrative Hub**: Role-gated management portal (`/admin/*`) enabling administrators to manage problems, test cases, MCQs, company exams, recruitment rounds, supported compiler languages, and educational institution directories.
+6. **Administrative Hub**: Role-gated management portal (`/admin/*`) enabling administrators to manage problems, DSA sheets and their ordered sections/question links, test cases, MCQs, company exams, recruitment rounds, supported compiler languages, and educational institution directories.
 
 ---
 
@@ -85,6 +85,7 @@ graph TB
 - **Authentication Lifecycle**: Email/password login, student signup, password reset with OTP, Google OAuth2 popup/callback, proactive token refresh, and single-flight concurrent refresh locking.
 - **API Transport Hardening**: Strict enforcement of `jwtToken` in request bodies, recursive elimination of duplicate/stale `token` fields via `purgeDuplicateTokenFields`, query-parameter token leak prevention.
 - **Problem Catalog & Filters**: Multi-faceted filtering by difficulty, topic, recruiter company, platform (LeetCode, GFG, HackerRank), search query, and pagination.
+- **API-Driven DSA Sheets**: `/dsa-sheet` lists active learning sheets, ordered top-level sections, and lazily loaded linked questions with search and solved-state indicators. `/admin/dsa-sheets` creates sheets/sections and manages question associations through the supplied learning-sheet endpoints.
 - **Monaco Code Runner**: Code execution uses the `/language` API's table-ID-to-reference-ID mapping, automatic Java class sanitization (`Main`), and sample test case execution. The client does not guess compiler IDs when the catalog is unavailable.
 - **Company Exam Blueprints**: Recruitment exam schedules, role salaries, section durations, and question count visualizations.
 - **Aptitude Bank**: Category-filtered practice (Quantitative, Reasoning, Verbal, Pseudocode), option synthesis respecting explicit `isCorrect: true/false`, and test submission scoring.

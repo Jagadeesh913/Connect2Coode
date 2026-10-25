@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 219 tests passed, 0 failed on 2026-10-23.
+- **Current verified run**: 267 tests passed, 0 failed on 2026-10-25.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -14,7 +14,7 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | Suite File | Scope & Tested Contracts | Tests Count |
 | :--- | :--- | :---: |
 | [`apiClient.test.mjs`](../../scripts/tests/apiClient.test.mjs) | Base URL normalization, trimming slashes, localhost rejection in prod, default backend fallback. | 13 |
-| [`apiIntegration.test.mjs`](../../scripts/tests/apiIntegration.test.mjs) | Endpoint formats, strict list response validation, user-question validation, captured language DTO mapping/cache invalidation, question fallback discipline, custom-input payloads, and execution verdicts. | 21 |
+| [`apiIntegration.test.mjs`](../../scripts/tests/apiIntegration.test.mjs) | Endpoint formats, strict list response validation, DSA sheet ordering/token-compatible deletes, user-question validation, captured language DTO mapping/cache invalidation, question fallback discipline, custom-input payloads, and execution verdicts. | 25 |
 | [`assessmentIntegrity.test.mjs`](../../scripts/tests/assessmentIntegrity.test.mjs) | Assessment shortcut restrictions while preserving typing, undo, and Run/Submit shortcuts. | 2 |
 | [`authSession.test.mjs`](../../scripts/tests/authSession.test.mjs) | JWT claims, JWT-only admin authorization, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 19 |
 | [`batch4Remediation.test.mjs`](../../scripts/tests/batch4Remediation.test.mjs) | Error mapping, status codes (400-504), server leak detection (`org.springframework`, Hibernate). | 24 |
@@ -29,7 +29,7 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, pagination semantics, and stable initial MCQ requests. | 10 |
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
-| **Total** | **All 16 test files (84 reported suites)** | **254 / 254 Passing** |
+| **Total** | **All 17 test files (89 reported suites)** | **267 / 267 Passing** |
 
 ---
 
@@ -82,7 +82,7 @@ Executes `tsc -p tsconfig.json --noEmit`. Expected: Exits with code 0.
 ```bash
 npm test
 ```
-Executes all 16 suites in `scripts/tests/`. Expected: `219 pass, 0 fail`.
+Executes all test files in `scripts/tests/`. Current verified result: `267 pass, 0 fail`.
 
 ### 4. Production Build
 ```bash

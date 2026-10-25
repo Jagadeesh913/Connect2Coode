@@ -57,7 +57,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Deep token purge, base URL resolution tested in `apiClient.test.mjs`. |
-| `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `VERIFIED` | Maps all 37+ platform endpoints. |
+| `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `RUNTIME-VERIFIED` | Includes tested user/admin learning-sheet route builders. |
 | `src/core/guards/AdminRoute.tsx` | Admin route gate checking JWT claims | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Admin redirect selection uses signed JWT claims only; covered by auth regression tests. |
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
@@ -86,6 +86,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/services/companyService.ts` | Companies and recruitment exams service | `PARTIALLY VERIFIED` | Strict page/detail envelopes and complete paginated catalog loading are tested; a non-empty live exam/detail DTO and admin mutations remain unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Language caching, API-only reference-ID resolution, custom-input payloads, malformed response rejection, and non-zero success verdicts are covered by tests; live execution remains backend-dependent. |
 | `src/services/institutionService.ts` | Public institution search autocomplete | `RUNTIME-VERIFIED` | Tested in `apiIntegration.test.mjs`. |
+| `src/services/learningSheetService.ts` | DSA sheets, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, and ordering are tested. Live API access remains backend-dependent. |
 | `src/services/mcqService.ts` | Aptitude MCQ queries and scoring | `RUNTIME-VERIFIED` | Tested in `mcqCorrectOption.test.mjs`. |
 | `src/services/problemService.ts` | Problem catalog and details service | `RUNTIME-VERIFIED` | Numeric direct details with slug/degraded-route catalog fallback tested. |
 | `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Tested in `userInfoProfile.test.mjs`. |
@@ -97,6 +98,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/services/admin/adminLanguageService.ts` | Admin language compiler management | `RUNTIME-VERIFIED` | Successful mutations invalidate execution-language cache; regression tested. |
 | `src/services/admin/adminMcqService.ts` | Admin MCQ CRUD | `RUNTIME-VERIFIED` | Tested in `mcqCorrectOption.test.mjs`. |
 | `src/services/admin/adminQuestionService.ts` | Admin question management | `RUNTIME-VERIFIED` | Tested in `validationArchitecture.test.mjs`. |
+| `src/services/admin/adminLearningSheetService.ts` | Admin DSA sheet authoring and link management | `PARTIALLY VERIFIED` | Endpoint/body shapes and token-compatible DELETE bodies are tested; live production mutations were not executed. |
 
 ---
 
@@ -156,7 +158,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `hooks/useExecutionRequest.ts` | Custom hook for Monaco code running | `RUNTIME-VERIFIED` | Handles run/submit state & aborts. |
 | `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | Topic tabs, filters, problem grid. |
 | `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Cancels history reads, resolves API language IDs/reference IDs, and accepts only non-zero passing verdicts. Browser-level proctoring remains unverified/unavailable. |
-| `pages/ProblemList.tsx` | Structured DSA problem sheet | `RUNTIME-VERIFIED` | Filterable problem list. |
+| `pages/ProblemList.tsx` | Legacy standalone problem-list page | `VERIFIED` | Retained but no longer owns `/dsa-sheet`; the route now uses the API-driven DSA feature. |
 | `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `RUNTIME-VERIFIED` | Tested in `problemSliceAbortRecovery.test.mjs`. |
 | `utils/problemEditorial.ts` | Problem solution editorial formatter | `VERIFIED` | Markdown editorial formatting. |
 | `utils/problemExecution.ts` | Output formatter, error parser, language resolver | `RUNTIME-VERIFIED` | Language entity/reference-ID resolution is tested. |
@@ -195,7 +197,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/AdminSidebar.tsx` | Admin navigation sidebar | `RUNTIME-VERIFIED` | Links to questions, mcqs, companies, etc. |
 | `components/AdminTable.tsx` | Reusable sortable admin table | `VERIFIED` | Table component. |
 | `components/companies/*` | Company, exam, role, section modals | `VERIFIED` | Admin authoring modals. |
-| `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics; code runner now freezes editor during execution and reports backend pass/fail verdicts. |
+| `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics; code runner sandbox supports dynamic question bank selection, real-time search, manual ID resolution, collapsible problem statement & test cases preview, and real-time Judge0 execution against selected problem test cases. |
 | `components/institutions/*` | Institution details, form, status modals | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
 | `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Dynamic reference library bindings (DIFF, TOPIC, QPF, TESTCASETYPE), sequential displayOrder on hints, and testcase assertions verified; live admin mutation remains backend-owned. |
 | `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses totalElements, never sample-derived global difficulty totals, and surfaces partial metric failures. |
@@ -204,9 +206,16 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `VERIFIED` | Compiler registry management. |
 | `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, reference name payload attachment, page clamping, and option-level correctness are tested. |
 | `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, full test case retrieval (both visible and hidden) on Manage Test Cases, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
+| `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Typechecked, linted, built, and service-contract tested; live admin mutations were not executed. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
 
-### F. Profile, Bookmarks, Landing, Settings, Roadmaps
+### F. DSA Sheet Feature (`src/features/dsaSheet/`)
+| File Path | Role | Status | Notes |
+| :--- | :--- | :---: | :--- |
+| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `PARTIALLY VERIFIED` | Responsive/theme-aware implementation passes static checks and build; live authenticated API rendering is not yet production-verified. |
+| `types.ts` | Learning sheet, section, question-link, and mutation DTOs | `RUNTIME-VERIFIED` | Used by strict service validation and contract tests. |
+
+### G. Profile, Bookmarks, Landing, Settings, Roadmaps
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `src/features/bookmarks/pages/BookmarksList.tsx` | User bookmarked problems page | `RUNTIME-VERIFIED` | Verified in protected route branch. |
@@ -227,9 +236,9 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 136
+- **Total First-Party TypeScript/TSX Files in `src/`**: 144
 - **Total Automated Test Suites in `scripts/tests/`**: 17
-- **Total Executed Automated Unit Tests**: 262 (262 Passed, 0 Failed; 88 reported suites across 17 files)
+- **Total Executed Automated Unit Tests**: 267 (267 Passed, 0 Failed; 89 reported suites across 17 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 160 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors

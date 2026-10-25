@@ -52,6 +52,12 @@
 
 ## 2. Key Architectural Decisions & Rationale
 
+### Decision 0: Learning Sheet API as the DSA Sheet Product Boundary
+- **Context**: The backend exposes a generic `learningSheet` name, but the supplied product scope is DSA preparation only. The section-question response also returns `sectionId: null`, even though the request path already identifies the owning section; no sheet update/delete or child-section read endpoint was supplied.
+- **Decision**: Present the feature exclusively as **DSA Sheet** in routes and UI while preserving the backend endpoint names in services. Treat the outer question-link `id` as the association deletion ID, navigate to problems using nested `question.id`, retain only top-level sections (`parentSectionId: null`), and do not invent editing, sheet deletion, or nested-section behavior.
+- **Authentication Boundary**: GET calls use the bearer token automatically attached by `apiClient`; mutating bodies receive canonical `jwtToken`. DELETE services provide `{ data: {} }` so the interceptor has a mutable request body for token injection.
+- **Verification Boundary**: Endpoint formatting, response validation, ordering, and DELETE request shape are locally runtime-tested. Live production reads and admin mutations remain `PARTIALLY VERIFIED` because this implementation did not mutate production data.
+
 ### Decision 1: Local Recruiter Logos in `public/companies/`
 - **Context**: The backend company records contain empty or broken remote logo URLs.
 - **Decision**: Keep 121 vector SVG and high-resolution PNG files in `public/companies/` as the first source, expose every unique bundled brand through `companyLogoRegistry.ts`, and ignore arbitrary backend logo URLs. For new companies, derive candidates from the validated website domain: optional Brandfetch, Simple Icons, official favicon, then a deterministic monogram.

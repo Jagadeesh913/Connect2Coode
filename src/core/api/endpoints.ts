@@ -70,4 +70,17 @@ export const API_ENDPOINTS = {
     ADMIN_CREATE: '/admin/mcq',
     ADMIN_DELETE: (id: string | number) => `/admin/mcq/${id}`,
   },
+  LEARNING_SHEET: {
+    LIST: '/user/learningSheets',
+    SECTIONS: (sheetId: string | number) => `/user/learningSheets/${sheetId}/sections`,
+    SECTION_QUESTIONS: (sectionId: string | number) =>
+      `/user/learningSheet/section/${sectionId}/questions`,
+    ADMIN_CREATE: '/admin/learningSheet',
+    ADMIN_SECTION_CREATE: '/admin/learningSheet/section',
+    ADMIN_SECTION_DELETE: (sectionId: string | number) =>
+      `/admin/learningSheet/section/${sectionId}`,
+    ADMIN_QUESTION_LINK: '/admin/learningSheet/question',
+    ADMIN_QUESTION_DELETE: (sectionId: string | number, linkId: string | number) =>
+      `/admin/learningSheet/section/${sectionId}/question/${linkId}`,
+  },
 } as const;

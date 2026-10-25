@@ -110,6 +110,8 @@ All generic components reside in [`src/shared/components/ui/`](../../src/shared/
 
 In `PracticePage`, `AdminQuestions`, and `AdminMcqs`, the table layout combines the question identifier and difficulty tier into a single unified `#` column using `getDifficultyNumberColor` (e.g. emerald for Easy/Basic, amber for Medium, rose for Hard, sky for Basic). Inactive items (`isActive === false`) render their question container with a distinct red rounded border (`border-rose-400 dark:border-rose-500 rounded-xl`) accompanied by an explicit `Inactive` badge, while preserving readable standard font weight and color for the problem statement.
 
+`DsaSheetPage` follows the same slate/blue light-and-dark palette with a restrained radial hero treatment, sheet selector, progress summary cards, and accessible expandable section panels. Questions reuse shared `Badge`, `Skeleton`, `Button`, and `EmptyState` components. `AdminDsaSheets` uses the established `AdminPageHeader`, `AdminCard`, `AdminModal`, `AdminBadge`, and confirmation-dialog system instead of introducing a parallel admin visual language.
+
 ## 5. Coding Workspace Behavior
 
 `ProblemDetails` is the student coding workspace. Its Monaco editor uses automatic layout, word wrapping, accessibility auto-detection, and a loading skeleton. While a run or submission is in flight the editor is read-only, which keeps the displayed verdict tied to the submitted source snapshot. Results use an ARIA live region and scroll into view when the request settles.

@@ -20,7 +20,7 @@ const Landing = lazy(() => import('../features/landing/pages/Landing').then((m: 
 const OAuthCallback = lazy(() => import('../features/auth/pages/OAuthCallback').then((m: any) => ({ default: m.OAuthCallback || m.default })));
 
 const PracticePage = lazy(() => import('../features/problems/pages/PracticePage').then((m: any) => ({ default: m.PracticePage || m.default })));
-const ProblemList = lazy(() => import('../features/problems/pages/ProblemList').then((m: any) => ({ default: m.ProblemList || m.default })));
+const DsaSheetPage = lazy(() => import('../features/dsaSheet/pages/DsaSheetPage').then((m: any) => ({ default: m.DsaSheetPage || m.default })));
 const ProblemDetails = lazy(() => import('../features/problems/pages/ProblemDetails').then((m: any) => ({ default: m.ProblemDetails || m.default })));
 const CompanyList = lazy(() => import('../features/companies/pages/CompanyList').then((m: any) => ({ default: m.CompanyList || m.default })));
 const CompanyDetails = lazy(() => import('../features/companies/pages/CompanyDetails').then((m: any) => ({ default: m.CompanyDetails || m.default })));
@@ -41,6 +41,7 @@ const AdminCompanies = lazy(() => import('../features/admin/pages/AdminCompanies
 const AdminLanguages = lazy(() => import('../features/admin/pages/AdminLanguages').then((m: any) => ({ default: m.AdminLanguages || m.default })));
 const AdminInstitutions = lazy(() => import('../features/admin/pages/AdminInstitutions').then((m: any) => ({ default: m.AdminInstitutions || m.default })));
 const AdminMcqs = lazy(() => import('../features/admin/pages/AdminMcqs').then((m: any) => ({ default: m.AdminMcqs || m.default })));
+const AdminDsaSheets = lazy(() => import('../features/admin/pages/AdminDsaSheets').then((m: any) => ({ default: m.AdminDsaSheets || m.default })));
 
 const NotFound = lazy(() => import('../shared/components/errors/NotFound').then((m: any) => ({ default: m.NotFound || m.default })));
 const ServerError = lazy(() => import('../shared/components/errors/ServerError').then((m: any) => ({ default: m.ServerError || m.default })));
@@ -103,7 +104,7 @@ const appRoutes = [
       { path: '/company-patterns/:slug', element: withSuspense(CompanyDetails) },
 
       // Practice & Problems Pages (Publicly accessible with in-app tracking for logged-in users)
-      { path: '/dsa-sheet', element: withSuspense(ProblemList) },
+      { path: '/dsa-sheet', element: withSuspense(DsaSheetPage) },
       { path: '/practice', element: withSuspense(PracticePage) },
       { path: '/problems', element: <Navigate to="/practice" replace /> },
       { path: '/problems/:slug', element: withSuspense(ProblemDetails) },
@@ -146,6 +147,7 @@ const appRoutes = [
           { path: 'companies', element: withSuspense(AdminCompanies) },
           { path: 'languages', element: withSuspense(AdminLanguages) },
           { path: 'institutions', element: withSuspense(AdminInstitutions) },
+          { path: 'dsa-sheets', element: withSuspense(AdminDsaSheets) },
         ],
       },
     ],

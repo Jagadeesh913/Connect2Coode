@@ -154,7 +154,24 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 | `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ. The request contains `id` for an update, taxonomy codes and names (`subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topicGroupCode`, `topicRefCode`, `topicRefName`, `difficultyGroupCode`, `difficultyRefCode`, `difficultyRefName`), optional `companyId` and `companyName`, `question`, optional `explanation`, `isActive`, and `options`. Each option contains only its persisted `id` when present, `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. Exactly one option must be correct. Legacy question-level answer fields and option aliases are not sent or used to determine correctness. |
 | `/admin/mcq/{id}` | `DELETE` | `ADMIN_ONLY` | Deletes an MCQ question. |
 
-### F. Live Read-Only DTO Fields (2026-10-23)
+### F. DSA Learning Sheets ([`src/services/learningSheetService.ts`](../../src/services/learningSheetService.ts), [`src/services/admin/adminLearningSheetService.ts`](../../src/services/admin/adminLearningSheetService.ts))
+
+The backend names this resource `learningSheet`; the product UI intentionally presents it only as **DSA Sheet**.
+
+| Endpoint | Method | Access | Description / Payload |
+| :--- | :---: | :--- | :--- |
+| `/user/learningSheets` | `GET` | `USER_OR_ADMIN` | Lists sheets with `id`, `sheetCode`, `sheetName`, `description`, and `isActive`. |
+| `/user/learningSheets/{sheetId}/sections` | `GET` | `USER_OR_ADMIN` | Returns top-level sections. The client retains only `parentSectionId: null` and orders by `displayOrder`, then `id`. |
+| `/user/learningSheet/section/{sectionId}/questions` | `GET` | `USER_OR_ADMIN` | Returns question-link records ordered by `displayOrder`. The deletion identifier is the outer link `id`; problem navigation uses `question.id`. |
+| `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Creates a sheet: `{ sheetCode, sheetName, description, isActive }`. |
+| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Creates a top-level section: `{ sheetId, parentSectionId: null, sectionName, displayOrder, isActive }`. |
+| `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section. The service supplies an empty mutable body so `apiClient` injects `jwtToken`. |
+| `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Links an existing problem: `{ id: null, sectionId, question: { id }, displayOrder, isActive }`. |
+| `/admin/learningSheet/section/{sectionId}/question/{linkId}` | `DELETE` | `ADMIN_ONLY` | Removes a section-question association without deleting the problem. The second path value is the association/link ID returned as the outer record `id`. |
+
+All calls use `apiClient`. GET requests carry the JWT in the bearer header; tokens are never put into query parameters. POST and DELETE bodies receive the canonical `jwtToken` from the interceptor, with duplicate token aliases removed.
+
+### G. Live Read-Only DTO Fields (2026-10-23)
 
 The following fields were captured from the configured production API using the supplied temporary test account before that account began returning `401` for subsequent requests. They are evidence for read paths only; admin mutation payloads were not sent to production. The Postman MCP connection was authenticated during the follow-up audit, but its enabled-tools handshake repeated instead of returning an inventory and its exposed surface did not offer a live-request executor; it supplied no contract evidence and no collection/example was used as a substitute.
 

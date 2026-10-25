@@ -210,15 +210,6 @@ export const AdminCompanies: React.FC = () => {
       },
     },
     {
-      header: 'Overview Notes',
-      className: 'max-w-md hidden md:table-cell',
-      cell: (row) => (
-        <span className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-          {row.description || 'No specific notes recorded.'}
-        </span>
-      ),
-    },
-    {
       header: 'Tagging Status',
       className: 'w-32',
       cell: (row) => (

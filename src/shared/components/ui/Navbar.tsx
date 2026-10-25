@@ -64,6 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const navItems = [
     { to: '/', label: 'Home', exact: true },
     { to: '/practice', label: 'Problems' },
+    { to: '/dsa-sheet', label: 'DSA Sheet' },
     { to: '/companies', label: 'Company Prep' },
     { to: '/aptitude', label: 'Aptitude' },
   ];

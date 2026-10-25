@@ -47,6 +47,7 @@ Connect-2-code/
 │   │   ├── auth/                 # Login, Signup, ForgotPassword, OAuthCallback
 │   │   ├── bookmarks/            # User saved problem bookmarks
 │   │   ├── companies/            # Company catalog, recruitment exams, and logos
+│   │   ├── dsaSheet/              # API-driven DSA sheets, sections, and linked questions
 │   │   ├── institutions/         # Student registration college autocomplete
 │   │   ├── interviews/           # Curated interview preparation hub
 │   │   ├── landing/              # High-conversion public landing page
