@@ -156,7 +156,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/PracticeHeroBanner.tsx` | Hero banner with problem stats & search | `RUNTIME-VERIFIED` | Verified on PracticePage. |
 | `hooks/useExecutionRequest.ts` | Custom hook for Monaco code running | `RUNTIME-VERIFIED` | Handles run/submit state & aborts. |
-| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | Topic tabs, filters, problem grid. |
+| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | Topic tabs, 2x2 difficulty filter layout (Basic/Easy row 1, Medium/Hard row 2), problem grid. |
 | `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Cancels history reads, resolves API language IDs/reference IDs, and accepts only non-zero passing verdicts. Browser-level proctoring remains unverified/unavailable. |
 | `pages/ProblemList.tsx` | Legacy standalone problem-list page | `VERIFIED` | Retained but no longer owns `/dsa-sheet`; the route now uses the API-driven DSA feature. |
 | `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `RUNTIME-VERIFIED` | Tested in `problemSliceAbortRecovery.test.mjs`. |
@@ -178,7 +178,7 @@ Every first-party source file has been inspected and assigned a verified status 
 ### D. Aptitude Feature (`src/features/aptitude/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | URL category changes synchronize filters; initial list requests remain stable while references hydrate; payloads are strict and pages clamp/refetch. |
+| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Filters matching Practice page ordered by Difficulty (2x2 Basic/Easy, Medium/Hard), Question Type, Subject, and Companies; dynamic company ID query payload; URL category sync. |
 | `utils/mcqUtils.ts` | MCQ option response mapper and correct-option resolver | `RUNTIME-VERIFIED` | Uses only `id`, `optionLabel`, `optionText`, and boolean `isCorrect`; it does not infer correctness from aliases or question-level answer text. |
 
 ### E. Admin Hub (`src/features/admin/`)
@@ -212,7 +212,8 @@ Every first-party source file has been inspected and assigned a verified status 
 ### F. DSA Sheet Feature (`src/features/dsaSheet/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `PARTIALLY VERIFIED` | Responsive/theme-aware implementation passes static checks and build; live authenticated API rendering is not yet production-verified. |
+| `components/DsaSheetHeroBanner.tsx` | Theme-aware generated DSA hero banner | `PARTIALLY VERIFIED` | Uses project-local light/dark raster assets and follows the Practice/Aptitude banner container treatment. |
+| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `PARTIALLY VERIFIED` | Uses an accessible two-path toggle instead of a select; responsive/theme-aware implementation passes static checks and build, while live authenticated API rendering is not yet production-verified. |
 | `types.ts` | Learning sheet, section, question-link, and mutation DTOs | `RUNTIME-VERIFIED` | Used by strict service validation and contract tests. |
 
 ### G. Profile, Bookmarks, Landing, Settings, Roadmaps

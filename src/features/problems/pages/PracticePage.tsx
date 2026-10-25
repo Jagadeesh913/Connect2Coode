@@ -148,6 +148,24 @@ export const PracticePage: React.FC = () => {
   const apiPlatforms: ReferenceItem[] = referenceGroups.QPF ?? EMPTY_REFERENCES;
   const apiCompanies = serverCompanies ?? EMPTY_COMPANIES;
 
+  // Sort difficulties: Row 1 = Basic, Easy; Row 2 = Medium, Hard
+  const sortedDifficulties = useMemo(() => {
+    const order: Record<string, number> = {
+      basic: 1,
+      school: 1,
+      easy: 2,
+      medium: 3,
+      hard: 4,
+    };
+    return [...apiDifficulties].sort((a, b) => {
+      const aKey = (a.refCode || a.refName || '').toLowerCase().trim();
+      const bKey = (b.refCode || b.refName || '').toLowerCase().trim();
+      const aOrder = order[aKey] ?? 99;
+      const bOrder = order[bKey] ?? 99;
+      return aOrder - bOrder;
+    });
+  }, [apiDifficulties]);
+
   // Resolve filters to numeric backend IDs whether passed as number or name/code
   const resolvedDifficultyId = useMemo(() => {
     if (!selectedDifficulty) return undefined;
@@ -615,12 +633,12 @@ export const PracticePage: React.FC = () => {
               </div>
             )}
 
-            {/* Difficulty Level Filter from API */}
-            {apiDifficulties.length > 0 && (
+            {/* Difficulty Level Filter from API: Row 1 = Basic, Easy | Row 2 = Medium, Hard */}
+            {sortedDifficulties.length > 0 && (
               <div className="flex flex-col gap-2">
                 <span className="text-xs font-bold text-slate-900 dark:text-white">Difficulty</span>
-                <div className="grid grid-cols-3 gap-2">
-                  {apiDifficulties.map((diff) => {
+                <div className="grid grid-cols-2 gap-2">
+                  {sortedDifficulties.map((diff) => {
                     const isSelected =
                       draftDifficulty === String(diff.id) ||
                       draftDifficulty.toLowerCase() === diff.refName.toLowerCase() ||

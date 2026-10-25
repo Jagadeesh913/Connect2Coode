@@ -46,6 +46,12 @@
     - Search queries failing on backend exceptions dynamically fall back to client-side filtering over the readable catalog.
     - Routed `companyService.getCompanyProblems` through `fetchResilientQuestionPage` so company question lists never crash when querying with large page sizes.
 
+### 6. Learning Sheet Section 4 Question Read Returns HTTP 500
+- **Observed Behavior (2026-10-25)**: An authenticated `GET /api/v1/user/learningSheet/section/4/questions` reaches the production Spring Boot handler but returns HTTP 500 with `"Error while retrieving Learning Sheet Questions"` and only the generic error `"An unexpected error occurred"`. The same route without authentication correctly returns HTTP 401, confirming that the failing request is past the authentication boundary.
+- **Root-Cause Boundary**: The exception is produced inside the remote backend before a question-link array is returned. This frontend repository contains no learning-sheet controller, entity, repository, mapper, database migration, or backend logs, and the generic response removes the underlying exception. The exact server defect is therefore `UNKNOWN` until the backend exception trace and the section-4 association rows are inspected. Likely candidates that must be distinguished server-side are an empty-section branch incorrectly treated as exceptional, an orphaned `learning_sheet_question` association, or an incomplete linked question that fails nested DTO mapping.
+- **Required Backend Repair**: Inspect the exception for this request and the section-4 link rows; return `200` with `data: []` when the section exists but has no links, return `404` when the section does not exist, and reject or skip orphaned/incomplete associations without dereferencing nullable relationships. The link-creation service should validate the section and question before persisting and the database should enforce foreign keys. Any corrupt association should be removed by its link ID only after it is positively identified.
+- **Frontend Boundary**: [`learningSheetService.getSectionQuestions`](../../src/services/learningSheetService.ts) intentionally preserves the backend failure. It must not translate HTTP 500 into a successful empty list because that would hide corruption and falsely tell users that a populated section is empty.
+
 
 ---
 

@@ -16,6 +16,7 @@ import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { Lock } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
+import { fetchCompanies } from '../../companies/redux/companySlice';
 
 export type AptitudeItem = McqQuestion;
 
@@ -101,8 +102,14 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
   const correctOption = useMemo(() => options.find((o) => o.isCorrect === true), [options]);
 
   const rawDiff = String(question.difficultyRefName || question.difficultyRefCode || '').toUpperCase();
-  const diffLabel: 'Easy' | 'Medium' | 'Hard' =
-    rawDiff === 'HARD' ? 'Hard' : rawDiff === 'MEDIUM' ? 'Medium' : 'Easy';
+  const diffLabel: 'Basic' | 'Easy' | 'Medium' | 'Hard' =
+    rawDiff.includes('HARD')
+      ? 'Hard'
+      : rawDiff.includes('MEDIUM')
+      ? 'Medium'
+      : rawDiff.includes('BASIC') || rawDiff.includes('SCHOOL')
+      ? 'Basic'
+      : 'Easy';
 
   const tags = [question.topicRefName, question.subjectRefName].filter(Boolean) as string[];
 
@@ -158,7 +165,9 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
           <span
             className={`w-2 h-2 rounded-full ${
-              diffLabel === 'Easy'
+              diffLabel === 'Basic'
+                ? 'bg-sky-500'
+                : diffLabel === 'Easy'
                 ? 'bg-emerald-500'
                 : diffLabel === 'Medium'
                 ? 'bg-amber-500'
@@ -327,10 +336,12 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
 export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) => {
   const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
+  const serverCompanies = useAppSelector((state) => state.companies.companies);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialSubject = parseAptitudeSubjectCode(searchParams.get('category') || defaultCategory);
   const [activeSubject, setActiveSubject] = useState<AptitudeSubjectCode>(initialSubject);
+  const [draftSubject, setDraftSubject] = useState<AptitudeSubjectCode>(initialSubject);
 
   // Search & Filter State (Draft vs Applied Architecture)
   const [draftSearch, setDraftSearch] = useState('');
@@ -339,15 +350,21 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const [appliedDifficulties, setAppliedDifficulties] = useState<string[]>([]);
   const [draftTopicIds, setDraftTopicIds] = useState<number[]>([]);
   const [appliedTopicIds, setAppliedTopicIds] = useState<number[]>([]);
+  const [draftCompanyIds, setDraftCompanyIds] = useState<number[]>([]);
+  const [appliedCompanyIds, setAppliedCompanyIds] = useState<number[]>([]);
+
+  // Search within filters & show more toggles
   const [topicSearch, setTopicSearch] = useState<string>('');
+  const [subjectFilterSearch, setSubjectFilterSearch] = useState('');
+  const [companyFilterSearch, setCompanyFilterSearch] = useState('');
+  const [showMoreTopics, setShowMoreTopics] = useState(false);
+  const [showMoreSubjects, setShowMoreSubjects] = useState(false);
+  const [showMoreCompanies, setShowMoreCompanies] = useState(false);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   const [sortBy, setSortBy] = useState<'default' | 'diff-asc' | 'diff-desc' | 'title-asc'>('default');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const pageSize = 8;
-
-  // Question Type Accordion Open State
-  const [isQuestionTypeOpen, setIsQuestionTypeOpen] = useState(true);
 
   // Data States
   const [committedPage, setCommittedPage] = useState(1);
@@ -367,8 +384,13 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     items: activeQuestionTypes,
     error: topicsError,
     retry: retryTopics,
-  } = useReferenceGroup(activeSubject);
+  } = useReferenceGroup(draftSubject);
   const { items: difficultyReferences } = useReferenceGroup('DIFF');
+
+  // Load companies once
+  useEffect(() => {
+    dispatch(fetchCompanies(undefined));
+  }, [dispatch]);
 
   const subjectRefMap = useMemo(() => {
     const map: Partial<Record<AptitudeSubjectCode, number>> = {};
@@ -393,33 +415,64 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     setTotalElements(0);
     setError(null);
     setActiveSubject(urlSubject);
+    setDraftSubject(urlSubject);
     setDraftSearch('');
     setAppliedSearch('');
     setDraftDifficulties([]);
     setAppliedDifficulties([]);
     setDraftTopicIds([]);
     setAppliedTopicIds([]);
+    setDraftCompanyIds([]);
+    setAppliedCompanyIds([]);
     setTopicSearch('');
+    setSubjectFilterSearch('');
+    setCompanyFilterSearch('');
     setCurrentPage(1);
   }, [activeSubject, defaultCategory, searchParams]);
 
   // Detect unapplied changes between draft and applied filters
   const hasUnappliedChanges = useMemo(() => {
     if (draftSearch.trim() !== appliedSearch.trim()) return true;
+    if (draftSubject !== activeSubject) return true;
     if (draftDifficulties.length !== appliedDifficulties.length) return true;
     if (!draftDifficulties.every((d) => appliedDifficulties.includes(d))) return true;
     if (draftTopicIds.length !== appliedTopicIds.length) return true;
     if (!draftTopicIds.every((id) => appliedTopicIds.includes(id))) return true;
+    if (draftCompanyIds.length !== appliedCompanyIds.length) return true;
+    if (!draftCompanyIds.every((id) => appliedCompanyIds.includes(id))) return true;
     return false;
-  }, [draftSearch, appliedSearch, draftDifficulties, appliedDifficulties, draftTopicIds, appliedTopicIds]);
+  }, [
+    draftSearch,
+    appliedSearch,
+    draftSubject,
+    activeSubject,
+    draftDifficulties,
+    appliedDifficulties,
+    draftTopicIds,
+    appliedTopicIds,
+    draftCompanyIds,
+    appliedCompanyIds,
+  ]);
 
   const draftFilterCount = useMemo(() => {
-    return draftDifficulties.length + draftTopicIds.length + (draftSearch.trim() ? 1 : 0);
-  }, [draftDifficulties, draftTopicIds, draftSearch]);
+    let count = 0;
+    if (draftDifficulties.length > 0) count += draftDifficulties.length;
+    if (draftTopicIds.length > 0) count += draftTopicIds.length;
+    if (draftSubject !== initialSubject) count += 1;
+    if (draftCompanyIds.length > 0) count += draftCompanyIds.length;
+    if (draftSearch.trim()) count += 1;
+    return count;
+  }, [draftDifficulties, draftTopicIds, draftSubject, initialSubject, draftCompanyIds, draftSearch]);
 
   const activeFilterCount = useMemo(() => {
-    return appliedDifficulties.length + appliedTopicIds.length + (appliedSearch.trim() ? 1 : 0);
-  }, [appliedDifficulties, appliedTopicIds, appliedSearch]);
+    let count = 0;
+    if (appliedDifficulties.length > 0) count += appliedDifficulties.length;
+    if (appliedTopicIds.length > 0) count += appliedTopicIds.length;
+    if (activeSubject !== initialSubject) count += 1;
+    if (appliedCompanyIds.length > 0) count += appliedCompanyIds.length;
+    if (appliedSearch.trim()) count += 1;
+    return count;
+  }, [appliedDifficulties, appliedTopicIds, activeSubject, initialSubject, appliedCompanyIds, appliedSearch]);
 
   // Sync category changes with URL query parameter & reset all filters
   const handleCategorySwitch = (code: AptitudeSubjectCode) => {
@@ -429,6 +482,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     setLoading(true);
     setError(null);
     setActiveSubject(code);
+    setDraftSubject(code);
     setSearchParams({ category: SUBJECT_CONFIG[code].urlParam });
     setDraftSearch('');
     setAppliedSearch('');
@@ -436,7 +490,11 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     setAppliedDifficulties([]);
     setDraftTopicIds([]);
     setAppliedTopicIds([]);
+    setDraftCompanyIds([]);
+    setAppliedCompanyIds([]);
     setTopicSearch('');
+    setSubjectFilterSearch('');
+    setCompanyFilterSearch('');
     setCurrentPage(1);
     if (isMobileFilterOpen) setIsMobileFilterOpen(false);
   };
@@ -464,6 +522,85 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     );
   }, [allCategoryTopics, topicSearch]);
 
+  const displayedQuestionTypes = useMemo(() => {
+    return availableQuestionTypes.slice(0, showMoreTopics ? availableQuestionTypes.length : 8);
+  }, [availableQuestionTypes, showMoreTopics]);
+
+  // Subject list configuration
+  const allSubjects = useMemo(() => {
+    return (['APTITUDE', 'REASONING', 'VERBAL', 'PSEUDOCODE'] as const).map((code) => {
+      const conf = SUBJECT_CONFIG[code];
+      const foundInRef = subjectReferences.find(
+        (s) => String(s.refCode || '').toUpperCase() === code
+      );
+      return {
+        code,
+        id: foundInRef?.id,
+        title: conf.title,
+        subtitle: conf.subtitle,
+        label: conf.label,
+        refName: foundInRef?.refName || conf.title,
+      };
+    });
+  }, [subjectReferences]);
+
+  const filteredSubjects = useMemo(() => {
+    if (!subjectFilterSearch.trim()) return allSubjects;
+    const q = subjectFilterSearch.toLowerCase().trim();
+    return allSubjects.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        s.label.toLowerCase().includes(q) ||
+        s.code.toLowerCase().includes(q) ||
+        s.refName.toLowerCase().includes(q)
+    );
+  }, [allSubjects, subjectFilterSearch]);
+
+  const displayedSubjects = useMemo(() => {
+    return filteredSubjects.slice(0, showMoreSubjects ? filteredSubjects.length : 8);
+  }, [filteredSubjects, showMoreSubjects]);
+
+  // Companies list configuration
+  const filteredCompanies = useMemo(() => {
+    if (!companyFilterSearch.trim()) return serverCompanies;
+    const q = companyFilterSearch.toLowerCase().trim();
+    return serverCompanies.filter((c) => c.name.toLowerCase().includes(q));
+  }, [serverCompanies, companyFilterSearch]);
+
+  const displayedCompanies = useMemo(() => {
+    return filteredCompanies.slice(0, showMoreCompanies ? filteredCompanies.length : 8);
+  }, [filteredCompanies, showMoreCompanies]);
+
+  // Default difficulties fallback
+  const DEFAULT_DIFFICULTIES = useMemo(
+    () => [
+      { id: 1, refCode: 'BASIC', refName: 'Basic' },
+      { id: 2, refCode: 'EASY', refName: 'Easy' },
+      { id: 3, refCode: 'MEDIUM', refName: 'Medium' },
+      { id: 4, refCode: 'HARD', refName: 'Hard' },
+    ],
+    []
+  );
+
+  // Sorted difficulties: Row 1 = Basic, Easy | Row 2 = Medium, Hard (matches Practice page)
+  const sortedDifficulties = useMemo(() => {
+    const order: Record<string, number> = {
+      basic: 1,
+      school: 1,
+      easy: 2,
+      medium: 3,
+      hard: 4,
+    };
+    const list = difficultyReferences.length > 0 ? difficultyReferences : DEFAULT_DIFFICULTIES;
+    return [...list].sort((a, b) => {
+      const aKey = (a.refCode || a.refName || '').toLowerCase().trim();
+      const bKey = (b.refCode || b.refName || '').toLowerCase().trim();
+      const aOrder = order[aKey] ?? 99;
+      const bOrder = order[bKey] ?? 99;
+      return aOrder - bOrder;
+    });
+  }, [difficultyReferences, DEFAULT_DIFFICULTIES]);
+
   // Resolve selected difficulty names against the live DIFF reference group.
   const selectedDifficultyIds = useMemo(() => {
     if (appliedDifficulties.length === 0) return EMPTY_REFERENCE_IDS;
@@ -471,7 +608,8 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     return difficultyReferences
       .filter((item) =>
         selected.has(String(item.refCode || '').toUpperCase()) ||
-        selected.has(String(item.refName || '').toUpperCase())
+        selected.has(String(item.refName || '').toUpperCase()) ||
+        selected.has(String(item.id))
       )
       .map((item) => Number(item.id))
       .filter(Number.isFinite);
@@ -518,7 +656,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
         {
           subject: [activeSubjectId],
           difficulty: selectedDifficultyIds,
-          companies: [],
+          companies: appliedCompanyIds,
           topic: appliedTopicIds.length > 0 ? appliedTopicIds : [],
           searchText: appliedSearch.trim(),
           pageRequest: {
@@ -566,7 +704,18 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, [isAuthenticated, activeSubjectId, subjectsLoading, subjectsError, selectedDifficultyIds, appliedTopicIds, appliedSearch, currentPage, sortBy]);
+  }, [
+    isAuthenticated,
+    activeSubjectId,
+    subjectsLoading,
+    subjectsError,
+    selectedDifficultyIds,
+    appliedTopicIds,
+    appliedCompanyIds,
+    appliedSearch,
+    currentPage,
+    sortBy,
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -581,10 +730,13 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   }, [fetchQuestions, isAuthenticated]);
 
   // Handlers for Filters
-  const handleDifficultyToggle = (diff: string) => {
-    setDraftDifficulties((prev) =>
-      prev.includes(diff) ? prev.filter((d) => d !== diff) : [...prev, diff]
-    );
+  const handleDifficultyClick = (diffVal: string) => {
+    setDraftDifficulties((prev) => {
+      const isAlready = prev.some((d) => d.toLowerCase() === diffVal.toLowerCase());
+      return isAlready
+        ? prev.filter((d) => d.toLowerCase() !== diffVal.toLowerCase())
+        : [diffVal];
+    });
   };
 
   const handleTopicToggle = (topicId: number) => {
@@ -593,11 +745,29 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     );
   };
 
+  const handleSubjectClick = (code: AptitudeSubjectCode) => {
+    if (draftSubject !== code) {
+      setDraftSubject(code);
+      setDraftTopicIds([]);
+    }
+  };
+
+  const handleCompanyToggle = (companyId: number) => {
+    setDraftCompanyIds((prev) =>
+      prev.includes(companyId) ? prev.filter((id) => id !== companyId) : [...prev, companyId]
+    );
+  };
+
   // APPLY FILTERS: Commits all staged draft filters and triggers backend API call
   const handleApplyFilters = () => {
     setAppliedDifficulties([...draftDifficulties]);
     setAppliedTopicIds([...draftTopicIds]);
+    setAppliedCompanyIds([...draftCompanyIds]);
     setAppliedSearch(draftSearch.trim());
+    if (draftSubject !== activeSubject) {
+      setActiveSubject(draftSubject);
+      setSearchParams({ category: SUBJECT_CONFIG[draftSubject].urlParam });
+    }
     setCurrentPage(1);
     if (isMobileFilterOpen) {
       setIsMobileFilterOpen(false);
@@ -612,11 +782,17 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const handleClearAll = () => {
     setDraftDifficulties([]);
     setDraftTopicIds([]);
+    setDraftCompanyIds([]);
     setDraftSearch('');
     setAppliedDifficulties([]);
     setAppliedTopicIds([]);
+    setAppliedCompanyIds([]);
     setAppliedSearch('');
     setTopicSearch('');
+    setSubjectFilterSearch('');
+    setCompanyFilterSearch('');
+    setDraftSubject(initialSubject);
+    setActiveSubject(initialSubject);
     setSortBy('default');
     setCurrentPage(1);
   };
@@ -630,6 +806,19 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
   const removeAppliedTopic = (id: number) => {
     setDraftTopicIds((prev) => prev.filter((t) => t !== id));
     setAppliedTopicIds((prev) => prev.filter((t) => t !== id));
+    setCurrentPage(1);
+  };
+
+  const removeAppliedCompany = (id: number) => {
+    setDraftCompanyIds((prev) => prev.filter((c) => c !== id));
+    setAppliedCompanyIds((prev) => prev.filter((c) => c !== id));
+    setCurrentPage(1);
+  };
+
+  const removeAppliedSubject = () => {
+    setDraftSubject(initialSubject);
+    setActiveSubject(initialSubject);
+    setSearchParams({ category: SUBJECT_CONFIG[initialSubject].urlParam });
     setCurrentPage(1);
   };
 
@@ -730,7 +919,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           
           {/* LEFT COLUMN: FILTERS CARD */}
-          <div className={`${isMobileFilterOpen ? 'flex' : 'hidden'} lg:flex lg:col-span-3 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex-col gap-5`}>
+          <div className={`${isMobileFilterOpen ? 'flex' : 'hidden'} lg:flex lg:col-span-3 w-full bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-5 shadow-xs flex-col gap-4`}>
             
             {/* APPLY FILTERS BUTTON AT THE VERY TOP OF THE FILTERS DIV (matching Problems page) */}
             <div className="w-full pb-3 border-b border-slate-100 dark:border-slate-800/80">
@@ -778,104 +967,273 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               )}
             </div>
 
-            {/* Filter Group: Difficulty */}
-            <div className="flex flex-col gap-2.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                Difficulty
-              </span>
-              <div className="flex flex-col gap-2 pt-1">
-                {(['Easy', 'Medium', 'Hard'] as const).map((diff) => {
-                  const isChecked = draftDifficulties.includes(diff);
+            {/* Unauthenticated Guide Banner */}
+            {!isAuthenticated && (
+              <div className="flex flex-col items-center justify-center p-4 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800">
+                <Lock className="w-5 h-5 text-blue-500 mb-2" />
+                <p className="text-xs font-bold text-slate-900 dark:text-white">Sign In to Filter</p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 mb-3">
+                  Log in to filter questions by difficulty level, question types, subject, and companies.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
+                  className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-xs transition-colors cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
+            )}
+
+            {/* 1. DIFFICULTY: Row 1 = Basic, Easy | Row 2 = Medium, Hard (exact matching Practice page) */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Difficulty</span>
+                {draftDifficulties.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftDifficulties([])}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {sortedDifficulties.map((diff) => {
+                  const isSelected = draftDifficulties.some(
+                    (d) =>
+                      d.toLowerCase() === diff.refName.toLowerCase() ||
+                      d.toLowerCase() === (diff.refCode || '').toLowerCase() ||
+                      d === String(diff.id)
+                  );
                   return (
-                    <label
-                      key={diff}
-                      className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
+                    <button
+                      key={diff.refCode || diff.id}
+                      type="button"
+                      onClick={() => handleDifficultyClick(diff.refName)}
+                      className={`py-2 px-2 rounded-xl text-xs font-bold transition-all text-center border cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700/80 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                      }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleDifficultyToggle(diff)}
-                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                      />
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className={`w-2 h-2 rounded-full ${
-                            diff === 'Easy'
-                              ? 'bg-emerald-500'
-                              : diff === 'Medium'
-                              ? 'bg-amber-500'
-                              : 'bg-rose-500'
-                          }`}
-                        />
-                        <span>{diff}</span>
-                      </span>
-                    </label>
+                      {diff.refName}
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Filter Group: Question Type (Collapsible Accordion with Search) */}
-            <div className="flex flex-col border-t border-slate-100 dark:border-slate-800 pt-4">
-              <button
-                type="button"
-                onClick={() => setIsQuestionTypeOpen((prev) => !prev)}
-                className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 cursor-pointer w-full text-left"
-              >
-                <span>Question Type</span>
-                <i className={`fa-solid fa-chevron-down text-[10px] transition-transform ${isQuestionTypeOpen ? 'rotate-180' : ''}`}></i>
-              </button>
+            {/* 2. QUESTION TYPE: Searchable Checkbox List (matching Practice page topics) */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Question Type</span>
+                {draftTopicIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftTopicIds([])}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
 
-              {isQuestionTypeOpen && (
-                <div className="flex flex-col gap-2 pt-3 animate-fade-in">
-                  {/* Topic search filter input */}
-                  <div className="relative mb-1">
-                    <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400"></i>
-                    <input
-                      type="text"
-                      value={topicSearch}
-                      onChange={(e) => setTopicSearch(e.target.value)}
-                      placeholder="Search topics..."
-                      className="w-full text-xs pl-7 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 placeholder-slate-400 outline-none focus:border-blue-500 transition-colors"
-                    />
-                    {topicSearch && (
-                      <button
-                        type="button"
-                        onClick={() => setTopicSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-[10px] cursor-pointer"
+              <div className="relative">
+                <i className="fa-solid fa-magnifying-glass text-slate-400 text-[10px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                <input
+                  type="text"
+                  placeholder="Search question types..."
+                  value={topicSearch}
+                  onChange={(e) => setTopicSearch(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-7 pr-2.5 py-1 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto no-scrollbar">
+                {availableQuestionTypes.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 text-center">
+                    No matching question types
+                  </div>
+                ) : (
+                  displayedQuestionTypes.map((t) => {
+                    const isChecked = draftTopicIds.includes(t.id);
+                    return (
+                      <label
+                        key={t.id}
+                        onClick={() => handleTopicToggle(t.id)}
+                        className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
                       >
-                        <i className="fa-solid fa-xmark"></i>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Topics List with Max Height */}
-                  <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
-                    {availableQuestionTypes.length === 0 ? (
-                      <div className="text-xs text-slate-400 py-2 text-center">
-                        No matching topics
-                      </div>
-                    ) : (
-                      availableQuestionTypes.map((t) => {
-                        const isChecked = draftTopicIds.includes(t.id);
-                        return (
-                          <label
-                            key={t.id}
-                            className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 font-medium cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors select-none"
+                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
+                          <span
+                            className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                              isChecked
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'border-slate-300 dark:border-slate-600'
+                            }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleTopicToggle(t.id)}
-                              className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-                            />
-                            <span className="truncate">{t.name}</span>
-                          </label>
-                        );
-                      })
-                    )}
+                            {isChecked && <i className="fa-solid fa-check text-[9px]"></i>}
+                          </span>
+                          <span className="truncate">{t.name}</span>
+                        </div>
+                        {t.code && (
+                          <span className="text-[10px] font-mono text-slate-400 ml-1 shrink-0">
+                            {t.code}
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              {availableQuestionTypes.length > 8 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreTopics(!showMoreTopics)}
+                  className="text-left text-xs font-semibold text-blue-600 dark:text-sky-400 hover:underline pt-0.5 cursor-pointer"
+                >
+                  {showMoreTopics ? 'Show Less ∧' : `Show All (${availableQuestionTypes.length}) ∨`}
+                </button>
+              )}
+            </div>
+
+            {/* 3. SUBJECT: Searchable Checkbox List (matching Practice page) */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Subject</span>
+                {draftSubject !== initialSubject && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftSubject(initialSubject);
+                      setDraftTopicIds([]);
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <i className="fa-solid fa-magnifying-glass text-slate-400 text-[10px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                <input
+                  type="text"
+                  placeholder="Search subjects..."
+                  value={subjectFilterSearch}
+                  onChange={(e) => setSubjectFilterSearch(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-7 pr-2.5 py-1 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto no-scrollbar">
+                {displayedSubjects.map((subj) => {
+                  const isSelected = draftSubject === subj.code;
+                  return (
+                    <label
+                      key={subj.code}
+                      onClick={() => handleSubjectClick(subj.code)}
+                      className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
+                        <span
+                          className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'border-slate-300 dark:border-slate-600'
+                          }`}
+                        >
+                          {isSelected && <i className="fa-solid fa-check text-[9px]"></i>}
+                        </span>
+                        <span className="truncate">{subj.title}</span>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400 ml-1 shrink-0">
+                        {subj.code}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {filteredSubjects.length > 8 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreSubjects(!showMoreSubjects)}
+                  className="text-left text-xs font-semibold text-blue-600 dark:text-sky-400 hover:underline pt-0.5 cursor-pointer"
+                >
+                  {showMoreSubjects ? 'Show Less ∧' : `Show All (${filteredSubjects.length}) ∨`}
+                </button>
+              )}
+            </div>
+
+            {/* 4. COMPANIES: Searchable Checkbox List (matching Practice page companies) */}
+            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">Companies</span>
+                {draftCompanyIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setDraftCompanyIds([])}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              <div className="relative">
+                <i className="fa-solid fa-magnifying-glass text-slate-400 text-[10px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
+                <input
+                  type="text"
+                  placeholder="Search companies..."
+                  value={companyFilterSearch}
+                  onChange={(e) => setCompanyFilterSearch(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg pl-7 pr-2.5 py-1 text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1 max-h-48 overflow-y-auto no-scrollbar">
+                {filteredCompanies.length === 0 ? (
+                  <div className="text-xs text-slate-400 py-2 text-center">
+                    No matching companies
                   </div>
-                </div>
+                ) : (
+                  displayedCompanies.map((comp) => {
+                    const isChecked = draftCompanyIds.includes(Number(comp.id));
+                    return (
+                      <label
+                        key={comp.id}
+                        onClick={() => handleCompanyToggle(Number(comp.id))}
+                        className="flex items-center justify-between text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
+                          <span
+                            className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                              isChecked
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'border-slate-300 dark:border-slate-600'
+                            }`}
+                          >
+                            {isChecked && <i className="fa-solid fa-check text-[9px]"></i>}
+                          </span>
+                          <span className="truncate">{comp.name}</span>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              {filteredCompanies.length > 8 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMoreCompanies(!showMoreCompanies)}
+                  className="text-left text-xs font-semibold text-blue-600 dark:text-sky-400 hover:underline pt-0.5 cursor-pointer"
+                >
+                  {showMoreCompanies ? 'Show Less ∧' : `Show All (${filteredCompanies.length}) ∨`}
+                </button>
               )}
             </div>
 
@@ -994,6 +1352,39 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                     </span>
                   );
                 })}
+                {appliedCompanyIds.map((id) => {
+                  const compObj = serverCompanies.find((c) => c.id === id);
+                  const name = compObj?.name || `Company #${id}`;
+                  return (
+                    <span
+                      key={id}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                    >
+                      <span>{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeAppliedCompany(id)}
+                        className="hover:text-rose-500 transition-colors cursor-pointer"
+                        title={`Remove ${name}`}
+                      >
+                        <i className="fa-solid fa-xmark text-[10px]"></i>
+                      </button>
+                    </span>
+                  );
+                })}
+                {activeSubject !== initialSubject && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shadow-2xs">
+                    <span>Subject: {SUBJECT_CONFIG[activeSubject].title}</span>
+                    <button
+                      type="button"
+                      onClick={removeAppliedSubject}
+                      className="hover:text-rose-500 transition-colors cursor-pointer"
+                      title="Reset subject to default"
+                    >
+                      <i className="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={handleClearAll}

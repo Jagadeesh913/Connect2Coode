@@ -1,15 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpenCheck,
   CheckCircle2,
   ChevronDown,
   Circle,
-  Code2,
-  Layers3,
   RefreshCw,
   Search,
-  Sparkles,
 } from 'lucide-react';
 import { useAppSelector } from '../../../app/hooks';
 import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
@@ -18,6 +15,7 @@ import { Badge } from '../../../shared/components/ui/Badge';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
+import { DsaSheetHeroBanner } from '../components/DsaSheetHeroBanner';
 import type { DsaSheet, DsaSheetQuestionLink, DsaSheetSection } from '../types';
 
 const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'neutral' => {
@@ -134,55 +132,11 @@ export const DsaSheetPage: React.FC = () => {
   }, [expandedSectionId, loadQuestions, questionsBySection]);
 
   const selectedSheet = sheets.find((sheet) => sheet.id === selectedSheetId) ?? null;
-  const visibleQuestionCount = useMemo(
-    () => Object.values(questionsBySection).reduce((total, questions) => total + questions.length, 0),
-    [questionsBySection]
-  );
-  const solvedVisibleCount = useMemo(
-    () =>
-      Object.values(questionsBySection).reduce(
-        (total, questions) =>
-          total + questions.filter((link) => Boolean(solvedByProblemId[String(link.question.id)])).length,
-        0
-      ),
-    [questionsBySection, solvedByProblemId]
-  );
   const normalizedSearch = search.trim().toLowerCase();
 
   return (
     <div className="min-h-screen bg-[var(--bg-page)] text-[var(--text-primary)] font-sans">
-      <section className="relative overflow-hidden border-b border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-[#0A1020]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.14),transparent_42%),radial-gradient(circle_at_bottom_left,rgba(37,99,235,0.12),transparent_40%)]" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 dark:border-blue-800/70 bg-blue-50/80 dark:bg-blue-950/40 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
-              Structured DSA preparation
-            </div>
-            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-950 dark:text-white">
-              DSA Sheet
-            </h1>
-            <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-600 dark:text-slate-300 max-w-2xl">
-              Follow a focused, section-by-section path and solve the most useful coding problems in the right order.
-            </p>
-          </div>
-
-          <div className="mt-7 grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-2xl">
-            {[
-              { label: 'Sections', value: sections.length, icon: Layers3 },
-              { label: 'Loaded problems', value: visibleQuestionCount, icon: Code2 },
-              { label: 'Solved', value: solvedVisibleCount, icon: CheckCircle2 },
-            ].map(({ label, value, icon: Icon }) => (
-              <div key={label} className="rounded-2xl border border-white/70 dark:border-slate-700/70 bg-white/80 dark:bg-slate-900/70 backdrop-blur px-4 py-3 shadow-sm">
-                <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold">
-                  <Icon className="w-4 h-4 text-blue-600 dark:text-blue-400" /> {label}
-                </div>
-                <p className="mt-1 text-2xl font-extrabold text-slate-950 dark:text-white">{value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <DsaSheetHeroBanner />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
         {loadingSheets ? (
@@ -192,17 +146,33 @@ export const DsaSheetPage: React.FC = () => {
         ) : (
           <>
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-7">
-              <div>
-                <label htmlFor="dsa-sheet-selector" className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">Learning path</label>
-                <select
-                  id="dsa-sheet-selector"
-                  value={selectedSheetId ?? ''}
-                  onChange={(event) => setSelectedSheetId(Number(event.target.value))}
-                  className="min-w-72 max-w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0D1322] px-4 py-3 text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <div className="min-w-0 flex-1">
+                <div
+                  aria-label="DSA sheets"
+                  role="group"
+                  className="inline-grid w-full max-w-2xl grid-cols-1 gap-2 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 dark:border-slate-800 dark:bg-slate-900/70 sm:grid-cols-2"
                 >
-                  {sheets.map((sheet) => <option key={sheet.id} value={sheet.id}>{sheet.sheetName}</option>)}
-                </select>
-                {selectedSheet && <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{selectedSheet.description}</p>}
+                  {sheets.map((sheet) => {
+                    const isSelected = sheet.id === selectedSheetId;
+                    return (
+                      <button
+                        key={sheet.id}
+                        type="button"
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedSheetId(sheet.id)}
+                        className={`min-w-0 rounded-xl px-4 py-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0D1322] ${
+                          isSelected
+                            ? 'bg-white text-slate-950 shadow-sm dark:bg-[#0D1322] dark:text-white'
+                            : 'text-slate-500 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/70 dark:hover:text-white'
+                        }`}
+                      >
+                        <span className="block truncate text-sm font-bold">{sheet.sheetName}</span>
+                        {sheet.sheetCode && <span className="mt-0.5 block truncate text-xs font-medium text-slate-400 dark:text-slate-500">{sheet.sheetCode}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedSheet?.description && <p className="mt-2 px-1 text-sm text-slate-500 dark:text-slate-400">{selectedSheet.description}</p>}
               </div>
               <div className="relative w-full lg:w-80">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
