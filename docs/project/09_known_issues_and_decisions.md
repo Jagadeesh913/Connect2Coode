@@ -1,10 +1,11 @@
 # 09. Known Issues, Architectural Decisions & Trade-Offs
 
-## Client-rendered social crawler boundary (2026-10-25)
+## Social crawler rendering boundary (2026-10-26)
 
 - **Status**: `PARTIALLY VERIFIED`
-- **Decision**: The static Vite entry provides one complete branded Open Graph/Twitter fallback, while React owns route-specific tags after hydration. This is the strongest correct behavior available in the existing static SPA architecture without adding a server-rendering or prerender deployment layer.
-- **Boundary**: Browser navigation, deep-link refreshes, canonical URLs, and runtime tag replacement are locally verifiable. Social crawlers that do not execute JavaScript receive the branded site-level fallback rather than API-backed problem/company text. Route-specific unfurls for those crawlers require an approved SSR/prerender or edge HTML transformation design and a confirmed production frontend origin; neither is invented here.
+- **Decision**: Vercel routes recognized search/social crawler user agents to [`api/social.ts`](../../api/social.ts), a read-only HTML metadata renderer. It uses the same central route policy as the React client, emits exactly one complete tag set with absolute URLs, and returns noindex markup for private, callback, error, and unknown paths. Normal browser requests continue to use the existing SPA fallback and React reconciliation.
+- **Privacy defense in depth**: [`vercel.json`](../../vercel.json) also sends `X-Robots-Tag` headers for all login, callback, authenticated, admin, and error entry points. This prevents a crawler that does not run JavaScript from indexing those route responses.
+- **Boundary**: The Vercel header-conditioned rewrite cannot be exercised by Vite preview, and no deployed frontend hostname or social-debugger access is available in this repository. Set `VITE_SITE_URL` to the approved HTTPS production origin in Vercel before deployment; otherwise previews and aliases self-canonicalize from the request host. The handler uses safe slug-derived metadata if a public detail API fails, times out, or returns an entity that does not match the requested identifier.
 
 ---
 
