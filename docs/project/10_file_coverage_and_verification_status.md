@@ -27,7 +27,8 @@ Every first-party source file has been inspected and assigned a verified status 
 | `tsconfig.json` | TypeScript 5.9 compiler options (`strict: true`, ES2022) | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run typecheck`. |
 | `tsconfig.ci.json`| CI TypeScript configuration | `VERIFIED` | Used in CI environment checks. |
 | `.oxlintrc.json` | Oxlint rules (React hooks and exports) | `RUNTIME-VERIFIED` | Passes with 0 errors on 153 files in 35ms. |
-| `vercel.json` | Edge routing, proxy rewrites, SPA fallback | `VERIFIED` | Validated rewrites for `/api/*` and SPA fallback. |
+| `vercel.json` | Edge routing, proxy rewrites, SPA fallback | `PARTIALLY VERIFIED` | Adds crawler-only metadata rewriting and defense-in-depth `X-Robots-Tag` headers; JSON and regression tests pass, but header-conditioned Vercel routing needs deployed verification. |
+| `api/social.ts` | Crawler-only server-rendered metadata endpoint | `RUNTIME-VERIFIED` | Emits escaped, absolute canonical/social tags; dynamic API data is accepted only when its identity matches the requested route. |
 | `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one default description, robots, Open Graph, and Twitter/X set; manifest and icon links verified. Runtime metadata creates the canonical link from the real origin. |
 | `.env.example` | Documented environment variable template | `VERIFIED` | Contains API/app settings plus optional canonical frontend origin and public Brandfetch client ID. |
 | `.env.production`| Production environment config | `VERIFIED` | Targets `https://api.connect2code.in/api/v1`. |
@@ -63,6 +64,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/mappers/problemMapper.ts` | Question DTO to problem model mapper | `RUNTIME-VERIFIED` | Maps question catalog and detail payloads, preserving testCases, examples, constraints, hints, and ref metadata. |
 | `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families. |
+| `src/core/metadata/crawlerMetadata.ts` | Static crawler document renderer and canonical-origin policy | `RUNTIME-VERIFIED` | Produces one escaped metadata set with absolute URLs and only accepts configured HTTPS origins. |
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
@@ -242,13 +244,13 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 146
-- **Total Automated Test Suites in `scripts/tests/`**: 20
-- **Total Executed Automated Unit Tests**: 311 (311 Passed, 0 Failed; 99 reported suites across 20 files)
+- **Total First-Party TypeScript/TSX Files in `src/`**: 152
+- **Total Automated Test Suites in `scripts/tests/`**: 21
+- **Total Executed Automated Unit Tests**: 311 (311 Passed, 0 Failed; 99 reported suites across 21 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors
-- **Documentation Integrity (`npm run verify:docs`)**: 250 internal links and source references passed.
+- **Documentation Integrity (`npm run verify:docs`)**: 255 internal links and source references passed.
 - **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. Passes in CI without local `.env`.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 11 bundle assets.
 

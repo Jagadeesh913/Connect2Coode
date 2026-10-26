@@ -112,6 +112,7 @@ test('crawler endpoint returns noindex private markup and rejects non-GET reques
 
 test('Vercel routes social crawlers to the renderer and sends noindex headers for private entry points', () => {
   const config = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
+  assert.equal(config.rewrites[0].source, '/api/:path((?!social(?:/|$)).*)');
   assert.ok(config.rewrites.some((rule) => rule.destination === '/api/social?path=/:path*' && rule.has?.[0]?.key === 'user-agent'));
 
   const privatePaths = new Set(config.headers.map((rule) => rule.source));

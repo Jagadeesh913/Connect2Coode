@@ -84,7 +84,7 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
 {
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/:path((?!social(?:/|$)).*)",
       "destination": "https://api.connect2code.in/api/:path*"
     },
     {
@@ -107,7 +107,7 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
 }
 ```
 - **SPA Fallback**: Rule `/(.*) -> /index.html` guarantees that deep URLs (e.g. `/problems/two-sum` or `/companies/tcs`) reload without HTTP 404 errors.
-- **Edge Proxy**: Rewrites `/api/*` and `/oauth2/*` directly to `https://api.connect2code.in`.
+- **Edge Proxy**: Rewrites `/api/*` (except the internal `/api/social` crawler renderer) and `/oauth2/*` directly to `https://api.connect2code.in`.
 - **Metadata on Deep Links**: `index.html` supplies branded defaults and icons before JavaScript loads. After hydration, `RouteMetadata` resolves the exact deep-link title, description, canonical URL, robots policy, and social tags using `VITE_SITE_URL` or the browser origin.
 - **Crawler metadata**: recognized search and social crawler user agents are rewritten to [`api/social.ts`](../../api/social.ts), which renders route-specific HTML tags without JavaScript. It only calls documented public detail endpoints, applies a short timeout, and falls back to safe route-derived content when an API payload is unavailable or does not match the requested route.
 - **Indexing protection**: route-specific `X-Robots-Tag` headers cover login, callback, authenticated, admin, and error routes even before the SPA loads. Keep those header entries synchronized with protected routes in `src/routes/appRoutes.tsx`.

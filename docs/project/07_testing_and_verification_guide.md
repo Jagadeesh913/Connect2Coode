@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 288 tests passed, 0 failed on 2026-10-25.
+- **Current verified run**: 311 tests passed, 0 failed on 2026-10-26.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -25,13 +25,14 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`institutionManagement.test.mjs`](../../scripts/tests/institutionManagement.test.mjs) | AISHE uppercase transforms, university affiliation logic, status toggle. | 9 |
 | [`mcqCorrectOption.test.mjs`](../../scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, stale-field rejection, and aptitude category URL parsing. | 7 |
 | [`metadataAndBranding.test.mjs`](../../scripts/tests/metadataAndBranding.test.mjs) | Default head-tag uniqueness, icon/manifest dimensions, complete route metadata coverage, indexing policy, centralized title ownership, and dynamic detail overrides. | 6 |
+| [`metadataCrawler.test.mjs`](../../scripts/tests/metadataCrawler.test.mjs) | Server-rendered crawler document escaping and uniqueness, absolute canonical origin policy, private-route noindex behavior, dynamic API identity rejection, and Vercel crawler/private-route routing configuration. | 5 |
 | [`problemExecution.test.mjs`](../../scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, and hook cancellation lifecycle. | 15 |
 | [`problemSliceAbortRecovery.test.mjs`](../../scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 12 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, pagination semantics, and stable initial MCQ requests. | 10 |
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
 | [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, and focus-safe shared controls. | 13 |
-| **Total** | **All 19 test files (91 reported suites)** | **288 / 288 Passing** |
+| **Total** | **All 21 test files (99 reported suites)** | **311 / 311 Passing** |
 
 ---
 
@@ -84,7 +85,7 @@ Executes `tsc -p tsconfig.json --noEmit`. Expected: Exits with code 0.
 ```bash
 npm test
 ```
-Executes all test files in `scripts/tests/`. Current verified result: `282 pass, 0 fail`.
+Executes all test files in `scripts/tests/`. Current verified result: `311 pass, 0 fail`.
 
 ### 4. Production Build
 ```bash
