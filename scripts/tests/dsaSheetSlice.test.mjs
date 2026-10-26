@@ -258,5 +258,25 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
       assert.equal(state1.sectionsError, null);
       assert.deepEqual(state1.questionErrors, {});
     });
+
+    it('resets state to initialState on auth/logout/fulfilled and auth/logout/rejected', () => {
+      const state0 = {
+        ...getInitialState(),
+        sheets: [{ id: 1, sheetName: 'Sheet 1', sheetCode: 'S1', isActive: true, createdAt: '', updatedAt: '' }],
+        selectedSheetId: 1,
+        sections: [{ id: 10, sectionTitle: 'Section 1', isActive: true, sheetId: 1, createdAt: '', updatedAt: '' }],
+        loadingSheets: false,
+      };
+
+      const stateFulfilled = dsaSheetReducer(state0, { type: 'auth/logout/fulfilled' });
+      assert.deepEqual(stateFulfilled.sheets, []);
+      assert.equal(stateFulfilled.selectedSheetId, null);
+      assert.equal(stateFulfilled.loadingSheets, true);
+
+      const stateRejected = dsaSheetReducer(state0, { type: 'auth/logout/rejected' });
+      assert.deepEqual(stateRejected.sheets, []);
+      assert.equal(stateRejected.selectedSheetId, null);
+      assert.equal(stateRejected.loadingSheets, true);
+    });
   });
 });

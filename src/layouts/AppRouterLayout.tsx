@@ -30,7 +30,14 @@ export const AppRouterLayout: React.FC = () => {
   const userId = useAppSelector((state) => state.auth?.user?.id);
   const hasInitializedRef = useRef(false);
   const lastIntegrityNoticeAt = useRef(0);
-  const { bindTarget: bindProtectedSurface } = useAssessmentIntegrity<HTMLDivElement>({
+  const {
+    bindTarget: bindProtectedSurface,
+    enterSecureMode,
+    isContentObscured,
+    isSecureModeActive,
+    secureModeSupported,
+  } = useAssessmentIntegrity<HTMLDivElement>({
+    obscureOnFocusLoss: true,
     onViolation: (violation) => {
       const now = Date.now();
       if (now - lastIntegrityNoticeAt.current < 1500) return;
@@ -38,11 +45,15 @@ export const AppRouterLayout: React.FC = () => {
       toast.error(
         violation === 'print-screen'
           ? 'Screen capture shortcuts are disabled on this site.'
+          : violation === 'secure-mode-exit'
+            ? 'Secure mode ended. Re-enable it before continuing your assessment.'
           : 'Copy, paste, export, and inspection shortcuts are restricted.',
         { id: 'global-integrity-warning' }
       );
     },
   });
+  const watermarkLabel = `CONNECT2CODE • ${userId ? `USER ${userId}` : 'GUEST'} • ${location.pathname}`;
+  const isProblemWorkspace = /^\/problems\/[^/]+$/.test(location.pathname);
 
   // Synchronize Redux store if apiClient interceptor silently refreshes in background
   useEffect(() => {
@@ -149,6 +160,35 @@ export const AppRouterLayout: React.FC = () => {
         <ScrollRestoration />
         <Outlet />
       </RouteMetadata>
+      <div className="c2c-security-watermark" aria-hidden="true">
+        {Array.from({ length: 6 }, (_, index) => (
+          <span key={index}>{watermarkLabel}</span>
+        ))}
+      </div>
+      {isProblemWorkspace && secureModeSupported && (
+        <button
+          type="button"
+          onClick={() => void enterSecureMode()}
+          disabled={isSecureModeActive}
+          className="fixed bottom-4 right-4 z-[60] inline-flex items-center gap-2 rounded-full border border-blue-400/30 bg-slate-950/90 px-3 py-2 text-xs font-extrabold text-blue-100 shadow-xl shadow-slate-950/20 backdrop-blur transition hover:border-blue-300/60 hover:bg-slate-900 disabled:cursor-default disabled:border-emerald-400/30 disabled:text-emerald-200"
+          aria-pressed={isSecureModeActive}
+          title="Use fullscreen and browser keyboard lock where supported"
+        >
+          <i className={`fa-solid ${isSecureModeActive ? 'fa-shield-circle-check' : 'fa-expand'}`} aria-hidden="true"></i>
+          {isSecureModeActive ? 'Secure mode on' : 'Enter secure mode'}
+        </button>
+      )}
+      {isContentObscured && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#070A13] p-6 text-center text-white" role="alert" aria-live="assertive">
+          <div className="max-w-sm">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-500/15 text-2xl text-blue-300">
+              <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
+            </div>
+            <h2 className="text-xl font-extrabold">Assessment content protected</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">Return focus to this window to continue. Content is hidden while the page is inactive.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

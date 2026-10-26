@@ -6,10 +6,12 @@ export type AssessmentIntegrityViolation =
   | 'developer-tools'
   | 'drag-drop'
   | 'print-screen'
+  | 'secure-mode-exit'
   | 'tab-switch';
 
 interface UseAssessmentIntegrityOptions {
   enabled?: boolean;
+  obscureOnFocusLoss?: boolean;
   onViolation?: (violation: AssessmentIntegrityViolation) => void;
 }
 
@@ -24,8 +26,8 @@ export function isInternalAssessmentClipboard(target: EventTarget | null): boole
   return target instanceof Element && Boolean(target.closest(INTERNAL_CLIPBOARD_SELECTOR));
 }
 
-const CLIPBOARD_KEYS = new Set(['c', 'v', 'x']);
-const RESTRICTED_BROWSER_KEYS = new Set(['p', 's', 'u']);
+const CLIPBOARD_KEYS = new Set(['a', 'c', 'v', 'x']);
+const RESTRICTED_BROWSER_KEYS = new Set(['o', 'p', 's', 'u']);
 const DEVELOPER_TOOL_KEYS = new Set(['c', 'i', 'j']);
 
 type AssessmentShortcut = Pick<
@@ -69,11 +71,15 @@ export function classifyAssessmentShortcut(
  */
 export function useAssessmentIntegrity<T extends HTMLElement>({
   enabled = true,
+  obscureOnFocusLoss = false,
   onViolation,
 }: UseAssessmentIntegrityOptions = {}) {
   const targetRef = useRef<T>(null);
   const [target, setTarget] = useState<T | null>(null);
   const [violationCount, setViolationCount] = useState(0);
+  const [isContentObscured, setIsContentObscured] = useState(false);
+  const [isSecureModeActive, setIsSecureModeActive] = useState(false);
+  const secureModeRequestedRef = useRef(false);
   const callbackRef = useRef(onViolation);
   callbackRef.current = onViolation;
 
@@ -86,6 +92,23 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
     targetRef.current = node;
     setTarget(node);
   }, []);
+
+  const secureModeSupported = typeof document !== 'undefined' && Boolean(document.documentElement.requestFullscreen);
+
+  const enterSecureMode = useCallback(async () => {
+    if (!target?.requestFullscreen) return false;
+
+    try {
+      type SecureFullscreenOptions = FullscreenOptions & { keyboardLock?: 'browser' };
+      await target.requestFullscreen({ navigationUI: 'hide', keyboardLock: 'browser' } as SecureFullscreenOptions);
+      secureModeRequestedRef.current = true;
+      setIsSecureModeActive(true);
+      setIsContentObscured(false);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [target]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -106,6 +129,13 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
       block(event, 'clipboard');
     };
     const handleDragDrop = (event: DragEvent) => block(event, 'drag-drop');
+    const handleSelectStart = (event: Event) => {
+      if (isInternalAssessmentClipboard(event.target)) return;
+      block(event, 'clipboard');
+    };
+    const handleAuxClick = (event: MouseEvent) => {
+      if (event.button === 1) block(event, 'clipboard');
+    };
     const handleBeforeInput = (event: InputEvent) => {
       if (event.inputType === 'insertFromPaste' || event.inputType === 'insertFromDrop') {
         if (event.inputType === 'insertFromPaste' && isAssessmentClipboardAllowed(event.target)) return;
@@ -121,7 +151,27 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
       if (violation) block(event, violation);
     };
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') reportViolation('tab-switch');
+      const isHidden = document.visibilityState === 'hidden';
+      if (obscureOnFocusLoss) setIsContentObscured(isHidden);
+      if (isHidden) reportViolation('tab-switch');
+    };
+    const handleWindowBlur = () => {
+      if (!obscureOnFocusLoss) return;
+      setIsContentObscured(true);
+      reportViolation('tab-switch');
+    };
+    const handleWindowFocus = () => {
+      if (obscureOnFocusLoss && document.visibilityState === 'visible') {
+        setIsContentObscured(false);
+      }
+    };
+    const handleFullscreenChange = () => {
+      const isFullscreen = document.fullscreenElement === target;
+      setIsSecureModeActive(isFullscreen);
+      if (!isFullscreen && secureModeRequestedRef.current) {
+        secureModeRequestedRef.current = false;
+        reportViolation('secure-mode-exit');
+      }
     };
 
     target.addEventListener('contextmenu', handleContextMenu, true);
@@ -129,10 +179,16 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
     target.addEventListener('cut', handleClipboard, true);
     target.addEventListener('paste', handleClipboard, true);
     target.addEventListener('dragstart', handleDragDrop, true);
+    target.addEventListener('dragover', handleDragDrop, true);
     target.addEventListener('drop', handleDragDrop, true);
+    target.addEventListener('selectstart', handleSelectStart, true);
+    target.addEventListener('auxclick', handleAuxClick, true);
     target.addEventListener('beforeinput', handleBeforeInput, true);
     window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
 
     return () => {
       target.removeEventListener('contextmenu', handleContextMenu, true);
@@ -140,12 +196,26 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
       target.removeEventListener('cut', handleClipboard, true);
       target.removeEventListener('paste', handleClipboard, true);
       target.removeEventListener('dragstart', handleDragDrop, true);
+      target.removeEventListener('dragover', handleDragDrop, true);
       target.removeEventListener('drop', handleDragDrop, true);
+      target.removeEventListener('selectstart', handleSelectStart, true);
+      target.removeEventListener('auxclick', handleAuxClick, true);
       target.removeEventListener('beforeinput', handleBeforeInput, true);
       window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [enabled, reportViolation, target]);
+  }, [enabled, obscureOnFocusLoss, reportViolation, target]);
 
-  return { bindTarget, targetRef, violationCount };
+  return {
+    bindTarget,
+    enterSecureMode,
+    isContentObscured,
+    isSecureModeActive,
+    secureModeSupported,
+    targetRef,
+    violationCount,
+  };
 }

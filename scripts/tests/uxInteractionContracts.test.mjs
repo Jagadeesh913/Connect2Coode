@@ -165,6 +165,34 @@ describe('shared UX interaction contracts', () => {
     assert.match(problemDetails, /connect2code-internal-paste/);
     assert.doesNotMatch(problemDetails, /navigator\.clipboard/);
     assert.match(integrityHook, /INTERNAL_CLIPBOARD_SELECTOR/);
+    assert.match(integrityHook, /obscureOnFocusLoss/);
+    assert.match(integrityHook, /window\.addEventListener\('blur'/);
+    assert.match(integrityHook, /requestFullscreen/);
+    assert.match(integrityHook, /keyboardLock: 'browser'/);
+    assert.match(integrityHook, /fullscreenchange/);
     assert.match(appLayout, /c2c-protected-surface/);
+    assert.match(appLayout, /c2c-security-watermark/);
+    assert.match(appLayout, /Assessment content protected/);
+    assert.match(appLayout, /Enter secure mode/);
+  });
+
+  it('ships deployment-level browser hardening headers', async () => {
+    const deploymentConfig = await readSource('vercel.json');
+    assert.match(deploymentConfig, /Content-Security-Policy/);
+    assert.match(deploymentConfig, /frame-ancestors 'none'/);
+    assert.match(deploymentConfig, /display-capture=\(\)/);
+    assert.match(deploymentConfig, /X-Frame-Options/);
+    assert.match(deploymentConfig, /Strict-Transport-Security/);
+  });
+
+  it('unauthenticated users on dsa-sheet page are presented with the sign-in EmptyState', async () => {
+    const dsaSheetSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
+    assert.match(dsaSheetSource, /openAuthModal/);
+    assert.match(dsaSheetSource, /!isAuthenticated && sheets\.length === 0/);
+    assert.match(dsaSheetSource, /title="Sign in to explore DSA Sheet"/);
+    assert.match(dsaSheetSource, /actionText="Sign In"/);
+    assert.match(dsaSheetSource, /onAction=\{\(\) => dispatch\(openAuthModal\(\{ mode: 'login' \}\)\)\}/);
+    assert.match(dsaSheetSource, /icon=\{<Lock className="w-12 h-12 text-blue-500" \/>\}/);
   });
 });
+

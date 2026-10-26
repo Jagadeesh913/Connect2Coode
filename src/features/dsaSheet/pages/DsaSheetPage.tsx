@@ -7,6 +7,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Lock,
   Search,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
@@ -14,6 +15,7 @@ import { Badge } from '../../../shared/components/ui/Badge';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
+import { openAuthModal } from '../../auth/redux/authSlice';
 import { DsaSheetHeroBanner } from '../components/DsaSheetHeroBanner';
 import {
   fetchDsaSections,
@@ -34,6 +36,7 @@ const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'ne
 
 export const DsaSheetPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const { isAuthenticated, loading: authLoading } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
   const {
     sheets,
@@ -54,11 +57,13 @@ export const DsaSheetPage: React.FC = () => {
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
-    const promise = dispatch(fetchDsaSheets());
-    return () => {
-      promise.abort();
-    };
-  }, [dispatch]);
+    if (isAuthenticated) {
+      const promise = dispatch(fetchDsaSheets());
+      return () => {
+        promise.abort();
+      };
+    }
+  }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
     if (selectedSheetId) {
@@ -139,8 +144,18 @@ export const DsaSheetPage: React.FC = () => {
       <DsaSheetHeroBanner />
 
       <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        {loadingSheets ? (
+        {authLoading || (loadingSheets && isAuthenticated) ? (
           <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>
+        ) : !isAuthenticated && sheets.length === 0 ? (
+          <div className="my-12">
+            <EmptyState
+              title="Sign in to explore DSA Sheet"
+              description="Log in with your Connect 2 Code account to browse curated DSA learning sheets, track your progress, and practice problems."
+              actionText="Sign In"
+              onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+              icon={<Lock className="w-12 h-12 text-blue-500" />}
+            />
+          </div>
         ) : sheetError && sheets.length === 0 ? (
           <EmptyState icon={<BookOpenCheck className="w-8 h-8" />} title="Unable to load DSA sheets" description={sheetError} actionText="Retry" onAction={() => void dispatch(fetchDsaSheets({ force: true }))} />
         ) : sheets.length === 0 ? (

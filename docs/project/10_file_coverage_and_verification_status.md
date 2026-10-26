@@ -27,7 +27,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `tsconfig.json` | TypeScript 5.9 compiler options (`strict: true`, ES2022) | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run typecheck`. |
 | `tsconfig.ci.json`| CI TypeScript configuration | `VERIFIED` | Used in CI environment checks. |
 | `.oxlintrc.json` | Oxlint rules (React hooks and exports) | `RUNTIME-VERIFIED` | Passes with 0 errors on 153 files in 35ms. |
-| `vercel.json` | Edge routing, proxy rewrites, SPA fallback | `PARTIALLY VERIFIED` | Adds crawler-only metadata rewriting and defense-in-depth `X-Robots-Tag` headers; JSON and regression tests pass, but header-conditioned Vercel routing needs deployed verification. |
+| `vercel.json` | Edge routing, proxy rewrites, SPA fallback, and security headers | `PARTIALLY VERIFIED` | Adds crawler metadata, route-specific `X-Robots-Tag`, anti-framing, permissions, referrer, HSTS, and MIME hardening; JSON/regression checks pass, but deployed header behavior requires production verification. |
 | `api/social.ts` | Crawler-only server-rendered metadata endpoint | `RUNTIME-VERIFIED` | Emits escaped, absolute canonical/social tags; dynamic API data is accepted only when its identity matches the requested route. |
 | `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one default description, robots, Open Graph, and Twitter/X set; manifest and icon links verified. Runtime metadata creates the canonical link from the real origin. |
 | `.env.example` | Documented environment variable template | `VERIFIED` | Contains API/app settings plus optional canonical frontend origin and public Brandfetch client ID. |
@@ -44,7 +44,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`. |
 | `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Provider, ThemeProvider, Toaster, ErrorBoundary. |
-| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except the isolated Monaco surface. |
+| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, protected pages are watermarked, and print output is suppressed. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
@@ -112,7 +112,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata plus browser-level clipboard/capture deterrence above every route branch. |
+| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata, watermarking, focus-loss privacy, browser-level clipboard/capture deterrence, and the problem-workspace secure-mode control. |
 | `src/layouts/AuthLayout.tsx` | Visual container for Login, Signup, ForgotPassword | `RUNTIME-VERIFIED` | Glassmorphism card and brand mark. |
 | `src/layouts/MainLayout.tsx` | Standard student portal layout with Navbar and Footer | `RUNTIME-VERIFIED` | Verified across all public pages. |
 | `src/routes/appRoutes.tsx` | Route definitions with lazy code-splitting | `RUNTIME-VERIFIED` | Verified with smoke preview on 5 routes. |
@@ -139,7 +139,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
-| `src/shared/hooks/useAssessmentIntegrity.ts` | Application-wide clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, developer-tool, Print Screen, common OS capture, internal-editor clipboard routing, and allowed execution-shortcut classification tested. Browser/OS enforcement boundary remains documented. |
+| `src/shared/hooks/useAssessmentIntegrity.ts` | Application-wide clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, selection, middle-click, drag/drop, developer-tool, Print Screen, common OS capture, focus-loss obscuring, fullscreen/keyboard-lock secure mode, internal-editor clipboard routing, and allowed execution shortcuts are covered. Browser/OS enforcement boundary remains documented. |
 | `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Verified theme switching. |
 
 ---

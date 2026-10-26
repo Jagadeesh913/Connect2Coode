@@ -111,9 +111,20 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
 - **Metadata on Deep Links**: `index.html` supplies branded defaults and icons before JavaScript loads. After hydration, `RouteMetadata` resolves the exact deep-link title, description, canonical URL, robots policy, and social tags using `VITE_SITE_URL` or the browser origin.
 - **Crawler metadata**: recognized search and social crawler user agents are rewritten to [`api/social.ts`](../../api/social.ts), which renders route-specific HTML tags without JavaScript. It only calls documented public detail endpoints, applies a short timeout, and falls back to safe route-derived content when an API payload is unavailable or does not match the requested route.
 - **Indexing protection**: route-specific `X-Robots-Tag` headers cover login, callback, authenticated, admin, and error routes even before the SPA loads. Keep those header entries synchronized with protected routes in `src/routes/appRoutes.tsx`.
+- **Browser hardening**: global deployment headers deny framing, object embedding, in-page display capture, camera/microphone/geolocation/payment/USB access, MIME sniffing, and insecure transport downgrade. `same-origin-allow-popups` is retained so the verified Google OAuth popup flow can continue to communicate with its opener.
 
 > [!IMPORTANT]
 > Set `VITE_SITE_URL` in Vercel's Production environment to the approved HTTPS frontend origin (with no path). The repository intentionally does not guess the production web hostname. Without this value, a preview or deployment alias is used as the canonical origin for requests made to that host.
+
+### Secure Assessment Deployment Boundary
+
+The public web application provides deterrence only: event cancellation, editor-local clipboard isolation, focus/visibility protection, watermarking, print suppression, and an optional fullscreen/keyboard-lock secure mode. A page cannot enumerate or disable browser extensions, prevent an operating-system screenshot, or stop a modified client.
+
+For high-stakes assessments, deploy the site through one of these controlled environments:
+
+1. A managed Chrome/ChromeOS fleet with Developer Tools set to **Never allow**, extension installation blocklisted except an explicit allowlist, guest/incognito access disabled, and the Connect2Code origin allowlisted.
+2. Safe Exam Browser or an equivalent kiosk client configured with private clipboard, screen capture disabled, application/process switching restricted, and the assessment origin pinned.
+3. Server-side exam sessions that record focus/fullscreen violations, enforce attempt windows and submission ownership, rate-limit execution, and invalidate compromised sessions. No verified telemetry endpoint currently exists in this frontend contract, so the client does not fabricate one.
 
 ---
 

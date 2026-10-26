@@ -257,6 +257,12 @@ export const dsaSheetSlice = createSlice({
       const message = payload?.message || 'Unable to load section questions.';
       state.questionErrors[sectionId] = message;
     });
+    builder.addMatcher(
+      (action) =>
+        action.type === 'auth/logout/fulfilled' ||
+        action.type === 'auth/logout/rejected',
+      () => initialState,
+    );
   },
 });
 
