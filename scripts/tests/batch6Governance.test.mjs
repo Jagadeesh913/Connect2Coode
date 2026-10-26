@@ -405,7 +405,8 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
         'utf8'
       );
 
-      assert.doesNotMatch(problemDetails, /userScopedStorage|submissions_\$\{activeQuestionId\}/, 'Submission history must be fetched from its API endpoint');
+      assert.doesNotMatch(problemDetails, /submissions_\$\{activeQuestionId\}/, 'Submission history must be fetched from its API endpoint');
+      assert.doesNotMatch(problemDetails, /userScopedStorage\.(?:getItem|setItem)\([^\n]*submission/i, 'Submission records must never be mirrored into user-scoped storage');
       assert.match(problemDetails, /setSubmissionsRetry\(\(attempt\) => attempt \+ 1\)/, 'A completed submission must invalidate the live history query');
     });
 

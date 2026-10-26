@@ -153,4 +153,18 @@ describe('shared UX interaction contracts', () => {
     assert.doesNotMatch(source, />Loading page…</);
     assert.match(source, /else \{[\s\S]*?<Skeleton/);
   });
+
+  it('problem drafts are user-scoped and editor clipboard data never reaches the system clipboard', async () => {
+    const problemDetails = await readSource('src/features/problems/pages/ProblemDetails.tsx');
+    const integrityHook = await readSource('src/shared/hooks/useAssessmentIntegrity.ts');
+    const appLayout = await readSource('src/layouts/AppRouterLayout.tsx');
+
+    assert.match(problemDetails, /userScopedStorage\.getItem/);
+    assert.match(problemDetails, /userScopedStorage\.setItem/);
+    assert.match(problemDetails, /data-assessment-clipboard="internal"/);
+    assert.match(problemDetails, /connect2code-internal-paste/);
+    assert.doesNotMatch(problemDetails, /navigator\.clipboard/);
+    assert.match(integrityHook, /INTERNAL_CLIPBOARD_SELECTOR/);
+    assert.match(appLayout, /c2c-protected-surface/);
+  });
 });

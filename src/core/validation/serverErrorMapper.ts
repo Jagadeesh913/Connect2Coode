@@ -69,7 +69,7 @@ export const getActionableErrorMessage = (
       if (rawMessage && !isInternalServerLeak(rawMessage)) {
         return rawMessage;
       }
-      return 'Please check the information you entered and try again.';
+      return fallbackMessage;
     }
     case 401: {
       if (rawMessage.toLowerCase().includes('credential') || rawMessage.toLowerCase().includes('password')) {
@@ -129,6 +129,8 @@ export const isInternalServerLeak = (text: string): boolean => {
   if (!text || typeof text !== 'string') return false;
   const lower = text.toLowerCase();
   return (
+    /https?:\/\/[\w.-]+(?::\d+)?\/[\w./?=&%-]*/i.test(text) ||
+    /\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b/.test(text) ||
     lower.includes('java.lang') ||
     lower.includes('org.springframework') ||
     lower.includes('hibernate') ||

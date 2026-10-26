@@ -34,6 +34,9 @@ import {
   collectExecutionDiagnostics,
   type CodeDiagnostic,
 } from '../utils/codeDiagnostics';
+import { getInternalEditorClipboardAction } from '../utils/internalEditorClipboard';
+import { userScopedStorage } from '../../../core/storage/userScopedStorage';
+import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
 
 interface QuestionTestCase {
   id?: number;
@@ -107,6 +110,9 @@ function solve() {
 solve();
 `,
 };
+
+const getDraftStorageKey = (problemIdentifier: string, languageId: number): string =>
+  `problem-draft:${problemIdentifier}:language:${languageId}`;
 
 export const ProblemDetails: React.FC = () => {
   const { slug, id } = useParams<{ slug?: string; id?: string }>();
@@ -218,6 +224,8 @@ export const ProblemDetails: React.FC = () => {
   const resultsPanelRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
+  const internalEditorClipboardRef = useRef('');
+  const draftOwner = String(user?.id ?? user?.email ?? 'guest');
 
   // Check whether the currently loaded problem entity matches this route's identifier
   const isProblemLoadedForRoute = Boolean(
@@ -355,8 +363,8 @@ export const ProblemDetails: React.FC = () => {
     [currentCode, monacoLang]
   );
   const executionDiagnostics = useMemo(
-    () => collectExecutionDiagnostics(executionResult, executionError),
-    [executionError, executionResult]
+    () => collectExecutionDiagnostics(executionResult),
+    [executionResult]
   );
   const diagnostics = useMemo(
     () => [...executionDiagnostics, ...editorDiagnostics],
@@ -399,6 +407,43 @@ export const ProblemDetails: React.FC = () => {
     syncEditorDiagnostics(diagnostics);
   }, [diagnostics, syncEditorDiagnostics]);
 
+  const handleInternalEditorClipboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const action = getInternalEditorClipboardAction(event);
+    if (!action) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+    const selection = editor?.getSelection();
+    if (!editor || !model || !selection) return;
+
+    if (action === 'copy' || action === 'cut') {
+      const selectedCode = model.getValueInRange(selection);
+      if (!selectedCode) return;
+      internalEditorClipboardRef.current = selectedCode;
+      if (action === 'cut' && !isExecuting) {
+        editor.pushUndoStop();
+        editor.executeEdits('connect2code-internal-cut', [{ range: selection, text: '', forceMoveMarkers: true }]);
+        editor.pushUndoStop();
+      }
+      return;
+    }
+
+    if (!internalEditorClipboardRef.current) {
+      toast.error('Paste is limited to code copied inside this editor.', { id: 'internal-editor-clipboard' });
+      return;
+    }
+    if (isExecuting) return;
+    editor.pushUndoStop();
+    editor.executeEdits('connect2code-internal-paste', [{
+      range: selection,
+      text: internalEditorClipboardRef.current,
+      forceMoveMarkers: true,
+    }]);
+    editor.pushUndoStop();
+  }, [isExecuting]);
+
   // Load shared server state once; Redux owns both resources.
   useEffect(() => {
     dispatch(fetchLanguages());
@@ -424,6 +469,32 @@ export const ProblemDetails: React.FC = () => {
       });
     }
   }, [serverLanguages]);
+
+  useEffect(() => {
+    setCodeByLang({});
+    internalEditorClipboardRef.current = '';
+  }, [draftOwner, problemIdentifier]);
+
+  useEffect(() => {
+    if (!selectedLanguage || !problemIdentifier) return;
+    const savedDraft = userScopedStorage.getItem(
+      getDraftStorageKey(problemIdentifier, selectedLanguage.id)
+    );
+    const starter = DEFAULT_STARTER_CODE[monacoLang] || DEFAULT_STARTER_CODE.java;
+    setCodeByLang((previous) => previous[selectedLanguage.id] !== undefined
+      ? previous
+      : { ...previous, [selectedLanguage.id]: savedDraft ?? starter });
+  }, [draftOwner, monacoLang, problemIdentifier, selectedLanguage]);
+
+  useEffect(() => {
+    if (!selectedLanguage || !problemIdentifier) return;
+    const draft = codeByLang[selectedLanguage.id];
+    if (draft === undefined) return;
+    const timer = window.setTimeout(() => {
+      userScopedStorage.setItem(getDraftStorageKey(problemIdentifier, selectedLanguage.id), draft);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [codeByLang, draftOwner, problemIdentifier, selectedLanguage]);
 
   usePageMetadata(
     isProblemLoadedForRoute && problem?.title
@@ -583,10 +654,9 @@ export const ProblemDetails: React.FC = () => {
       }
       setExecutionResult(result);
       setSelectedTestCaseIdx(0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
-      const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Failed to execute code'}: ${detail}` : (err?.message || 'Failed to execute code');
+      const msg = getActionableErrorMessage(err, 'We could not run your code. Please try again.');
       setExecutionError(msg);
       toast.error(msg);
     } finally {
@@ -656,10 +726,9 @@ export const ProblemDetails: React.FC = () => {
 
       // The submission endpoint owns history; refetch it instead of synthesizing a client record.
       setSubmissionsRetry((attempt) => attempt + 1);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
-      const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Failed to submit code'}: ${detail}` : (err?.message || 'Failed to submit code');
+      const msg = getActionableErrorMessage(err, 'We could not submit your code. Please try again.');
       setExecutionError(msg);
       toast.error(msg);
     } finally {
@@ -826,7 +895,7 @@ export const ProblemDetails: React.FC = () => {
       <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
 
       {/* Coding workspaces use the full available desktop width while retaining page gutters. */}
-      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 flex flex-col flex-1 min-h-0">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 flex flex-col flex-1 min-h-0">
         {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (Matching Reference Image 5) */}
       <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
         
@@ -1408,7 +1477,11 @@ export const ProblemDetails: React.FC = () => {
             )}
             {/* Monaco Editor Container */}
             <div
-              data-assessment-clipboard="allowed"
+              data-assessment-clipboard="internal"
+              onKeyDownCapture={handleInternalEditorClipboard}
+              onCopyCapture={(event) => event.preventDefault()}
+              onCutCapture={(event) => event.preventDefault()}
+              onPasteCapture={(event) => event.preventDefault()}
               className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 h-[400px] lg:h-auto lg:flex-1 lg:min-h-[260px] ${consoleHeight === 'expanded' ? 'sm:h-[280px]' : consoleHeight === 'collapsed' ? 'sm:h-[620px]' : 'sm:h-[400px]'}`}
             >
               {loadingLanguages && languages.length === 0 ? (
@@ -1437,8 +1510,8 @@ export const ProblemDetails: React.FC = () => {
                   fontFamily: "JetBrains Mono, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
                   cursorBlinking: 'smooth',
                   smoothScrolling: true,
-                  contextmenu: true,
-                  copyWithSyntaxHighlighting: true,
+                  contextmenu: false,
+                  copyWithSyntaxHighlighting: false,
                   dragAndDrop: false,
                   readOnly: isExecuting,
                   readOnlyMessage: { value: 'Code editing is paused while the current execution is in progress.' },
@@ -1851,94 +1924,71 @@ export const ProblemDetails: React.FC = () => {
 
                     {/* SUBMIT VERDICT VIEW */}
                     {lastExecutionMode === 'submit' && executionResult && (
-                      <div className="space-y-4 animate-fade-in">
-                        {isExecutionResultSuccessful(executionResult) ? (
-                          <div className="p-6 bg-gradient-to-br from-white dark:from-[#0F172A] to-emerald-50 dark:to-emerald-950/20 border border-emerald-500/30 rounded-3xl flex flex-col gap-5 shadow-xs">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-2xl shadow-sm">
-                                <i className="fa-solid fa-check"></i>
-                              </div>
-                              <div>
-                                <div className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-                                  Accepted
-                                </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                                  All {executionResult.totalTestCases} test cases passed successfully!
-                                </div>
-                              </div>
+                      <section className={`animate-fade-in overflow-hidden rounded-2xl border bg-white shadow-xs dark:bg-[#0F172A] ${isExecutionResultSuccessful(executionResult) ? 'border-emerald-200 dark:border-emerald-900/70' : 'border-rose-200 dark:border-rose-900/70'}`}>
+                        <div className={`flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${isExecutionResultSuccessful(executionResult) ? 'border-emerald-200 bg-emerald-50/70 dark:border-emerald-900/60 dark:bg-emerald-950/20' : 'border-rose-200 bg-rose-50/70 dark:border-rose-900/60 dark:bg-rose-950/20'}`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-base text-white shadow-sm ${isExecutionResultSuccessful(executionResult) ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+                              <i className={`fa-solid ${isExecutionResultSuccessful(executionResult) ? 'fa-check' : 'fa-xmark'}`} aria-hidden="true"></i>
                             </div>
-
-                            {/* Stats Grid */}
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
-                                <span className="text-slate-400 text-[10px] block">TEST CASES</span>
-                                <span className="text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                                  {executionResult.passedTestCases} / {executionResult.totalTestCases}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block">100% Passed</span>
-                              </div>
-
-                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
-                                <span className="text-slate-400 text-[10px] block">RUNTIME</span>
-                                <span className="text-slate-900 dark:text-white font-bold text-sm">
-                                  {executionResult.runtimeMs ?? '—'}{executionResult.runtimeMs !== undefined && executionResult.runtimeMs !== null ? ' ms' : ''}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block">Fast</span>
-                              </div>
-
-                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
-                                <span className="text-slate-400 text-[10px] block">MEMORY</span>
-                                <span className="text-slate-900 dark:text-white font-bold text-sm">
-                                  {executionResult.memoryMb ?? '—'}{executionResult.memoryMb !== undefined && executionResult.memoryMb !== null ? ' MB' : ''}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block">Optimal</span>
-                              </div>
-
-                              <div className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xs">
-                                <span className="text-slate-400 text-[10px] block">LANGUAGE</span>
-                                <span className="text-blue-600 dark:text-blue-400 font-bold text-sm truncate block">
-                                  {selectedLanguage?.name || '—'}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block">Verified</span>
-                              </div>
+                            <div>
+                              <h3 className={`text-lg font-extrabold tracking-tight ${isExecutionResultSuccessful(executionResult) ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                                {isExecutionResultSuccessful(executionResult) ? 'Accepted' : 'Wrong answer'}
+                              </h3>
+                              <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                                {isExecutionResultSuccessful(executionResult)
+                                  ? 'Your solution passed every evaluation case.'
+                                  : 'Your solution did not pass the complete evaluation.'}
+                              </p>
                             </div>
                           </div>
-                        ) : (
-                          <div className="p-6 bg-gradient-to-br from-white dark:from-[#0F172A] to-rose-50 dark:to-rose-950/20 border border-rose-500/30 rounded-3xl flex flex-col gap-4 shadow-xs">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-600 dark:text-rose-400 text-2xl shadow-sm">
-                                <i className="fa-solid fa-xmark"></i>
-                              </div>
-                              <div>
-                                <div className="text-2xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight">
-                                  Wrong Answer
-                                </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-sans">
-                                  Failed {executionResult.failedTestCases} out of {executionResult.totalTestCases} test cases
-                                </div>
-                              </div>
-                            </div>
+                          <span className={`w-fit rounded-full border px-3 py-1 font-mono text-[11px] font-bold ${isExecutionResultSuccessful(executionResult) ? 'border-emerald-200 bg-white text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300' : 'border-rose-200 bg-white text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300'}`}>
+                            {executionResult.passedTestCases}/{executionResult.totalTestCases} tests passed
+                          </span>
+                        </div>
 
-                            {/* Ratio Progress Bar */}
-                            <div className="space-y-1.5 font-mono text-xs">
-                              <div className="flex justify-between text-[11px] text-slate-500">
-                                <span>Passed: <strong className="text-emerald-500">{executionResult.passedTestCases}</strong> / {executionResult.totalTestCases}</span>
-                                <span>Failed: <strong className="text-rose-500">{executionResult.failedTestCases}</strong></span>
+                        <div className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                              <span>Evaluation progress</span>
+                              <span>{Math.round((executionResult.passedTestCases / (executionResult.totalTestCases || 1)) * 100)}%</span>
+                            </div>
+                            <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100 ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-700">
+                              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(executionResult.passedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}></div>
+                              <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${(executionResult.failedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2.5">
+                              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Passed</span>
+                                <span className="mt-0.5 block text-base font-extrabold text-emerald-600 dark:text-emerald-400">{executionResult.passedTestCases}</span>
                               </div>
-                              <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex border border-slate-200 dark:border-slate-700">
-                                <div
-                                  className="bg-emerald-500 h-full transition-all duration-300"
-                                  style={{ width: `${(executionResult.passedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}
-                                ></div>
-                                <div
-                                  className="bg-rose-500 h-full transition-all duration-300"
-                                  style={{ width: `${(executionResult.failedTestCases / (executionResult.totalTestCases || 1)) * 100}%` }}
-                                ></div>
+                              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+                                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Failed</span>
+                                <span className={`mt-0.5 block text-base font-extrabold ${executionResult.failedTestCases > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'}`}>{executionResult.failedTestCases}</span>
                               </div>
                             </div>
+                            <p className="rounded-xl bg-slate-50 px-3 py-2 text-[11px] leading-relaxed text-slate-500 dark:bg-slate-900/50 dark:text-slate-400">
+                              {isExecutionResultSuccessful(executionResult)
+                                ? 'Submission recorded. Your draft remains saved automatically on this device.'
+                                : 'Review the diagnostics and sample output, update your solution, then submit again.'}
+                            </p>
                           </div>
-                        )}
-                      </div>
+
+                          <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-1">
+                            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
+                              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Runtime</dt>
+                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.runtimeMs !== undefined && executionResult.runtimeMs !== null ? `${executionResult.runtimeMs} ms` : 'Not reported'}</dd>
+                            </div>
+                            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
+                              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Memory</dt>
+                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.memoryMb !== undefined && executionResult.memoryMb !== null ? `${executionResult.memoryMb} MB` : 'Not reported'}</dd>
+                            </div>
+                            <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
+                              <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Language</dt>
+                              <dd className="max-w-32 truncate font-bold text-blue-600 dark:text-blue-400">{selectedLanguage?.name || 'Unknown'}</dd>
+                            </div>
+                          </dl>
+                        </div>
+                      </section>
                     )}
 
                   </div>

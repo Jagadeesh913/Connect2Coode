@@ -15,6 +15,7 @@ import { decodeJwtPayload, isJwtExpired } from '../core/security/jwt';
 import { subscribeToAuthSessionEvents } from '../core/security/authSessionSync';
 import { toast } from 'react-hot-toast';
 import { RouteMetadata } from '../core/metadata/RouteMetadata';
+import { useAssessmentIntegrity } from '../shared/hooks/useAssessmentIntegrity';
 
 /**
  * Root route shell (F-010, F-039):
@@ -28,6 +29,20 @@ export const AppRouterLayout: React.FC = () => {
   const navigate = useNavigate();
   const userId = useAppSelector((state) => state.auth?.user?.id);
   const hasInitializedRef = useRef(false);
+  const lastIntegrityNoticeAt = useRef(0);
+  const { bindTarget: bindProtectedSurface } = useAssessmentIntegrity<HTMLDivElement>({
+    onViolation: (violation) => {
+      const now = Date.now();
+      if (now - lastIntegrityNoticeAt.current < 1500) return;
+      lastIntegrityNoticeAt.current = now;
+      toast.error(
+        violation === 'print-screen'
+          ? 'Screen capture shortcuts are disabled on this site.'
+          : 'Copy, paste, export, and inspection shortcuts are restricted.',
+        { id: 'global-integrity-warning' }
+      );
+    },
+  });
 
   // Synchronize Redux store if apiClient interceptor silently refreshes in background
   useEffect(() => {
@@ -129,9 +144,11 @@ export const AppRouterLayout: React.FC = () => {
   }, [dispatch, userId]);
 
   return (
-    <RouteMetadata>
-      <ScrollRestoration />
-      <Outlet />
-    </RouteMetadata>
+    <div ref={bindProtectedSurface} className="c2c-protected-surface contents">
+      <RouteMetadata>
+        <ScrollRestoration />
+        <Outlet />
+      </RouteMetadata>
+    </div>
   );
 };

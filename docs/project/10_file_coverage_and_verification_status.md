@@ -44,7 +44,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`. |
 | `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Provider, ThemeProvider, Toaster, ErrorBoundary. |
-| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`. |
+| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except the isolated Monaco surface. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
@@ -75,7 +75,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | MCQ question type no longer admits stale top-level correctness fields; includes API-supported optional execution `customInput`. |
 | `src/core/validation/commonRules.ts` | Zod validators (email, password, name, phone, URL) | `RUNTIME-VERIFIED` | Migrated to Zod 4 error APIs and tested in `validationArchitecture.test.mjs`. |
-| `src/core/validation/serverErrorMapper.ts`| Backend error parser and security leak filter | `RUNTIME-VERIFIED` | Tested in `batch4Remediation.test.mjs`. |
+| `src/core/validation/serverErrorMapper.ts`| Backend error parser and security leak filter | `RUNTIME-VERIFIED` | Stack traces, backend implementation names, service URLs, and IP/port details are regression-tested and suppressed. |
 | `src/core/validation/index.ts` | Re-exports validation rules | `VERIFIED` | Re-exports all schemas. |
 | `src/core/validation/schemas/adminSchemas.ts` | Zod schemas for admin forms | `RUNTIME-VERIFIED` | Zod 4-compatible and tested in `validationArchitecture.test.mjs`. |
 | `src/core/validation/schemas/authSchemas.ts` | Zod schemas for login, signup, forgot password | `RUNTIME-VERIFIED` | Tested in `validationArchitecture.test.mjs`. |
@@ -112,7 +112,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration and route metadata | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata ownership above every route branch. |
+| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata plus browser-level clipboard/capture deterrence above every route branch. |
 | `src/layouts/AuthLayout.tsx` | Visual container for Login, Signup, ForgotPassword | `RUNTIME-VERIFIED` | Glassmorphism card and brand mark. |
 | `src/layouts/MainLayout.tsx` | Standard student portal layout with Navbar and Footer | `RUNTIME-VERIFIED` | Verified across all public pages. |
 | `src/routes/appRoutes.tsx` | Route definitions with lazy code-splitting | `RUNTIME-VERIFIED` | Verified with smoke preview on 5 routes. |
@@ -139,7 +139,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
-| `src/shared/hooks/useAssessmentIntegrity.ts` | Student-workspace clipboard/shortcut deterrence | `RUNTIME-VERIFIED` | Clipboard, developer-tool, Print Screen, and allowed execution-shortcut classification tested. |
+| `src/shared/hooks/useAssessmentIntegrity.ts` | Application-wide clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, developer-tool, Print Screen, common OS capture, internal-editor clipboard routing, and allowed execution-shortcut classification tested. Browser/OS enforcement boundary remains documented. |
 | `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Verified theme switching. |
 
 ---
@@ -163,11 +163,13 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/PracticeHeroBanner.tsx` | Hero banner with problem stats & search | `RUNTIME-VERIFIED` | Verified on PracticePage. |
 | `hooks/useExecutionRequest.ts` | Custom hook for Monaco code running | `RUNTIME-VERIFIED` | Handles run/submit state & aborts. |
 | `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | Multi-select URL-backed filters (difficulty, topic, company, platform via comma-separated params), quick sort/status/page-size dropdowns, individual active filter pill removal, skeleton-backed query transitions, and post-filtering catalog pagination are regression-tested. |
-| `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Cancels history reads, resolves API language IDs/reference IDs, and accepts only non-zero passing verdicts. Browser-level proctoring remains unverified/unavailable. |
+| `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Cancels history reads, resolves API language IDs/reference IDs, restores user/problem/language-scoped drafts, isolates clipboard operations in memory, sanitizes execution failures, and accepts only non-zero passing verdicts. Browser-level proctoring remains unavailable. |
 | `pages/ProblemList.tsx` | Legacy standalone problem-list page | `VERIFIED` | Retained but no longer owns `/dsa-sheet`; the route now uses the API-driven DSA feature. |
 | `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `RUNTIME-VERIFIED` | Request ownership plus stale-row clearing and same-query refresh retention are tested in `problemSliceAbortRecovery.test.mjs`. |
 | `utils/problemEditorial.ts` | Problem solution editorial formatter | `VERIFIED` | Markdown editorial formatting. |
 | `utils/problemExecution.ts` | Output formatter, error parser, language resolver | `RUNTIME-VERIFIED` | Language entity/reference-ID resolution is tested. |
+| `utils/codeDiagnostics.ts` | Monaco and execution diagnostic mapper | `RUNTIME-VERIFIED` | Cross-language API misuse and deduplicated compiler line/column mapping are tested. |
+| `utils/internalEditorClipboard.ts` | Editor-only clipboard shortcut classifier | `RUNTIME-VERIFIED` | Copy, cut, paste, Insert aliases, and non-clipboard shortcuts are tested without system clipboard access. |
 
 ### C. Companies Feature (`src/features/companies/`)
 | File Path | Role | Status | Notes |

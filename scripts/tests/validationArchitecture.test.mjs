@@ -324,6 +324,15 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.equal(sanitized, 'Our servers encountered an issue while processing your request. Please try again shortly.');
     });
 
+    it('does not expose internal compiler service URLs or IP addresses to users', () => {
+      const sanitized = getActionableErrorMessage({
+        statusCode: 400,
+        message: 'Code Submission Failed: 400 Bad Request from GET http://165.22.217.218:2358/submissions/batch',
+      }, 'We could not submit your code. Please try again.');
+      assert.equal(sanitized, 'We could not submit your code. Please try again.');
+      assert.doesNotMatch(sanitized, /https?:|165\.22/);
+    });
+
     it('maps HTTP status codes to user-friendly actionable guidance', () => {
       assert.equal(
         getActionableErrorMessage({ statusCode: 401 }),

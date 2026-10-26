@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 const { classifyAssessmentShortcut } = await import(
   '../../src/shared/hooks/useAssessmentIntegrity.ts'
 );
+const { getInternalEditorClipboardAction } = await import(
+  '../../src/features/problems/utils/internalEditorClipboard.ts'
+);
 
 const shortcut = (key, overrides = {}) => ({
   altKey: false,
@@ -23,6 +26,8 @@ describe('assessment integrity shortcut classification', () => {
     assert.equal(classifyAssessmentShortcut(shortcut('I', { ctrlKey: true, shiftKey: true })), 'developer-tools');
     assert.equal(classifyAssessmentShortcut(shortcut('F12')), 'developer-tools');
     assert.equal(classifyAssessmentShortcut(shortcut('PrintScreen')), 'print-screen');
+    assert.equal(classifyAssessmentShortcut(shortcut('s', { metaKey: true, shiftKey: true })), 'print-screen');
+    assert.equal(classifyAssessmentShortcut(shortcut('4', { metaKey: true, shiftKey: true })), 'print-screen');
   });
 
   it('preserves editor typing and execution shortcuts', () => {
@@ -30,5 +35,14 @@ describe('assessment integrity shortcut classification', () => {
     assert.equal(classifyAssessmentShortcut(shortcut('Enter', { ctrlKey: true })), null);
     assert.equal(classifyAssessmentShortcut(shortcut("'", { ctrlKey: true })), null);
     assert.equal(classifyAssessmentShortcut(shortcut('z', { ctrlKey: true })), null);
+  });
+
+  it('recognizes editor-local clipboard shortcuts without using the system clipboard', () => {
+    assert.equal(getInternalEditorClipboardAction(shortcut('c', { ctrlKey: true })), 'copy');
+    assert.equal(getInternalEditorClipboardAction(shortcut('x', { metaKey: true })), 'cut');
+    assert.equal(getInternalEditorClipboardAction(shortcut('v', { ctrlKey: true })), 'paste');
+    assert.equal(getInternalEditorClipboardAction(shortcut('Insert', { ctrlKey: true })), 'copy');
+    assert.equal(getInternalEditorClipboardAction(shortcut('Insert', { shiftKey: true })), 'paste');
+    assert.equal(getInternalEditorClipboardAction(shortcut('z', { ctrlKey: true })), null);
   });
 });

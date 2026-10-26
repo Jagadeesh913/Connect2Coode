@@ -14,9 +14,14 @@ interface UseAssessmentIntegrityOptions {
 }
 
 const CLIPBOARD_ALLOWED_SELECTOR = '[data-assessment-clipboard="allowed"]';
+const INTERNAL_CLIPBOARD_SELECTOR = '[data-assessment-clipboard="internal"]';
 
 export function isAssessmentClipboardAllowed(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(CLIPBOARD_ALLOWED_SELECTOR));
+}
+
+export function isInternalAssessmentClipboard(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(INTERNAL_CLIPBOARD_SELECTOR));
 }
 
 const CLIPBOARD_KEYS = new Set(['c', 'v', 'x']);
@@ -34,6 +39,13 @@ export function classifyAssessmentShortcut(
   const key = event.key.toLowerCase();
   const primaryModifier = event.ctrlKey || event.metaKey;
   if (
+    event.key === 'PrintScreen' ||
+    (event.metaKey && event.shiftKey && ['3', '4', '5', 's'].includes(key)) ||
+    (event.metaKey && (key === 'g' || (event.altKey && key === 'r')))
+  ) {
+    return 'print-screen';
+  }
+  if (
     (primaryModifier && CLIPBOARD_KEYS.has(key)) ||
     (event.shiftKey && key === 'insert') ||
     (event.ctrlKey && key === 'insert')
@@ -47,7 +59,7 @@ export function classifyAssessmentShortcut(
   ) {
     return 'developer-tools';
   }
-  return event.key === 'PrintScreen' ? 'print-screen' : null;
+  return null;
 }
 
 /**
@@ -102,7 +114,10 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const violation = classifyAssessmentShortcut(event);
-      if (violation === 'clipboard' && isAssessmentClipboardAllowed(event.target)) return;
+      if (
+        violation === 'clipboard' &&
+        (isAssessmentClipboardAllowed(event.target) || isInternalAssessmentClipboard(event.target))
+      ) return;
       if (violation) block(event, violation);
     };
     const handleVisibilityChange = () => {

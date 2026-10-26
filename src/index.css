@@ -112,6 +112,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Assessment content is not selectable or transferable outside the isolated code editor. */
+.c2c-protected-surface,
+.c2c-protected-surface * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.c2c-protected-surface [data-assessment-clipboard="internal"],
+.c2c-protected-surface [data-assessment-clipboard="internal"] * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

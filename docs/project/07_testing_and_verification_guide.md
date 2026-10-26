@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 311 tests passed, 0 failed on 2026-10-26.
+- **Current verified run**: 314 tests passed, 0 failed on 2026-10-26.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -13,26 +13,28 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 
 | Suite File | Scope & Tested Contracts | Tests Count |
 | :--- | :--- | :---: |
-| [`apiClient.test.mjs`](../../scripts/tests/apiClient.test.mjs) | Base URL normalization, trimming slashes, localhost rejection in prod, default backend fallback. | 13 |
+| [`apiClient.test.mjs`](../../scripts/tests/apiClient.test.mjs) | Base URL normalization, trimming slashes, localhost rejection in prod, default backend fallback. | 18 |
 | [`apiIntegration.test.mjs`](../../scripts/tests/apiIntegration.test.mjs) | Endpoint formats, strict list response validation, DSA sheet ordering/token-compatible deletes, user-question validation, captured language DTO mapping/cache invalidation, question fallback discipline, custom-input payloads, and execution verdicts. | 25 |
-| [`assessmentIntegrity.test.mjs`](../../scripts/tests/assessmentIntegrity.test.mjs) | Assessment shortcut restrictions while preserving typing, undo, and Run/Submit shortcuts. | 2 |
-| [`authSession.test.mjs`](../../scripts/tests/authSession.test.mjs) | JWT claims, JWT-only admin authorization, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 19 |
+| [`assessmentIntegrity.test.mjs`](../../scripts/tests/assessmentIntegrity.test.mjs) | Global assessment shortcut restrictions and editor-local clipboard routing while preserving typing, undo, and Run/Submit shortcuts. | 3 |
+| [`authSession.test.mjs`](../../scripts/tests/authSession.test.mjs) | JWT claims, JWT-only admin authorization, logout, cookie-only storage, startup refresh gating, token-only refresh profile preservation, and cross-tab event validation. | 20 |
 | [`batch4Remediation.test.mjs`](../../scripts/tests/batch4Remediation.test.mjs) | Error mapping, status codes (400-504), server leak detection (`org.springframework`, Hibernate). | 24 |
 | [`batch6Governance.test.mjs`](../../scripts/tests/batch6Governance.test.mjs) | Route guards, storage boundaries, bookmark/progress/profile failure behavior, modal accessibility, and cross-user stale Redux responses. | 34 |
 | [`companyLogos.test.mjs`](../../scripts/tests/companyLogos.test.mjs) | Bundled asset presence/reachability, canonical aliases, legal-suffix normalization, domain validation, provider ordering, and monogram fallback. | 12 |
 | [`companyResilience.test.mjs`](../../scripts/tests/companyResilience.test.mjs) | Company fallbacks, canonical question contracts, mutation error propagation, and full test case retrieval. | 17 |
+| [`dsaSheetSlice.test.mjs`](../../scripts/tests/dsaSheetSlice.test.mjs) | DSA sheet request ownership, selection, filters, and stale-response protection. | 12 |
 | [`googleOAuthLifecycle.test.mjs`](../../scripts/tests/googleOAuthLifecycle.test.mjs) | Google OAuth, Redux auth lifecycle, single-flight refresh, open-redirect prevention. | 14 |
 | [`institutionManagement.test.mjs`](../../scripts/tests/institutionManagement.test.mjs) | AISHE uppercase transforms, university affiliation logic, status toggle. | 9 |
 | [`mcqCorrectOption.test.mjs`](../../scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false` priority, exact admin update serialization, stale-field rejection, and aptitude category URL parsing. | 7 |
 | [`metadataAndBranding.test.mjs`](../../scripts/tests/metadataAndBranding.test.mjs) | Default head-tag uniqueness, icon/manifest dimensions, complete route metadata coverage, indexing policy, centralized title ownership, and dynamic detail overrides. | 6 |
 | [`metadataCrawler.test.mjs`](../../scripts/tests/metadataCrawler.test.mjs) | Server-rendered crawler document escaping and uniqueness, absolute canonical origin policy, private-route noindex behavior, dynamic API identity rejection, and Vercel crawler/private-route routing configuration. | 5 |
-| [`problemExecution.test.mjs`](../../scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, and hook cancellation lifecycle. | 15 |
-| [`problemSliceAbortRecovery.test.mjs`](../../scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 12 |
+| [`problemExecution.test.mjs`](../../scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, editor/compiler diagnostics, and hook cancellation lifecycle. | 17 |
+| [`problemSliceAbortRecovery.test.mjs`](../../scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 14 |
+| [`questionsPaginationResilience.test.mjs`](../../scripts/tests/questionsPaginationResilience.test.mjs) | Paginated question retrieval resilience, ordering, and partial-page recovery. | 13 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, pagination semantics, and stable initial MCQ requests. | 10 |
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
-| [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization. | 24 |
-| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, and focus-safe shared controls. | 13 |
-| **Total** | **All 21 test files (99 reported suites)** | **311 / 311 Passing** |
+| [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
+| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, focus-safe controls, user-scoped drafts, and isolated editor clipboard contracts. | 14 |
+| **Total** | **All 21 test files (99 reported suites)** | **314 / 314 Passing** |
 
 ---
 
