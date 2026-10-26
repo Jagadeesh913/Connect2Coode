@@ -18,9 +18,27 @@ import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
 const EMPTY_REFERENCES: ReferenceItem[] = [];
 const EMPTY_COMPANIES: CompanyItem[] = [];
 
+const getDifficultyRank = (diff?: string): number => {
+  if (!diff) return 99;
+  const d = diff.toLowerCase().trim();
+  if (d.includes('basic') || d.includes('school')) return 1;
+  if (d.includes('easy')) return 2;
+  if (d.includes('medium')) return 3;
+  if (d.includes('hard')) return 4;
+  return 99;
+};
+
+const parseListParam = (val: string | null): string[] => {
+  if (!val) return [];
+  return val
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+};
+
 export const PracticePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { problems: apiProblems, listLoading: loading, listError: error, pagination } = useAppSelector((state) => state.problems);
+  const { problems: apiProblems, listLoading: loading, listError: error } = useAppSelector((state) => state.problems);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { solvedByProblemId } = useAppSelector((state) => state.progress);
@@ -28,23 +46,28 @@ export const PracticePage: React.FC = () => {
   const serverCompanies = useAppSelector((state) => state.companies.companies);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const pageSize = 20;
+  const rawLimit = searchParams.get('limit') || searchParams.get('pageSize');
+  const allowedPageSizes = [10, 25, 50, 100];
+  const parsedLimit = Number(rawLimit);
+  const pageSize = allowedPageSizes.includes(parsedLimit) ? parsedLimit : 25;
 
-  // URL state persistence (applied filters)
+  // URL state persistence (applied filters - arrays supporting multiple selections)
   const searchInputParam = searchParams.get('q') || '';
-  const selectedTopic = searchParams.get('topic') || '';
-  const selectedDifficulty = searchParams.get('difficulty') || '';
-  const selectedCompany = searchParams.get('company') || '';
-  const selectedPlatform = searchParams.get('platform') || '';
+  const selectedTopics = useMemo(() => parseListParam(searchParams.get('topic')), [searchParams]);
+  const selectedDifficulties = useMemo(() => parseListParam(searchParams.get('difficulty')), [searchParams]);
+  const selectedCompanies = useMemo(() => parseListParam(searchParams.get('company')), [searchParams]);
+  const selectedPlatforms = useMemo(() => parseListParam(searchParams.get('platform')), [searchParams]);
+  const selectedStatus = searchParams.get('status') || '';
+  const selectedSort = searchParams.get('sort') || '';
   const rawPage = searchParams.get('page');
   const parsedPage = Number(rawPage || '1');
   const currentPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
 
   // Draft filters staged until user clicks "Apply Filters"
-  const [draftDifficulty, setDraftDifficulty] = useState(selectedDifficulty);
-  const [draftTopic, setDraftTopic] = useState(selectedTopic);
-  const [draftCompany, setDraftCompany] = useState(selectedCompany);
-  const [draftPlatform, setDraftPlatform] = useState(selectedPlatform);
+  const [draftDifficulties, setDraftDifficulties] = useState<string[]>(selectedDifficulties);
+  const [draftTopics, setDraftTopics] = useState<string[]>(selectedTopics);
+  const [draftCompanies, setDraftCompanies] = useState<string[]>(selectedCompanies);
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [searchInput, setSearchInput] = useState(searchInputParam);
 
   // In-filter search inputs
@@ -59,20 +82,20 @@ export const PracticePage: React.FC = () => {
 
   // Sync draft states whenever URL params change
   useEffect(() => {
-    setDraftDifficulty(selectedDifficulty);
-  }, [selectedDifficulty]);
+    setDraftDifficulties(selectedDifficulties);
+  }, [selectedDifficulties]);
 
   useEffect(() => {
-    setDraftTopic(selectedTopic);
-  }, [selectedTopic]);
+    setDraftTopics(selectedTopics);
+  }, [selectedTopics]);
 
   useEffect(() => {
-    setDraftCompany(selectedCompany);
-  }, [selectedCompany]);
+    setDraftCompanies(selectedCompanies);
+  }, [selectedCompanies]);
 
   useEffect(() => {
-    setDraftPlatform(selectedPlatform);
-  }, [selectedPlatform]);
+    setDraftPlatforms(selectedPlatforms);
+  }, [selectedPlatforms]);
 
   useEffect(() => {
     setSearchInput(searchInputParam);
@@ -80,41 +103,70 @@ export const PracticePage: React.FC = () => {
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (selectedDifficulty) count++;
-    if (selectedTopic) count++;
-    if (selectedCompany) count++;
-    if (selectedPlatform) count++;
+    count += selectedDifficulties.length;
+    count += selectedTopics.length;
+    count += selectedCompanies.length;
+    count += selectedPlatforms.length;
     if (searchInputParam.trim()) count++;
+    if (selectedStatus) count++;
+    if (selectedSort) count++;
     return count;
-  }, [selectedDifficulty, selectedTopic, selectedCompany, selectedPlatform, searchInputParam]);
+  }, [
+    selectedDifficulties,
+    selectedTopics,
+    selectedCompanies,
+    selectedPlatforms,
+    searchInputParam,
+    selectedStatus,
+    selectedSort,
+  ]);
 
   const draftFilterCount = useMemo(() => {
     let count = 0;
-    if (draftDifficulty) count++;
-    if (draftTopic) count++;
-    if (draftCompany) count++;
-    if (draftPlatform) count++;
+    count += draftDifficulties.length;
+    count += draftTopics.length;
+    count += draftCompanies.length;
+    count += draftPlatforms.length;
     if (searchInput.trim()) count++;
     return count;
-  }, [draftDifficulty, draftTopic, draftCompany, draftPlatform, searchInput]);
+  }, [draftDifficulties, draftTopics, draftCompanies, draftPlatforms, searchInput]);
 
   const hasUnappliedChanges = useMemo(() => {
-    return (
-      draftDifficulty !== selectedDifficulty ||
-      draftTopic !== selectedTopic ||
-      draftCompany !== selectedCompany ||
-      draftPlatform !== selectedPlatform ||
-      searchInput.trim() !== searchInputParam
-    );
+    if (searchInput.trim() !== searchInputParam) return true;
+    if (
+      draftDifficulties.length !== selectedDifficulties.length ||
+      !draftDifficulties.every((d) => selectedDifficulties.includes(d))
+    ) {
+      return true;
+    }
+    if (
+      draftTopics.length !== selectedTopics.length ||
+      !draftTopics.every((t) => selectedTopics.includes(t))
+    ) {
+      return true;
+    }
+    if (
+      draftCompanies.length !== selectedCompanies.length ||
+      !draftCompanies.every((c) => selectedCompanies.includes(c))
+    ) {
+      return true;
+    }
+    if (
+      draftPlatforms.length !== selectedPlatforms.length ||
+      !draftPlatforms.every((p) => selectedPlatforms.includes(p))
+    ) {
+      return true;
+    }
+    return false;
   }, [
-    draftDifficulty,
-    selectedDifficulty,
-    draftTopic,
-    selectedTopic,
-    draftCompany,
-    selectedCompany,
-    draftPlatform,
-    selectedPlatform,
+    draftDifficulties,
+    selectedDifficulties,
+    draftTopics,
+    selectedTopics,
+    draftCompanies,
+    selectedCompanies,
+    draftPlatforms,
+    selectedPlatforms,
     searchInput,
     searchInputParam,
   ]);
@@ -168,49 +220,63 @@ export const PracticePage: React.FC = () => {
   }, [apiDifficulties]);
 
   // Resolve filters to numeric backend IDs whether passed as number or name/code
-  const resolvedDifficultyId = useMemo(() => {
-    if (!selectedDifficulty) return undefined;
-    if (!isNaN(Number(selectedDifficulty))) return Number(selectedDifficulty);
-    const found = apiDifficulties.find(
-      (d) =>
-        d.refName.toLowerCase() === selectedDifficulty.toLowerCase() ||
-        d.refCode?.toLowerCase() === selectedDifficulty.toLowerCase()
-    );
-    return found?.id !== undefined && !isNaN(Number(found.id)) ? Number(found.id) : undefined;
-  }, [selectedDifficulty, apiDifficulties]);
+  const resolvedDifficultyIds = useMemo(() => {
+    const ids = new Set<number>();
+    selectedDifficulties.forEach((val) => {
+      if (!isNaN(Number(val))) ids.add(Number(val));
+      const found = apiDifficulties.find(
+        (d) =>
+          d.refName.toLowerCase() === val.toLowerCase() ||
+          d.refCode?.toLowerCase() === val.toLowerCase()
+      );
+      if (found?.id !== undefined && !isNaN(Number(found.id))) ids.add(Number(found.id));
+    });
+    return ids;
+  }, [selectedDifficulties, apiDifficulties]);
 
-  const resolvedTopicId = useMemo(() => {
-    if (!selectedTopic) return undefined;
-    if (!isNaN(Number(selectedTopic))) return Number(selectedTopic);
-    const found = apiTopics.find(
-      (t) =>
-        t.refName.toLowerCase() === selectedTopic.toLowerCase() ||
-        t.refCode?.toLowerCase() === selectedTopic.toLowerCase()
-    );
-    return found?.id !== undefined && !isNaN(Number(found.id)) ? Number(found.id) : undefined;
-  }, [selectedTopic, apiTopics]);
+  const resolvedTopicIds = useMemo(() => {
+    const ids = new Set<number>();
+    selectedTopics.forEach((val) => {
+      if (!isNaN(Number(val))) ids.add(Number(val));
+      const found = apiTopics.find(
+        (t) =>
+          t.refName.toLowerCase() === val.toLowerCase() ||
+          t.refCode?.toLowerCase() === val.toLowerCase()
+      );
+      if (found?.id !== undefined && !isNaN(Number(found.id))) ids.add(Number(found.id));
+    });
+    return ids;
+  }, [selectedTopics, apiTopics]);
 
-  const resolvedCompanyId = useMemo(() => {
-    if (!selectedCompany) return undefined;
-    if (!isNaN(Number(selectedCompany))) return Number(selectedCompany);
-    const found = apiCompanies.find(
-      (c) =>
-        c.name.toLowerCase() === selectedCompany.toLowerCase() ||
-        c.slug?.toLowerCase() === selectedCompany.toLowerCase()
-    );
-    return found?.id !== undefined && !isNaN(Number(found.id)) ? Number(found.id) : undefined;
-  }, [selectedCompany, apiCompanies]);
+  const resolvedCompanyIds = useMemo(() => {
+    const ids = new Set<number>();
+    selectedCompanies.forEach((val) => {
+      if (!isNaN(Number(val))) ids.add(Number(val));
+      const found = apiCompanies.find(
+        (c) =>
+          c.name.toLowerCase() === val.toLowerCase() ||
+          c.slug?.toLowerCase() === val.toLowerCase() ||
+          String(c.id) === val
+      );
+      if (found?.id !== undefined && !isNaN(Number(found.id))) ids.add(Number(found.id));
+    });
+    return ids;
+  }, [selectedCompanies, apiCompanies]);
 
-  const resolvedPlatformId = useMemo(() => {
-    if (!selectedPlatform) return undefined;
-    if (!isNaN(Number(selectedPlatform))) return Number(selectedPlatform);
-    const found = apiPlatforms.find(
-      (p) =>
-        p.refName.toLowerCase() === selectedPlatform.toLowerCase() ||
-        p.refCode?.toLowerCase() === selectedPlatform.toLowerCase()
-    );
-    return found?.id !== undefined && !isNaN(Number(found.id)) ? Number(found.id) : undefined;
-  }, [selectedPlatform, apiPlatforms]);
+  const resolvedPlatformIds = useMemo(() => {
+    const ids = new Set<number>();
+    selectedPlatforms.forEach((val) => {
+      if (!isNaN(Number(val))) ids.add(Number(val));
+      const found = apiPlatforms.find(
+        (p) =>
+          p.refName.toLowerCase() === val.toLowerCase() ||
+          p.refCode?.toLowerCase() === val.toLowerCase() ||
+          String(p.id) === val
+      );
+      if (found?.id !== undefined && !isNaN(Number(found.id))) ids.add(Number(found.id));
+    });
+    return ids;
+  }, [selectedPlatforms, apiPlatforms]);
 
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
@@ -224,32 +290,18 @@ export const PracticePage: React.FC = () => {
 
   const [retryAttempt, setRetryAttempt] = useState(0);
 
-  // Start query transitions before paint so old rows never flash beneath new URL filters.
+  // Load the full problems catalog so filtering operates across all items without being pre-sliced by pagination
   useLayoutEffect(() => {
     let active = true;
     if (!isAuthenticated) {
       setHasFetchedOnce(true);
       return;
     }
-    const topicId = resolvedTopicId;
-    const difficultyId = resolvedDifficultyId;
-    const companyId = resolvedCompanyId;
-    const platformId = resolvedPlatformId;
-    const search = searchInputParam.trim();
 
     const request = dispatch(
       fetchProblems({
-        search: search || undefined,
-        searchText: search || undefined,
-        topic: topicId ? [topicId] : undefined,
-        difficulty: difficultyId ? [difficultyId] : undefined,
-        level: difficultyId ? [difficultyId] : undefined,
-        company: companyId ? [companyId] : undefined,
-        companies: companyId ? [companyId] : undefined,
-        platform: platformId ? [platformId] : undefined,
-        platforms: platformId ? [platformId] : undefined,
-        page: currentPage,
-        limit: pageSize,
+        page: 1,
+        limit: 100,
       })
     );
 
@@ -264,39 +316,61 @@ export const PracticePage: React.FC = () => {
       active = false;
       request.abort();
     };
-  }, [
-    dispatch,
-    isAuthenticated,
-    searchInputParam,
-    resolvedTopicId,
-    resolvedDifficultyId,
-    resolvedCompanyId,
-    resolvedPlatformId,
-    currentPage,
-    retryAttempt,
-  ]);
+  }, [dispatch, isAuthenticated, retryAttempt]);
 
   const isProblemsLoading = (loading || !hasFetchedOnce) && apiProblems.length === 0;
 
   // Filter Selection handlers (updates DRAFT state ONLY - NO API call until Apply clicked)
   const handleDifficultyClick = (diffVal: string) => {
-    setDraftDifficulty((prev) => (prev === diffVal ? '' : diffVal));
+    setDraftDifficulties((prev) => {
+      const isAlready = prev.some((d) => d.toLowerCase() === diffVal.toLowerCase());
+      return isAlready
+        ? prev.filter((d) => d.toLowerCase() !== diffVal.toLowerCase())
+        : [...prev, diffVal];
+    });
   };
 
   const handleTopicClick = (topicVal: string) => {
-    setDraftTopic((prev) => (prev === topicVal ? '' : topicVal));
+    setDraftTopics((prev) => {
+      const isAlready = prev.some((t) => t.toLowerCase() === topicVal.toLowerCase());
+      return isAlready
+        ? prev.filter((t) => t.toLowerCase() !== topicVal.toLowerCase())
+        : [...prev, topicVal];
+    });
   };
 
   const handleCompanyClick = (compVal: string) => {
-    setDraftCompany((prev) => (prev === compVal ? '' : compVal));
+    setDraftCompanies((prev) => {
+      const isAlready = prev.some((c) => c.toLowerCase() === compVal.toLowerCase());
+      return isAlready
+        ? prev.filter((c) => c.toLowerCase() !== compVal.toLowerCase())
+        : [...prev, compVal];
+    });
   };
 
   const handlePlatformClick = (platVal: string) => {
-    setDraftPlatform((prev) => (prev === platVal ? '' : platVal));
+    setDraftPlatforms((prev) => {
+      const isAlready = prev.some((p) => p.toLowerCase() === platVal.toLowerCase());
+      return isAlready
+        ? prev.filter((p) => p.toLowerCase() !== platVal.toLowerCase())
+        : [...prev, platVal];
+    });
+  };
+
+  const handleClearDifficultyDraft = () => {
+    setDraftDifficulties([]);
+  };
+
+  const handleClearTopicDraft = () => {
+    setDraftTopics([]);
+  };
+
+  const handleClearCompanyDraft = () => {
+    setDraftCompanies([]);
   };
 
   const handleClearPlatformDraft = () => {
-    setDraftPlatform('');
+    setDraftPlatforms([]);
   };
 
   // APPLY FILTERS: Commits all staged filters to URL and triggers backend API call
@@ -304,10 +378,10 @@ export const PracticePage: React.FC = () => {
     const trimmed = searchInput.trim();
     updatePracticeParams({
       q: trimmed || null,
-      difficulty: draftDifficulty || null,
-      topic: draftTopic || null,
-      company: draftCompany || null,
-      platform: draftPlatform || null,
+      difficulty: draftDifficulties.length > 0 ? draftDifficulties.join(',') : null,
+      topic: draftTopics.length > 0 ? draftTopics.join(',') : null,
+      company: draftCompanies.length > 0 ? draftCompanies.join(',') : null,
+      platform: draftPlatforms.length > 0 ? draftPlatforms.join(',') : null,
       page: '1',
     });
     if (isMobileFilterOpen) {
@@ -321,13 +395,49 @@ export const PracticePage: React.FC = () => {
   };
 
   const handleResetFilters = () => {
-    setDraftDifficulty('');
-    setDraftTopic('');
-    setDraftCompany('');
-    setDraftPlatform('');
+    setDraftDifficulties([]);
+    setDraftTopics([]);
+    setDraftCompanies([]);
+    setDraftPlatforms([]);
     setSearchInput('');
     setSearchParams(new URLSearchParams(), { replace: true, preventScrollReset: true });
     dispatch(resetFilters());
+  };
+
+  const removeAppliedDifficulty = (val: string) => {
+    const next = selectedDifficulties.filter((d) => d.toLowerCase() !== val.toLowerCase());
+    setDraftDifficulties(next);
+    updatePracticeParams({
+      difficulty: next.length > 0 ? next.join(',') : null,
+      page: '1',
+    });
+  };
+
+  const removeAppliedTopic = (val: string) => {
+    const next = selectedTopics.filter((t) => t.toLowerCase() !== val.toLowerCase());
+    setDraftTopics(next);
+    updatePracticeParams({
+      topic: next.length > 0 ? next.join(',') : null,
+      page: '1',
+    });
+  };
+
+  const removeAppliedCompany = (val: string) => {
+    const next = selectedCompanies.filter((c) => c.toLowerCase() !== val.toLowerCase());
+    setDraftCompanies(next);
+    updatePracticeParams({
+      company: next.length > 0 ? next.join(',') : null,
+      page: '1',
+    });
+  };
+
+  const removeAppliedPlatform = (val: string) => {
+    const next = selectedPlatforms.filter((p) => p.toLowerCase() !== val.toLowerCase());
+    setDraftPlatforms(next);
+    updatePracticeParams({
+      platform: next.length > 0 ? next.join(',') : null,
+      page: '1',
+    });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -393,27 +503,177 @@ export const PracticePage: React.FC = () => {
     );
   }, [apiCompanies, companyFilterSearch]);
 
-  // Display problems respecting platform filter
+  // Filter problems across all criteria without prior pagination restrictions (production standard)
+  const filteredProblems = useMemo(() => {
+    let list = apiProblems;
+
+    // 1. Search Query filter
+    if (searchInputParam.trim()) {
+      const q = searchInputParam.trim().toLowerCase();
+      list = list.filter((p) => {
+        const title = (p.title || '').toLowerCase();
+        const desc = (p.description || '').toLowerCase();
+        const topic = (p.topic || '').toLowerCase();
+        const diff = (p.difficulty || '').toLowerCase();
+        return title.includes(q) || desc.includes(q) || topic.includes(q) || diff.includes(q);
+      });
+    }
+
+    // 2. Difficulty filter (matches if problem matches ANY selected difficulty)
+    if (selectedDifficulties.length > 0) {
+      list = list.filter((p) => {
+        const pDiffId = p.difficultyId !== undefined ? Number(p.difficultyId) : undefined;
+        if (pDiffId !== undefined && resolvedDifficultyIds.has(pDiffId)) return true;
+        const diffName = (p.difficulty || '').toLowerCase().trim();
+        return selectedDifficulties.some((target) => {
+          const targetItem = apiDifficulties.find(
+            (d) =>
+              String(d.id) === target ||
+              d.refName.toLowerCase() === target.toLowerCase() ||
+              d.refCode?.toLowerCase() === target.toLowerCase()
+          );
+          const targetName = (targetItem?.refName || target).toLowerCase().trim();
+          const targetCode = (targetItem?.refCode || '').toLowerCase().trim();
+          return diffName === targetName || (targetCode && diffName === targetCode);
+        });
+      });
+    }
+
+    // 3. Topic filter (matches if problem matches ANY selected topic)
+    if (selectedTopics.length > 0) {
+      list = list.filter((p) => {
+        const pTopicId = p.topicId !== undefined ? Number(p.topicId) : undefined;
+        if (pTopicId !== undefined && resolvedTopicIds.has(pTopicId)) return true;
+        const topicName = (p.topic || '').toLowerCase().trim();
+        return selectedTopics.some((target) => {
+          const targetItem = apiTopics.find(
+            (t) =>
+              String(t.id) === target ||
+              t.refName.toLowerCase() === target.toLowerCase() ||
+              t.refCode?.toLowerCase() === target.toLowerCase()
+          );
+          const targetName = (targetItem?.refName || target).toLowerCase().trim();
+          return topicName === targetName;
+        });
+      });
+    }
+
+    // 4. Company filter (matches if problem matches ANY selected company)
+    if (selectedCompanies.length > 0) {
+      list = list.filter((p) => {
+        if (!Array.isArray(p.companies) || p.companies.length === 0) return false;
+        return selectedCompanies.some((selComp) => {
+          const targetComp = (
+            apiCompanies.find(
+              (c) =>
+                String(c.id) === selComp ||
+                c.name.toLowerCase() === selComp.toLowerCase() ||
+                c.slug?.toLowerCase() === selComp.toLowerCase()
+            )?.name || selComp
+          ).toLowerCase().trim();
+
+          return p.companies.some((c: any) => {
+            if (c?.id !== undefined && resolvedCompanyIds.has(Number(c.id))) {
+              return true;
+            }
+            const compStr = (typeof c === 'string' ? c : c?.name || String(c?.id || '')).toLowerCase().trim();
+            return compStr === targetComp || compStr.includes(targetComp);
+          });
+        });
+      });
+    }
+
+    // 5. Platform filter (matches if problem matches ANY selected platform)
+    if (selectedPlatforms.length > 0) {
+      list = list.filter((prob) => {
+        const code = (prob.qpfRefCode || '').toUpperCase().trim();
+        const name = (
+          prob.questionPlatform ||
+          prob.qpfRefName ||
+          prob.examPlatform ||
+          prob.platformName ||
+          ''
+        ).toLowerCase().trim();
+
+        return selectedPlatforms.some((selPlat) => {
+          const selectedItem = apiPlatforms.find(
+            (p) =>
+              resolvedPlatformIds.has(p.id) ||
+              String(p.id) === selPlat ||
+              p.refCode.toLowerCase() === selPlat.toLowerCase() ||
+              p.refName.toLowerCase() === selPlat.toLowerCase()
+          );
+          const targetCode = (selectedItem?.refCode || selPlat).toUpperCase().trim();
+          const targetName = (selectedItem?.refName || '').toLowerCase().trim();
+
+          if (code && code === targetCode) return true;
+          if (targetName && name.includes(targetName)) return true;
+          if (targetCode === 'GFG' && name.includes('geeks')) return true;
+          if (targetCode === 'LEETCODE' && name.includes('leetcode')) return true;
+          if (targetCode === 'HACKERRANK' && name.includes('hackerrank')) return true;
+          if (targetCode === 'METTL' && name.includes('mettl')) return true;
+          if (targetCode === 'TCSION' && (name.includes('tcs') || name.includes('ion'))) return true;
+          if (targetCode === 'AON' && name.includes('aon')) return true;
+          return false;
+        });
+      });
+    }
+
+    // 6. Status filter
+    if (selectedStatus === 'solved') {
+      list = list.filter((prob) => Boolean(solvedByProblemId[String(prob.id)]));
+    } else if (selectedStatus === 'bookmarked') {
+      list = list.filter((prob) => bookmarks.some((b) => isBookmarkItem(b, prob.id, 'PROBLEM')));
+    }
+
+    // 7. Sort filter
+    if (selectedSort === 'easy-to-hard') {
+      list = [...list].sort(
+        (a, b) => getDifficultyRank(a.difficulty) - getDifficultyRank(b.difficulty)
+      );
+    } else if (selectedSort === 'hard-to-easy') {
+      list = [...list].sort(
+        (a, b) => getDifficultyRank(b.difficulty) - getDifficultyRank(a.difficulty)
+      );
+    }
+
+    return list;
+  }, [
+    apiProblems,
+    searchInputParam,
+    selectedDifficulties,
+    resolvedDifficultyIds,
+    apiDifficulties,
+    selectedTopics,
+    resolvedTopicIds,
+    apiTopics,
+    selectedCompanies,
+    resolvedCompanyIds,
+    apiCompanies,
+    selectedPlatforms,
+    resolvedPlatformIds,
+    apiPlatforms,
+    selectedStatus,
+    solvedByProblemId,
+    bookmarks,
+    selectedSort,
+  ]);
+
+  const totalMatching = filteredProblems.length;
+  const totalPages = Math.max(1, Math.ceil(totalMatching / pageSize));
+
+  // Reset page to 1 if current page is out of range
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      updatePracticeParams({ page: '1' });
+    }
+  }, [currentPage, totalPages, updatePracticeParams]);
+
+  // Paginate AFTER filtering across the entire dataset (production standard)
   const displayedProblems = useMemo(() => {
-    if (!selectedPlatform) return apiProblems;
-    const selectedItem = apiPlatforms.find(
-      (p) =>
-        String(p.id) === selectedPlatform ||
-        p.refCode.toLowerCase() === selectedPlatform.toLowerCase() ||
-        p.refName.toLowerCase() === selectedPlatform.toLowerCase()
-    );
-    const targetCode = (selectedItem?.refCode || selectedPlatform).toUpperCase();
-    const targetName = (selectedItem?.refName || '').toLowerCase();
-
-    return apiProblems.filter((prob) => {
-      const code = (prob.qpfRefCode || '').toUpperCase();
-      const name = (prob.questionPlatform || prob.qpfRefName || prob.examPlatform || prob.platformName || '').toLowerCase();
-
-      if (code && code === targetCode) return true;
-      if (name && targetName && name.includes(targetName)) return true;
-      return false;
-    });
-  }, [apiProblems, selectedPlatform, apiPlatforms]);
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredProblems.slice(startIndex, startIndex + pageSize);
+  }, [filteredProblems, currentPage, pageSize]);
 
   // Company lookup map for retrieving authentic logos and websites
   const companyMap = useMemo(() => {
@@ -505,8 +765,6 @@ export const PracticePage: React.FC = () => {
     );
   };
 
-  const totalPages = pagination?.totalPages || 1;
-
   return (
     <div className="relative w-full flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-20">
       
@@ -518,24 +776,283 @@ export const PracticePage: React.FC = () => {
       {/* 1. HERO BANNER SECTION (Exact matching user design) */}
       <PracticeHeroBanner />
 
-      {/* 2. GLOBAL SEARCH BAR */}
-      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6">
-        <form onSubmit={handleSearchSubmit} className="relative w-full">
-          <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm absolute left-5 top-1/2 -translate-y-1/2"></i>
-          <input
-            type="text"
-            placeholder="Search problems by title or keywords..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 rounded-2xl pl-12 pr-28 py-3.5 outline-none focus:border-blue-500 dark:focus:border-blue-400 shadow-sm transition-colors"
-          />
-          <button
-            type="submit"
-            className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors cursor-pointer"
-          >
-            Search
-          </button>
-        </form>
+      {/* 2. GLOBAL SEARCH BAR & FILTERS (Search input, Sort, Limit, Status + Active Filter Pills) */}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 flex flex-col gap-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full">
+          {/* Search Form */}
+          <form onSubmit={handleSearchSubmit} className="relative flex-1 w-full">
+            <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm absolute left-5 top-1/2 -translate-y-1/2"></i>
+            <input
+              type="text"
+              placeholder="Search problems by title or keywords..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 text-sm text-slate-900 dark:text-white placeholder-slate-400 rounded-2xl pl-12 pr-28 py-3.5 outline-none focus:border-blue-500 dark:focus:border-blue-400 shadow-2xs transition-colors"
+            />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  if (searchInputParam) {
+                    updatePracticeParams({ q: null, page: '1' });
+                  }
+                }}
+                className="absolute right-24 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer p-1"
+                title="Clear search"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            )}
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors cursor-pointer"
+            >
+              Search
+            </button>
+          </form>
+
+          {/* Quick Filters Beside Search: Status, Sort, Problems Per Page */}
+          <div className="flex items-center gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap shrink-0">
+            {/* 1. Status Dropdown */}
+            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[120px]">
+              <select
+                value={selectedStatus}
+                onChange={(e) => {
+                  updatePracticeParams({ status: e.target.value || null, page: '1' });
+                }}
+                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
+                aria-label="Filter by status"
+              >
+                <option value="" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Status
+                </option>
+                <option value="solved" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Solved
+                </option>
+                <option value="bookmarked" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Bookmarked
+                </option>
+              </select>
+              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+            </div>
+
+            {/* 2. Sort Dropdown */}
+            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[140px]">
+              <select
+                value={selectedSort}
+                onChange={(e) => {
+                  updatePracticeParams({ sort: e.target.value || null, page: '1' });
+                }}
+                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
+                aria-label="Sort problems"
+              >
+                <option value="" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Sort
+                </option>
+                <option value="easy-to-hard" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Easy to Hard
+                </option>
+                <option value="hard-to-easy" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  Hard to Easy
+                </option>
+              </select>
+              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+            </div>
+
+            {/* 3. Problems Per Page Dropdown */}
+            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[115px]">
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  updatePracticeParams({ limit: e.target.value, page: '1' });
+                }}
+                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
+                aria-label="Problems per page"
+              >
+                <option value="10" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  10 / page
+                </option>
+                <option value="25" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  25 / page
+                </option>
+                <option value="50" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  50 / page
+                </option>
+                <option value="100" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
+                  100 / page
+                </option>
+              </select>
+              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
+            </div>
+          </div>
+        </div>
+
+        {/* Active Filter Pills Bar (styled like AptitudePrep) */}
+        {activeFilterCount > 0 && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 animate-fade-in">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mr-1">
+              <i className="fa-solid fa-sliders text-[11px] text-blue-500"></i> Active Filters:
+            </span>
+
+            {searchInputParam && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-sky-300 border border-blue-200/60 dark:border-blue-800/60 shadow-2xs">
+                <span>Search: "{searchInputParam}"</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput('');
+                    updatePracticeParams({ q: null, page: '1' });
+                  }}
+                  className="hover:text-rose-500 transition-colors cursor-pointer"
+                  title="Remove search filter"
+                >
+                  <i className="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+              </span>
+            )}
+
+            {selectedStatus && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shadow-2xs">
+                <span>{selectedStatus === 'solved' ? 'Solved' : 'Bookmarked'}</span>
+                <button
+                  type="button"
+                  onClick={() => updatePracticeParams({ status: null, page: '1' })}
+                  className="hover:text-rose-500 transition-colors cursor-pointer"
+                  title="Remove status filter"
+                >
+                  <i className="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+              </span>
+            )}
+
+            {selectedSort && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs">
+                <span>{selectedSort === 'easy-to-hard' ? 'Easy to Hard' : 'Hard to Easy'}</span>
+                <button
+                  type="button"
+                  onClick={() => updatePracticeParams({ sort: null, page: '1' })}
+                  className="hover:text-rose-500 transition-colors cursor-pointer"
+                  title="Remove sort"
+                >
+                  <i className="fa-solid fa-xmark text-[10px]"></i>
+                </button>
+              </span>
+            )}
+
+            {selectedDifficulties.map((val) => {
+              const label =
+                apiDifficulties.find(
+                  (d) =>
+                    String(d.id) === val ||
+                    d.refName.toLowerCase() === val.toLowerCase() ||
+                    d.refCode?.toLowerCase() === val.toLowerCase()
+                )?.refName || val;
+              return (
+                <span
+                  key={`diff-${val}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                >
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppliedDifficulty(val)}
+                    className="hover:text-rose-500 transition-colors cursor-pointer"
+                    title={`Remove ${label}`}
+                  >
+                    <i className="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </span>
+              );
+            })}
+
+            {selectedTopics.map((val) => {
+              const label =
+                apiTopics.find(
+                  (t) =>
+                    String(t.id) === val ||
+                    t.refName.toLowerCase() === val.toLowerCase() ||
+                    t.refCode?.toLowerCase() === val.toLowerCase()
+                )?.refName || val;
+              return (
+                <span
+                  key={`topic-${val}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                >
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppliedTopic(val)}
+                    className="hover:text-rose-500 transition-colors cursor-pointer"
+                    title={`Remove ${label}`}
+                  >
+                    <i className="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </span>
+              );
+            })}
+
+            {selectedCompanies.map((val) => {
+              const label =
+                apiCompanies.find(
+                  (c) =>
+                    String(c.id) === val ||
+                    c.name.toLowerCase() === val.toLowerCase() ||
+                    c.slug?.toLowerCase() === val.toLowerCase()
+                )?.name || val;
+              return (
+                <span
+                  key={`comp-${val}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                >
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppliedCompany(val)}
+                    className="hover:text-rose-500 transition-colors cursor-pointer"
+                    title={`Remove ${label}`}
+                  >
+                    <i className="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </span>
+              );
+            })}
+
+            {selectedPlatforms.map((val) => {
+              const label =
+                apiPlatforms.find(
+                  (p) =>
+                    String(p.id) === val ||
+                    p.refName.toLowerCase() === val.toLowerCase() ||
+                    p.refCode.toLowerCase() === val.toLowerCase()
+                )?.refName || val;
+              return (
+                <span
+                  key={`plat-${val}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                >
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppliedPlatform(val)}
+                    className="hover:text-rose-500 transition-colors cursor-pointer"
+                    title={`Remove ${label}`}
+                  >
+                    <i className="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </span>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="text-xs font-bold text-rose-500 dark:text-rose-400 hover:underline cursor-pointer ml-1"
+            >
+              Clear All
+            </button>
+          </div>
+        )}
       </section>
 
       {/* 3. MAIN CATALOG: SIDEBAR FILTERS (Left) + DATA TABLE (Right) */}
@@ -638,13 +1155,26 @@ export const PracticePage: React.FC = () => {
             {/* Difficulty Level Filter from API: Row 1 = Basic, Easy | Row 2 = Medium, Hard */}
             {sortedDifficulties.length > 0 && (
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-bold text-slate-900 dark:text-white">Difficulty</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">Difficulty</span>
+                  {draftDifficulties.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearDifficultyDraft}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   {sortedDifficulties.map((diff) => {
-                    const isSelected =
-                      draftDifficulty === String(diff.id) ||
-                      draftDifficulty.toLowerCase() === diff.refName.toLowerCase() ||
-                      draftDifficulty.toLowerCase() === diff.refCode?.toLowerCase();
+                    const isSelected = draftDifficulties.some(
+                      (d) =>
+                        d === String(diff.id) ||
+                        d.toLowerCase() === diff.refName.toLowerCase() ||
+                        d.toLowerCase() === diff.refCode?.toLowerCase()
+                    );
                     return (
                       <button
                         key={diff.id}
@@ -669,7 +1199,7 @@ export const PracticePage: React.FC = () => {
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-900 dark:text-white">Platforms</span>
-                  {draftPlatform && (
+                  {draftPlatforms.length > 0 && (
                     <button
                       type="button"
                       onClick={handleClearPlatformDraft}
@@ -695,10 +1225,12 @@ export const PracticePage: React.FC = () => {
                   {filteredPlatforms
                     .slice(0, showMorePlatforms ? filteredPlatforms.length : 6)
                     .map((plat) => {
-                      const isSelected =
-                        draftPlatform === String(plat.id) ||
-                        draftPlatform.toLowerCase() === plat.refCode.toLowerCase() ||
-                        draftPlatform.toLowerCase() === plat.refName.toLowerCase();
+                      const isSelected = draftPlatforms.some(
+                        (p) =>
+                          p === String(plat.id) ||
+                          p.toLowerCase() === plat.refCode.toLowerCase() ||
+                          p.toLowerCase() === plat.refName.toLowerCase()
+                      );
                       return (
                         <button
                           type="button"
@@ -742,7 +1274,18 @@ export const PracticePage: React.FC = () => {
             {/* Topics Section from API */}
             {apiTopics.length > 0 && (
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-900 dark:text-white">Topics</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">Topics</span>
+                  {draftTopics.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearTopicDraft}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <i className="fa-solid fa-magnifying-glass text-slate-400 text-[10px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
                   <input
@@ -758,9 +1301,12 @@ export const PracticePage: React.FC = () => {
                   {filteredTopics
                     .slice(0, showMoreTopics ? filteredTopics.length : 8)
                     .map((topic) => {
-                      const isSelected =
-                        draftTopic === String(topic.id) ||
-                        draftTopic.toLowerCase() === topic.refName.toLowerCase();
+                      const isSelected = draftTopics.some(
+                        (t) =>
+                          t === String(topic.id) ||
+                          t.toLowerCase() === topic.refName.toLowerCase() ||
+                          t.toLowerCase() === topic.refCode?.toLowerCase()
+                      );
                       return (
                         <button
                           type="button"
@@ -801,7 +1347,18 @@ export const PracticePage: React.FC = () => {
             {/* Companies Section from API */}
             {apiCompanies.length > 0 && (
               <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-bold text-slate-900 dark:text-white">Companies</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">Companies</span>
+                  {draftCompanies.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearCompanyDraft}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <i className="fa-solid fa-magnifying-glass text-slate-400 text-[10px] absolute left-2.5 top-1/2 -translate-y-1/2"></i>
                   <input
@@ -818,11 +1375,12 @@ export const PracticePage: React.FC = () => {
                     .slice(0, showMoreCompanies ? filteredCompanies.length : 8)
                     .map((comp) => {
                       const compId = String(comp.id || comp.slug || comp.name);
-                      const isSelected = Boolean(
-                        draftCompany === compId ||
-                        draftCompany === String(comp.id) ||
-                        draftCompany.toLowerCase() === comp.name.toLowerCase() ||
-                        (comp.slug && draftCompany.toLowerCase() === comp.slug.toLowerCase())
+                      const isSelected = draftCompanies.some(
+                        (c) =>
+                          c === compId ||
+                          c === String(comp.id) ||
+                          c.toLowerCase() === comp.name.toLowerCase() ||
+                          (comp.slug && c.toLowerCase() === comp.slug.toLowerCase())
                       );
                       return (
                         <button
@@ -891,7 +1449,7 @@ export const PracticePage: React.FC = () => {
 
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
                         {isProblemsLoading ? (
-                          <TableRowSkeleton rows={20} showTopic={false} showDifficulty={false} />
+                          <TableRowSkeleton rows={Math.min(pageSize, 25)} showTopic={false} showDifficulty={false} />
                         ) : error && displayedProblems.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -1037,13 +1595,13 @@ export const PracticePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Pagination Controls (Standardized 20 problems per page) */}
-            {!isProblemsLoading && totalPages > 0 && (displayedProblems.length > 0 || (pagination?.total && pagination.total > 0)) && (
+            {/* Pagination Controls (Reflects total matching filtered problems) */}
+            {!isProblemsLoading && totalPages > 0 && totalMatching > 0 && (
               <div className="pt-2">
                 <Pagination
                   currentPage={currentPage}
                   totalPages={totalPages}
-                  totalElements={pagination?.total ?? displayedProblems.length}
+                  totalElements={totalMatching}
                   pageSize={pageSize}
                   onPageChange={handlePageChange}
                 />

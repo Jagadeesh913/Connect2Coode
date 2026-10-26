@@ -738,7 +738,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       const isAlready = prev.some((d) => d.toLowerCase() === diffVal.toLowerCase());
       return isAlready
         ? prev.filter((d) => d.toLowerCase() !== diffVal.toLowerCase())
-        : [diffVal];
+        : [...prev, diffVal];
     });
   };
 

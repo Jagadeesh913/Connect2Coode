@@ -7,6 +7,7 @@ import profileReducer from '../features/profile/redux/profileSlice';
 import referenceReducer from '../features/references/redux/referenceSlice';
 import languageReducer from '../features/languages/redux/languageSlice';
 import progressReducer from '../features/progress/redux/progressSlice';
+import dsaSheetReducer from '../features/dsaSheet/redux/dsaSheetSlice';
 
 export const rootReducer = combineReducers({
   auth: authReducer,
@@ -17,4 +18,5 @@ export const rootReducer = combineReducers({
   references: referenceReducer,
   languages: languageReducer,
   progress: progressReducer,
+  dsaSheet: dsaSheetReducer,
 });

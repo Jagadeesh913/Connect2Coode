@@ -360,5 +360,178 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
         apiClient.post = originalPost;
       }
     });
+
+    it('recovers when level filter (e.g. Medium) throws 500 on backend corrupted records', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          if (Array.isArray(payload.level) && payload.level.includes(3)) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'Questions Fetched Successfully',
+              data: {
+                content: [
+                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium' },
+                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy' },
+                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'GeeksforGeeks' },
+                ],
+              },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: [3],
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 2);
+        assert.equal(res.data.content[0].id, 1);
+        assert.equal(res.data.content[1].id, 3);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('recovers when both level (Medium) and platform (GeeksforGeeks) are filtered and backend 500s', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          if (Array.isArray(payload.level) && payload.level.includes(3)) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'Questions Fetched Successfully',
+              data: {
+                content: [
+                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'LeetCode' },
+                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy', questionPlatform: 'GeeksforGeeks' },
+                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'GeeksforGeeks' },
+                ],
+              },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: [3],
+          platform: [25],
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 1);
+        assert.equal(res.data.content[0].id, 3);
+        assert.equal(res.data.content[0].title, 'Next Greater Element');
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+  });
+
+  describe('5. Multi-Select Filter Execution & OR-Logic within Categories', () => {
+    it('filters across multiple difficulty levels (Basic or Easy) via resilient fallback', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          if (Array.isArray(payload?.level)) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload?.pageRequest?.pageSize === 24 && payload?.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'Questions Fetched Successfully',
+              data: {
+                content: [
+                  { id: 1, title: 'Basic Sum', difficultyId: 1, difficultyName: 'Basic' },
+                  { id: 2, title: 'Easy Array', difficultyId: 2, difficultyName: 'Easy' },
+                  { id: 3, title: 'Medium DP', difficultyId: 3, difficultyName: 'Medium' },
+                  { id: 4, title: 'Hard Graph', difficultyId: 4, difficultyName: 'Hard' },
+                ],
+              },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: [1, 2],
+          platform: null,
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 2);
+        assert.deepEqual(res.data.content.map((q) => q.id), [1, 2]);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('filters across multiple platforms simultaneously via resilient fallback', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (url, payload) => {
+          if (Array.isArray(payload?.platform)) {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload?.pageRequest?.pageSize === 24 && payload?.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'Questions Fetched Successfully',
+              data: {
+                content: [
+                  { id: 10, title: 'GFG Problem', questionPlatform: 'GeeksforGeeks' },
+                  { id: 20, title: 'LeetCode Problem', questionPlatform: 'LeetCode' },
+                  { id: 30, title: 'HackerRank Problem', questionPlatform: 'HackerRank' },
+                ],
+              },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        const res = await adminQuestionService.getQuestions({
+          level: null,
+          platform: ['GFG', 'LEETCODE'],
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+        });
+
+        assert.equal(res.statusCode, 200);
+        assert.equal(res.data.content.length, 2);
+        assert.deepEqual(res.data.content.map((q) => q.id), [10, 20]);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
   });
 });
+

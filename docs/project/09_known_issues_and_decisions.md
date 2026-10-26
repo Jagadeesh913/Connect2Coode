@@ -51,8 +51,11 @@
     - Slices containing corrupted records: Executes fine-grained micro-batch probing (`pageSize: 1` in parallel) across slice offsets. Corrupted records (500) are safely bypassed while healthy records (such as newly created questions at offsets 48+) are successfully recovered and rendered on their genuine page.
     - Out-of-bounds offsets (`offset >= liveTotalQuestionsCount`): Returns a clean empty page (`content: []`) with HTTP 200 and dynamic total elements, preserving active pagination controls so the user can easily navigate backward or jump to the last page.
     - Admin question creation automatically transitions the admin to the last page where newly created DSA problems are immediately visible.
-    - Search queries failing on backend exceptions dynamically fall back to client-side filtering over the readable catalog.
+    - Search queries and filtered queries (such as `level: [3]`, topic, companies, or platforms) failing on backend exceptions dynamically fall back to in-memory filtering over the verified readable catalog (`[0..20)` + `[20..24)`), returning status 200 with accurate totalElements and totalPages.
     - Routed `companyService.getCompanyProblems` through `fetchResilientQuestionPage` so company question lists never crash when querying with large page sizes.
+    - In `/practice`, catalog loading fetches all verified problems once, allowing multi-axis filtering (difficulty, topic, company, platform, status: solved/bookmarked, search keyword, and difficulty sorting) to operate across the entire catalog rather than a pre-paginated single page slice. Filters support multi-select via comma-separated query params (e.g., `difficulty=Basic,Easy&platform=GFG,LEETCODE`), applying OR-logic within categories and AND-logic across categories, with individual active filter pill removal and automatic reset to page 1.
+    - In `/aptitude`, difficulty filtering supports multi-select toggles, seamlessly matching the multi-select behavior of Question Types and Companies while passing resolved numeric reference IDs to the backend API.
+
 
 ### 6. Learning Sheet Section 4 Question Read Returns HTTP 500
 - **Observed Behavior (2026-10-25)**: An authenticated `GET /api/v1/user/learningSheet/section/4/questions` reaches the production Spring Boot handler but returns HTTP 500 with `"Error while retrieving Learning Sheet Questions"` and only the generic error `"An unexpected error occurred"`. The same route without authentication correctly returns HTTP 401, confirming that the failing request is past the authentication boundary.

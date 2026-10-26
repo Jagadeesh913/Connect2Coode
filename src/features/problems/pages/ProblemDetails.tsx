@@ -2,7 +2,7 @@ import { useExecutionRequest } from '../hooks/useExecutionRequest';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { fetchProblemById } from '../redux/problemSlice';
@@ -29,6 +29,11 @@ import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
 import { useAssessmentIntegrity } from '../../../shared/hooks/useAssessmentIntegrity';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
+import {
+  analyzeSourceCode,
+  collectExecutionDiagnostics,
+  type CodeDiagnostic,
+} from '../utils/codeDiagnostics';
 
 interface QuestionTestCase {
   id?: number;
@@ -211,6 +216,8 @@ export const ProblemDetails: React.FC = () => {
   const [bottomTab, setBottomTab] = useState<'testcases' | 'custom' | 'results'>('testcases');
   const [customInput, setCustomInput] = useState<string>('');
   const resultsPanelRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+  const monacoRef = useRef<Parameters<OnMount>[1] | null>(null);
 
   // Check whether the currently loaded problem entity matches this route's identifier
   const isProblemLoadedForRoute = Boolean(
@@ -342,6 +349,55 @@ export const ProblemDetails: React.FC = () => {
     }
     return DEFAULT_STARTER_CODE[monacoLang] || DEFAULT_STARTER_CODE.java;
   }, [codeByLang, selectedLanguage, monacoLang]);
+
+  const editorDiagnostics = useMemo(
+    () => analyzeSourceCode(currentCode, monacoLang),
+    [currentCode, monacoLang]
+  );
+  const executionDiagnostics = useMemo(
+    () => collectExecutionDiagnostics(executionResult, executionError),
+    [executionError, executionResult]
+  );
+  const diagnostics = useMemo(
+    () => [...executionDiagnostics, ...editorDiagnostics],
+    [editorDiagnostics, executionDiagnostics]
+  );
+
+  const syncEditorDiagnostics = useCallback((items: CodeDiagnostic[]) => {
+    const editor = editorRef.current;
+    const monaco = monacoRef.current;
+    const model = editor?.getModel();
+    if (!model || !monaco) return;
+    monaco.editor.setModelMarkers(
+      model,
+      'connect2code',
+      items.map((item) => ({
+        severity:
+          item.severity === 'error'
+            ? monaco.MarkerSeverity.Error
+            : item.severity === 'warning'
+              ? monaco.MarkerSeverity.Warning
+              : monaco.MarkerSeverity.Info,
+        message: `${item.title}: ${item.message}`,
+        source: item.source === 'editor' ? 'Connect2Code' : item.source,
+        startLineNumber: item.line,
+        startColumn: item.column,
+        endLineNumber: item.line,
+        endColumn: item.endColumn || item.column + 1,
+      }))
+    );
+  }, []);
+
+  useEffect(() => {
+    syncEditorDiagnostics(diagnostics);
+  }, [diagnostics, syncEditorDiagnostics]);
+
+  const handleEditorMount: OnMount = useCallback((editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    editor.focus();
+    syncEditorDiagnostics(diagnostics);
+  }, [diagnostics, syncEditorDiagnostics]);
 
   // Load shared server state once; Redux owns both resources.
   useEffect(() => {
@@ -504,6 +560,7 @@ export const ProblemDetails: React.FC = () => {
     if (!controller) return;
     setIsExecuting(true);
     setLastExecutionMode(customInputValue ? 'custom' : 'run');
+    setExecutionResult(null);
     setExecutionError(null);
     setBottomTab('results');
     setMobileWorkspaceTab('editor');
@@ -571,6 +628,7 @@ export const ProblemDetails: React.FC = () => {
     if (!controller) return;
     setIsExecuting(true);
     setLastExecutionMode('submit');
+    setExecutionResult(null);
     setExecutionError(null);
     setBottomTab('results');
     setMobileWorkspaceTab('editor');
@@ -608,6 +666,14 @@ export const ProblemDetails: React.FC = () => {
       if (executionRequest.finish(controller)) setIsExecuting(false);
     }
   }, [isExecutionReady, activeQuestionId, selectedLanguage, loadingProblem, currentCode, consoleHeight, dispatch, executionRequest, user?.id]);
+
+  const handleRetryExecution = useCallback(() => {
+    if (lastExecutionMode === 'submit') {
+      void handleSubmitCode();
+      return;
+    }
+    void executeRun(lastExecutionMode === 'custom' ? customInput : undefined);
+  }, [customInput, executeRun, handleSubmitCode, lastExecutionMode]);
 
   // Keyboard Shortcuts (Ctrl+' or Cmd+' to Run, Ctrl+Enter or Cmd+Enter to Submit)
   useEffect(() => {
@@ -759,8 +825,8 @@ export const ProblemDetails: React.FC = () => {
       <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
       <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
 
-      {/* Main Container constrained to Home page max-w-7xl width and padding */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 flex flex-col flex-1">
+      {/* Coding workspaces use the full available desktop width while retaining page gutters. */}
+      <div className="w-full max-w-[1600px] mx-auto px-3 sm:px-5 lg:px-6 pt-3 sm:pt-5 flex flex-col flex-1 min-h-0">
         {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (Matching Reference Image 5) */}
       <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
         
@@ -863,12 +929,12 @@ export const ProblemDetails: React.FC = () => {
       </div>
 
       {/* 2. MAIN WORKSPACE (2-COLUMN SPLIT PANE) */}
-      <main className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-start w-full">
+      <main className="grid grid-cols-1 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] gap-4 flex-1 items-start lg:items-stretch w-full lg:h-[calc(100vh-9.5rem)] lg:min-h-[680px] lg:max-h-[920px] min-h-0">
         
         {/* ========================================================
             LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
            ======================================================== */}
-        <div className={`${mobileWorkspaceTab === 'problem' ? 'flex' : 'hidden'} lg:flex lg:col-span-5 flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs h-[520px] sm:h-[650px] lg:h-[780px] overflow-hidden w-full`}>
+        <div className={`${mobileWorkspaceTab === 'problem' ? 'flex' : 'hidden'} lg:flex flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs h-[560px] sm:h-[680px] lg:h-full overflow-hidden w-full min-h-0`}>
           
           {/* Tab Bar: Description | Submissions | Companies | Hints */}
           <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-3 py-2 overflow-x-auto no-scrollbar gap-1.5 shrink-0">
@@ -1243,18 +1309,20 @@ export const ProblemDetails: React.FC = () => {
         {/* ========================================================
             RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
            ======================================================== */}
-        <div className={`${mobileWorkspaceTab === 'editor' ? 'flex' : 'hidden'} lg:flex lg:col-span-7 flex-col gap-4 min-w-0 w-full`}>
+        <div className={`${mobileWorkspaceTab === 'editor' ? 'flex' : 'hidden'} lg:flex flex-col gap-4 min-w-0 w-full lg:h-full min-h-0`}>
           
           {/* EDITOR CARD CONTAINER */}
-          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs overflow-hidden flex flex-col w-full">
+          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden flex flex-col w-full lg:flex-1 lg:min-h-[280px]">
             
             {/* Editor Action Bar (Matching Reference Image 5) */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
               
               {/* Language Selector Pill */}
               <div className="flex items-center gap-2">
-                <div className="relative inline-flex items-center">
-                  <select
+                <div className="relative inline-flex items-center min-w-36">
+                  {loadingLanguages && languages.length === 0 ? (
+                    <Skeleton className="h-8 w-36 rounded-full" />
+                  ) : <select
                     id="languageSelect"
                     value={selectedLanguage?.id ?? ''}
                     onChange={handleLanguageChange}
@@ -1273,8 +1341,8 @@ export const ProblemDetails: React.FC = () => {
                         </option>
                       ))
                     )}
-                  </select>
-                  <i className={`text-xs absolute left-3 pointer-events-none ${
+                  </select>}
+                  {selectedLanguage && <i className={`text-xs absolute left-3 pointer-events-none ${
                     monacoLang === 'python'
                       ? 'fa-brands fa-python text-blue-500'
                       : monacoLang === 'cpp'
@@ -1282,8 +1350,8 @@ export const ProblemDetails: React.FC = () => {
                       : monacoLang === 'javascript'
                       ? 'fa-brands fa-js text-amber-500'
                       : 'fa-brands fa-java text-orange-500'
-                  }`}></i>
-                  <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3 pointer-events-none"></i>
+                  }`}></i>}
+                  {selectedLanguage && <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3 pointer-events-none"></i>}
                 </div>
               </div>
 
@@ -1333,17 +1401,29 @@ export const ProblemDetails: React.FC = () => {
               </div>
             </div>
 
-              <RequestStatus pending={isExecuting || loadingLanguages} error={languagesError} onRetry={() => dispatch(fetchLanguages())} label={isExecuting ? (lastExecutionMode === "submit" ? "Submitting code…" : "Running code…") : "Loading languages…"} />
-            <RequestStatus pending={loadingProblem} error={problemError} onRetry={() => dispatch(fetchProblemById(problemIdentifier!))} label="Refreshing problem…" />
+            {languagesError && languages.length === 0 && (
+              <div className="px-4 py-3 border-b border-rose-200 bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/30">
+                <RequestStatus error={languagesError} onRetry={() => dispatch(fetchLanguages())} />
+              </div>
+            )}
             {/* Monaco Editor Container */}
-            <div className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 ${consoleHeight === 'expanded' ? 'h-[240px]' : consoleHeight === 'collapsed' ? 'h-[620px]' : 'h-[380px]'}`}>
-
-                    <Editor
+            <div
+              data-assessment-clipboard="allowed"
+              className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 h-[400px] lg:h-auto lg:flex-1 lg:min-h-[260px] ${consoleHeight === 'expanded' ? 'sm:h-[280px]' : consoleHeight === 'collapsed' ? 'sm:h-[620px]' : 'sm:h-[400px]'}`}
+            >
+              {loadingLanguages && languages.length === 0 ? (
+                <div role="status" aria-label="Loading code editor" className="h-full p-5 space-y-3">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" count={8} />
+                </div>
+              ) : (
+                <Editor
                       loading={<div role="status" className="p-6 w-full"><Skeleton className="h-5 w-3/4" count={8} /><span className="sr-only">Loading code editor</span></div>}
                 height="100%"
                 language={monacoLang}
                 value={currentCode}
                 onChange={handleEditorChange}
+                onMount={handleEditorMount}
                 theme={theme === 'dark' ? 'vs-dark' : 'light'}
                 options={{
                   minimap: { enabled: false },
@@ -1357,22 +1437,33 @@ export const ProblemDetails: React.FC = () => {
                   fontFamily: "JetBrains Mono, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
                   cursorBlinking: 'smooth',
                   smoothScrolling: true,
-                  contextmenu: false,
-                  copyWithSyntaxHighlighting: false,
+                  contextmenu: true,
+                  copyWithSyntaxHighlighting: true,
                   dragAndDrop: false,
                   readOnly: isExecuting,
                   readOnlyMessage: { value: 'Code editing is paused while the current execution is in progress.' },
                   wordWrap: 'on',
                   accessibilitySupport: 'auto',
+                  bracketPairColorization: { enabled: true },
+                  guides: { bracketPairs: true, indentation: true },
+                  matchBrackets: 'always',
+                  quickSuggestions: { comments: false, strings: false, other: true },
+                  suggestOnTriggerCharacters: true,
+                  parameterHints: { enabled: true },
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  stickyScroll: { enabled: true },
+                  renderWhitespace: 'selection',
                 }}
               />
+              )}
             </div>
           </div>
 
           {/* ========================================================
               BOTTOM RESULTS & INTERACTIVE CONSOLE (Matching Reference Image 5)
              ======================================================== */}
-          <div className={`bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs flex flex-col transition-all duration-300 overflow-hidden ${consoleHeight === 'collapsed' ? 'h-[48px]' : consoleHeight === 'expanded' ? 'h-[460px]' : 'h-[340px]'}`}>
+          <div className={`bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col transition-all duration-300 overflow-hidden shrink-0 ${consoleHeight === 'collapsed' ? 'h-[48px]' : consoleHeight === 'expanded' ? 'h-[500px] lg:h-[60%]' : 'h-[380px] lg:h-[42%]'}`}>
             
             {/* Console Header Bar */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-4 py-2.5 flex-wrap gap-2 shrink-0">
@@ -1424,7 +1515,7 @@ export const ProblemDetails: React.FC = () => {
                   }`}
                 >
                   <i className="fa-solid fa-list-check text-xs text-emerald-500"></i>
-                  <span>Test Result &gt;</span>
+                  <span>Results</span>
                   {executionResult && (
                     <span
                       className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold ${
@@ -1434,6 +1525,11 @@ export const ProblemDetails: React.FC = () => {
                       }`}
                     >
                       {executionResult.passedTestCases}/{executionResult.totalTestCases}
+                    </span>
+                  )}
+                  {!executionResult && diagnostics.length > 0 && (
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 font-mono text-[10px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
+                      {diagnostics.length}
                     </span>
                   )}
                 </button>
@@ -1471,80 +1567,78 @@ export const ProblemDetails: React.FC = () => {
                 
                 {/* 1. TEST CASES TAB (Matching Reference Image 5) */}
                 {bottomTab === 'testcases' && (
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full items-start">
-                    
-                    {/* Left Side: Case Selectors & Inputs */}
-                    <div className="md:col-span-7 space-y-3">
-                      {/* Case Pills: Case 1, Case 2, Case 3, + */}
-                      <div className="flex items-center gap-2 flex-wrap">
+                  <div className="space-y-4 h-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Sample test cases</h3>
+                        <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Review the public examples before running your solution.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBottomTab('custom')}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-100 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/70"
+                      >
+                        <i className="fa-solid fa-plus text-[10px]" aria-hidden="true"></i>
+                        Custom input
+                      </button>
+                    </div>
+
+                    {sampleTestCases.length > 0 ? (
+                      <>
+                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5" role="tablist" aria-label="Sample test cases">
                         {sampleTestCases.map((_, i) => (
                           <button
                             key={i}
+                            type="button"
+                            role="tab"
+                            aria-selected={selectedTestCaseIdx === i}
                             onClick={() => setSelectedTestCaseIdx(i)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                               selectedTestCaseIdx === i
-                                ? 'bg-blue-600 text-white shadow-xs'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700'
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800'
                             }`}
                           >
+                            <span className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] ${selectedTestCaseIdx === i ? 'bg-white/20' : 'bg-slate-200 dark:bg-slate-800'}`}>{i + 1}</span>
                             Case {i + 1}
                           </button>
                         ))}
-                        <button
-                          onClick={() => setBottomTab('custom')}
-                          className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
-                          title="Add custom case"
-                        >
-                          +
-                        </button>
+                        </div>
+
+                        {activeSampleCase && (
+                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 font-mono text-xs">
+                            <section className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
+                              <div className="mb-2 flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                <i className="fa-solid fa-arrow-right-to-bracket text-blue-500" aria-hidden="true"></i>
+                                Input
+                              </div>
+                              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-slate-800 dark:border-slate-800 dark:bg-[#0B1120] dark:text-slate-200">{activeSampleCase.input || 'No input'}</pre>
+                            </section>
+                            <section className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/15">
+                              <div className="mb-2 flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                                <i className="fa-solid fa-bullseye" aria-hidden="true"></i>
+                                Expected output
+                              </div>
+                              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-200 bg-white p-3 font-semibold text-slate-900 dark:border-emerald-900/60 dark:bg-[#0B1120] dark:text-white">{activeSampleCase.expectedOutput}</pre>
+                            </section>
+                            {activeSampleCase.explanation && (
+                              <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white px-3.5 py-3 font-sans text-xs leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
+                                <span className="mr-2 font-bold text-slate-900 dark:text-white">Why:</span>
+                                {activeSampleCase.explanation}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-900/40">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                          <i className="fa-solid fa-flask" aria-hidden="true"></i>
+                        </div>
+                        <p className="text-sm font-bold text-slate-800 dark:text-slate-200">No public test cases</p>
+                        <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">Use custom input to check your solution. Hidden cases are evaluated only when you submit.</p>
                       </div>
-
-                      {/* Active Case Inputs */}
-                      {activeSampleCase ? (
-                        <div className="space-y-3 font-mono text-xs">
-                          <div>
-                            <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Input</span>
-                            <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-800 dark:text-slate-200 shadow-2xs">
-                              <pre className="whitespace-pre-wrap">{activeSampleCase.input}</pre>
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-slate-500 dark:text-slate-400 block mb-1 text-[11px] font-sans font-semibold">Expected Output</span>
-                            <div className="relative p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white font-bold shadow-2xs">
-                              <pre className="whitespace-pre-wrap">{activeSampleCase.expectedOutput}</pre>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs text-slate-400">
-                          No visible test cases were returned for this problem.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Right Side: Execution Illustration (Matching Reference Image 5) */}
-                    <div className="md:col-span-5 flex flex-col items-center justify-center p-6 text-center border-t md:border-t-0 md:border-l border-slate-100 dark:border-slate-800/80 my-auto h-full">
-                      <div className="w-44 h-32 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-2.5 flex flex-col shadow-xs mb-4">
-                        <div className="flex items-center gap-1.5 pb-2 border-b border-slate-200 dark:border-slate-700">
-                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
-                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
-                          <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
-                        </div>
-                        <div className="flex-1 flex items-center justify-center">
-                          <div className="w-11 h-11 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md">
-                            <i className="fa-solid fa-play text-sm ml-0.5"></i>
-                          </div>
-                        </div>
-                      </div>
-                      <h4 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
-                        Run your code to see the output
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 max-w-xs leading-relaxed">
-                        Test your solution against the sample test cases or custom input.
-                      </p>
-                    </div>
-
+                    )}
                   </div>
                 )}
 
@@ -1573,20 +1667,76 @@ export const ProblemDetails: React.FC = () => {
                 {/* 3. TEST RESULTS TAB */}
                 {bottomTab === 'results' && (
                   <div ref={resultsPanelRef} className="space-y-4 animate-fade-in" aria-live="polite">
-                    
-                    {/* Error Box */}
-                    {executionError && (
-                      <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-rose-600 dark:text-rose-400 text-xs font-mono space-y-1">
-                        <div className="font-bold flex items-center gap-2">
-                          <i className="fa-solid fa-triangle-exclamation"></i>
-                          <span>Execution Error</span>
+
+                    {isExecuting && (
+                      <div role="status" aria-label={lastExecutionMode === 'submit' ? 'Submitting solution' : 'Running code'} className="space-y-3 loading-status">
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/60 dark:bg-blue-950/20">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white"><i className="fa-solid fa-circle-notch fa-spin" aria-hidden="true"></i></div>
+                            <div>
+                              <p className="text-sm font-extrabold text-slate-900 dark:text-white">{lastExecutionMode === 'submit' ? 'Evaluating your solution' : 'Running your code'}</p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">The previous result has been cleared. Waiting for a valid response…</p>
+                            </div>
+                          </div>
                         </div>
-                        <pre className="whitespace-pre-wrap text-[11px] text-rose-700 dark:text-rose-300">{executionError}</pre>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <Skeleton className="h-20 w-full rounded-2xl" count={3} />
+                        </div>
+                        <Skeleton className="h-24 w-full rounded-2xl" />
                       </div>
                     )}
 
+                    {/* Error Box */}
+                    {executionError && !isExecuting && (
+                      <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-rose-700 dark:bg-rose-950/25 dark:border-rose-900/60 dark:text-rose-300 text-xs space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="font-bold flex items-center gap-2">
+                            <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>Execution request failed</span>
+                          </div>
+                          <button type="button" onClick={handleRetryExecution} className="shrink-0 rounded-lg border border-rose-300 bg-white px-3 py-1.5 font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50 dark:text-rose-300 dark:hover:bg-rose-950">
+                            Retry
+                          </button>
+                        </div>
+                        <pre className="whitespace-pre-wrap font-mono text-[11px]">{executionError}</pre>
+                      </div>
+                    )}
+
+                    {diagnostics.length > 0 && !isExecuting && (
+                      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900/40" aria-label="Code diagnostics">
+                        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2.5 dark:border-slate-800 dark:bg-slate-900/70">
+                          <div className="flex items-center gap-2 text-xs font-extrabold text-slate-900 dark:text-white">
+                            <i className="fa-solid fa-stethoscope text-amber-500" aria-hidden="true"></i>
+                            Diagnostics
+                          </div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{diagnostics.length} issue{diagnostics.length === 1 ? '' : 's'}</span>
+                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {diagnostics.map((diagnostic) => (
+                            <button
+                              type="button"
+                              key={diagnostic.id}
+                              onClick={() => {
+                                editorRef.current?.revealLineInCenter(diagnostic.line);
+                                editorRef.current?.setPosition({ lineNumber: diagnostic.line, column: diagnostic.column });
+                                editorRef.current?.focus();
+                              }}
+                              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-900"
+                            >
+                              <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${diagnostic.severity === 'error' ? 'bg-rose-500' : diagnostic.severity === 'warning' ? 'bg-amber-500' : 'bg-blue-500'}`}></span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-xs font-bold text-slate-900 dark:text-white">{diagnostic.title}</span>
+                                <span className="mt-0.5 block whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">{diagnostic.message}</span>
+                              </span>
+                              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">Ln {diagnostic.line}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+                    )}
+
                     {/* Empty State before running/submitting */}
-                    {!executionResult && !executionError && !isExecuting && (
+                    {!executionResult && !executionError && !isExecuting && diagnostics.length === 0 && (
                       <div className="flex flex-col items-center justify-center p-8 text-center text-slate-400 text-xs font-mono gap-2">
                         <i className="fa-solid fa-terminal text-2xl text-slate-400 mb-1"></i>
                         <span>Click "Run" to test sample cases, or "Submit" for full evaluation.</span>
@@ -1671,7 +1821,7 @@ export const ProblemDetails: React.FC = () => {
                               </div>
                             )}
 
-                            {activeRunCase.actualOutput && (
+                            {activeRunCase.actualOutput !== undefined && (
                               <div>
                                 <span className="text-slate-500 block mb-1 text-[11px]">Your Output:</span>
                                 <pre
@@ -1682,6 +1832,15 @@ export const ProblemDetails: React.FC = () => {
                                   }`}
                                 >
                                   {activeRunCase.actualOutput}
+                                </pre>
+                              </div>
+                            )}
+
+                            {activeRunCase.errorMessage && (
+                              <div>
+                                <span className="text-rose-600 dark:text-rose-400 block mb-1 text-[11px] font-bold">Compiler / runtime diagnostic</span>
+                                <pre className="p-3 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 rounded-xl text-rose-700 dark:text-rose-300 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                                  {activeRunCase.errorMessage}
                                 </pre>
                               </div>
                             )}

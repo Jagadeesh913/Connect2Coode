@@ -65,13 +65,15 @@ describe('shared UX interaction contracts', () => {
   });
 
   it('DSA user questions cancel superseded requests and keep errors scoped to the failed section', async () => {
-    const source = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
-    assert.match(source, /questionAbortRef\.current\?\.abort/);
-    assert.match(source, /getSectionQuestions\(sectionId, controller\.signal\)/);
-    assert.match(source, /questionErrors/);
-    assert.match(source, /loadingQuestionSectionId === section\.id/);
-    assert.match(source, /loadingQuestionSectionId === section\.id \? \([\s\S]*?<Skeleton/);
-    assert.match(source, /sectionsError && sections\.length === 0 \? null/);
+    const pageSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
+    const sliceSource = await readSource('src/features/dsaSheet/redux/dsaSheetSlice.ts');
+    assert.match(pageSource, /dispatch\(fetchSectionQuestions\(/);
+    assert.match(pageSource, /promise\.abort\(\)/);
+    assert.match(sliceSource, /learningSheetService\.getSectionQuestions\(sectionId, signal\)/);
+    assert.match(pageSource, /questionErrors/);
+    assert.match(pageSource, /loadingQuestionSectionId === section\.id/);
+    assert.match(pageSource, /loadingQuestionSectionId === section\.id \? \([\s\S]*?<Skeleton/);
+    assert.match(pageSource, /sectionsError && sections\.length === 0 \? null/);
   });
 
   it('problem list URL transitions dispatch before paint to prevent one-frame stale rows', async () => {

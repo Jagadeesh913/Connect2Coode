@@ -15,6 +15,7 @@ graph TD
     Store --> references[referenceSlice: API Taxonomy Groups]
     Store --> languages[languageSlice: Languages, Dropdowns]
     Store --> progress[progressSlice: Solved & Attempted Maps]
+    Store --> dsaSheet[dsaSheetSlice: Sheets, Sections, Questions]
 ```
 
 ### Typed Hooks
@@ -88,6 +89,16 @@ export const useAppStore = useStore.withTypes<AppStore>();
 ### 8. `languageSlice` ([`src/features/languages/redux/languageSlice.ts`](../../src/features/languages/redux/languageSlice.ts))
 - **Responsibilities**: Compilers, Judge0 language IDs, versions, and dropdown options.
 - **Service cache coordination**: Redux applies a 30-minute TTL and stale-response ownership. The execution service deduplicates its transport request with the same TTL; forced refresh bypasses it. Successful admin mutations invalidate both caches before the next editor/run lookup. Execution refuses an ID absent from API catalog fields instead of applying a static mapping.
+
+### 9. `dsaSheetSlice` ([`src/features/dsaSheet/redux/dsaSheetSlice.ts`](../../src/features/dsaSheet/redux/dsaSheetSlice.ts))
+- **Responsibilities**: Learning sheets catalog, selected sheet ID, sections by sheet ID, questions linked by section ID, accordion expansion, and granular loading/error flags (`loadingSheets`, `loadingSections`, `loadingQuestionSectionId`, `sheetError`, `sectionsError`, `questionErrors`).
+- **Caching Mechanics**:
+  - `DSA_SHEET_CACHE_TTL_MS`: 5 minutes.
+  - Granular timestamps: `sheetsFetchedAt`, `sectionsFetchedAt[sheetId]`, `questionsFetchedAt[sectionId]`.
+  - Seamless navigation: Switching between previously loaded sheets or accordion sections re-renders from memory instantly without layout shift or skeleton flashing.
+  - Invalidation & Error Reset: `invalidateDsaSheetCache` and `resetDsaSheetErrors` provide programmatic cache flushes and retry resets.
+- **Superseded Request Cancellation**:
+  - In `DsaSheetPage`, `useEffect` calls capture the returned thunk promise and invoke `promise.abort()` during unmount or parameter transitions.
 
 ### Persistence Middleware
 

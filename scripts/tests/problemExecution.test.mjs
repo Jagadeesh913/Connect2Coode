@@ -7,6 +7,10 @@ import {
   canExecuteProblem,
   resolveExecutionLanguageName,
 } from '../../src/features/problems/utils/problemExecution.ts';
+import {
+  analyzeSourceCode,
+  collectExecutionDiagnostics,
+} from '../../src/features/problems/utils/codeDiagnostics.ts';
 
 describe('BATCH-2: Problem Workspace & Code Execution Integrity (F-001, F-009, F-016)', () => {
   describe('F-001 & F-016: resolveActiveQuestionId', () => {
@@ -130,6 +134,35 @@ describe('BATCH-2: Problem Workspace & Code Execution Integrity (F-001, F-009, F
 
     it('does not invent a hardcoded language name for an unknown ID', () => {
       assert.equal(resolveExecutionLanguageName(languages, 99), 'Language #99');
+    });
+  });
+
+  describe('editor and execution diagnostics', () => {
+    it('flags obvious cross-language API and keyword mismatches with line locations', () => {
+      const diagnostics = analyzeSourceCode(
+        'public class Main {\n  console.log("wrong runtime");\n}',
+        'java'
+      );
+      assert.equal(diagnostics.length, 1);
+      assert.equal(diagnostics[0].severity, 'error');
+      assert.equal(diagnostics[0].line, 2);
+      assert.match(diagnostics[0].message, /System\.out\.println/);
+    });
+
+    it('surfaces and deduplicates compiler messages returned on test cases', () => {
+      const diagnostics = collectExecutionDiagnostics({
+        totalTestCases: 2,
+        passedTestCases: 0,
+        failedTestCases: 2,
+        testCases: [
+          { testCaseId: 1, testCaseType: 'Sample', status: 'Compilation Error', errorMessage: 'Main.java:7:12: cannot find symbol' },
+          { testCaseId: 2, testCaseType: 'Sample', status: 'Compilation Error', errorMessage: 'Main.java:7:12: cannot find symbol' },
+        ],
+      });
+      assert.equal(diagnostics.length, 1);
+      assert.equal(diagnostics[0].title, 'Compilation error');
+      assert.equal(diagnostics[0].line, 7);
+      assert.equal(diagnostics[0].column, 12);
     });
   });
 });

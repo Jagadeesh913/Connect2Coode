@@ -13,6 +13,12 @@ interface UseAssessmentIntegrityOptions {
   onViolation?: (violation: AssessmentIntegrityViolation) => void;
 }
 
+const CLIPBOARD_ALLOWED_SELECTOR = '[data-assessment-clipboard="allowed"]';
+
+export function isAssessmentClipboardAllowed(target: EventTarget | null): boolean {
+  return target instanceof Element && Boolean(target.closest(CLIPBOARD_ALLOWED_SELECTOR));
+}
+
 const CLIPBOARD_KEYS = new Set(['c', 'v', 'x']);
 const RESTRICTED_BROWSER_KEYS = new Set(['p', 's', 'u']);
 const DEVELOPER_TOOL_KEYS = new Set(['c', 'i', 'j']);
@@ -79,16 +85,24 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
       reportViolation(violation);
     };
 
-    const handleContextMenu = (event: MouseEvent) => block(event, 'context-menu');
-    const handleClipboard = (event: ClipboardEvent) => block(event, 'clipboard');
+    const handleContextMenu = (event: MouseEvent) => {
+      if (isAssessmentClipboardAllowed(event.target)) return;
+      block(event, 'context-menu');
+    };
+    const handleClipboard = (event: ClipboardEvent) => {
+      if (isAssessmentClipboardAllowed(event.target)) return;
+      block(event, 'clipboard');
+    };
     const handleDragDrop = (event: DragEvent) => block(event, 'drag-drop');
     const handleBeforeInput = (event: InputEvent) => {
       if (event.inputType === 'insertFromPaste' || event.inputType === 'insertFromDrop') {
+        if (event.inputType === 'insertFromPaste' && isAssessmentClipboardAllowed(event.target)) return;
         block(event, event.inputType === 'insertFromPaste' ? 'clipboard' : 'drag-drop');
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       const violation = classifyAssessmentShortcut(event);
+      if (violation === 'clipboard' && isAssessmentClipboardAllowed(event.target)) return;
       if (violation) block(event, violation);
     };
     const handleVisibilityChange = () => {

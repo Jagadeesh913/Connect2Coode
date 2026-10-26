@@ -47,7 +47,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
-| `src/app/rootReducer.ts` | Combined root reducer (8 slices) | `RUNTIME-VERIFIED` | Combines auth, problems, companies, etc. |
+| `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `RUNTIME-VERIFIED` | Combines auth, problems, companies, dsaSheet, progress, bookmarks, profile, references, languages. |
 | `src/app/hooks.ts` | Typed Redux hooks | `RUNTIME-VERIFIED` | React Redux 9 `withTypes` hooks for dispatch, selector, and store. |
 
 ---
@@ -160,7 +160,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/PracticeHeroBanner.tsx` | Hero banner with problem stats & search | `RUNTIME-VERIFIED` | Verified on PracticePage. |
 | `hooks/useExecutionRequest.ts` | Custom hook for Monaco code running | `RUNTIME-VERIFIED` | Handles run/submit state & aborts. |
-| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | URL-backed filters, skeleton-backed query transitions, and keyboard-accessible topic/company/platform toggles are regression-tested. |
+| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | Multi-select URL-backed filters (difficulty, topic, company, platform via comma-separated params), quick sort/status/page-size dropdowns, individual active filter pill removal, skeleton-backed query transitions, and post-filtering catalog pagination are regression-tested. |
 | `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Cancels history reads, resolves API language IDs/reference IDs, and accepts only non-zero passing verdicts. Browser-level proctoring remains unverified/unavailable. |
 | `pages/ProblemList.tsx` | Legacy standalone problem-list page | `VERIFIED` | Retained but no longer owns `/dsa-sheet`; the route now uses the API-driven DSA feature. |
 | `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `RUNTIME-VERIFIED` | Request ownership plus stale-row clearing and same-query refresh retention are tested in `problemSliceAbortRecovery.test.mjs`. |
@@ -182,7 +182,7 @@ Every first-party source file has been inspected and assigned a verified status 
 ### D. Aptitude Feature (`src/features/aptitude/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Query changes clear mismatched rows/totals and render skeletons; question type, subject, and company filters are keyboard-operable toggles. |
+| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Query changes clear mismatched rows/totals and render skeletons; multi-select difficulty, question type, subject, and company filters are keyboard-operable toggles. |
 | `utils/mcqUtils.ts` | MCQ option response mapper and correct-option resolver | `RUNTIME-VERIFIED` | Uses only `id`, `optionLabel`, `optionText`, and boolean `isCorrect`; it does not infer correctness from aliases or question-level answer text. |
 
 ### E. Admin Hub (`src/features/admin/`)
@@ -216,8 +216,9 @@ Every first-party source file has been inspected and assigned a verified status 
 ### F. DSA Sheet Feature (`src/features/dsaSheet/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `components/DsaSheetHeroBanner.tsx` | Theme-aware generated DSA hero banner | `PARTIALLY VERIFIED` | Uses project-local light/dark raster assets with 2048x384 dimensions matching Practice/Aptitude banner container and design treatment. |
-| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `PARTIALLY VERIFIED` | Uses an accessible two-path toggle instead of a select; responsive/theme-aware implementation passes static checks and build, while live authenticated API rendering is not yet production-verified. |
+| `components/DsaSheetHeroBanner.tsx` | Theme-aware generated DSA hero banner | `RUNTIME-VERIFIED` | Uses project-local light/dark raster assets with 2048x384 dimensions matching Practice/Aptitude banner container and design treatment. |
+| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `RUNTIME-VERIFIED` | Connected to Redux Toolkit (`dsaSheetSlice`); accessible two-path toggle, TTL caching, accordion question fetching, error retries, and superseded request cancellation. |
+| `redux/dsaSheetSlice.ts` | Learning sheets, sections, questions Redux slice | `RUNTIME-VERIFIED` | 5-minute TTL caching, section accordion state, and error handling tested in `dsaSheetSlice.test.mjs`. |
 | `types.ts` | Learning sheet, section, question-link, and mutation DTOs | `RUNTIME-VERIFIED` | Used by strict service validation and contract tests. |
 
 ### G. Profile, Bookmarks, Landing, Settings, Roadmaps
@@ -241,13 +242,13 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 145
-- **Total Automated Test Suites in `scripts/tests/`**: 19
-- **Total Executed Automated Unit Tests**: 282 (282 Passed, 0 Failed; 91 reported suites across 18 files)
+- **Total First-Party TypeScript/TSX Files in `src/`**: 146
+- **Total Automated Test Suites in `scripts/tests/`**: 20
+- **Total Executed Automated Unit Tests**: 311 (311 Passed, 0 Failed; 99 reported suites across 20 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
-- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 160 files
+- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors
-- **Documentation Integrity (`npm run verify:docs`)**: 239 internal links and source references passed.
+- **Documentation Integrity (`npm run verify:docs`)**: 250 internal links and source references passed.
 - **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. Passes in CI without local `.env`.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 11 bundle assets.
 

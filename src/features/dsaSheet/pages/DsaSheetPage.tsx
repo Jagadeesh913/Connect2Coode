@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   BookOpenCheck,
@@ -7,15 +7,19 @@ import {
   Circle,
   Search,
 } from 'lucide-react';
-import { useAppSelector } from '../../../app/hooks';
-import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
-import { learningSheetService } from '../../../services/learningSheetService';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { Badge } from '../../../shared/components/ui/Badge';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { DsaSheetHeroBanner } from '../components/DsaSheetHeroBanner';
-import type { DsaSheet, DsaSheetQuestionLink, DsaSheetSection } from '../types';
+import {
+  fetchDsaSections,
+  fetchDsaSheets,
+  fetchSectionQuestions,
+  selectSheet,
+  toggleSection,
+} from '../redux/dsaSheetSlice';
 
 const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'neutral' => {
   const normalized = difficulty.toLowerCase();
@@ -26,123 +30,48 @@ const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'ne
 };
 
 export const DsaSheetPage: React.FC = () => {
+  const dispatch = useAppDispatch();
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
-  const [sheets, setSheets] = useState<DsaSheet[]>([]);
-  const [selectedSheetId, setSelectedSheetId] = useState<number | null>(null);
-  const [sections, setSections] = useState<DsaSheetSection[]>([]);
-  const [expandedSectionId, setExpandedSectionId] = useState<number | null>(null);
-  const [questionsBySection, setQuestionsBySection] = useState<Record<number, DsaSheetQuestionLink[]>>({});
-  const [loadingSheets, setLoadingSheets] = useState(true);
-  const [loadingSections, setLoadingSections] = useState(false);
-  const [loadingQuestionSectionId, setLoadingQuestionSectionId] = useState<number | null>(null);
-  const [sheetError, setSheetError] = useState<string | null>(null);
-  const [sectionsError, setSectionsError] = useState<string | null>(null);
-  const [questionErrors, setQuestionErrors] = useState<Record<number, string>>({});
+  const {
+    sheets,
+    selectedSheetId,
+    sections,
+    expandedSectionId,
+    questionsBySection,
+    loadingSheets,
+    loadingSections,
+    loadingQuestionSectionId,
+    sheetError,
+    sectionsError,
+    questionErrors,
+  } = useAppSelector((state) => state.dsaSheet);
+
   const [search, setSearch] = useState('');
-  const selectedSheetIdRef = useRef<number | null>(null);
-  const questionAbortRef = useRef<AbortController | null>(null);
-
-  const loadSheets = useCallback(async (signal?: AbortSignal) => {
-    setLoadingSheets(true);
-    setSheetError(null);
-    try {
-      const result = await learningSheetService.getSheets(signal);
-      const activeSheets = result.filter((sheet) => sheet.isActive);
-      setSheets(activeSheets);
-      const current = selectedSheetIdRef.current;
-      const next = current && activeSheets.some((sheet) => sheet.id === current)
-        ? current
-        : activeSheets[0]?.id ?? null;
-      if (next !== current) setLoadingSections(next !== null);
-      selectedSheetIdRef.current = next;
-      setSelectedSheetId(next);
-    } catch (requestError) {
-      if (!signal?.aborted) setSheetError(getActionableErrorMessage(requestError, 'Unable to load DSA sheets.'));
-    } finally {
-      if (!signal?.aborted) setLoadingSheets(false);
-    }
-  }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void loadSheets(controller.signal);
-    return () => controller.abort();
-  }, [loadSheets]);
-
-  const loadSections = useCallback(async (sheetId: number, signal?: AbortSignal) => {
-    questionAbortRef.current?.abort();
-    setLoadingQuestionSectionId(null);
-    setLoadingSections(true);
-    setSectionsError(null);
-    setExpandedSectionId(null);
-    setQuestionsBySection({});
-    try {
-      const result = await learningSheetService.getSections(sheetId, signal);
-      const activeSections = result.filter((section) => section.isActive);
-      setSections(activeSections);
-      setLoadingQuestionSectionId(activeSections[0]?.id ?? null);
-      setExpandedSectionId(activeSections[0]?.id ?? null);
-    } catch (requestError) {
-      if (!signal?.aborted) {
-        setSectionsError(getActionableErrorMessage(requestError, 'Unable to load DSA sheet sections.'));
-        setSections([]);
-      }
-    } finally {
-      if (!signal?.aborted) setLoadingSections(false);
-    }
-  }, []);
+    const promise = dispatch(fetchDsaSheets());
+    return () => {
+      promise.abort();
+    };
+  }, [dispatch]);
 
   useEffect(() => {
-    if (!selectedSheetId) {
-      setSections([]);
-      return;
+    if (selectedSheetId) {
+      const promise = dispatch(fetchDsaSections({ sheetId: selectedSheetId }));
+      return () => {
+        promise.abort();
+      };
     }
-    const controller = new AbortController();
-    void loadSections(selectedSheetId, controller.signal);
-    return () => controller.abort();
-  }, [loadSections, selectedSheetId]);
-
-  const loadQuestions = useCallback(async (sectionId: number) => {
-    questionAbortRef.current?.abort();
-    const controller = new AbortController();
-    questionAbortRef.current = controller;
-    setLoadingQuestionSectionId(sectionId);
-    setQuestionErrors((current) => {
-      const next = { ...current };
-      delete next[sectionId];
-      return next;
-    });
-    try {
-      const result = await learningSheetService.getSectionQuestions(sectionId, controller.signal);
-      if (controller.signal.aborted) return;
-      setQuestionsBySection((current) => ({
-        ...current,
-        [sectionId]: result.filter((link) => link.isActive && link.question.isActive),
-      }));
-    } catch (requestError) {
-      if (controller.signal.aborted) return;
-      setQuestionErrors((current) => ({
-        ...current,
-        [sectionId]: getActionableErrorMessage(requestError, 'Unable to load section questions.'),
-      }));
-    } finally {
-      if (questionAbortRef.current === controller) {
-        setLoadingQuestionSectionId(null);
-      }
-    }
-  }, []);
+  }, [dispatch, selectedSheetId]);
 
   useEffect(() => {
-    if (!expandedSectionId) {
-      questionAbortRef.current?.abort();
-      setLoadingQuestionSectionId(null);
-      return;
-    }
     if (expandedSectionId && questionsBySection[expandedSectionId] === undefined) {
-      void loadQuestions(expandedSectionId);
+      const promise = dispatch(fetchSectionQuestions({ sectionId: expandedSectionId }));
+      return () => {
+        promise.abort();
+      };
     }
-    return () => questionAbortRef.current?.abort();
-  }, [expandedSectionId, loadQuestions, questionsBySection]);
+  }, [dispatch, expandedSectionId, questionsBySection]);
 
   const selectedSheet = sheets.find((sheet) => sheet.id === selectedSheetId) ?? null;
   const normalizedSearch = search.trim().toLowerCase();
@@ -160,9 +89,9 @@ export const DsaSheetPage: React.FC = () => {
         {loadingSheets ? (
           <div className="space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>
         ) : sheetError && sheets.length === 0 ? (
-          <EmptyState icon={<BookOpenCheck className="w-8 h-8" />} title="Unable to load DSA sheets" description={sheetError} actionText="Retry" onAction={() => void loadSheets()} />
+          <EmptyState icon={<BookOpenCheck className="w-8 h-8" />} title="Unable to load DSA sheets" description={sheetError} actionText="Retry" onAction={() => void dispatch(fetchDsaSheets({ force: true }))} />
         ) : sheets.length === 0 ? (
-          <EmptyState icon={<BookOpenCheck className="w-8 h-8" />} title="No active DSA sheet yet" description="The preparation sheet is being curated. Please check back soon." actionText="Try again" onAction={() => void loadSheets()} />
+          <EmptyState icon={<BookOpenCheck className="w-8 h-8" />} title="No active DSA sheet yet" description="The preparation sheet is being curated. Please check back soon." actionText="Try again" onAction={() => void dispatch(fetchDsaSheets({ force: true }))} />
         ) : (
           <>
             <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 mb-7">
@@ -181,14 +110,7 @@ export const DsaSheetPage: React.FC = () => {
                         aria-pressed={isSelected}
                         onClick={() => {
                           if (sheet.id === selectedSheetId) return;
-                          questionAbortRef.current?.abort();
-                          setSections([]);
-                          setExpandedSectionId(null);
-                          setQuestionsBySection({});
-                          setSectionsError(null);
-                          setLoadingSections(true);
-                          selectedSheetIdRef.current = sheet.id;
-                          setSelectedSheetId(sheet.id);
+                          dispatch(selectSheet(sheet.id));
                         }}
                         className={`min-w-0 rounded-xl px-4 py-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-[#0D1322] ${
                           isSelected
@@ -218,7 +140,7 @@ export const DsaSheetPage: React.FC = () => {
             {sectionsError && (
               <div role="alert" className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/20 px-4 py-3 text-sm text-rose-700 dark:text-rose-300">
                 <span>{sectionsError}</span>
-                <Button size="sm" variant="ghost" onClick={() => selectedSheetId && void loadSections(selectedSheetId)}>Retry</Button>
+                <Button size="sm" variant="ghost" onClick={() => selectedSheetId && void dispatch(fetchDsaSections({ sheetId: selectedSheetId, force: true }))}>Retry</Button>
               </div>
             )}
 
@@ -240,9 +162,7 @@ export const DsaSheetPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const nextId = isExpanded ? null : section.id;
-                          if (nextId && questionsBySection[nextId] === undefined) setLoadingQuestionSectionId(nextId);
-                          setExpandedSectionId(nextId);
+                          dispatch(toggleSection(section.id));
                         }}
                         aria-expanded={isExpanded}
                         className="w-full flex items-center justify-between gap-4 p-4 sm:p-5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
@@ -264,7 +184,7 @@ export const DsaSheetPage: React.FC = () => {
                           ) : questionErrors[section.id] ? (
                             <div role="alert" className="flex flex-col items-center gap-3 px-5 py-8 text-center text-sm text-rose-600 dark:text-rose-300">
                               <span>{questionErrors[section.id]}</span>
-                              <Button size="sm" variant="outline" onClick={() => void loadQuestions(section.id)}>Retry</Button>
+                              <Button size="sm" variant="outline" onClick={() => void dispatch(fetchSectionQuestions({ sectionId: section.id, force: true }))}>Retry</Button>
                             </div>
                           ) : filteredQuestions.length === 0 ? (
                             <div className="px-5 py-8 text-center text-sm text-slate-500 dark:text-slate-400">{normalizedSearch && questions.length ? 'No loaded questions match your search.' : 'No active questions are linked to this section.'}</div>
