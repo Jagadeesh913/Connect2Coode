@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Current verified run**: 314 tests passed, 0 failed on 2026-10-26.
+- **Current verified run**: 317 tests passed, 0 failed on 2026-10-26.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -33,8 +33,8 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, partial-save feedback, pagination semantics, and stable initial MCQ requests. | 10 |
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, exact `jwtToken` payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
-| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, focus-safe controls, user-scoped drafts, and isolated editor clipboard contracts. | 14 |
-| **Total** | **All 21 test files (99 reported suites)** | **314 / 314 Passing** |
+| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, URL-backed catalogs, duplicate-submit guards, modal/row keyboard behavior, focus-safe controls, user-scoped drafts, isolated editor clipboard, secure mode, and deployment-header contracts. | 16 |
+| **Total** | **All 21 test files (99 reported suites)** | **317 / 317 Passing** |
 
 ---
 

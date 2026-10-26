@@ -96,11 +96,11 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
   const secureModeSupported = typeof document !== 'undefined' && Boolean(document.documentElement.requestFullscreen);
 
   const enterSecureMode = useCallback(async () => {
-    if (!target?.requestFullscreen) return false;
+    if (!target || !document.documentElement.requestFullscreen) return false;
 
     try {
       type SecureFullscreenOptions = FullscreenOptions & { keyboardLock?: 'browser' };
-      await target.requestFullscreen({ navigationUI: 'hide', keyboardLock: 'browser' } as SecureFullscreenOptions);
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide', keyboardLock: 'browser' } as SecureFullscreenOptions);
       secureModeRequestedRef.current = true;
       setIsSecureModeActive(true);
       setIsContentObscured(false);
@@ -166,7 +166,7 @@ export function useAssessmentIntegrity<T extends HTMLElement>({
       }
     };
     const handleFullscreenChange = () => {
-      const isFullscreen = document.fullscreenElement === target;
+      const isFullscreen = document.fullscreenElement === document.documentElement;
       setIsSecureModeActive(isFullscreen);
       if (!isFullscreen && secureModeRequestedRef.current) {
         secureModeRequestedRef.current = false;
