@@ -37,7 +37,9 @@ test('HTML supplies one complete default metadata set without duplicate managed 
   uniqueSelectors.forEach((selector) => {
     assert.equal(html.split(selector).length - 1, 1, `${selector} must appear exactly once`);
   });
-  assert.doesNotMatch(html, /<link[^>]+rel="canonical"/);
+  assert.equal(html.split('rel="canonical"').length - 1, 1);
+  assert.match(html, /<link rel="canonical" href="https:\/\/connect2code\.in\/"/);
+  assert.match(html, /property="og:image" content="https:\/\/connect2code\.in\/social-card\.png"/);
   assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertCanonical\(canonicalUrl\)/);
   assert.match(html, /<link rel="manifest" href="\/site\.webmanifest" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png" \/>/);

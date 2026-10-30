@@ -1,4 +1,6 @@
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "headers": [
     {
       "source": "/(.*)",
@@ -12,82 +14,56 @@
         { "key": "X-Frame-Options", "value": "DENY" }
       ]
     },
-    {
-      "source": "/oauth/callback",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/login",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
-    },
-    {
-      "source": "/signup",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
-    },
-    {
-      "source": "/forgot-password",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }]
-    },
-    {
-      "source": "/dashboard",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/bookmarks",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/profile",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/settings",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/admin",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/admin/:path*",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    },
-    {
-      "source": "/500",
-      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
-    }
+    { "source": "/oauth/callback", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/login", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/signup", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/forgot-password", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] },
+    { "source": "/dashboard", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/bookmarks", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/profile", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/settings", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/admin", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/admin/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/problems/:slug", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/companies/:slug", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/companies/:companyId/exams/:examId", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/companies/exams/:examId", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/company-patterns/:slug", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/roadmaps/:slug", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/interviews", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] },
+    { "source": "/500", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
+  ],
+  "redirects": [
+    { "source": "/problems", "destination": "/practice", "permanent": true },
+    { "source": "/company-patterns", "destination": "/companies", "permanent": true },
+    { "source": "/progress", "destination": "/aptitude", "permanent": true },
+    { "source": "/roadmaps", "destination": "/aptitude", "permanent": true },
+    { "source": "/logical", "destination": "/aptitude?category=reasoning", "permanent": true },
+    { "source": "/verbal", "destination": "/aptitude?category=verbal", "permanent": true },
+    { "source": "/pseudocode", "destination": "/aptitude?category=pseudocode", "permanent": true }
   ],
   "rewrites": [
-    {
-      "source": "/api/:path((?!social(?:/|$)).*)",
-      "destination": "https://api.connect2code.in/api/:path*"
-    },
-    {
-      "source": "/refresh",
-      "destination": "https://api.connect2code.in/api/v1/auth/refresh"
-    },
-    {
-      "source": "/auth/refresh",
-      "destination": "https://api.connect2code.in/api/v1/auth/refresh"
-    },
-    {
-      "source": "/oauth2/:path*",
-      "destination": "https://api.connect2code.in/oauth2/:path*"
-    },
-    {
-      "source": "/:path*",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*([Ff]acebookexternalhit|[Ff]acebot|[Tt]witterbot|[Ll]inked[Ii]n[Bb]ot|[Ss]lackbot|[Dd]iscordbot|[Ww]hats[Aa]pp|[Tt]elegram[Bb]ot|[Gg]ooglebot|[Bb]ingbot|[Dd]uck[Dd]uck[Bb]ot|[Yy]andex[Bb]ot|[Bb]aiduspider|[Aa]pplebot).*"
-        }
-      ],
-      "destination": "/api/social?path=/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/:path*", "destination": "https://api.connect2code.in/api/:path*" },
+    { "source": "/refresh", "destination": "https://api.connect2code.in/api/v1/auth/refresh" },
+    { "source": "/auth/refresh", "destination": "https://api.connect2code.in/api/v1/auth/refresh" },
+    { "source": "/oauth2/:path*", "destination": "https://api.connect2code.in/oauth2/:path*" },
+    { "source": "/oauth/callback", "destination": "/app" },
+    { "source": "/login", "destination": "/app" },
+    { "source": "/signup", "destination": "/app" },
+    { "source": "/forgot-password", "destination": "/app" },
+    { "source": "/dashboard", "destination": "/app" },
+    { "source": "/bookmarks", "destination": "/app" },
+    { "source": "/profile", "destination": "/app" },
+    { "source": "/settings", "destination": "/app" },
+    { "source": "/admin", "destination": "/app" },
+    { "source": "/admin/:path*", "destination": "/app" },
+    { "source": "/problems/:slug", "destination": "/app" },
+    { "source": "/companies/:companyId/exams/:examId", "destination": "/app" },
+    { "source": "/companies/exams/:examId", "destination": "/app" },
+    { "source": "/companies/:slug", "destination": "/app" },
+    { "source": "/company-patterns/:slug", "destination": "/app" },
+    { "source": "/roadmaps/:slug", "destination": "/app" },
+    { "source": "/interviews", "destination": "/app" },
+    { "source": "/500", "destination": "/app" }
   ]
 }

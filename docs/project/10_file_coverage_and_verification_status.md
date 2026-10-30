@@ -27,11 +27,14 @@ Every first-party source file has been inspected and assigned a verified status 
 | `tsconfig.json` | TypeScript 5.9 compiler options (`strict: true`, ES2022) | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run typecheck`. |
 | `tsconfig.ci.json`| CI TypeScript configuration | `VERIFIED` | Used in CI environment checks. |
 | `.oxlintrc.json` | Oxlint rules (React hooks and exports) | `RUNTIME-VERIFIED` | Passes with 0 errors on 153 files in 35ms. |
-| `vercel.json` | Edge routing, proxy rewrites, SPA fallback, and security headers | `PARTIALLY VERIFIED` | Adds crawler metadata, route-specific `X-Robots-Tag`, anti-framing, permissions, referrer, HSTS, and MIME hardening; JSON/regression checks pass, but deployed header behavior requires production verification. |
-| `api/social.ts` | Crawler-only server-rendered metadata endpoint | `RUNTIME-VERIFIED` | Emits escaped, absolute canonical/social tags; dynamic API data is accepted only when its identity matches the requested route. |
-| `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one default description, robots, Open Graph, and Twitter/X set; manifest and icon links verified. Runtime metadata creates the canonical link from the real origin. |
-| `.env.example` | Documented environment variable template | `VERIFIED` | Contains API/app settings plus optional canonical frontend origin and public Brandfetch client ID. |
-| `.env.production`| Production environment config | `VERIFIED` | Targets `https://api.connect2code.in/api/v1`. |
+| `vercel.json` | Edge routing, API proxy, valid SPA deep-link allowlist, redirects, and security/indexing headers | `PARTIALLY VERIFIED` | Removes crawler discrimination and the soft-404 catch-all; structural regression checks pass, but deployed Vercel status/header behavior requires production verification. |
+| `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one absolute apex canonical, description, robots, Open Graph, and Twitter/X set; manifest and icon links verified. |
+| `public/robots.txt` | Production crawler policy and sitemap discovery | `RUNTIME-VERIFIED` | Advertises `https://connect2code.in/sitemap.xml`; page routes remain crawlable so response-level noindex directives can be observed. |
+| `scripts/generate-seo-assets.mjs` | Build-time public prerender, sitemap, noindex app shell, and 404 generator | `RUNTIME-VERIFIED` | Produces five route-specific public documents, absolute apex social/canonical URLs, `app.html`, `404.html`, and a static sitemap without authenticated or invented dynamic URLs. |
+| `scripts/tests/metadataCrawler.test.mjs` | Indexing, crawler-output, sitemap, robots, and edge-route regression coverage | `RUNTIME-VERIFIED` | Covers meaningful no-JS HTML, canonical normalization, sitemap exclusions, noindex shells, dynamic failures, and removal of bot-specific routing. |
+| `scripts/verify-architecture.mjs` | Prohibited-pattern and deployment-boundary scanner | `RUNTIME-VERIFIED` | Validates the production API proxy, noindex deep-link shell, and absence of a soft-404 catch-all; a local ignored `.env` still intentionally fails the workspace run. |
+| `.env.example` | Documented environment variable template | `VERIFIED` | Documents the required apex `VITE_SITE_URL`, API/app settings, and optional public Brandfetch client ID. |
+| `.env.production`| Production environment config | `VERIFIED` | Targets `https://api.connect2code.in/api/v1` and pins canonical output to `https://connect2code.in`. |
 | `.env` | Local development environment override (untracked) | `VERIFIED` | Local development override. |
 | `.gitignore` | Git exclusion rules (ignores `.env`, `graphify-out/`) | `VERIFIED` | Validated against git tracking. |
 | `.github/workflows/frontend-ci.yml` | GitHub Actions CI workflow | `VERIFIED` | Matches actual scripts and Node 22 version. |
@@ -44,7 +47,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`. |
 | `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Provider, ThemeProvider, Toaster, ErrorBoundary. |
-| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, protected pages are watermarked, and print output is suppressed. |
+| `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, and print output is suppressed. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
@@ -63,8 +66,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Admin redirect selection uses signed JWT claims only; covered by auth regression tests. |
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/mappers/problemMapper.ts` | Question DTO to problem model mapper | `RUNTIME-VERIFIED` | Maps question catalog and detail payloads, preserving testCases, examples, constraints, hints, and ref metadata. |
-| `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families. |
-| `src/core/metadata/crawlerMetadata.ts` | Static crawler document renderer and canonical-origin policy | `RUNTIME-VERIFIED` | Produces one escaped metadata set with absolute URLs and only accepts configured HTTPS origins. |
+| `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families; authenticated API-backed and coming-soon routes default to noindex without guessed entity names. |
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
@@ -112,7 +114,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata, watermarking, focus-loss privacy, browser-level clipboard/capture deterrence, and the problem-workspace secure-mode control. |
+| `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata; learner routes receive focus-loss privacy, clipboard/capture deterrence, and the problem-workspace secure-mode control, while `/admin/*` routes remain unrestricted. |
 | `src/layouts/AuthLayout.tsx` | Visual container for Login, Signup, ForgotPassword | `RUNTIME-VERIFIED` | Glassmorphism card and brand mark. |
 | `src/layouts/MainLayout.tsx` | Standard student portal layout with Navbar and Footer | `RUNTIME-VERIFIED` | Verified across all public pages. |
 | `src/routes/appRoutes.tsx` | Route definitions with lazy code-splitting | `RUNTIME-VERIFIED` | Verified with smoke preview on 5 routes. |
@@ -139,7 +141,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
-| `src/shared/hooks/useAssessmentIntegrity.ts` | Application-wide clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, selection, middle-click, drag/drop, developer-tool, Print Screen, common OS capture, focus-loss obscuring, fullscreen/keyboard-lock secure mode, internal-editor clipboard routing, and allowed execution shortcuts are covered. Browser/OS enforcement boundary remains documented. |
+| `src/shared/hooks/useAssessmentIntegrity.ts` | Learner-route clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, selection, middle-click, drag/drop, browser export, Print Screen, common OS capture, focus-loss obscuring, fullscreen/keyboard-lock secure mode, internal-editor clipboard routing, allowed DevTools, and execution shortcuts are covered; `AppRouterLayout` disables the hook for `/admin/*`. Browser/OS enforcement boundary remains documented. |
 | `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Verified theme switching. |
 
 ---
@@ -205,10 +207,10 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/AdminSidebar.tsx` | Admin navigation sidebar | `RUNTIME-VERIFIED` | Links to questions, mcqs, companies, etc. |
 | `components/AdminTable.tsx` | Reusable sortable admin table | `RUNTIME-VERIFIED` | Replaces stale rows with same-column skeletons for every pending request; clickable rows support Enter/Space and visible focus. |
 | `components/companies/*` | Company, exam, role, section modals | `VERIFIED` | Admin authoring modals. |
-| `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics; code runner sandbox supports dynamic question bank selection, real-time search, manual ID resolution, collapsible problem statement & test cases preview, and real-time Judge0 execution against selected problem test cases. |
+| `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics across 8 cards (including DSA Sheets); dynamic user role from Redux auth; code runner sandbox features dynamic problem-tailored boilerplate generation, demo solution loading, draft persistence per problem/language, resilient 5-tier fallback, and real-time Judge0 execution against selected problem test cases. |
 | `components/institutions/*` | Institution details, form, status modals | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
 | `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Dynamic reference library bindings (DIFF, TOPIC, QPF, TESTCASETYPE), sequential displayOrder on hints, and testcase assertions verified; live admin mutation remains backend-owned. |
-| `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses totalElements, never sample-derived global difficulty totals, and surfaces partial metric failures. |
+| `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses totalElements, dynamic reference group DIFF resolution for difficulty metrics, learningSheetService for sheet counts, and resilient error scoping. |
 | `pages/AdminCompanies.tsx` | Company CRUD page | `RUNTIME-VERIFIED` | Keyboard-operable cards and synchronous duplicate-save protection; live mutation remains unverified. |
 | `pages/AdminInstitutions.tsx` | Institution directory management | `RUNTIME-VERIFIED` | Strict pages, authoritative edit details, clamped pagination, complete university options, and duplicate mutation guards. |
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `RUNTIME-VERIFIED` | Loading KPIs use skeletons and save/deactivation handlers reject duplicate actions. |
@@ -248,11 +250,11 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 152
 - **Total Automated Test Suites in `scripts/tests/`**: 21
-- **Total Executed Automated Unit Tests**: 311 (311 Passed, 0 Failed; 99 reported suites across 21 files)
+- **Total Executed Automated Unit Tests**: 318 (318 Passed, 0 Failed; 99 reported suites across 21 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
-- **Vite Production Bundler Build (`npm run build`)**: 0 errors
-- **Documentation Integrity (`npm run verify:docs`)**: 255 internal links and source references passed.
-- **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because an ignored local `.env` exists; no direct Axios/fetch/`Math.random()` violation was reported. Passes in CI without local `.env`.
+- **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.
+- **Documentation Integrity (`npm run verify:docs`)**: 266 internal links and source references passed.
+- **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because a pre-existing ignored local `.env` exists; the API proxy, noindex deep-link shell, no-soft-404 contract, and source architecture checks reported no failure. Passes in CI without local `.env`.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 11 bundle assets.
 

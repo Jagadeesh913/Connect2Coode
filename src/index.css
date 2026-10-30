@@ -126,39 +126,16 @@ body {
   user-select: text;
 }
 
-.c2c-security-watermark {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  pointer-events: none;
-  overflow: hidden;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  place-items: center;
-  color: rgba(15, 23, 42, 0.045);
-  font-family: var(--font-mono);
-  font-size: clamp(0.65rem, 1vw, 0.8rem);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.c2c-security-watermark span {
-  transform: rotate(-18deg);
-  white-space: nowrap;
-}
-
-html.dark .c2c-security-watermark {
-  color: rgba(226, 232, 240, 0.045);
-}
-
 @media print {
-  body > * {
+  .c2c-protected-surface {
+    display: block !important;
+  }
+
+  .c2c-protected-surface > * {
     display: none !important;
   }
 
-  body::before {
+  .c2c-protected-surface::before {
     content: 'Printing is disabled for protected Connect2Code content.';
     display: block;
     padding: 3rem;

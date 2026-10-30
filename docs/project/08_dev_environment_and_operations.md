@@ -22,7 +22,7 @@
 | :--- | :--- | :--- |
 | `VITE_API_BASE_URL` | `https://api.connect2code.in/api/v1` | Root API base URL targeting the remote Spring Boot backend. |
 | `VITE_APP_NAME` | `Connect 2 Code` | Platform application name display. |
-| `VITE_SITE_URL` | Empty (optional) | Canonical frontend origin for deployed metadata, such as `https://app.example.com`. When omitted, the metadata manager uses the current browser origin; do not configure a path or an HTTP production URL. |
+| `VITE_SITE_URL` | `https://connect2code.in` (required in Vercel Production) | Canonical frontend origin used by client metadata and build-generated pages. Set the apex HTTPS origin exactly; never use a Vercel preview URL or include a path/trailing slash. |
 | `VITE_BRANDFETCH_CLIENT_ID` | Empty (optional) | Public Brandfetch client ID used for domain-derived company logos after bundled assets. When omitted, the cascade continues with Simple Icons, the official-site favicon, and a deterministic monogram. Never put a secret key in a `VITE_` variable. |
 | `VITE_SHOW_COMING_SOON` | `true` (defaults to true) | Feature flag routing unimplemented routes (`/interviews`, `/roadmaps/:slug`) to `<ComingSoon />`. Set to `false` to preview draft implementations. |
 
@@ -79,12 +79,14 @@ server: {
 
 Connect2Code is configured for deployment on Vercel or any SPA static web host.
 
-[`vercel.json`](../../vercel.json) defines edge proxy rewrites and SPA fallback:
+[`vercel.json`](../../vercel.json) defines edge proxy rewrites, prerender routing, permanent alias redirects, and an explicit valid-route allowlist:
 ```json
 {
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/:path((?!social(?:/|$)).*)",
+      "source": "/api/:path*",
       "destination": "https://api.connect2code.in/api/:path*"
     },
     {
@@ -100,29 +102,31 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
       "destination": "https://api.connect2code.in/oauth2/:path*"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/problems/:slug",
+      "destination": "/app"
     }
   ]
 }
 ```
-- **SPA Fallback**: Rule `/(.*) -> /index.html` guarantees that deep URLs (e.g. `/problems/two-sum` or `/companies/tcs`) reload without HTTP 404 errors.
-- **Edge Proxy**: Rewrites `/api/*` (except the internal `/api/social` crawler renderer) and `/oauth2/*` directly to `https://api.connect2code.in`.
-- **Metadata on Deep Links**: `index.html` supplies branded defaults and icons before JavaScript loads. After hydration, `RouteMetadata` resolves the exact deep-link title, description, canonical URL, robots policy, and social tags using `VITE_SITE_URL` or the browser origin.
-- **Crawler metadata**: recognized search and social crawler user agents are rewritten to [`api/social.ts`](../../api/social.ts), which renders route-specific HTML tags without JavaScript. It only calls documented public detail endpoints, applies a short timeout, and falls back to safe route-derived content when an API payload is unavailable or does not match the requested route.
-- **Indexing protection**: route-specific `X-Robots-Tag` headers cover login, callback, authenticated, admin, and error routes even before the SPA loads. Keep those header entries synchronized with protected routes in `src/routes/appRoutes.tsx`.
+- **Public prerendering**: `npm run build` runs Vite and then [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs). It emits meaningful route-specific documents for `/`, `/practice`, `/dsa-sheet`, `/companies`, and `/aptitude`, plus `sitemap.xml`, `app.html`, and `404.html`. The output is identical for browsers and crawlers; no User-Agent routing remains.
+- **Deep links and real 404s**: Static public hubs resolve through Vercel clean URLs. Every other valid React route is explicitly rewritten to the noindex `/app` shell. With no global SPA catch-all, any path outside the allowlist falls through to generated `404.html` and Vercel's HTTP 404 behavior. Keep the allowlist synchronized with `src/routes/appRoutes.tsx`.
+- **Edge proxy**: Rewrites `/api/*` and `/oauth2/*` directly to `https://api.connect2code.in`; refresh and OAuth callback paths retain their existing dedicated rules.
+- **Canonical and social metadata**: All generated public documents contain the apex canonical and absolute social image URLs before JavaScript loads. After React mounts, `RouteMetadata` continues to reconcile metadata on navigation using `VITE_SITE_URL`.
+- **Indexing protection**: Route-specific `X-Robots-Tag` headers and the noindex app shell cover login, callback, authenticated, admin, authenticated API-backed detail, coming-soon, and error routes. Dynamic entity routes are intentionally absent from the sitemap because their current API contracts require authentication; a build must not receive user credentials or invent entity slugs.
 - **Browser hardening**: global deployment headers deny framing, object embedding, in-page display capture, camera/microphone/geolocation/payment/USB access, MIME sniffing, and insecure transport downgrade. `same-origin-allow-popups` is retained so the verified Google OAuth popup flow can continue to communicate with its opener.
 
 > [!IMPORTANT]
-> Set `VITE_SITE_URL` in Vercel's Production environment to the approved HTTPS frontend origin (with no path). The repository intentionally does not guess the production web hostname. Without this value, a preview or deployment alias is used as the canonical origin for requests made to that host.
+> In Vercel Project Settings → Environment Variables, set `VITE_SITE_URL=https://connect2code.in` for **Production**. Keep `VITE_API_BASE_URL=https://api.connect2code.in/api/v1`. Redeploy only after the deployment owner reviews the build. The repository pins the same apex value in `.env.production`, preventing preview request hosts from becoming canonical, but the Vercel Production variable remains required as an explicit provider contract.
+
+The exact sitemap URL after deployment is `https://connect2code.in/sitemap.xml`. The deployment owner must verify the apex domain assignment, HTTPS certificate, `www` → apex redirect, generated route statuses/headers, and sitemap response from Vercel before adding the property to Google Search Console.
 
 ### Secure Assessment Deployment Boundary
 
-The public web application provides deterrence only: event cancellation, editor-local clipboard isolation, focus/visibility protection, watermarking, print suppression, and an optional fullscreen/keyboard-lock secure mode. A page cannot enumerate or disable browser extensions, prevent an operating-system screenshot, or stop a modified client.
+The public web application provides deterrence only: event cancellation, editor-local clipboard isolation, focus/visibility protection, print suppression, and an optional fullscreen/keyboard-lock secure mode. Developer Tools remain available. A page cannot enumerate or disable browser extensions, prevent an operating-system screenshot, or stop a modified client.
 
 For high-stakes assessments, deploy the site through one of these controlled environments:
 
-1. A managed Chrome/ChromeOS fleet with Developer Tools set to **Never allow**, extension installation blocklisted except an explicit allowlist, guest/incognito access disabled, and the Connect2Code origin allowlisted.
+1. If a future assessment policy requires stronger lockdown, use a managed Chrome/ChromeOS fleet with extension installation blocklisted except an explicit allowlist, guest/incognito access disabled, and the Connect2Code origin allowlisted. DevTools policy must follow the current product requirement; the web client deliberately allows it.
 2. Safe Exam Browser or an equivalent kiosk client configured with private clipboard, screen capture disabled, application/process switching restricted, and the assessment origin pinned.
 3. Server-side exam sessions that record focus/fullscreen violations, enforce attempt windows and submission ownership, rate-limit execution, and invalidate compromised sessions. No verified telemetry endpoint currently exists in this frontend contract, so the client does not fabricate one.
 

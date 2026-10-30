@@ -5,7 +5,8 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
-import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
+import { adminQuestionService, getLiveTotalQuestionsCount } from '../../../../services/admin/adminQuestionService';
+import { problemService } from '../../../../services/problemService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
@@ -32,13 +33,20 @@ import { extractTestCasesFromProblem } from '../../utils/testCaseUtils';
 interface QuestionOption {
   id: number;
   title: string;
+  description?: string;
+  constraints?: string;
   difficulty?: string;
   difficultyRefName?: string;
   topicRefName?: string;
+  testCases?: QuestionTestCase[];
 }
 
-const DEFAULT_STARTER_CODES: Record<string, string> = {
-  Java: `import java.util.*;
+/**
+ * Verified working demo solutions for quick runtime verification testing.
+ */
+const SAMPLE_WORKING_SOLUTIONS: Record<number, Record<string, string>> = {
+  1: {
+    java: `import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
@@ -55,7 +63,7 @@ public class Main {
         }
     }
 }`,
-  Python: `import sys
+    python: `import sys
 
 def main():
     lines = sys.stdin.read().split()
@@ -69,7 +77,7 @@ def main():
 if __name__ == '__main__':
     main()
 `,
-  'C++': `#include <iostream>
+    cpp: `#include <iostream>
 #include <vector>
 #include <algorithm>
 #include <climits>
@@ -89,7 +97,7 @@ int main() {
     return 0;
 }
 `,
-  JavaScript: `const fs = require('fs');
+    javascript: `const fs = require('fs');
 
 function solve() {
     const input = fs.readFileSync(0, 'utf-8').trim().split(/\\s+/);
@@ -103,29 +111,22 @@ function solve() {
 
 solve();
 `,
+  },
 };
 
-const getGeneralBoilerplate = (languageName: string, title?: string): string => {
-  const problemTitle = title ? `// Solution for: ${title}` : '// Write your solution here';
-  switch (languageName?.toLowerCase()) {
-    case 'java':
-      return `import java.util.*;
+/**
+ * Generates dynamic starter boilerplate tailored to each problem challenge and target runtime.
+ */
+const getDynamicStarterCode = (languageName: string, title?: string, problemId?: number | null): string => {
+  const normLang = (languageName || '').toLowerCase().trim();
+  const idPrefix = problemId ? `#${problemId} ` : '';
+  const headerComment = title ? `${idPrefix}${title}` : 'Solution';
 
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        ${problemTitle}
-        while (sc.hasNextLine()) {
-            String line = sc.nextLine();
-            // Process input and print output
-        }
-    }
-}`;
-    case 'python':
-      return `import sys
+  if (normLang.includes('python')) {
+    return `import sys
 
 def solve():
-    ${problemTitle}
+    # ${headerComment}
     lines = sys.stdin.read().split()
     if not lines:
         return
@@ -134,15 +135,17 @@ def solve():
 if __name__ == '__main__':
     solve()
 `;
-    case 'c++':
-      return `#include <iostream>
+  }
+
+  if (normLang.includes('c++') || normLang === 'cpp') {
+    return `#include <iostream>
 #include <vector>
 #include <string>
 #include <algorithm>
 using namespace std;
 
 int main() {
-    ${problemTitle}
+    // ${headerComment}
     string line;
     while (cin >> line) {
         // Process input and print answer
@@ -150,11 +153,13 @@ int main() {
     return 0;
 }
 `;
-    case 'javascript':
-      return `const fs = require('fs');
+  }
+
+  if (normLang.includes('javascript') || normLang.includes('node') || normLang === 'js') {
+    return `const fs = require('fs');
 
 function solve() {
-    ${problemTitle}
+    // ${headerComment}
     const input = fs.readFileSync(0, 'utf-8').trim();
     if (!input) return;
     // Process input and print answer
@@ -162,9 +167,22 @@ function solve() {
 
 solve();
 `;
-    default:
-      return '';
   }
+
+  // Default Java
+  return `import java.util.*;
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        // ${headerComment}
+        while (sc.hasNextLine()) {
+            String line = sc.nextLine();
+            // Process input and print output
+        }
+    }
+}
+`;
 };
 
 export const DashboardCodeRunner: React.FC = () => {
@@ -173,6 +191,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
   // Question options & dynamic search
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
+  const [totalKnownQuestions, setTotalKnownQuestions] = useState<number>(0);
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
   const [manualQuestionId, setManualQuestionId] = useState<string>('');
   const [searchFilter, setSearchFilter] = useState<string>('');
@@ -194,7 +213,8 @@ export const DashboardCodeRunner: React.FC = () => {
   );
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
 
-  // Editor code
+  // Scoped code drafts per question and runtime language
+  const [_codeDrafts, setCodeDrafts] = useState<Record<string, string>>({});
   const [sourceCode, setSourceCode] = useState<string>('');
 
   // Execution states
@@ -225,17 +245,25 @@ export const DashboardCodeRunner: React.FC = () => {
         signal
       );
       const raw: any = initialRes?.data || initialRes;
-      let allItems: QuestionOption[] = Array.isArray(raw?.content)
+      let allItems: any[] = Array.isArray(raw?.content)
         ? raw.content
         : Array.isArray(raw)
         ? raw
         : [];
 
-      const totalPages = typeof raw?.totalPages === 'number' ? raw.totalPages : 1;
+      const totalElements =
+        typeof raw?.totalElements === 'number'
+          ? raw.totalElements
+          : getLiveTotalQuestionsCount();
+      const totalPages =
+        typeof raw?.totalPages === 'number'
+          ? raw.totalPages
+          : Math.max(1, Math.ceil(totalElements / 10));
+      setTotalKnownQuestions(totalElements);
 
-      // Dynamically load additional pages with pageSize: 10 matching /admin/questions contract
+      // Dynamically load all available pages with pageSize: 10 matching /admin/questions contract
       if (totalPages > 1) {
-        const pagesToFetch = Array.from({ length: Math.min(totalPages - 1, 4) }, (_, i) => i + 1);
+        const pagesToFetch = Array.from({ length: totalPages - 1 }, (_, i) => i + 1);
         const subPageResults = await Promise.allSettled(
           pagesToFetch.map((pageNum) =>
             adminQuestionService.getQuestions(
@@ -260,11 +288,20 @@ export const DashboardCodeRunner: React.FC = () => {
         }
       }
 
-      // Deduplicate by ID
+      // Deduplicate by ID and map
       const uniqueMap = new Map<number, QuestionOption>();
       allItems.forEach((item) => {
         if (item && typeof item.id === 'number') {
-          uniqueMap.set(item.id, item);
+          uniqueMap.set(item.id, {
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            constraints: item.constraints,
+            difficulty: item.difficulty || item.difficultyRefName,
+            difficultyRefName: item.difficultyRefName || item.difficulty,
+            topicRefName: item.topicRefName,
+            testCases: item.testCases,
+          });
         }
       });
       const uniqueList = Array.from(uniqueMap.values()).sort((a, b) => a.id - b.id);
@@ -278,7 +315,7 @@ export const DashboardCodeRunner: React.FC = () => {
         });
       }
     } catch {
-      setResourcesError('Unable to load full question catalog.');
+      setResourcesError('Unable to load question catalog.');
     } finally {
       setResourcesLoading(false);
     }
@@ -293,17 +330,16 @@ export const DashboardCodeRunner: React.FC = () => {
     };
   }, [dispatch, loadQuestionBank, resourcesRetry]);
 
-  // Set default language and starter code on language load
+  // Set default language on language load
   useEffect(() => {
     setSelectedLanguageId((previous) =>
       languages.some((language) => language.id === previous)
         ? previous
         : languages[0]?.id ?? null
     );
-    setSourceCode((code) => code || DEFAULT_STARTER_CODES[languages[0]?.name] || '');
   }, [languages]);
 
-  // 2. Fetch selected problem statement & test cases dynamically
+  // 2. Fetch selected problem statement & test cases dynamically with multi-tier fallback
   useEffect(() => {
     if (!selectedQuestionId) {
       setSelectedQuestionDetails(null);
@@ -314,46 +350,139 @@ export const DashboardCodeRunner: React.FC = () => {
     let active = true;
     setLoadingQuestionDetails(true);
 
-    Promise.allSettled([
-      adminQuestionService.getQuestionById(selectedQuestionId),
-      adminQuestionService.getTestCases(selectedQuestionId),
-    ]).then(([detailResult, testCasesResult]) => {
-      if (!active) return;
+    const loadDetailsAndTestCases = async () => {
       let details: Question | null = null;
       let cases: QuestionTestCase[] = [];
 
-      if (detailResult.status === 'fulfilled') {
-        const raw: any = detailResult.value?.data || detailResult.value;
-        if (raw && typeof raw === 'object') {
+      // Tier 1: Dedicated adminQuestionService.getQuestionById
+      try {
+        const detailRes = await adminQuestionService.getQuestionById(selectedQuestionId);
+        const raw: any = detailRes?.data || detailRes;
+        if (raw && typeof raw === 'object' && raw.id) {
           details = raw;
           if (Array.isArray(raw.testCases) && raw.testCases.length > 0) {
             cases = raw.testCases;
           }
         }
+      } catch {
+        // Direct admin detail fetch might fail (e.g. backend 500 on certain IDs like #6)
       }
 
-      if (
-        testCasesResult.status === 'fulfilled' &&
-        Array.isArray(testCasesResult.value) &&
-        testCasesResult.value.length > 0
-      ) {
-        cases = testCasesResult.value;
+      // Tier 2: Resilient problemService.getProblemById with catalog fallback
+      if (!details) {
+        try {
+          const probRes = await problemService.getProblemById(selectedQuestionId);
+          if (probRes?.data) {
+            const p = probRes.data;
+            details = {
+              id: Number(p.id || p.questionId || selectedQuestionId),
+              title: p.title,
+              description: p.description || '',
+              constraints: p.constraints || '',
+              difficultyRefGroupCode: 'DIFF',
+              difficultyRefCode: p.difficultyRefCode || '',
+              difficultyRefName: p.difficultyRefName || p.difficulty || '',
+              topicRefGroupCode: 'TOPIC',
+              topicRefCode: p.topicRefCode || '',
+              topicRefName: p.topicRefName || p.topic || '',
+              qpfRefGroupCode: 'QPF',
+              qpfRefCode: p.qpfRefCode || '',
+              qpfRefName: p.qpfRefName || '',
+              questionHints: [],
+              testCases: p.testCases || [],
+            };
+            if (Array.isArray(p.testCases) && p.testCases.length > 0) {
+              cases = p.testCases;
+            }
+          }
+        } catch {
+          // Fall through to question cache
+        }
       }
 
-      // If backend returned no explicit test cases array, parse from problem description
+      // Tier 3: Lookup in already-loaded questions list
+      if (!details) {
+        const cached = questions.find((q) => q.id === selectedQuestionId);
+        if (cached) {
+          details = {
+            id: cached.id,
+            title: cached.title,
+            description: cached.description || '',
+            constraints: cached.constraints || '',
+            difficultyRefGroupCode: 'DIFF',
+            difficultyRefCode: '',
+            difficultyRefName: cached.difficultyRefName || cached.difficulty || '',
+            topicRefGroupCode: 'TOPIC',
+            topicRefCode: '',
+            topicRefName: cached.topicRefName || '',
+            qpfRefGroupCode: 'QPF',
+            qpfRefCode: '',
+            qpfRefName: '',
+            questionHints: [],
+            testCases: cached.testCases || [],
+          };
+          if (Array.isArray(cached.testCases) && cached.testCases.length > 0) {
+            cases = cached.testCases;
+          }
+        }
+      }
+
+      // Tier 4: Try fetching test cases if still empty
+      if (cases.length === 0) {
+        try {
+          const tcRes = await adminQuestionService.getTestCases(selectedQuestionId);
+          if (Array.isArray(tcRes) && tcRes.length > 0) {
+            cases = tcRes;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      // Tier 5: Extract test cases from problem description markdown or standard cases
       if (cases.length === 0 && details) {
         cases = extractTestCasesFromProblem(details);
       }
 
+      if (!active) return;
       setSelectedQuestionDetails(details);
       setSelectedQuestionTestCases(cases);
       setLoadingQuestionDetails(false);
-    });
+    };
+
+    void loadDetailsAndTestCases();
 
     return () => {
       active = false;
     };
-  }, [selectedQuestionId]);
+  }, [selectedQuestionId, questions]);
+
+  // Synchronize editor code per problem challenge and runtime language
+  useEffect(() => {
+    if (!selectedQuestionId || !selectedLanguageId) return;
+    const key = `${selectedQuestionId}_${selectedLanguageId}`;
+    const langObj = languages.find((l) => l.id === selectedLanguageId);
+    const langName = langObj?.name || 'Java';
+    const normLang = langName.toLowerCase().includes('python')
+      ? 'python'
+      : langName.toLowerCase().includes('c++')
+      ? 'cpp'
+      : langName.toLowerCase().includes('javascript')
+      ? 'javascript'
+      : 'java';
+
+    setCodeDrafts((prev) => {
+      if (prev[key] !== undefined) {
+        setSourceCode(prev[key]);
+        return prev;
+      }
+      const starter =
+        SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang] ||
+        getDynamicStarterCode(langName, selectedQuestionDetails?.title, selectedQuestionId);
+      setSourceCode(starter);
+      return { ...prev, [key]: starter };
+    });
+  }, [selectedQuestionId, selectedLanguageId, languages, selectedQuestionDetails?.title]);
 
   const combinedResourcesLoading = resourcesLoading || languagesLoading;
   const combinedResourcesError =
@@ -399,7 +528,7 @@ export const DashboardCodeRunner: React.FC = () => {
         pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
       const raw: any = res?.data || res;
-      const list: QuestionOption[] = Array.isArray(raw?.content)
+      const list = Array.isArray(raw?.content)
         ? raw.content
         : Array.isArray(raw)
         ? raw
@@ -408,7 +537,20 @@ export const DashboardCodeRunner: React.FC = () => {
       if (list.length > 0) {
         setQuestions((prev) => {
           const map = new Map(prev.map((item) => [item.id, item]));
-          list.forEach((item) => map.set(item.id, item));
+          list.forEach((item: any) => {
+            if (item && item.id) {
+              map.set(item.id, {
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                constraints: item.constraints,
+                difficulty: item.difficulty || item.difficultyRefName,
+                difficultyRefName: item.difficultyRefName || item.difficulty,
+                topicRefName: item.topicRefName,
+                testCases: item.testCases,
+              });
+            }
+          });
           return Array.from(map.values()).sort((a, b) => a.id - b.id);
         });
         setSelectedQuestionId(list[0].id);
@@ -424,17 +566,18 @@ export const DashboardCodeRunner: React.FC = () => {
     }
   };
 
+  const handleEditorChange = (value: string | undefined) => {
+    const val = value || '';
+    setSourceCode(val);
+    if (selectedQuestionId && selectedLanguageId) {
+      const key = `${selectedQuestionId}_${selectedLanguageId}`;
+      setCodeDrafts((prev) => ({ ...prev, [key]: val }));
+    }
+  };
+
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = Number(e.target.value);
     setSelectedLanguageId(newId);
-    const langObj = languages.find((l) => l.id === newId);
-    if (langObj) {
-      if (selectedQuestionId === 1 && DEFAULT_STARTER_CODES[langObj.name]) {
-        setSourceCode(DEFAULT_STARTER_CODES[langObj.name]);
-      } else {
-        setSourceCode(getGeneralBoilerplate(langObj.name, selectedQuestionDetails?.title));
-      }
-    }
     setResult(null);
   };
 
@@ -463,24 +606,31 @@ export const DashboardCodeRunner: React.FC = () => {
     const exists = questions.some((q) => q.id === num);
     if (!exists) {
       try {
-        const res = await adminQuestionService.getQuestionById(num);
-        const qData: any = res?.data || res;
-        if (qData && qData.id) {
-          setQuestions((prev) => {
-            const updated = [
-              ...prev,
-              {
-                id: qData.id,
-                title: qData.title,
-                difficulty: qData.difficultyRefName,
-                difficultyRefName: qData.difficultyRefName,
-                topicRefName: qData.topicRefName,
-              },
-            ].sort((a, b) => a.id - b.id);
-            return updated;
-          });
+        let qData: any = null;
+        try {
+          const res = await adminQuestionService.getQuestionById(num);
+          qData = res?.data || res;
+        } catch {
+          const res2 = await problemService.getProblemById(num);
+          qData = res2?.data;
+        }
+
+        if (qData && (qData.id || qData.title)) {
+          const newOpt: QuestionOption = {
+            id: Number(qData.id || num),
+            title: qData.title,
+            description: qData.description,
+            constraints: qData.constraints,
+            difficulty: qData.difficultyRefName || qData.difficulty,
+            difficultyRefName: qData.difficultyRefName || qData.difficulty,
+            topicRefName: qData.topicRefName,
+            testCases: qData.testCases,
+          };
+          setQuestions((prev) => [...prev, newOpt].sort((a, b) => a.id - b.id));
           setSelectedQuestionId(num);
           toast.success(`Loaded Question #${num}: ${qData.title}`);
+        } else {
+          toast.error(`Question #${num} not found`);
         }
       } catch {
         toast.error(`Question #${num} not found`);
@@ -489,14 +639,47 @@ export const DashboardCodeRunner: React.FC = () => {
   };
 
   const handleResetTemplate = () => {
-    if (!selectedLangObj) return;
-    if (selectedQuestionId === 1 && DEFAULT_STARTER_CODES[selectedLangObj.name]) {
-      setSourceCode(DEFAULT_STARTER_CODES[selectedLangObj.name]);
-    } else {
-      setSourceCode(getGeneralBoilerplate(selectedLangObj.name, selectedQuestionDetails?.title));
-    }
+    if (!selectedLangObj || !selectedQuestionId) return;
+    const key = `${selectedQuestionId}_${selectedLanguageId}`;
+    const starter = getDynamicStarterCode(
+      selectedLangObj.name,
+      selectedQuestionDetails?.title,
+      selectedQuestionId
+    );
+    setSourceCode(starter);
+    setCodeDrafts((prev) => ({ ...prev, [key]: starter }));
     toast.success('Code editor reset to boilerplate template.');
   };
+
+  const handleLoadWorkingSolution = () => {
+    if (!selectedLangObj || !selectedQuestionId) return;
+    const normLang = selectedLangObj.name.toLowerCase().includes('python')
+      ? 'python'
+      : selectedLangObj.name.toLowerCase().includes('c++')
+      ? 'cpp'
+      : selectedLangObj.name.toLowerCase().includes('javascript')
+      ? 'javascript'
+      : 'java';
+    const sample = SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang];
+    if (sample) {
+      const key = `${selectedQuestionId}_${selectedLanguageId}`;
+      setSourceCode(sample);
+      setCodeDrafts((prev) => ({ ...prev, [key]: sample }));
+      toast.success(`Loaded demo solution for #${selectedQuestionId} (${selectedLangObj.name})`);
+    }
+  };
+
+  const hasSampleSolution = useMemo(() => {
+    if (!selectedQuestionId || !selectedLangObj) return false;
+    const normLang = selectedLangObj.name.toLowerCase().includes('python')
+      ? 'python'
+      : selectedLangObj.name.toLowerCase().includes('c++')
+      ? 'cpp'
+      : selectedLangObj.name.toLowerCase().includes('javascript')
+      ? 'javascript'
+      : 'java';
+    return Boolean(SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang]);
+  }, [selectedQuestionId, selectedLangObj]);
 
   const executionRequest = useExecutionRequest('dashboard');
   useEffect(() => {
@@ -690,7 +873,7 @@ export const DashboardCodeRunner: React.FC = () => {
             <div className="md:col-span-4 space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Select Problem ({filteredQuestions.length} of {questions.length})
+                  Select Problem ({filteredQuestions.length} of {totalKnownQuestions || questions.length})
                 </label>
                 <button
                   type="button"
@@ -986,14 +1169,28 @@ export const DashboardCodeRunner: React.FC = () => {
                 Target: Problem #{selectedQuestionId || '—'}
               </span>
             </div>
-            <button
-              onClick={handleResetTemplate}
-              className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
-              title="Reset code editor to default boilerplate"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Reset Boilerplate</span>
-            </button>
+            <div className="flex items-center gap-3">
+              {hasSampleSolution && (
+                <button
+                  type="button"
+                  onClick={handleLoadWorkingSolution}
+                  className="flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors cursor-pointer"
+                  title="Load verified sample solution for this problem"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Load Demo Solution</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleResetTemplate}
+                className="flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                title="Reset code editor to default boilerplate"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Boilerplate</span>
+              </button>
+            </div>
           </div>
 
           <div className="h-80 w-full bg-[#1e1e1e]">
@@ -1007,7 +1204,7 @@ export const DashboardCodeRunner: React.FC = () => {
               height="100%"
               language={monacoLang}
               value={sourceCode}
-              onChange={(value) => setSourceCode(value || '')}
+              onChange={handleEditorChange}
               theme={theme === 'dark' ? 'vs-dark' : 'light'}
               options={{
                 minimap: { enabled: false },

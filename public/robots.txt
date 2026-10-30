@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# API and OAuth transport endpoints are not web documents. Page-level private,
+# admin, authentication, and error routes remain crawlable so their noindex
+# response headers can be observed.
+Disallow: /api/
+Disallow: /oauth2/
+
+Sitemap: https://connect2code.in/sitemap.xml

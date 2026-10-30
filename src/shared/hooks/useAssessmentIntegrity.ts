@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type AssessmentIntegrityViolation =
+  | 'browser-export'
   | 'clipboard'
   | 'context-menu'
-  | 'developer-tools'
   | 'drag-drop'
   | 'print-screen'
   | 'secure-mode-exit'
@@ -48,18 +48,21 @@ export function classifyAssessmentShortcut(
     return 'print-screen';
   }
   if (
+    event.key === 'F12' ||
+    (primaryModifier && event.shiftKey && DEVELOPER_TOOL_KEYS.has(key)) ||
+    (event.metaKey && event.altKey && DEVELOPER_TOOL_KEYS.has(key))
+  ) {
+    return null;
+  }
+  if (
     (primaryModifier && CLIPBOARD_KEYS.has(key)) ||
     (event.shiftKey && key === 'insert') ||
     (event.ctrlKey && key === 'insert')
   ) {
     return 'clipboard';
   }
-  if (
-    event.key === 'F12' ||
-    (primaryModifier && event.shiftKey && DEVELOPER_TOOL_KEYS.has(key)) ||
-    (primaryModifier && RESTRICTED_BROWSER_KEYS.has(key))
-  ) {
-    return 'developer-tools';
+  if (primaryModifier && RESTRICTED_BROWSER_KEYS.has(key)) {
+    return 'browser-export';
   }
   return null;
 }

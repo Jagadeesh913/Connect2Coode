@@ -30,6 +30,7 @@ export const AppRouterLayout: React.FC = () => {
   const userId = useAppSelector((state) => state.auth?.user?.id);
   const hasInitializedRef = useRef(false);
   const lastIntegrityNoticeAt = useRef(0);
+  const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const {
     bindTarget: bindProtectedSurface,
     enterSecureMode,
@@ -37,7 +38,8 @@ export const AppRouterLayout: React.FC = () => {
     isSecureModeActive,
     secureModeSupported,
   } = useAssessmentIntegrity<HTMLDivElement>({
-    obscureOnFocusLoss: true,
+    enabled: !isAdminRoute,
+    obscureOnFocusLoss: !isAdminRoute,
     onViolation: (violation) => {
       const now = Date.now();
       if (now - lastIntegrityNoticeAt.current < 1500) return;
@@ -47,13 +49,19 @@ export const AppRouterLayout: React.FC = () => {
           ? 'Screen capture shortcuts are disabled on this site.'
           : violation === 'secure-mode-exit'
             ? 'Secure mode ended. Re-enable it before continuing your assessment.'
-          : 'Copy, paste, export, and inspection shortcuts are restricted.',
+          : 'Copy, paste, export, and capture shortcuts are restricted.',
         { id: 'global-integrity-warning' }
       );
     },
   });
-  const watermarkLabel = `CONNECT2CODE • ${userId ? `USER ${userId}` : 'GUEST'} • ${location.pathname}`;
-  const isProblemWorkspace = /^\/problems\/[^/]+$/.test(location.pathname);
+  const isProblemWorkspace = !isAdminRoute && /^\/problems\/[^/]+$/.test(location.pathname);
+
+  // Secure mode is learner-only. Do not carry its document fullscreen state
+  // into the unrestricted administrator workspace after client navigation.
+  useEffect(() => {
+    if (!isAdminRoute || !document.fullscreenElement) return;
+    void document.exitFullscreen().catch(() => undefined);
+  }, [isAdminRoute]);
 
   // Synchronize Redux store if apiClient interceptor silently refreshes in background
   useEffect(() => {
@@ -155,16 +163,14 @@ export const AppRouterLayout: React.FC = () => {
   }, [dispatch, userId]);
 
   return (
-    <div ref={bindProtectedSurface} className="c2c-protected-surface contents">
+    <div
+      ref={bindProtectedSurface}
+      className={isAdminRoute ? 'contents' : 'c2c-protected-surface contents'}
+    >
       <RouteMetadata>
         <ScrollRestoration />
         <Outlet />
       </RouteMetadata>
-      <div className="c2c-security-watermark" aria-hidden="true">
-        {Array.from({ length: 6 }, (_, index) => (
-          <span key={index}>{watermarkLabel}</span>
-        ))}
-      </div>
       {isProblemWorkspace && secureModeSupported && (
         <button
           type="button"
@@ -178,7 +184,7 @@ export const AppRouterLayout: React.FC = () => {
           {isSecureModeActive ? 'Secure mode on' : 'Enter secure mode'}
         </button>
       )}
-      {isContentObscured && (
+      {!isAdminRoute && isContentObscured && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#070A13] p-6 text-center text-white" role="alert" aria-live="assertive">
           <div className="max-w-sm">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-500/15 text-2xl text-blue-300">

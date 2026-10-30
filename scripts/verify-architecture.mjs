@@ -37,10 +37,16 @@ if (existsSync(join(root, '.env'))) {
 if (existsSync(join(root, 'vercel.json'))) {
   try {
     const vercelConfig = JSON.parse(readFileSync(join(root, 'vercel.json'), 'utf8'));
-    const hasValidRewrites = Array.isArray(vercelConfig.rewrites) &&
-      vercelConfig.rewrites.some(r => r.destination === '/index.html' || r.destination === '/');
-    if (!hasValidRewrites) {
-      failures.push('vercel.json must only configure SPA fallback rewrite to /index.html.');
+    const rewrites = Array.isArray(vercelConfig.rewrites) ? vercelConfig.rewrites : [];
+    const rewriteMap = new Map(rewrites.map((rule) => [rule.source, rule.destination]));
+    if (rewriteMap.get('/api/:path*') !== 'https://api.connect2code.in/api/:path*') {
+      failures.push('vercel.json must preserve the production API proxy.');
+    }
+    if (rewriteMap.get('/problems/:slug') !== '/app' || rewriteMap.get('/admin/:path*') !== '/app') {
+      failures.push('vercel.json must preserve valid dynamic/admin SPA deep links through the noindex app shell.');
+    }
+    if (rewrites.some((rule) => rule.source === '/(.*)' || rule.source === '/:path*')) {
+      failures.push('vercel.json must not use a catch-all SPA rewrite that converts unknown routes into soft 404s.');
     }
   } catch (err) {
     failures.push(`Invalid vercel.json configuration: ${err.message}`);

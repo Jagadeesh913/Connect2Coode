@@ -18,15 +18,17 @@ const shortcut = (key, overrides = {}) => ({
 });
 
 describe('assessment integrity shortcut classification', () => {
-  it('blocks clipboard, source-view, print and developer-tool shortcuts', () => {
+  it('blocks clipboard, browser export and print shortcuts while allowing developer tools', () => {
     assert.equal(classifyAssessmentShortcut(shortcut('c', { ctrlKey: true })), 'clipboard');
     assert.equal(classifyAssessmentShortcut(shortcut('a', { ctrlKey: true })), 'clipboard');
     assert.equal(classifyAssessmentShortcut(shortcut('v', { metaKey: true })), 'clipboard');
     assert.equal(classifyAssessmentShortcut(shortcut('Insert', { shiftKey: true })), 'clipboard');
-    assert.equal(classifyAssessmentShortcut(shortcut('u', { ctrlKey: true })), 'developer-tools');
-    assert.equal(classifyAssessmentShortcut(shortcut('o', { ctrlKey: true })), 'developer-tools');
-    assert.equal(classifyAssessmentShortcut(shortcut('I', { ctrlKey: true, shiftKey: true })), 'developer-tools');
-    assert.equal(classifyAssessmentShortcut(shortcut('F12')), 'developer-tools');
+    assert.equal(classifyAssessmentShortcut(shortcut('u', { ctrlKey: true })), 'browser-export');
+    assert.equal(classifyAssessmentShortcut(shortcut('o', { ctrlKey: true })), 'browser-export');
+    assert.equal(classifyAssessmentShortcut(shortcut('I', { ctrlKey: true, shiftKey: true })), null);
+    assert.equal(classifyAssessmentShortcut(shortcut('C', { ctrlKey: true, shiftKey: true })), null);
+    assert.equal(classifyAssessmentShortcut(shortcut('I', { metaKey: true, altKey: true })), null);
+    assert.equal(classifyAssessmentShortcut(shortcut('F12')), null);
     assert.equal(classifyAssessmentShortcut(shortcut('PrintScreen')), 'print-screen');
     assert.equal(classifyAssessmentShortcut(shortcut('s', { metaKey: true, shiftKey: true })), 'print-screen');
     assert.equal(classifyAssessmentShortcut(shortcut('4', { metaKey: true, shiftKey: true })), 'print-screen');

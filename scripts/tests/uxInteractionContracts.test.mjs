@@ -154,15 +154,18 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /else \{[\s\S]*?<Skeleton/);
   });
 
-  it('problem drafts are user-scoped and editor clipboard data never reaches the system clipboard', async () => {
+  it('problem drafts are user-scoped, editor clipboard is isolated, and admin routes stay unrestricted', async () => {
     const problemDetails = await readSource('src/features/problems/pages/ProblemDetails.tsx');
     const integrityHook = await readSource('src/shared/hooks/useAssessmentIntegrity.ts');
     const appLayout = await readSource('src/layouts/AppRouterLayout.tsx');
+    const globalStyles = await readSource('src/index.css');
 
     assert.match(problemDetails, /userScopedStorage\.getItem/);
     assert.match(problemDetails, /userScopedStorage\.setItem/);
     assert.match(problemDetails, /data-assessment-clipboard="internal"/);
     assert.match(problemDetails, /connect2code-internal-paste/);
+    assert.match(problemDetails, /Developer Tools remain available/);
+    assert.doesNotMatch(problemDetails, /developer-tool shortcuts are restricted/);
     assert.doesNotMatch(problemDetails, /navigator\.clipboard/);
     assert.match(integrityHook, /INTERNAL_CLIPBOARD_SELECTOR/);
     assert.match(integrityHook, /obscureOnFocusLoss/);
@@ -171,9 +174,16 @@ describe('shared UX interaction contracts', () => {
     assert.match(integrityHook, /keyboardLock: 'browser'/);
     assert.match(integrityHook, /fullscreenchange/);
     assert.match(appLayout, /c2c-protected-surface/);
-    assert.match(appLayout, /c2c-security-watermark/);
+    assert.match(appLayout, /location\.pathname === '\/admin'/);
+    assert.match(appLayout, /location\.pathname\.startsWith\('\/admin\/'\)/);
+    assert.match(appLayout, /enabled: !isAdminRoute/);
+    assert.match(appLayout, /className=\{isAdminRoute \? 'contents' : 'c2c-protected-surface contents'\}/);
+    assert.match(appLayout, /document\.exitFullscreen/);
+    assert.doesNotMatch(appLayout, /c2c-security-watermark/);
     assert.match(appLayout, /Assessment content protected/);
     assert.match(appLayout, /Enter secure mode/);
+    assert.match(globalStyles, /\.c2c-protected-surface::before/);
+    assert.doesNotMatch(globalStyles, /body > \*/);
   });
 
   it('ships deployment-level browser hardening headers', async () => {

@@ -37,24 +37,6 @@ const privatePage = (title: string, description: string, canonicalPath: string):
   robots: 'noindex, nofollow',
 });
 
-const humanizeSegment = (value: string | undefined, fallback: string): string => {
-  if (!value) return fallback;
-
-  const decoded = (() => {
-    try {
-      return decodeURIComponent(value);
-    } catch {
-      return value;
-    }
-  })();
-
-  return decoded
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/\b\w/g, (character) => character.toUpperCase()) || fallback;
-};
-
 const normalizePathname = (pathname: string): string => {
   const normalized = pathname.startsWith('/') ? pathname : `/${pathname}`;
   return normalized !== '/' ? normalized.replace(/\/+$/, '') : normalized;
@@ -155,7 +137,8 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
     '/interviews': publicPage(
       'Interview Preparation',
       'Prepare for technical interviews with focused questions and practical guidance.',
-      '/interviews'
+      '/interviews',
+      { robots: 'noindex, nofollow' }
     ),
     '/dashboard': privatePage(
       'Dashboard',
@@ -228,20 +211,17 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
   if (exactMatch) return exactMatch;
 
   if (segments[0] === 'problems' && segments.length === 2) {
-    const problemName = humanizeSegment(segments[1], 'Coding Problem');
-    return publicPage(
-      problemName,
-      `Solve ${problemName} with the Connect2Code coding workspace and test cases.`,
-      pathname,
-      { type: 'article' }
+    return privatePage(
+      'Coding Problem',
+      'Open a valid Connect2Code coding problem to view its current authenticated details.',
+      pathname
     );
   }
 
   if ((segments[0] === 'companies' || segments[0] === 'company-patterns') && segments.length === 2) {
-    const companyName = humanizeSegment(segments[1], 'Company');
-    return publicPage(
-      `${companyName} Placement Preparation`,
-      `Prepare for ${companyName} placement exams with hiring patterns, aptitude topics, and coding questions.`,
+    return privatePage(
+      'Company Placement Preparation',
+      'Open a valid Connect2Code company page to view its current authenticated preparation resources.',
       `/companies/${segments[1]}`
     );
   }
@@ -251,23 +231,18 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
     ((segments.length === 3 && segments[1] === 'exams') ||
       (segments.length === 4 && segments[2] === 'exams'));
   if (isCompanyExam) {
-    const examId = segments.at(-1);
-    const examName = humanizeSegment(examId, 'Company Exam');
-    return publicPage(
-      `${examName} Exam Pattern`,
-      `Review the ${examName} placement exam pattern, sections, timing, roles, and preparation resources.`,
-      pathname,
-      { type: 'article' }
+    return privatePage(
+      'Company Exam Pattern',
+      'Open a valid Connect2Code company exam to view its current authenticated pattern and preparation resources.',
+      pathname
     );
   }
 
   if (segments[0] === 'roadmaps' && segments.length === 2) {
-    const roadmapName = humanizeSegment(segments[1], 'Learning');
-    return publicPage(
-      `${roadmapName} Roadmap`,
-      `Follow the ${roadmapName} learning roadmap for structured placement preparation.`,
-      pathname,
-      { type: 'article' }
+    return privatePage(
+      'Learning Roadmap Coming Soon',
+      'This Connect2Code learning roadmap is not currently available for indexing.',
+      pathname
     );
   }
 

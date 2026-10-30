@@ -930,7 +930,7 @@ export const ProblemDetails: React.FC = () => {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <span
             className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300"
-            title="Clipboard, context-menu, drag/drop, printing, source-view and developer-tool shortcuts are restricted in this workspace"
+            title="Clipboard, context-menu, drag/drop, printing, source-view and screen-capture shortcuts are restricted in this workspace; Developer Tools remain available"
           >
             <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
             Integrity mode{violationCount > 0 ? ` · ${violationCount}` : ''}

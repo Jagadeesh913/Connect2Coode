@@ -2,10 +2,13 @@ import React from 'react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
 import { BASE_URL } from '../../../../core/api/apiClient';
+import { useAppSelector } from '../../../../app/hooks';
 import { Server, KeyRound, ShieldCheck, Database } from 'lucide-react';
 
 export const DashboardSystemInfo: React.FC = () => {
+  const { user } = useAppSelector((state) => state.auth);
   const getBaseUrl = () => BASE_URL;
+  const roleName = user?.role || 'ROLE_ADMIN';
 
   return (
     <AdminCard
@@ -52,7 +55,7 @@ export const DashboardSystemInfo: React.FC = () => {
             </span>
           </div>
           <span className="text-slate-800 dark:text-slate-200 font-bold truncate text-xs">
-            ROLE_ADMIN Active
+            {roleName} Active
           </span>
           <AdminBadge variant="warning" className="w-fit mt-1">
             RBAC Protected

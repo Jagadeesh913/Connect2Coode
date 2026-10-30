@@ -8,6 +8,7 @@ import {
   Building2,
   GraduationCap,
   ListChecks,
+  BookOpen,
 } from 'lucide-react';
 
 export interface DashboardStats {
@@ -18,6 +19,7 @@ export interface DashboardStats {
   totalCompanies: number | null;
   totalInstitutions?: number | null;
   totalMcqs?: number | null;
+  totalSheets?: number | null;
 }
 
 interface DashboardMetricsGridProps {
@@ -85,6 +87,14 @@ export const DashboardMetricsGrid: React.FC<DashboardMetricsGridProps> = ({
       icon: ListChecks,
       color: 'text-violet-600 dark:text-violet-400',
       bgColor: 'bg-violet-50 dark:bg-violet-950/40 border-violet-100 dark:border-violet-900/50',
+    },
+    {
+      label: 'DSA Sheets',
+      value: stats?.totalSheets ?? null,
+      description: 'Structured curricula',
+      icon: BookOpen,
+      color: 'text-teal-600 dark:text-teal-400',
+      bgColor: 'bg-teal-50 dark:bg-teal-950/40 border-teal-100 dark:border-teal-900/50',
     },
   ];
 

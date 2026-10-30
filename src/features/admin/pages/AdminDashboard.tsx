@@ -6,10 +6,12 @@ import { DashboardMetricsGrid, DashboardStats } from '../components/dashboard/Da
 import { DashboardSystemInfo } from '../components/dashboard/DashboardSystemInfo';
 import { DashboardQuickActions } from '../components/dashboard/DashboardQuickActions';
 import { DashboardCodeRunner } from '../components/dashboard/DashboardCodeRunner';
-import { adminQuestionService } from '../../../services/admin/adminQuestionService';
+import { adminQuestionService, getLiveTotalQuestionsCount } from '../../../services/admin/adminQuestionService';
 import { adminCompanyService } from '../../../services/admin/adminCompanyService';
 import { adminInstitutionService } from '../../../services/admin/adminInstitutionService';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
+import { referenceService } from '../../../services/referenceService';
+import { learningSheetService } from '../../../services/learningSheetService';
 import { Play, RotateCw } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -21,6 +23,7 @@ export const AdminDashboard: React.FC = () => {
     totalCompanies: null,
     totalInstitutions: null,
     totalMcqs: null,
+    totalSheets: null,
   });
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
@@ -35,7 +38,8 @@ export const AdminDashboard: React.FC = () => {
     setError(null);
 
     try {
-      const [probRes, compRes, instRes, mcqRes, easyRes, medRes, hardRes] = await Promise.allSettled([
+      // 1. Fetch primary dashboard resources in parallel
+      const [probRes, compRes, instRes, mcqRes, diffRes, sheetsRes] = await Promise.allSettled([
         adminQuestionService.getQuestions(
           {
             level: null,
@@ -53,10 +57,54 @@ export const AdminDashboard: React.FC = () => {
         ),
         adminCompanyService.getCompanies(controller.signal),
         adminInstitutionService.getInstitutions({ page: 0, size: 1 }, controller.signal),
-        adminMcqService.getMcqs({ pageRequest: { pageNumber: 0, pageSize: 1 } }, controller.signal),
+        adminMcqService.getMcqs(
+          {
+            subject: [],
+            difficulty: [],
+            companies: [],
+            topic: null,
+            pageRequest: {
+              pageNumber: 0,
+              pageSize: 1,
+              sortBy: 'createdAt',
+              sortDirection: 'DESC',
+            },
+          },
+          controller.signal
+        ),
+        referenceService.getByGroupCode('DIFF', controller.signal),
+        learningSheetService.getSheets(controller.signal),
+      ]);
+
+      if (controller.signal.aborted) return;
+
+      // 2. Dynamically resolve difficulty IDs from the live reference library
+      const diffList =
+        diffRes.status === 'fulfilled' && Array.isArray(diffRes.value?.data)
+          ? diffRes.value.data
+          : [];
+      const easyItem = diffList.find(
+        (d) => d.refName?.toLowerCase() === 'easy' || d.refCode?.toLowerCase() === 'easy'
+      );
+      const medItem = diffList.find(
+        (d) =>
+          d.refName?.toLowerCase() === 'medium' ||
+          d.refCode?.toLowerCase() === 'med' ||
+          d.refCode?.toLowerCase() === 'medium'
+      );
+      const hardItem = diffList.find(
+        (d) => d.refName?.toLowerCase() === 'hard' || d.refCode?.toLowerCase() === 'hard'
+      );
+
+      const easyId = easyItem?.id ?? 2;
+      const medId = medItem?.id ?? 3;
+      const hardId = hardItem?.id ?? 4;
+
+      // 3. Query difficulty breakdowns using dynamically resolved IDs
+      const [easyRes, medRes, hardRes] = await Promise.allSettled([
         adminQuestionService.getQuestions(
           {
-            level: [1],
+            level: [easyId],
             companies: null,
             topic: null,
             searchText: null,
@@ -71,7 +119,7 @@ export const AdminDashboard: React.FC = () => {
         ),
         adminQuestionService.getQuestions(
           {
-            level: [2],
+            level: [medId],
             companies: null,
             topic: null,
             searchText: null,
@@ -86,7 +134,7 @@ export const AdminDashboard: React.FC = () => {
         ),
         adminQuestionService.getQuestions(
           {
-            level: [3],
+            level: [hardId],
             companies: null,
             topic: null,
             searchText: null,
@@ -110,17 +158,16 @@ export const AdminDashboard: React.FC = () => {
       let totalCompanies = 0;
       let totalInstitutions = 0;
       let totalMcqs = 0;
+      let totalSheets = 0;
 
       // 1. Total Problems
       if (probRes.status === 'fulfilled' && probRes.value) {
         const pageData = probRes.value.data;
         const questionsList = Array.isArray(pageData?.content) ? pageData.content : [];
-
-        totalProblems = pageData?.totalElements ?? questionsList.length;
+        totalProblems = pageData?.totalElements ?? getLiveTotalQuestionsCount() ?? questionsList.length;
       }
 
-      // 1b. Difficulty counts come only from their dedicated filtered queries.
-      // A single catalog page is not a valid substitute for global totals.
+      // 1b. Difficulty counts from dedicated filtered queries
       if (easyRes.status === 'fulfilled' && typeof easyRes.value?.data?.totalElements === 'number') {
         easyCount = easyRes.value.data.totalElements;
       }
@@ -151,14 +198,24 @@ export const AdminDashboard: React.FC = () => {
           pageData?.totalElements ?? pageData?.content?.length ?? 0;
       }
 
-      const failures = [probRes, compRes, instRes, mcqRes, easyRes, medRes, hardRes]
+      // 5. DSA Sheets
+      if (sheetsRes.status === 'fulfilled' && Array.isArray(sheetsRes.value)) {
+        totalSheets = sheetsRes.value.length;
+      }
+
+      const criticalFailures = [probRes, compRes, instRes, mcqRes]
         .map((result, index) =>
           result.status === 'rejected'
-            ? ['problems', 'companies', 'institutions', 'MCQs', 'easy totals', 'medium totals', 'hard totals'][index]
+            ? ['problem catalog', 'companies', 'institutions', 'MCQs'][index]
             : null
         )
         .filter(Boolean);
-      setError(failures.length ? 'Could not refresh ' + failures.join(', ') + '. Previous values, if available, are retained.' : null);
+
+      setError(
+        criticalFailures.length > 0
+          ? 'Could not refresh ' + criticalFailures.join(', ') + '. Previous values, if available, are retained.'
+          : null
+      );
       setHasData(true);
       setStats((previous) => ({
         totalProblems: probRes.status === 'fulfilled' ? totalProblems : previous.totalProblems,
@@ -168,6 +225,7 @@ export const AdminDashboard: React.FC = () => {
         totalCompanies: compRes.status === 'fulfilled' ? totalCompanies : previous.totalCompanies,
         totalInstitutions: instRes.status === 'fulfilled' ? totalInstitutions : previous.totalInstitutions,
         totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
+        totalSheets: sheetsRes.status === 'fulfilled' ? totalSheets : previous.totalSheets,
       }));
     } catch (err) {
       if (controller.signal.aborted) return;
