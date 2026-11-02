@@ -27,9 +27,23 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 
 // Import real apiClient implementation
 const apiClientModule = await import('../../src/core/api/apiClient.ts');
-const { resolveApiBaseUrl, BASE_URL } = apiClientModule;
+const { resolveApiBaseUrl, BASE_URL, prepareAuthenticatedRequestData } = apiClientModule;
 
 describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-006)', () => {
+  it('centrally injects canonical jwtToken without mutating caller payloads', () => {
+    const payload = { token: 'old', nested: { jwt_token: 'old', value: 1 } };
+    const prepared = prepareAuthenticatedRequestData(payload, 'post', 'active-jwt');
+    assert.deepEqual(prepared, { nested: { value: 1 }, jwtToken: 'active-jwt' });
+    assert.deepEqual(payload, { token: 'old', nested: { jwt_token: 'old', value: 1 } });
+  });
+
+  it('creates an authenticated body for DELETE without service-level workarounds', () => {
+    assert.deepEqual(
+      prepareAuthenticatedRequestData(undefined, 'delete', 'active-jwt'),
+      { jwtToken: 'active-jwt' }
+    );
+  });
+
   it('F-006: supports relative API base paths starting with "/" and trims trailing slashes', () => {
     assert.equal(resolveApiBaseUrl('/api/v1'), '/api/v1');
     assert.equal(resolveApiBaseUrl('/api/v1/'), '/api/v1');

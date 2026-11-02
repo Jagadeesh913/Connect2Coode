@@ -274,7 +274,6 @@ export const UserProfilePage: React.FC = () => {
             bio: data.bio?.trim() || '',
             gender: data.gender ?? null,
             dob: data.dob || null,
-            jwtToken: tokenStorage.getAccessToken() || undefined,
           },
         })
       ).unwrap();
@@ -305,7 +304,6 @@ export const UserProfilePage: React.FC = () => {
     mutationPendingRef.current = true;
     setSubmitting(true);
     try {
-      const token = tokenStorage.getAccessToken();
       const resolvedCollegeId =
         data.collegeId !== undefined && data.collegeId !== null && data.collegeId !== ''
           ? String(data.collegeId)
@@ -324,7 +322,6 @@ export const UserProfilePage: React.FC = () => {
         bio: (data.bio || '').trim(),
         gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
         dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
-        jwtToken: token || undefined,
       };
 
       // Direct unwrap: any backend error throws directly into catch block

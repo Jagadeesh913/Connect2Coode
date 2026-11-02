@@ -101,7 +101,7 @@ export const AdminInstitutions: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      const responseData: any = res?.data || res;
+      const responseData = res.data;
 
       if (responseData && Array.isArray(responseData.content)) {
         const computedPages = Math.max(1, Number(responseData.totalPages) || 1);
@@ -113,10 +113,6 @@ export const AdminInstitutions: React.FC = () => {
         setInstitutions(responseData.content);
         setTotalPages(computedPages);
         setTotalElements(total);
-      } else if (Array.isArray(responseData)) {
-        setInstitutions(responseData);
-        setTotalPages(Math.max(1, Math.ceil(responseData.length / size)));
-        setTotalElements(responseData.length);
       } else {
         throw new Error('Unexpected institutions response format');
       }

@@ -119,3 +119,15 @@ export const adminLanguageSchema = z.object({
 });
 
 export type AdminLanguageFormData = z.infer<typeof adminLanguageSchema>;
+
+/** Admin reference-library create/update form schema. */
+export const adminReferenceItemSchema = z.object({
+  id: z.number().int().positive().optional(),
+  refGroupCode: requiredTextRule('Reference group code', 1).max(80),
+  refGroupName: z.string().trim().max(120).optional(),
+  refCode: requiredTextRule('Reference code', 1).max(80),
+  refName: requiredTextRule('Reference name', 1).max(160),
+  isActive: z.boolean().default(true),
+});
+
+export type AdminReferenceItemFormData = z.infer<typeof adminReferenceItemSchema>;

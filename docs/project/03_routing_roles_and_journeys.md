@@ -24,7 +24,7 @@ graph TD
     end
     
     subgraph AdminBranch [Administrator Only (AdminRoute)]
-        AdminSpace["/admin/dashboard, /admin/questions, /admin/mcqs, /admin/companies, /admin/languages, /admin/institutions"]
+        AdminSpace["/admin/dashboard, /admin/questions, /admin/mcqs, /admin/companies, /admin/languages, /admin/institutions, /admin/references"]
     end
 
     Root --> GuestBranch
@@ -71,6 +71,7 @@ graph TD
 | `/admin/languages` | `AdminLanguages` | Administrator | `AdminLayout` | `AdminRoute` |
 | `/admin/institutions`| `AdminInstitutions`| Administrator | `AdminLayout` | `AdminRoute` |
 | `/admin/dsa-sheets` | `AdminDsaSheets` | Administrator | `AdminLayout` | `AdminRoute` |
+| `/admin/references` | `AdminReferences` | Administrator | `AdminLayout` | `AdminRoute` |
 | `/500` | `ServerError` | Public | None | Server error fallback |
 | `*` | `NotFound` | Public | None | 404 catch-all |
 
@@ -141,3 +142,4 @@ The application distinguishes between two primary user roles:
 2. **Question CRUD**: At `/admin/questions`, admin clicks "Add Question". Enters problem title, description, constraints, and test cases (input, expected output, hidden flag). Dispatches `POST /api/v1/question` and `POST /api/v1/question/{id}/testCases`.
 3. **MCQ CRUD**: At `/admin/mcqs`, admin creates MCQ. Marks correct option explicitly. Dispatches `POST /api/v1/admin/mcq`.
 4. **Institution Governance**: At `/admin/institutions`, admin reviews colleges, edits AISHE codes, and toggles active status via `PATCH /api/v1/admin/institutions/{id}/status`.
+5. **DSA Sheet Authoring**: At `/admin/dsa-sheets`, admin creates or edits sheets, top-level sections, and linked-question ordering/status. Existing resource IDs are sent only in edit mode through the learning-sheet save POSTs; successful mutations invalidate the student DSA cache.

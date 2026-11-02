@@ -12,7 +12,12 @@ export const API_ENDPOINTS = {
     VERIFY_PASSWORD_RESET_OTP: '/auth/verifyPasswordResetOtp',
   },
   REFERENCE: {
-    GROUP: (refGroupCode: string) => `/referenceLibrary/refGroupCode/${refGroupCode}`,
+    BASE: '/referenceLibrary',
+    GROUP_CODES: '/referenceLibrary/refGroupCode/list',
+    GROUP: (refGroupCode: string) =>
+      `/referenceLibrary/refGroupCode/${encodeURIComponent(refGroupCode)}`,
+    ITEM: (refGroupCode: string, refCode: string) =>
+      `/referenceLibrary/refGroupCode/${encodeURIComponent(refGroupCode)}/refCode/${encodeURIComponent(refCode)}`,
   },
   COMPANY: {
     BASE: '/company',
@@ -67,7 +72,7 @@ export const API_ENDPOINTS = {
   MCQ: {
     LIST: '/mcq',
     DETAILS: (id: string | number) => `/mcq/${id}`,
-    ADMIN_CREATE: '/admin/mcq',
+    ADMIN_SAVE: '/admin/mcq',
     ADMIN_DELETE: (id: string | number) => `/admin/mcq/${id}`,
   },
   LEARNING_SHEET: {
@@ -75,11 +80,11 @@ export const API_ENDPOINTS = {
     SECTIONS: (sheetId: string | number) => `/user/learningSheets/${sheetId}/sections`,
     SECTION_QUESTIONS: (sectionId: string | number) =>
       `/user/learningSheet/section/${sectionId}/questions`,
-    ADMIN_CREATE: '/admin/learningSheet',
-    ADMIN_SECTION_CREATE: '/admin/learningSheet/section',
+    ADMIN_SAVE: '/admin/learningSheet',
+    ADMIN_SECTION_SAVE: '/admin/learningSheet/section',
     ADMIN_SECTION_DELETE: (sectionId: string | number) =>
       `/admin/learningSheet/section/${sectionId}`,
-    ADMIN_QUESTION_LINK: '/admin/learningSheet/question',
+    ADMIN_QUESTION_SAVE: '/admin/learningSheet/question',
     ADMIN_QUESTION_DELETE: (sectionId: string | number, linkId: string | number) =>
       `/admin/learningSheet/section/${sectionId}/question/${linkId}`,
   },

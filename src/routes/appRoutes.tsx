@@ -42,6 +42,7 @@ const AdminLanguages = lazy(() => import('../features/admin/pages/AdminLanguages
 const AdminInstitutions = lazy(() => import('../features/admin/pages/AdminInstitutions').then((m: any) => ({ default: m.AdminInstitutions || m.default })));
 const AdminMcqs = lazy(() => import('../features/admin/pages/AdminMcqs').then((m: any) => ({ default: m.AdminMcqs || m.default })));
 const AdminDsaSheets = lazy(() => import('../features/admin/pages/AdminDsaSheets').then((m: any) => ({ default: m.AdminDsaSheets || m.default })));
+const AdminReferences = lazy(() => import('../features/admin/pages/AdminReferences').then((m: any) => ({ default: m.AdminReferences || m.default })));
 
 const NotFound = lazy(() => import('../shared/components/errors/NotFound').then((m: any) => ({ default: m.NotFound || m.default })));
 const ServerError = lazy(() => import('../shared/components/errors/ServerError').then((m: any) => ({ default: m.ServerError || m.default })));
@@ -148,6 +149,7 @@ const appRoutes = [
           { path: 'languages', element: withSuspense(AdminLanguages) },
           { path: 'institutions', element: withSuspense(AdminInstitutions) },
           { path: 'dsa-sheets', element: withSuspense(AdminDsaSheets) },
+          { path: 'references', element: withSuspense(AdminReferences) },
         ],
       },
     ],

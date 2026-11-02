@@ -2,8 +2,10 @@ import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { AdminModal } from '../AdminModal';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import type { CompanyExamSectionItem } from '../../../companies/types/companyExam';
 import { ListTree, Clock, FileText, Award, Hash } from 'lucide-react';
+import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 
 export interface ExamSectionFormData {
   id: number | null;
@@ -45,6 +47,8 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     register,
     handleSubmit,
     reset,
+    getValues,
+    setValue,
     formState: { errors },
   } = useForm<ExamSectionFormData>({
     defaultValues: {
@@ -52,7 +56,7 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
       companyExamId,
       parentSectionId: null,
       sectionName: '',
-      sectionTypeId: 100,
+      sectionTypeId: 0,
       questionTypeId: null,
       questionCount: null,
       durationMinutes: null,
@@ -60,6 +64,26 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
       sequenceNumber: 1,
     },
   });
+  const {
+    items: sectionTypeReferences,
+    loading: sectionTypesLoading,
+    error: sectionTypesError,
+    retry: retrySectionTypes,
+  } = useReferenceGroup('EXAM SECTION TYPE', isOpen);
+  const {
+    items: questionTypeReferences,
+    loading: questionTypesLoading,
+    error: questionTypesError,
+    retry: retryQuestionTypes,
+  } = useReferenceGroup('QUESTION TYPE', isOpen);
+  const sectionTypes = initialData?.sectionType &&
+    !sectionTypeReferences.some((item) => item.id === initialData.sectionType.id)
+    ? [initialData.sectionType, ...sectionTypeReferences]
+    : sectionTypeReferences;
+  const questionTypes = initialData?.questionType &&
+    !questionTypeReferences.some((item) => item.id === initialData.questionType?.id)
+    ? [initialData.questionType, ...questionTypeReferences]
+    : questionTypeReferences;
 
   useEffect(() => {
     if (initialData) {
@@ -68,7 +92,7 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
         companyExamId: initialData.companyExamId ? Number(initialData.companyExamId) : companyExamId,
         parentSectionId: initialData.parentSectionId ? Number(initialData.parentSectionId) : null,
         sectionName: initialData.sectionName || '',
-        sectionTypeId: initialData.sectionType?.id || 100,
+        sectionTypeId: initialData.sectionType?.id || 0,
         questionTypeId: initialData.questionType?.id || null,
         questionCount: initialData.questionCount ?? null,
         durationMinutes: initialData.durationMinutes ?? null,
@@ -81,7 +105,7 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
         companyExamId,
         parentSectionId: null,
         sectionName: '',
-        sectionTypeId: 100,
+        sectionTypeId: 0,
         questionTypeId: null,
         questionCount: null,
         durationMinutes: null,
@@ -91,12 +115,19 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     }
   }, [initialData, companyExamId, existingSections.length, reset]);
 
+  useEffect(() => {
+    const firstSectionTypeId = sectionTypeReferences[0]?.id;
+    if (isOpen && !initialData && firstSectionTypeId && !getValues('sectionTypeId')) {
+      setValue('sectionTypeId', firstSectionTypeId, { shouldValidate: true });
+    }
+  }, [getValues, initialData, isOpen, sectionTypeReferences, setValue]);
+
   const handleFormSubmit = (data: ExamSectionFormData) => {
     onSubmit({
       ...data,
       companyExamId: Number(companyExamId),
       parentSectionId: data.parentSectionId ? Number(data.parentSectionId) : null,
-      sectionTypeId: Number(data.sectionTypeId) || 100,
+      sectionTypeId: Number(data.sectionTypeId),
       questionTypeId: data.questionTypeId ? Number(data.questionTypeId) : null,
       questionCount: data.questionCount !== null && data.questionCount !== undefined && String(data.questionCount) !== '' ? Number(data.questionCount) : null,
       durationMinutes: data.durationMinutes !== null && data.durationMinutes !== undefined && String(data.durationMinutes) !== '' ? Number(data.durationMinutes) : null,
@@ -131,7 +162,7 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit(handleFormSubmit)}
-            disabled={submitting}
+            disabled={submitting || sectionTypesLoading || sectionTypes.length === 0}
             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer font-sans disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? 'Saving...' : isEditing ? 'Update Section' : 'Save Section'}
@@ -140,6 +171,15 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
       }
     >
       <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4 font-sans text-left">
+        <RequestStatus
+          pending={sectionTypesLoading || questionTypesLoading}
+          error={sectionTypesError || questionTypesError}
+          onRetry={() => {
+            void retrySectionTypes();
+            void retryQuestionTypes();
+          }}
+          label="Loading API reference types…"
+        />
         {/* Section Name & Sequence */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-3 space-y-1.5">
@@ -200,12 +240,19 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
               Section Classification
             </label>
             <select
-              {...register('sectionTypeId', { valueAsNumber: true })}
+              {...register('sectionTypeId', {
+                valueAsNumber: true,
+                validate: (value) => value > 0 || 'Section classification is required',
+              })}
+              disabled={sectionTypesLoading || sectionTypes.length === 0}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
-              <option value={100}>Section (Sub-section / Module)</option>
-              <option value={99}>Round (Comprehensive Assessment Stage)</option>
+              <option value={0}>-- Select classification --</option>
+              {sectionTypes.map((item) => (
+                <option key={item.id} value={item.id}>{item.refName}</option>
+              ))}
             </select>
+            <FormFieldError error={errors.sectionTypeId?.message} />
           </div>
 
           <div className="space-y-1.5">
@@ -216,12 +263,13 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
               {...register('questionTypeId', {
                 setValueAs: (v) => (v === '' || v === 'null' ? null : Number(v)),
               })}
+              disabled={questionTypesLoading}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- General / Multi-disciplinary --</option>
-              <option value={89}>SQL Assessment</option>
-              <option value={88}>MCQ / Aptitude</option>
-              <option value={87}>Hands-on Coding</option>
+              {questionTypes.map((item) => (
+                <option key={item.id} value={item.id}>{item.refName}</option>
+              ))}
             </select>
           </div>
         </div>

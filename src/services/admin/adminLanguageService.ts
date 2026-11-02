@@ -14,28 +14,10 @@ export type AdminLanguageItem = AdminLanguage;
 export const adminLanguageService = {
   /**
    * POST /api/v1/language
-   * Registers a new language in the platform (without id)
+   * Creates without an id and updates when an id is present.
    */
-  async createLanguage(payload: {
-    referenceId: number;
-    judge0LanguageId: number;
-    version?: string;
-    isActive?: boolean;
-  }): Promise<ApiResponse<AdminLanguageItem>> {
-    const response: ApiResponse<AdminLanguageItem> = await apiClient.post(
-      API_ENDPOINTS.LANGUAGE.BASE,
-      payload
-    );
-    executionService.invalidateLanguageCache();
-    return response;
-  },
-
-  /**
-   * POST /api/v1/language
-   * Updates an existing language (includes id in request body)
-   */
-  async updateLanguage(payload: {
-    id: number;
+  async saveLanguage(payload: {
+    id?: number;
     referenceId: number;
     judge0LanguageId: number;
     version?: string;

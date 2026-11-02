@@ -76,29 +76,13 @@ sequenceDiagram
 ### The Problem
 Historically, some services sent a payload field named `token` while others sent `jwtToken`, or both. The backend strictly expects `jwtToken` and throws validation errors if duplicate or conflicting token fields are present.
 
-### The Solution: Deep Purge in `apiClient.ts`
-[`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts) implements `purgeDuplicateTokenFields`:
-```ts
-function purgeDuplicateTokenFields(obj: any): void {
-  if (!obj || typeof obj !== 'object' || obj instanceof FormData) return;
-  if (Array.isArray(obj)) {
-    for (const item of obj) purgeDuplicateTokenFields(item);
-    return;
-  }
-  for (const key of Object.keys(obj)) {
-    const lowerKey = key.toLowerCase();
-    if (lowerKey === 'token' || (lowerKey === 'jwttoken' && key !== 'jwtToken') || lowerKey === 'jwt_token') {
-      delete obj[key];
-    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-      purgeDuplicateTokenFields(obj[key]);
-    }
-  }
-}
-```
-In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
-1. `purgeDuplicateTokenFields` recursively removes any `token`, `jwttoken`, or `jwt_token` keys.
-2. The logged-in user's active access token is attached strictly as `jwtToken`.
-3. URL query parameters are checked to ensure no token is ever exposed in query strings.
+### The Solution: Non-Mutating Canonicalization in `apiClient.ts`
+[`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts) implements `prepareAuthenticatedRequestData` over a recursive clone. In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
+
+1. The caller-owned body remains unchanged while a recursive clone removes `token`, `jwttoken`, and `jwt_token` aliases.
+2. The logged-in user's active access token is attached strictly as `jwtToken`; individual services do not read or inject access tokens.
+3. A DELETE without business data receives a canonical object body automatically, eliminating per-service Axios `{ data: {} }` workarounds.
+4. URL query parameters are checked to ensure no token is ever exposed in query strings.
 
 ---
 
@@ -137,22 +121,24 @@ In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
 ### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](../../src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](../../src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/company/list` | `POST` | `USER_OR_ADMIN` | Paginated companies: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
+| `/company/list` | `POST` | `USER_OR_ADMIN` | Service payload: `{ pageNumber, pageSize, sortBy, sortDirection }`; `apiClient` adds `jwtToken`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
 | `/company/{id}` | `GET` | `USER_OR_ADMIN` | Company details by numeric ID; captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
-| `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Exams associated with company: `{ pageNumber, pageSize, sortBy, sortDirection, jwtToken }`. |
+| `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Services send pagination/sort fields and `apiClient` adds `jwtToken`. |
 | `/company/exams/{examId}` | `GET` | `USER_OR_ADMIN` | Detailed exam blueprint (exam info, recruitment roles, exam sections). |
 | `/admin/company` | `POST` | `ADMIN_ONLY` | Creates or updates company record. |
 | `/admin/companyRole` | `POST` | `ADMIN_ONLY` | Creates or updates recruitment role (`roleName`, `roleCode`, `salary`). |
-| `/admin/examSection` | `POST` | `ADMIN_ONLY` | Creates or updates exam section / round (`sectionName`, `durationMinutes`, `totalMarks`). |
+| `/admin/examSection` | `POST` | `ADMIN_ONLY` | Creates or updates an exam section / round. `sectionTypeId` and optional `questionTypeId` must be selected from `EXAM SECTION TYPE` and `QUESTION TYPE`; no legacy numeric fallback is permitted. |
 | `/admin/companyExam` | `POST` | `ADMIN_ONLY` | Creates or updates company exam schedule (`examName`, `year`, `totalDurationMinutes`). |
 
-### E. Aptitude & MCQ Assessment ([`src/services/mcqService.ts`](../../src/services/mcqService.ts))
+### E. Aptitude & MCQ Assessment ([`src/services/mcqService.ts`](../../src/services/mcqService.ts), [`src/services/admin/adminMcqService.ts`](../../src/services/admin/adminMcqService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by subject, difficulty, company, search text with pagination. |
 | `/mcq/{id}` | `GET` | `USER_OR_ADMIN` | Single MCQ question details and options. |
 | `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ. The request contains `id` for an update, taxonomy codes and names (`subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topicGroupCode`, `topicRefCode`, `topicRefName`, `difficultyGroupCode`, `difficultyRefCode`, `difficultyRefName`), optional `companyId` and `companyName`, `question`, optional `explanation`, `isActive`, and `options`. Each option contains only its persisted `id` when present, `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. Exactly one option must be correct. Legacy question-level answer fields and option aliases are not sent or used to determine correctness. |
 | `/admin/mcq/{id}` | `DELETE` | `ADMIN_ONLY` | Deletes an MCQ question. |
+
+User-facing MCQ reads remain in `mcqService`; create/update/delete operations exist only in the admin service and admin-routed UI. Because the backend uses one `POST` route for both create and update, endpoint constants and payload types use `SAVE` naming rather than the obsolete create-only name.
 
 ### F. DSA Learning Sheets ([`src/services/learningSheetService.ts`](../../src/services/learningSheetService.ts), [`src/services/admin/adminLearningSheetService.ts`](../../src/services/admin/adminLearningSheetService.ts))
 
@@ -163,23 +149,27 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 | `/user/learningSheets` | `GET` | `USER_OR_ADMIN` | Lists sheets with `id`, `sheetCode`, `sheetName`, `description`, and `isActive`. |
 | `/user/learningSheets/{sheetId}/sections` | `GET` | `USER_OR_ADMIN` | Returns top-level sections. The client retains only `parentSectionId: null` and orders by `displayOrder`, then `id`. |
 | `/user/learningSheet/section/{sectionId}/questions` | `GET` | `USER_OR_ADMIN` | Returns question-link records ordered by `displayOrder`. The deletion identifier is the outer link `id`; problem navigation uses `question.id`. |
-| `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Creates a sheet: `{ sheetCode, sheetName, description, isActive }`. |
-| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Creates a top-level section: `{ sheetId, parentSectionId: null, sectionName, displayOrder, isActive }`. |
-| `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section. The service supplies an empty mutable body so `apiClient` injects `jwtToken`. |
-| `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Links an existing problem: `{ id: null, sectionId, question: { id }, displayOrder, isActive }`. |
+| `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Saves a sheet. Create omits `id`; edit sends `{ id, sheetCode, sheetName, description, isActive }`. |
+| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a top-level section. Create omits `id`; edit sends `{ id, sheetId, parentSectionId, sectionName, displayOrder, isActive }`. |
+| `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section. `apiClient` creates the authenticated body and injects `jwtToken`. |
+| `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Saves a problem association: create sends `id: null`; edit sends the outer association `id`, plus `{ sectionId, question: { id }, displayOrder, isActive }`. |
 | `/admin/learningSheet/section/{sectionId}/question/{linkId}` | `DELETE` | `ADMIN_ONLY` | Removes a section-question association without deleting the problem. The second path value is the association/link ID returned as the outer record `id`. |
+
+The problem route is deliberately built from the nested `question.id`, never the outer association `id` and never the nullable response `sectionId`. The production OpenAPI document requires authentication and could not be read anonymously on 2026-11-01; therefore live update acceptance remains `PARTIALLY VERIFIED` until an authenticated edit is executed against the backend.
 
 All calls use `apiClient`. GET requests carry the JWT in the bearer header; tokens are never put into query parameters. POST and DELETE bodies receive the canonical `jwtToken` from the interceptor, with duplicate token aliases removed.
 
 ### G. Live Read-Only DTO Fields (2026-10-23)
 
-The following fields were captured from the configured production API using the supplied temporary test account before that account began returning `401` for subsequent requests. They are evidence for read paths only; admin mutation payloads were not sent to production. The Postman MCP connection was authenticated during the follow-up audit, but its enabled-tools handshake repeated instead of returning an inventory and its exposed surface did not offer a live-request executor; it supplied no contract evidence and no collection/example was used as a substitute.
+The following fields were captured from the configured production API using supplied test credentials. They are evidence for read paths only; admin mutation payloads were not sent to production. A follow-up Postman MCP run on 2026-11-01 authenticated successfully and runtime-verified the reference group-code catalog; the per-group request exposed the backend cache failure documented in the known-issues register.
 
 | Endpoint | Captured `data` fields |
 | :--- | :--- |
 | `GET /language` | `id`, `referenceId`, `languageName`, `judge0LanguageId`, `version`, `isActive` |
 | `GET /language/dropdown` | `id`, `name` (a distinct dropdown DTO) |
 | `GET /referenceLibrary/refGroupCode/{group}` | `id`, `refGroupCode`, `refCode`, `refName`, `isActive` |
+| `GET /referenceLibrary/refGroupCode/list` | Array of reference group-code strings |
+| `POST /referenceLibrary` | `id`, `refGroupCode`, `refCode`, `refName`, `isActive` (`refGroupName` is accepted on create but omitted from the observed response) |
 | `POST /mcq`, `GET /mcq/{id}` | Question: `subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topic*`, `difficulty*`, `companyName`, `companyId`, `question`, `explanation`, `isActive`, `options`, `id`; option: `id`, `optionLabel`, `optionText`, `isCorrect` |
 | `POST /questions` | `id`, `title`, `description`, `difficultyId`, `difficultyName`, `topicId`, `topicName`, `isOwnProblem`, `isActive`, `companies`, `questionPlatform` |
 | `GET /users/{id}/questions/bookmarks` | `questionId`, `title`, `difficulty` |
@@ -196,13 +186,13 @@ Live MCQ verification on 2026-10-23 found that this is a record-level data bound
 
 ### H. Envelope and Detail Rules
 
-`apiClient` returns the backend envelope directly, so UI callers consume the payload exactly once through `response.data`; user and admin MCQ/question/dashboard views do not attempt nested `data.data` fallbacks. `POST /questions` rows are mapped only from the captured list fields. They are not converted into full `Question` detail records, because the list DTO lacks the reference and test-case fields required for authoring. When `GET /question/{id}` fails, the admin/detail UI reports that API failure instead of showing guessed taxonomy, platform, or test cases.
+`apiClient` is typed as an unwrapped transport and returns the backend envelope directly, so services and UI callers consume the payload exactly once through `response.data`; user and admin MCQ/question/dashboard views do not attempt raw-response or nested `data.data` fallbacks. `POST /questions` rows are mapped only from captured list fields. They are not converted into full `Question` detail records, because the list DTO lacks the reference and test-case fields required for authoring. When `GET /question/{id}` fails, the admin/detail UI reports that API failure instead of showing guessed taxonomy, platform, or test cases.
 
 ### F. User Profile, Bookmarks & Academic Details ([`src/services/profileService.ts`](../../src/services/profileService.ts), [`src/services/userQuestionService.ts`](../../src/services/userQuestionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/userInfo/{userId}` | `GET` | `USER_OR_ADMIN` | Fetches academic details (regNumber, joinedYear, passedOutYear, college). |
-| `/userInfo/{userId}` | `POST` | `USER_OR_ADMIN` | Saves/updates academic details. Payload includes `jwtToken`. |
+| `/userInfo/{userId}` | `POST` | `USER_OR_ADMIN` | Saves/updates academic details. The service sends academic fields; `apiClient` adds `jwtToken`. |
 | `/users/{userId}/questions/{questionId}/bookmark` | `POST` | `USER_ONLY` | Bookmarks a problem for the user. |
 | `/users/{userId}/questions/{questionId}/bookmark` | `DELETE` | `USER_ONLY` | Removes a problem bookmark. |
 | `/users/{userId}/questions/bookmarks` | `GET` | `USER_ONLY` | Retrieves all bookmarked questions for the user. |
@@ -227,16 +217,19 @@ Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, 
 | `/admin/institutions/{id}` | `PUT` | `ADMIN_ONLY` | Updates existing institution details. |
 | `/admin/institutions/{id}/status` | `PATCH` | `ADMIN_ONLY` | Soft toggle: `{ isActive: boolean }`. |
 
-### H. Compiler Languages & Taxonomy ([`src/services/referenceService.ts`](../../src/services/referenceService.ts), [`src/services/admin/adminLanguageService.ts`](../../src/services/admin/adminLanguageService.ts))
+### H. Compiler Languages & Taxonomy ([`src/services/referenceService.ts`](../../src/services/referenceService.ts), [`src/services/admin/adminReferenceService.ts`](../../src/services/admin/adminReferenceService.ts), [`src/services/admin/adminLanguageService.ts`](../../src/services/admin/adminLanguageService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/referenceLibrary/refGroupCode/{groupCode}` | `GET` | `USER_OR_ADMIN` | Returns API-owned taxonomy terms. Current callers request `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, subject-specific topic groups, `GENDER`, `LANG`, and `TESTCASETYPE`. |
+| `/referenceLibrary/refGroupCode/list` | `GET` | `USER_OR_ADMIN` | Returns all reference group codes as strings. The authenticated 2026-11-01 response contained 15 codes; clients consume the returned list rather than hardcoding its length or membership. |
+| `/referenceLibrary` | `POST` | `ADMIN_ONLY` | Creates when no `id` is present using `{ refGroupCode, refGroupName, refCode, refName, isActive }`; updates when `id` is present using `{ id, refGroupCode, refCode, refName, isActive }`. The API injects canonical `jwtToken` centrally. A group is created by saving its first record. |
+| `/referenceLibrary/refGroupCode/{groupCode}/refCode/{refCode}` | `DELETE` | `ADMIN_ONLY` | Irreversible hard delete. The admin UI requires an explicit confirmation and URL-encodes both path segments. |
 | `/language` | `GET` | `USER_OR_ADMIN` | Compiler catalog with database table IDs and execution reference IDs. Values are consumed from response fields, not fixed client ranges. |
 | `/language/dropdown` | `GET` | `USER_OR_ADMIN` | Lightweight language selector for code runner. |
 | `/language` | `POST` | `ADMIN_ONLY` | Registers or updates language compiler configuration. |
 | `/language/{id}` | `DELETE` | `ADMIN_ONLY` | Soft deletes language compiler configuration. |
 
-The response interceptor returns the backend `ApiResponse<T>` envelope itself, not an Axios response wrapper. Services therefore consume `response.data` exactly once. List services reject malformed successful payloads rather than silently converting them into empty arrays. Reference groups and compiler dropdowns use 30-minute Redux TTLs, in-flight deduplication, and request ownership; an API-confirmed empty list is cacheable. Successful language create/update/delete operations invalidate both Redux and execution-service caches so Monaco/code execution cannot retain an obsolete compiler mapping. Public institution-search failures are surfaced to the autocomplete instead of being converted into a false successful empty result.
+The response interceptor returns the backend `ApiResponse<T>` envelope itself, not an Axios response wrapper. Services therefore consume `response.data` exactly once. List services reject malformed successful payloads rather than silently converting them into empty arrays. Reference group paths are URL-encoded (including group names containing spaces), and every returned reference record is validated for numeric `id`, matching `refGroupCode`, non-empty `refCode`/`refName`, and boolean `isActive`. Component-level group-record reads use the shared Redux reference cache with a 30-minute TTL, in-flight deduplication, and request ownership; the group-code catalog is read through the same validated reference service. An API-confirmed empty list is cacheable. Successful reference-library mutations invalidate the affected Redux reference group, while language create/update/delete operations invalidate both Redux and execution-service caches so Monaco/code execution cannot retain obsolete mappings. Public institution-search failures are surfaced to the autocomplete instead of being converted into a false successful empty result.
 
 ---
 

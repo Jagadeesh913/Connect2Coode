@@ -65,6 +65,11 @@
 - **Required Backend Repair**: Inspect the exception for this request and the section-4 link rows; return `200` with `data: []` when the section exists but has no links, return `404` when the section does not exist, and reject or skip orphaned/incomplete associations without dereferencing nullable relationships. The link-creation service should validate the section and question before persisting and the database should enforce foreign keys. Any corrupt association should be removed by its link ID only after it is positively identified.
 - **Frontend Boundary**: [`learningSheetService.getSectionQuestions`](../../src/services/learningSheetService.ts) intentionally preserves the backend failure. It must not translate HTTP 500 into a successful empty list because that would hide corruption and falsely tell users that a populated section is empty.
 
+### 7. Reference Library Cache Deployment Failure (Backend; Repair Reported)
+- **Observed Behavior (2026-11-01)**: An authenticated Postman MCP run confirmed `GET /api/v1/referenceLibrary/refGroupCode/list` returns HTTP 200 with 15 group codes. In the same authenticated session, a per-group record read returned HTTP 500 because Spring could not find cache `referenceCodesByGroup`; the user-supplied `DIFF` response demonstrates the intended five-field DTO but the current deployment is not consistently serving it.
+- **Current Verification Boundary**: Authentication and the group-code catalog are `RUNTIME-VERIFIED`. Per-group records and all reference mutations remain `NOT WORKING`/`PARTIALLY VERIFIED` at the live-backend boundary until the missing cache is configured. No production create, update, or hard-delete mutation was executed during verification.
+- **Frontend Boundary**: The per-group URL did not change. The frontend continues to use it for dropdown records and uses `/refGroupCode/list` only to discover group names. It surfaces backend failures, validates successful DTOs, and never converts a 500 into a false empty result or static fallback.
+
 
 ---
 
@@ -72,9 +77,9 @@
 ## 2. Key Architectural Decisions & Rationale
 
 ### Decision 0: Learning Sheet API as the DSA Sheet Product Boundary
-- **Context**: The backend exposes a generic `learningSheet` name, but the supplied product scope is DSA preparation only. The section-question response also returns `sectionId: null`, even though the request path already identifies the owning section; no sheet update/delete or child-section read endpoint was supplied.
+- **Context**: The backend exposes a generic `learningSheet` name, but the supplied product scope is DSA preparation only. The section-question response also returns `sectionId: null`, even though the request path already identifies the owning section; no sheet delete or child-section read endpoint was supplied. Admin editing reuses the existing save POSTs by including the resource/association `id` only in edit mode.
 - **Decision**: Present the feature exclusively as **DSA Sheet** in routes and UI while preserving the backend endpoint names in services. Treat the outer question-link `id` as the association deletion ID, navigate to problems using nested `question.id`, retain only top-level sections (`parentSectionId: null`), and do not invent editing, sheet deletion, or nested-section behavior.
-- **Authentication Boundary**: GET calls use the bearer token automatically attached by `apiClient`; mutating bodies receive canonical `jwtToken`. DELETE services provide `{ data: {} }` so the interceptor has a mutable request body for token injection.
+- **Authentication Boundary**: GET calls use the bearer token automatically attached by `apiClient`; mutating bodies receive canonical `jwtToken`. The central client creates DELETE bodies, so services contain no transport-specific token workaround.
 - **Verification Boundary**: Endpoint formatting, response validation, ordering, and DELETE request shape are locally runtime-tested. Live production reads and admin mutations remain `PARTIALLY VERIFIED` because this implementation did not mutate production data.
 
 ### Decision 1: Local Recruiter Logos in `public/companies/`
@@ -83,10 +88,10 @@
 - **Benefits**: Known brands retain fast same-origin assets and consistent aspect ratios, while new API-created companies receive useful branding without a frontend release. The terminal monogram keeps the UI stable when a remote source is unavailable.
 - **Limitation**: Brandfetch's advertised 95%+ core-brand coverage is vendor-reported, not a measured guarantee for Connect2Code. Production coverage depends on a configured public client ID, valid API website fields, provider availability, and the actual company population.
 
-### Decision 2: Deep Purge of Duplicate Token Fields in `apiClient`
-- **Context**: Different legacy API calls sent either `token` or `jwtToken`. The backend rejected duplicate fields.
-- **Decision**: Implement `purgeDuplicateTokenFields` in `apiClient.ts` request interceptor.
-- **Benefits**: Centrally strips any lowercase `token`, `jwttoken`, or `jwt_token` key from nested request bodies and guarantees only `jwtToken` is transmitted across all 37+ platform APIs without having to edit dozens of individual UI components.
+### Decision 2: Central, Non-Mutating Request and Response Ownership
+- **Context**: Legacy services independently read credentials, injected multiple token spellings, supplied Axios-specific DELETE bodies, and guessed whether a result was an Axios response, a backend envelope, or a nested payload. That distributed transport policy caused duplicates, inconsistent names, caller-payload mutation risk, and false empty states.
+- **Decision**: `apiClient` clones mutating request bodies, recursively removes `token`, `jwttoken`, and `jwt_token`, injects only `jwtToken`, and creates DELETE bodies centrally. Its TypeScript facade models the response interceptor's unwrapped `ApiResponse<T>` behavior; services send business fields and consume one envelope layer only.
+- **Benefits**: Authentication and envelope rules now have one owner, service payloads remain reusable and testable, and malformed successful responses fail explicitly instead of passing through compatibility guesses.
 
 ### Decision 3: Option-Level `isCorrect` Flag for MCQs
 - **Context**: In the MCQ Bank, questions contain top-level fields (`correctOption: "A"`, `correctAnswer: "15"`) and an array `options: [{ optionLabel: "A", isCorrect: false }, { optionLabel: "B", isCorrect: true }]`. When an author updates an MCQ to change the correct option from A to B, the backend updates `options[].isCorrect` but may leave the top-level `correctOption` unchanged.
@@ -117,9 +122,9 @@
 - **Benefits**: Reducers stay deterministic, independent mutations compose safely, and late network responses cannot leak or overwrite another user's state.
 
 ### Decision 9: Shared Reference Taxonomy and API-Only Platform Metadata
-- **Context**: Forms independently fetched the same reference groups, valid empty responses were fetched repeatedly, and question IDs were mapped to hard-coded platform names.
-- **Decision**: All reference-library consumers use `referenceSlice` through `useReferenceGroup`, with TTL, force invalidation, and per-group request ownership. Problem platform code/name comes only from returned question fields (`questionPlatform`, `qpfRefCode`, `qpfRefName`, `examPlatform`, `platformName`, or `platform`); missing metadata stays unspecified.
-- **Benefits**: Navigation and Strict Mode no longer amplify identical reference calls, and the UI cannot silently assign a platform based on a question ID or title.
+- **Context**: Forms independently fetched the same reference groups, valid empty responses were fetched repeatedly, question IDs were mapped to hard-coded platform names, and exam sections embedded numeric classification IDs.
+- **Decision**: All component-level reference group-record consumers use `referenceSlice` through `useReferenceGroup`, with TTL, force invalidation, and per-group request ownership. The separate group-code catalog remains a validated service read. Difficulty, platform, exam-section type, question type, and other taxonomy values come only from API records; missing records stay unavailable rather than being replaced by static DTOs or legacy numeric IDs. Problem platform identity comes only from returned question fields (`qpfId`, `questionPlatform`, `qpfRefCode`, `qpfRefName`, `examPlatform`, `platformName`, or `platform`).
+- **Benefits**: Navigation and Strict Mode no longer amplify identical reference calls, and the UI cannot silently assign a taxonomy value based on an old constant, question ID, or title.
 
 ### Decision 10: Assessment Integrity Is a Client Deterrent, Not a Trust Boundary
 - **Context**: The site previously allowed normal clipboard/context-menu/drag-drop operations, and the coding workspace could transfer source through the operating-system clipboard. Its custom-input control also did not send the API-supported `customInput` field.
@@ -180,7 +185,7 @@
   - **Dynamic Starter Code**: Generated dynamically per selected problem title, ID, and runtime language (`java`, `python`, `cpp`, `javascript`). Verified working demo solutions (`SAMPLE_WORKING_SOLUTIONS`) can be loaded on-demand via a dedicated "Load Demo Solution" button.
   - **Scoped Code Drafts**: Preserves edited code drafts in local state indexed by `${questionId}_${languageId}`, preventing edits from being overwritten when toggling between problems or languages.
   - **Resilient 5-Tier Question Loading**: Resolves question metadata and test cases gracefully: `adminQuestionService.getQuestionById` -> `problemService.getProblemById` (resilient catalog fallback) -> local question catalog cache -> `adminQuestionService.getTestCases` -> `extractTestCasesFromProblem`.
-  - **Authoritative Metrics & Difficulty Resolution**: Dynamically maps difficulty levels by fetching reference library group `DIFF` (`referenceService.getByGroupCode('DIFF')`) instead of assuming sequential IDs. Integrates `learningSheetService.getSheets` to populate the 8th metric card (`DSA Sheets`) in a balanced 4x2 grid.
+  - **Authoritative Metrics & Difficulty Resolution**: Dynamically maps difficulty levels through `useReferenceGroup('DIFF')` instead of assuming sequential IDs. A metric request is omitted when its API reference is unavailable; no legacy fallback ID is sent. Integrates `learningSheetService.getSheets` to populate the 8th metric card (`DSA Sheets`) in a balanced 4x2 grid.
   - **Safe MCQ Pagination Contract**: Sanitizes `adminMcqService.getMcqs` payload to include full `pageRequest` and empty filter arrays, preventing Spring Boot 500 NPEs.
 
 ---
@@ -193,5 +198,4 @@
 2. **Real-Time Notification Websocket**: Currently notifications and progress updates are pulled via HTTP; evaluate Stomp/Websocket integration if live multi-user contests are introduced.
 3. **Draft Features Activation**: The `/interviews` and `/roadmaps/:slug` features are toggle-gated behind `VITE_SHOW_COMING_SOON`. Once backend endpoints for roadmaps are finalized, toggle `VITE_SHOW_COMING_SOON=false` to promote them to production.
 4. **Base Profile and Avatar Mutation**: `/user/profile` is unmapped in the available direct probes. Name/email are session-derived and read-only, and avatar editing is disabled until the backend exposes a verified mutation contract.
-5. **Exam Section Reference IDs**: Admin exam-section forms currently use IDs observed in the existing payload implementation (`sectionType` 99/100 and `questionType` 87/88/89). No verified reference-library group for these fields exists in the repository evidence; backend confirmation is required before replacing them with a dynamic group.
-6. **High-Stakes Proctoring Contract**: A secure assessment mode requires backend-owned exam-session state, server-side attempt/time limits, signed audit events, and a reviewed proctoring/privacy policy. No such verified API contract is present in this repository.
+5. **High-Stakes Proctoring Contract**: A secure assessment mode requires backend-owned exam-session state, server-side attempt/time limits, signed audit events, and a reviewed proctoring/privacy policy. No such verified API contract is present in this repository.

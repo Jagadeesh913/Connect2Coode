@@ -115,24 +115,16 @@ export const AdminLanguages: React.FC = () => {
     mutationPendingRef.current = true;
     setSubmitting(true);
     try {
-      if (editingLanguage && editingLanguage.id) {
-        // Update Language (POST /api/v1/language with id)
-        await adminLanguageService.updateLanguage({
-          id: editingLanguage.id,
-          referenceId: data.referenceId,
-          judge0LanguageId: data.judge0LanguageId,
-          version: data.version?.trim() || undefined,
-          isActive: data.isActive,
-        });
+      await adminLanguageService.saveLanguage({
+        id: editingLanguage?.id,
+        referenceId: data.referenceId,
+        judge0LanguageId: data.judge0LanguageId,
+        version: data.version?.trim() || undefined,
+        isActive: data.isActive,
+      });
+      if (editingLanguage?.id) {
         toast.success(`Language #${editingLanguage.id} updated successfully!`);
       } else {
-        // Create Language (POST /api/v1/language without id)
-        await adminLanguageService.createLanguage({
-          referenceId: data.referenceId,
-          judge0LanguageId: data.judge0LanguageId,
-          version: data.version?.trim() || undefined,
-          isActive: data.isActive,
-        });
         toast.success('Language registered successfully!');
       }
       setIsModalOpen(false);

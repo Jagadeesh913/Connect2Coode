@@ -25,6 +25,7 @@ import {
   toggleSection,
 } from '../redux/dsaSheetSlice';
 import type { DsaSheet } from '../types';
+import { getDsaQuestionProblemPath } from '../utils/questionRoute';
 
 const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'neutral' => {
   const normalized = difficulty.toLowerCase();
@@ -344,7 +345,7 @@ export const DsaSheetPage: React.FC = () => {
                                 const solved = Boolean(solvedByProblemId[String(link.question.id)]);
                                 return (
                                   <li key={link.id}>
-                                    <Link to={`/problems/${link.question.id}`} className="group flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                                    <Link to={getDsaQuestionProblemPath(link)} className="group flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                                       <div className="pt-0.5 text-slate-400">{solved ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5" />}</div>
                                       <span className="w-7 pt-0.5 text-xs font-mono font-bold text-slate-400">{String(questionIndex + 1).padStart(2, '0')}</span>
                                       <div className="min-w-0 flex-1">

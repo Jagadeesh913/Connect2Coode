@@ -1,5 +1,6 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
+import type { ApiResponse } from '../core/types/api';
 import type {
   DsaSheet,
   DsaSheetQuestionLink,
@@ -66,25 +67,25 @@ const assertId = (id: number, label: string): void => {
 
 export const learningSheetService = {
   async getSheets(signal?: AbortSignal): Promise<DsaSheet[]> {
-    const response: any = await apiClient.get(API_ENDPOINTS.LEARNING_SHEET.LIST, { signal });
-    return requireArray(response?.data, isSheet, 'learning sheets');
+    const response: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.LEARNING_SHEET.LIST, { signal });
+    return requireArray(response.data, isSheet, 'learning sheets');
   },
 
   async getSections(sheetId: number, signal?: AbortSignal): Promise<DsaSheetSection[]> {
     assertId(sheetId, 'Sheet ID');
-    const response: any = await apiClient.get(API_ENDPOINTS.LEARNING_SHEET.SECTIONS(sheetId), { signal });
-    return requireArray(response?.data, isSection, 'learning sheet sections')
+    const response: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.LEARNING_SHEET.SECTIONS(sheetId), { signal });
+    return requireArray(response.data, isSection, 'learning sheet sections')
       .filter((section) => section.parentSectionId === null)
       .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
   },
 
   async getSectionQuestions(sectionId: number, signal?: AbortSignal): Promise<DsaSheetQuestionLink[]> {
     assertId(sectionId, 'Section ID');
-    const response: any = await apiClient.get(
+    const response: ApiResponse<unknown> = await apiClient.get(
       API_ENDPOINTS.LEARNING_SHEET.SECTION_QUESTIONS(sectionId),
       { signal }
     );
-    return requireArray(response?.data, isQuestionLink, 'learning sheet questions')
+    return requireArray(response.data, isQuestionLink, 'learning sheet questions')
       .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
   },
 };

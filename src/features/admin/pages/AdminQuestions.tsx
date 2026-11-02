@@ -377,7 +377,7 @@ export const AdminQuestions: React.FC = () => {
       };
 
       const res = await adminQuestionService.saveOrUpdateQuestion(questionPayload);
-      const savedQuestion: any = res?.data || res;
+      const savedQuestion = res.data;
       const targetQuestionId = savedQuestion?.id || questionId;
 
       if (targetQuestionId) {

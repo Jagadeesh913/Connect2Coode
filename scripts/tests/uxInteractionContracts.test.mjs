@@ -62,6 +62,12 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /linksError/);
     assert.match(source, /AdminListSkeleton/);
     assert.doesNotMatch(source, /Loading (?:sheets|sections|linked questions)…/);
+    assert.match(source, /openEditSheet/);
+    assert.match(source, /openEditSection/);
+    assert.match(source, /openEditLink/);
+    assert.match(source, /editingSheet \? \{ id: editingSheet\.id/);
+    assert.match(source, /id: editingLink\?\.id \?\? null/);
+    assert.match(source, /dispatch\(invalidateDsaSheetCache\(\)\)/);
   });
 
   it('DSA user questions cancel superseded requests and keep errors scoped to the failed section', async () => {
@@ -74,6 +80,7 @@ describe('shared UX interaction contracts', () => {
     assert.match(pageSource, /loadingQuestionSectionId === section\.id/);
     assert.match(pageSource, /loadingQuestionSectionId === section\.id \? \([\s\S]*?<Skeleton/);
     assert.match(pageSource, /sectionsError && sections\.length === 0 \? null/);
+    assert.match(pageSource, /getDsaQuestionProblemPath\(link\)/);
   });
 
   it('problem list URL transitions dispatch before paint to prevent one-frame stale rows', async () => {

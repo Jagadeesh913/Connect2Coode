@@ -181,18 +181,17 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     try {
       const res = await adminQuestionService.adminTestCode({
         questionId: Number(question.id),
-        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
+        languageId: selectedLangObj?.referenceId || selectedLanguageId,
         sourceCode,
       }, controller.signal);
       if (controller.signal.aborted) return;
 
-      const data = (res as any)?.data || res;
-      setResult(data);
-      setExecutionMessage((res as any)?.message || 'Executed sample test cases');
-      if (isExecutionResultSuccessful(data)) {
+      setResult(res);
+      setExecutionMessage('Executed sample test cases');
+      if (isExecutionResultSuccessful(res)) {
         toast.success('All sample test cases passed.');
       } else {
-        toast.error(`${data.failedTestCases} sample test case(s) failed.`);
+        toast.error(`${res.failedTestCases} sample test case(s) failed.`);
       }
     } catch (err: any) {
       if (controller.signal.aborted) return;
@@ -220,18 +219,17 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     try {
       const res = await adminQuestionService.adminSubmitCode({
         questionId: Number(question.id),
-        languageId: (selectedLangObj as any)?.referenceId || selectedLanguageId,
+        languageId: selectedLangObj?.referenceId || selectedLanguageId,
         sourceCode,
       }, controller.signal);
       if (controller.signal.aborted) return;
 
-      const data = (res as any)?.data || res;
-      setResult(data);
-      setExecutionMessage((res as any)?.message || 'Executed all test cases');
-      if (isExecutionResultSuccessful(data)) {
+      setResult(res);
+      setExecutionMessage('Executed all test cases');
+      if (isExecutionResultSuccessful(res)) {
         toast.success('All validation test cases passed.');
       } else {
-        toast.error(`${data.failedTestCases} validation test case(s) failed.`);
+        toast.error(`${res.failedTestCases} validation test case(s) failed.`);
       }
     } catch (err: any) {
       if (controller.signal.aborted) return;

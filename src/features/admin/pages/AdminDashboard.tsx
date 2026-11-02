@@ -10,9 +10,9 @@ import { adminQuestionService, getLiveTotalQuestionsCount } from '../../../servi
 import { adminCompanyService } from '../../../services/admin/adminCompanyService';
 import { adminInstitutionService } from '../../../services/admin/adminInstitutionService';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
-import { referenceService } from '../../../services/referenceService';
 import { learningSheetService } from '../../../services/learningSheetService';
 import { Play, RotateCw } from 'lucide-react';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 export const AdminDashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats>({
@@ -29,6 +29,12 @@ export const AdminDashboard: React.FC = () => {
   const [hasData, setHasData] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
   const dashboardRequestRef = useRef<AbortController | null>(null);
+  const {
+    items: difficultyReferences,
+    loading: difficultiesLoading,
+    error: difficultiesError,
+    retry: retryDifficulties,
+  } = useReferenceGroup('DIFF');
 
   const fetchDashboardData = useCallback(async () => {
     dashboardRequestRef.current?.abort();
@@ -39,7 +45,7 @@ export const AdminDashboard: React.FC = () => {
 
     try {
       // 1. Fetch primary dashboard resources in parallel
-      const [probRes, compRes, instRes, mcqRes, diffRes, sheetsRes] = await Promise.allSettled([
+      const [probRes, compRes, instRes, mcqRes, sheetsRes] = await Promise.allSettled([
         adminQuestionService.getQuestions(
           {
             level: null,
@@ -72,39 +78,30 @@ export const AdminDashboard: React.FC = () => {
           },
           controller.signal
         ),
-        referenceService.getByGroupCode('DIFF', controller.signal),
         learningSheetService.getSheets(controller.signal),
       ]);
 
       if (controller.signal.aborted) return;
 
       // 2. Dynamically resolve difficulty IDs from the live reference library
-      const diffList =
-        diffRes.status === 'fulfilled' && Array.isArray(diffRes.value?.data)
-          ? diffRes.value.data
-          : [];
-      const easyItem = diffList.find(
+      const easyItem = difficultyReferences.find(
         (d) => d.refName?.toLowerCase() === 'easy' || d.refCode?.toLowerCase() === 'easy'
       );
-      const medItem = diffList.find(
+      const medItem = difficultyReferences.find(
         (d) =>
           d.refName?.toLowerCase() === 'medium' ||
           d.refCode?.toLowerCase() === 'med' ||
           d.refCode?.toLowerCase() === 'medium'
       );
-      const hardItem = diffList.find(
+      const hardItem = difficultyReferences.find(
         (d) => d.refName?.toLowerCase() === 'hard' || d.refCode?.toLowerCase() === 'hard'
       );
 
-      const easyId = easyItem?.id ?? 2;
-      const medId = medItem?.id ?? 3;
-      const hardId = hardItem?.id ?? 4;
-
       // 3. Query difficulty breakdowns using dynamically resolved IDs
       const [easyRes, medRes, hardRes] = await Promise.allSettled([
-        adminQuestionService.getQuestions(
+        easyItem ? adminQuestionService.getQuestions(
           {
-            level: [easyId],
+            level: [easyItem.id],
             companies: null,
             topic: null,
             searchText: null,
@@ -116,10 +113,10 @@ export const AdminDashboard: React.FC = () => {
             },
           },
           controller.signal
-        ),
-        adminQuestionService.getQuestions(
+        ) : Promise.reject(new Error('EASY reference is unavailable')),
+        medItem ? adminQuestionService.getQuestions(
           {
-            level: [medId],
+            level: [medItem.id],
             companies: null,
             topic: null,
             searchText: null,
@@ -131,10 +128,10 @@ export const AdminDashboard: React.FC = () => {
             },
           },
           controller.signal
-        ),
-        adminQuestionService.getQuestions(
+        ) : Promise.reject(new Error('MEDIUM reference is unavailable')),
+        hardItem ? adminQuestionService.getQuestions(
           {
-            level: [hardId],
+            level: [hardItem.id],
             companies: null,
             topic: null,
             searchText: null,
@@ -146,7 +143,7 @@ export const AdminDashboard: React.FC = () => {
             },
           },
           controller.signal
-        ),
+        ) : Promise.reject(new Error('HARD reference is unavailable')),
       ]);
 
       if (controller.signal.aborted) return;
@@ -210,10 +207,17 @@ export const AdminDashboard: React.FC = () => {
             : null
         )
         .filter(Boolean);
+      const difficultyFailures = [easyRes, medRes, hardRes]
+        .map((result, index) =>
+          result.status === 'rejected' ? ['Easy', 'Medium', 'Hard'][index] : null
+        )
+        .filter(Boolean);
 
       setError(
         criticalFailures.length > 0
           ? 'Could not refresh ' + criticalFailures.join(', ') + '. Previous values, if available, are retained.'
+          : difficultyFailures.length > 0
+          ? 'Could not refresh ' + difficultyFailures.join(', ') + ' difficulty metrics. Previous values, if available, are retained.'
           : null
       );
       setHasData(true);
@@ -236,7 +240,12 @@ export const AdminDashboard: React.FC = () => {
         setLoading(false);
       }
     }
-  }, []);
+  }, [difficultyReferences]);
+
+  const refreshDashboard = useCallback(() => {
+    void retryDifficulties();
+    void fetchDashboardData();
+  }, [fetchDashboardData, retryDifficulties]);
 
   useEffect(() => {
     void fetchDashboardData();
@@ -264,12 +273,12 @@ export const AdminDashboard: React.FC = () => {
               <span>Test Runtime</span>
             </button>
             <button
-              onClick={fetchDashboardData}
-              disabled={loading}
+              onClick={refreshDashboard}
+              disabled={loading || difficultiesLoading}
               className="px-4 py-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 shadow-xs"
               title="Refresh Data"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-blue-500' : ''}`} />
+              <RotateCw className={`w-3.5 h-3.5 ${loading || difficultiesLoading ? 'animate-spin text-blue-500' : ''}`} />
               <span>Refresh</span>
             </button>
           </div>
@@ -280,7 +289,12 @@ export const AdminDashboard: React.FC = () => {
       <DashboardOverview />
 
       {/* 2. Real-Time Platform Metrics Grid */}
-      <RequestStatus pending={loading} error={error} onRetry={fetchDashboardData} label="Refreshing metrics…" />
+      <RequestStatus
+        pending={loading || difficultiesLoading}
+        error={error || difficultiesError}
+        onRetry={refreshDashboard}
+        label="Refreshing metrics…"
+      />
       <DashboardMetricsGrid stats={stats} loading={loading && !hasData} />
 
       {/* 3. Interactive Problem Code Runner & Test Suite */}

@@ -3,7 +3,6 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Company, Problem } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
-import { tokenStorage } from '../core/security/tokenStorage';
 import { fetchResilientQuestionPage } from './admin/adminQuestionService';
 import type {
   CompanyExamItem,
@@ -13,6 +12,55 @@ import type {
 } from '../features/companies/types/companyExam';
 
 export type CompanyItem = Company;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const mapCompanyItem = (value: unknown): CompanyItem => {
+  if (!isRecord(value) || typeof value.name !== 'string' || !value.name.trim()) {
+    throw new Error('Unexpected company record format');
+  }
+  const id = typeof value.id === 'string' || typeof value.id === 'number' ? value.id : null;
+  const slug = typeof value.slug === 'string' && value.slug.trim()
+    ? value.slug
+    : id !== null
+    ? String(id)
+    : value.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+  return {
+    ...(value as unknown as Company),
+    id: id ?? slug,
+    name: value.name,
+    slug,
+    logo: typeof value.logo === 'string' ? value.logo : '',
+    website: typeof value.website === 'string' ? value.website : '',
+  };
+};
+
+const normalizePage = <T>(
+  data: unknown,
+  fallbackPageNumber: number,
+  fallbackPageSize: number,
+  mapItem: (item: unknown) => T,
+  label: string
+): PaginatedData<T> => {
+  const page = isRecord(data) ? data : null;
+  const rawContent = Array.isArray(data) ? data : page && Array.isArray(page.content) ? page.content : null;
+  if (!rawContent) throw new Error(`Unexpected ${label} response format`);
+  const content = rawContent.map(mapItem);
+  const numberValue = (value: unknown, fallback: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+  return {
+    content,
+    pageNumber: numberValue(page?.pageNumber, fallbackPageNumber),
+    pageSize: numberValue(page?.pageSize, fallbackPageSize),
+    totalElements: numberValue(page?.totalElements, content.length),
+    totalPages: numberValue(page?.totalPages, 1),
+    first: typeof page?.first === 'boolean' ? page.first : fallbackPageNumber === 0,
+    last: typeof page?.last === 'boolean' ? page.last : true,
+  };
+};
 
 export const companyService = {
   /**
@@ -28,99 +76,13 @@ export const companyService = {
       pageSize: pageRequest.pageSize ?? 24,
       sortBy: pageRequest.sortBy ?? 'name',
       sortDirection: pageRequest.sortDirection ?? 'ASC',
-      jwtToken: tokenStorage.getAccessToken(),
     };
 
-    try {
-      const res: any = await apiClient.post(API_ENDPOINTS.COMPANY.LIST, payload, { signal });
-      const rawData = res?.data || res;
-      const content = Array.isArray(rawData?.content)
-        ? rawData.content
-        : Array.isArray(rawData)
-        ? rawData
-        : null;
-
-      if (!content) {
-        throw new Error('Unexpected companies response format');
-      }
-
-      const mappedContent = content.map((item: any) => {
-        const name = typeof item.name === 'string' ? item.name : '';
-        const safeSlug =
-          item.slug ||
-          (item.id ? String(item.id) : name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-
-        return {
-          ...item,
-          id: item.id ?? safeSlug,
-          name,
-          slug: safeSlug,
-          logo: typeof item.logo === 'string' ? item.logo : '',
-          website: typeof item.website === 'string' ? item.website : '',
-        };
-      });
-
-      return {
-        statusCode: 200,
-        message: res?.message || 'Companies Fetched Successfully',
-        data: {
-          content: mappedContent,
-          pageNumber: rawData?.pageNumber ?? payload.pageNumber,
-          pageSize: rawData?.pageSize ?? payload.pageSize,
-          totalElements: rawData?.totalElements ?? mappedContent.length,
-          totalPages: rawData?.totalPages ?? 1,
-          first: rawData?.first ?? true,
-          last: rawData?.last ?? true,
-        },
-        errors: null,
-        timestamp: res?.timestamp || new Date().toISOString(),
-      };
-    } catch (err: any) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      const status = err?.statusCode || err?.response?.status;
-      if (status === 404) {
-        // Fallback to GET /company if list route returns 404
-        const fallbackRes: any = await apiClient.get(API_ENDPOINTS.COMPANY.BASE, { signal });
-        const raw = fallbackRes?.data || fallbackRes;
-        const list = Array.isArray(raw) ? raw : Array.isArray(raw?.content) ? raw.content : null;
-        if (!list) {
-          throw new Error('Unexpected companies fallback response format');
-        }
-        const mappedList = list.map((item: any) => {
-          const name = typeof item.name === 'string' ? item.name : '';
-          const safeSlug =
-            item.slug ||
-            (item.id ? String(item.id) : name.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-          return {
-            ...item,
-            id: item.id ?? safeSlug,
-            name,
-            slug: safeSlug,
-            logo: typeof item.logo === 'string' ? item.logo : '',
-            website: typeof item.website === 'string' ? item.website : '',
-          };
-        });
-
-        return {
-          statusCode: 200,
-          message: 'Companies Fetched Successfully',
-          data: {
-            content: mappedList,
-            pageNumber: 0,
-            pageSize: mappedList.length,
-            totalElements: mappedList.length,
-            totalPages: 1,
-            first: true,
-            last: true,
-          },
-          errors: null,
-          timestamp: new Date().toISOString(),
-        };
-      }
-      throw err;
-    }
+    const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.COMPANY.LIST, payload, { signal });
+    return {
+      ...res,
+      data: normalizePage(res.data, payload.pageNumber, payload.pageSize, mapCompanyItem, 'companies'),
+    };
   },
 
   /**
@@ -204,47 +166,28 @@ export const companyService = {
       pageSize: pageRequest.pageSize ?? 20,
       sortBy: pageRequest.sortBy ?? 'year',
       sortDirection: pageRequest.sortDirection ?? 'DESC',
-      jwtToken: tokenStorage.getAccessToken(),
     };
 
-    try {
-      const res: any = await apiClient.post(
-        API_ENDPOINTS.COMPANY.EXAMS(companyId),
-        payload,
-        { signal }
-      );
-      const rawData = res?.data || res;
-      const content = Array.isArray(rawData?.content)
-        ? rawData.content
-        : Array.isArray(rawData)
-        ? rawData
-        : null;
-
-      if (!content) {
-        throw new Error('Unexpected company exams response format');
-      }
-
-      return {
-        statusCode: 200,
-        message: res?.message || 'Company Exams Fetched Successfully',
-        data: {
-          content,
-          pageNumber: rawData?.pageNumber ?? payload.pageNumber,
-          pageSize: rawData?.pageSize ?? payload.pageSize,
-          totalElements: rawData?.totalElements ?? content.length,
-          totalPages: rawData?.totalPages ?? 1,
-          first: rawData?.first ?? true,
-          last: rawData?.last ?? true,
+    const res: ApiResponse<unknown> = await apiClient.post(
+      API_ENDPOINTS.COMPANY.EXAMS(companyId),
+      payload,
+      { signal }
+    );
+    return {
+      ...res,
+      data: normalizePage(
+        res.data,
+        payload.pageNumber,
+        payload.pageSize,
+        (item) => {
+          if (!isRecord(item) || typeof item.id !== 'number' || typeof item.examName !== 'string') {
+            throw new Error('Unexpected company exam record format');
+          }
+          return item as unknown as CompanyExamItem;
         },
-        errors: null,
-        timestamp: res?.timestamp || new Date().toISOString(),
-      };
-    } catch (err) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      throw err;
-    }
+        'company exams'
+      ),
+    };
   },
 
   /**
@@ -255,69 +198,43 @@ export const companyService = {
     examId: number | string,
     signal?: AbortSignal
   ): Promise<ApiResponse<CompanyExamDetailsData>> {
-    try {
-      const res: any = await apiClient.get(
-        API_ENDPOINTS.COMPANY.EXAM_DETAILS(examId),
-        { signal }
-      );
-      const rawData = res?.data || res;
-
-      if (!rawData || typeof rawData !== 'object') {
-        throw new Error('Unexpected company exam details response format');
-      }
-
-      return {
-        statusCode: 200,
-        message: res?.message || 'Company Exam Details Fetched Successfully',
-        data: {
-          exam: rawData?.exam || rawData,
-          roles: Array.isArray(rawData?.roles) ? rawData.roles : [],
-          pattern: Array.isArray(rawData?.pattern) ? rawData.pattern : [],
-        },
-        errors: null,
-        timestamp: res?.timestamp || new Date().toISOString(),
-      };
-    } catch (err) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      throw err;
+    const res: ApiResponse<unknown> = await apiClient.get(
+      API_ENDPOINTS.COMPANY.EXAM_DETAILS(examId),
+      { signal }
+    );
+    if (!isRecord(res.data) || !isRecord(res.data.exam)) {
+      throw new Error('Unexpected company exam details response format');
     }
+    if (!Array.isArray(res.data.roles) || !Array.isArray(res.data.pattern)) {
+      throw new Error('Unexpected company exam details response format');
+    }
+    return {
+      ...res,
+      data: {
+        exam: res.data.exam as unknown as CompanyExamItem,
+        roles: res.data.roles as CompanyExamDetailsData['roles'],
+        pattern: res.data.pattern as CompanyExamDetailsData['pattern'],
+      },
+    };
   },
 
   async getCompanyBySlug(slug: string, signal?: AbortSignal): Promise<ApiResponse<Company>> {
     try {
-      const res: any = await apiClient.get(API_ENDPOINTS.COMPANY.DETAILS(slug), { signal });
-      const compData = res?.data || res;
+      const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.COMPANY.DETAILS(slug), { signal });
+      return { ...res, data: mapCompanyItem(res.data) };
 
-      if (compData && (compData.id || compData.name)) {
-        const name = typeof compData.name === 'string' ? compData.name : '';
-        const safeSlug =
-          compData.slug ||
-          (compData.id ? String(compData.id) : '') ||
-          slug ||
-          name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
-        return {
-          statusCode: 200,
-          message: 'Company Fetched Successfully',
-          data: {
-            ...compData,
-            name,
-            slug: safeSlug,
-          },
-          errors: null,
-          timestamp: new Date().toISOString(),
-        };
-      }
-
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isRequestCanceled(err)) {
         throw err;
       }
       // F-012: Only genuine HTTP 404 responses trigger catalog search fallback.
       // Propagate HTTP 500, network failures, auth errors, and any non-404 failures.
-      const status = err?.statusCode || err?.response?.status || err?.status;
+      const error = err && typeof err === 'object' ? err as {
+        statusCode?: number;
+        status?: number;
+        response?: { status?: number };
+      } : null;
+      const status = error?.statusCode || error?.response?.status || error?.status;
       if (status !== 404) {
         throw err;
       }
@@ -367,6 +284,7 @@ export const companyService = {
     const problemsList: Problem[] = [];
     const seenTitles = new Set<string>();
     let lastBackendError: unknown = null;
+    let lastAttemptFailed = false;
 
     if (numericCandidate !== undefined) {
       try {
@@ -383,19 +301,8 @@ export const companyService = {
           },
         };
 
-        const res: any = await fetchResilientQuestionPage(payload, signal);
-        const raw = res?.data || res;
-        const list = Array.isArray(raw?.content)
-          ? raw.content
-          : Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : null;
-
-        if (!list) {
-          throw new Error('Unexpected company problems response format');
-        }
+        const res = await fetchResilientQuestionPage(payload, signal);
+        const list = res.data.content;
 
         for (const item of list) {
           const problem = mapProblemDto(item);
@@ -405,11 +312,13 @@ export const companyService = {
             problemsList.push(problem);
           }
         }
+        lastAttemptFailed = false;
       } catch (err) {
         if (isRequestCanceled(err)) {
           throw err;
         }
         lastBackendError = err;
+        lastAttemptFailed = true;
       }
     }
 
@@ -428,19 +337,8 @@ export const companyService = {
           },
         };
 
-        const res: any = await fetchResilientQuestionPage(payload, signal);
-        const raw = res?.data || res;
-        const list = Array.isArray(raw?.content)
-          ? raw.content
-          : Array.isArray(raw)
-          ? raw
-          : Array.isArray(raw?.data)
-          ? raw.data
-          : null;
-
-        if (!list) {
-          throw new Error('Unexpected company search response format');
-        }
+        const res = await fetchResilientQuestionPage(payload, signal);
+        const list = res.data.content;
 
         for (const item of list) {
           const problem = mapProblemDto(item);
@@ -450,15 +348,17 @@ export const companyService = {
             problemsList.push(problem);
           }
         }
+        lastAttemptFailed = false;
       } catch (err) {
         if (isRequestCanceled(err)) {
           throw err;
         }
         lastBackendError = err;
+        lastAttemptFailed = true;
       }
     }
 
-    if (problemsList.length === 0 && lastBackendError) {
+    if (problemsList.length === 0 && lastAttemptFailed && lastBackendError) {
       throw lastBackendError;
     }
 

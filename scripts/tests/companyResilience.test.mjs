@@ -143,7 +143,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       let fallbackInvoked = false;
 
       apiClient.get = async (url) => {
-        if (url === '/company/missing-slug' || url.endsWith('/missing-slug')) {
+        if (url === '/company/target-corp' || url.endsWith('/target-corp')) {
           const err = new Error('Not Found');
           err.statusCode = 404;
           throw err;
@@ -203,6 +203,37 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         );
       } finally {
         apiClient.get = originalGet;
+      }
+    });
+
+    it('does not rethrow a stale numeric-filter failure after the name fallback succeeds empty', async () => {
+      const originalPost = apiClient.post;
+      apiClient.post = async (_url, payload) => {
+        if (Array.isArray(payload.companies) && payload.companies.length > 0) {
+          throw { statusCode: 500, message: 'Numeric company filter failed' };
+        }
+        return {
+          statusCode: 200,
+          message: 'No matching questions',
+          data: {
+            content: [],
+            totalElements: 0,
+            totalPages: 0,
+            number: 0,
+            size: 50,
+            first: true,
+            last: true,
+            empty: true,
+            numberOfElements: 0,
+          },
+        };
+      };
+
+      try {
+        const response = await companyService.getCompanyProblems(42, 'No Results Inc');
+        assert.deepEqual(response.data, []);
+      } finally {
+        apiClient.post = originalPost;
       }
     });
   });

@@ -60,8 +60,8 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Deep token purge, base URL resolution tested in `apiClient.test.mjs`. |
-| `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `RUNTIME-VERIFIED` | Includes tested user/admin learning-sheet route builders. |
+| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Unwrapped response typing, non-mutating token canonicalization, centralized DELETE bodies, and base URL resolution are tested in `apiClient.test.mjs`; mutation testing killed removal of DELETE handling. |
+| `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `RUNTIME-VERIFIED` | Includes tested reference routes and semantic `SAVE` names for POST routes shared by create/update. |
 | `src/core/guards/AdminRoute.tsx` | Admin route gate checking JWT claims | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Admin redirect selection uses signed JWT claims only; covered by auth regression tests. |
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
@@ -75,7 +75,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/security/tokenStorage.ts` | Cookie & memory token storage | `RUNTIME-VERIFIED` | Web-storage credential/profile mirroring removed; legacy copies are cleaned, and cross-tab events clear stale per-tab memory. |
 | `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Tested in `taskRemediationVerification.test.mjs`. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
-| `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | MCQ question type no longer admits stale top-level correctness fields; includes API-supported optional execution `customInput`. |
+| `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Canonical institution filters, reference save unions, nullable profile responses, and MCQ save payloads reflect the active contracts. |
 | `src/core/validation/commonRules.ts` | Zod validators (email, password, name, phone, URL) | `RUNTIME-VERIFIED` | Migrated to Zod 4 error APIs and tested in `validationArchitecture.test.mjs`. |
 | `src/core/validation/serverErrorMapper.ts`| Backend error parser and security leak filter | `RUNTIME-VERIFIED` | Stack traces, backend implementation names, service URLs, and IP/port details are regression-tested and suppressed. |
 | `src/core/validation/index.ts` | Re-exports validation rules | `VERIFIED` | Re-exports all schemas. |
@@ -91,20 +91,21 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Login/refresh notify open same-origin tabs without disclosing credentials; tested in `authSession.test.mjs`. |
 | `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
-| `src/services/companyService.ts` | Companies and recruitment exams service | `PARTIALLY VERIFIED` | Strict page/detail envelopes and complete paginated catalog loading are tested; a non-empty live exam/detail DTO and admin mutations remain unverified. |
+| `src/services/companyService.ts` | Companies and recruitment exams service | `PARTIALLY VERIFIED` | Strict page/detail envelopes, complete pagination, and stale-fallback error isolation are tested; a non-empty live exam/detail DTO remains unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Language caching, API-only reference-ID resolution, custom-input payloads, malformed response rejection, and non-zero success verdicts are covered by tests; live execution remains backend-dependent. |
 | `src/services/institutionService.ts` | Public institution search autocomplete | `RUNTIME-VERIFIED` | Tested in `apiIntegration.test.mjs`. |
 | `src/services/learningSheetService.ts` | DSA sheets, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, and ordering are tested. Live API access remains backend-dependent. |
-| `src/services/mcqService.ts` | Aptitude MCQ queries and scoring | `RUNTIME-VERIFIED` | Tested in `mcqCorrectOption.test.mjs`. |
+| `src/services/mcqService.ts` | User/admin MCQ reads and aptitude scoring | `RUNTIME-VERIFIED` | Contains no admin mutations; that boundary and option correctness are regression-tested. |
 | `src/services/problemService.ts` | Problem catalog and details service | `RUNTIME-VERIFIED` | Numeric direct details with slug/degraded-route catalog fallback tested. |
-| `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Tested in `userInfoProfile.test.mjs`. |
+| `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Nullable reads, strict envelopes, and business-only save payloads are tested in `userInfoProfile.test.mjs`. |
 | `src/services/questionService.ts` | Problem CRUD and test case retrieval | `RUNTIME-VERIFIED` | Numeric direct lookup, cancellation, and test-case failure propagation covered by service tests. |
-| `src/services/referenceService.ts` | Taxonomy metadata (`DIFF`, `TOPIC`, `QPF`) | `RUNTIME-VERIFIED` | Verified with conditional Redux caching. |
+| `src/services/referenceService.ts` | Taxonomy group codes and group records | `PARTIALLY VERIFIED` | Authenticated group-code listing returned 200; encoded group paths and strict DTO validation are tested, while the current per-group production read is blocked by the backend's missing `referenceCodesByGroup` cache. |
 | `src/services/userQuestionService.ts` | Solved/attempted IDs, bookmarks, submissions | `RUNTIME-VERIFIED` | Strict array extraction, cancellation signals, and backend typo endpoints are tested. |
-| `src/services/admin/adminCompanyService.ts` | Admin company, role, section, exam authoring | `RUNTIME-VERIFIED` | Strict `jwtToken` verified in `userInfoProfile.test.mjs`. |
-| `src/services/admin/adminInstitutionService.ts`| Admin institution CRUD & status toggle | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
-| `src/services/admin/adminLanguageService.ts` | Admin language compiler management | `RUNTIME-VERIFIED` | Successful mutations invalidate execution-language cache; regression tested. |
-| `src/services/admin/adminMcqService.ts` | Admin MCQ CRUD | `RUNTIME-VERIFIED` | Tested in `mcqCorrectOption.test.mjs`. |
+| `src/services/admin/adminCompanyService.ts` | Admin company, role, section, exam authoring | `RUNTIME-VERIFIED` | Business-only payloads and required API-owned exam taxonomy IDs are regression-tested; live mutation remains backend-owned. |
+| `src/services/admin/adminInstitutionService.ts`| Admin institution CRUD & status toggle | `RUNTIME-VERIFIED` | Sends only canonical `type` and `activeOnly` filter names; tested in `institutionManagement.test.mjs`. |
+| `src/services/admin/adminLanguageService.ts` | Admin language compiler management | `RUNTIME-VERIFIED` | One save method matches the shared create/update POST; successful mutations invalidate execution-language cache. |
+| `src/services/admin/adminReferenceService.ts` | Admin reference create/update/hard delete | `PARTIALLY VERIFIED` | Request/response shapes, encoded delete path, and admin isolation are source-tested; production mutations were not executed. |
+| `src/services/admin/adminMcqService.ts` | Admin MCQ mutations and management reads | `RUNTIME-VERIFIED` | Owns one create/update save method plus delete, delegates shared reads, and uses the semantic `ADMIN_SAVE` endpoint constant. |
 | `src/services/admin/adminQuestionService.ts` | Admin question management | `RUNTIME-VERIFIED` | Tested in `validationArchitecture.test.mjs`. |
 | `src/services/admin/adminLearningSheetService.ts` | Admin DSA sheet authoring and link management | `PARTIALLY VERIFIED` | Endpoint/body shapes and token-compatible DELETE bodies are tested; live production mutations were not executed. |
 
@@ -188,7 +189,7 @@ Every first-party source file has been inspected and assigned a verified status 
 ### D. Aptitude Feature (`src/features/aptitude/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Query changes clear mismatched rows/totals and render skeletons; multi-select difficulty, question type, subject, and company filters are keyboard-operable toggles. |
+| `pages/AptitudePrep.tsx` | Multi-subject aptitude practice hub | `RUNTIME-VERIFIED` | Difficulty filters and labels use API reference records only; missing taxonomy surfaces a retryable status rather than static fallback DTOs. |
 | `utils/mcqUtils.ts` | MCQ option response mapper and correct-option resolver | `RUNTIME-VERIFIED` | Uses only `id`, `optionLabel`, `optionText`, and boolean `isCorrect`; it does not infer correctness from aliases or question-level answer text. |
 
 ### E. Admin Hub (`src/features/admin/`)
@@ -206,17 +207,18 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/AdminPageHeader.tsx` | Admin page title & action buttons | `VERIFIED` | Page header. |
 | `components/AdminSidebar.tsx` | Admin navigation sidebar | `RUNTIME-VERIFIED` | Links to questions, mcqs, companies, etc. |
 | `components/AdminTable.tsx` | Reusable sortable admin table | `RUNTIME-VERIFIED` | Replaces stale rows with same-column skeletons for every pending request; clickable rows support Enter/Space and visible focus. |
-| `components/companies/*` | Company, exam, role, section modals | `VERIFIED` | Admin authoring modals. |
+| `components/companies/*` | Company, exam, role, section modals | `RUNTIME-VERIFIED` | Exam sections load `EXAM SECTION TYPE` and `QUESTION TYPE` through shared reference state and never substitute legacy numeric IDs. |
 | `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics across 8 cards (including DSA Sheets); dynamic user role from Redux auth; code runner sandbox features dynamic problem-tailored boilerplate generation, demo solution loading, draft persistence per problem/language, resilient 5-tier fallback, and real-time Judge0 execution against selected problem test cases. |
 | `components/institutions/*` | Institution details, form, status modals | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
 | `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Dynamic reference library bindings (DIFF, TOPIC, QPF, TESTCASETYPE), sequential displayOrder on hints, and testcase assertions verified; live admin mutation remains backend-owned. |
-| `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses totalElements, dynamic reference group DIFF resolution for difficulty metrics, learningSheetService for sheet counts, and resilient error scoping. |
+| `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `RUNTIME-VERIFIED` | Uses shared `DIFF` reference state and never substitutes legacy numeric IDs; unavailable references omit the affected request and remain retryable. |
 | `pages/AdminCompanies.tsx` | Company CRUD page | `RUNTIME-VERIFIED` | Keyboard-operable cards and synchronous duplicate-save protection; live mutation remains unverified. |
 | `pages/AdminInstitutions.tsx` | Institution directory management | `RUNTIME-VERIFIED` | Strict pages, authoritative edit details, clamped pagination, complete university options, and duplicate mutation guards. |
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `RUNTIME-VERIFIED` | Loading KPIs use skeletons and save/deactivation handlers reject duplicate actions. |
+| `pages/AdminReferences.tsx` | Reference taxonomy administration | `PARTIALLY VERIFIED` | Admin-only mutations, shared group-record state, mutation locking, cache invalidation, and explicit hard-delete confirmation are locally verified; production mutations were not executed. |
 | `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, reference name payload attachment, page clamping, and option-level correctness are tested. |
 | `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, full test case retrieval (both visible and hidden) on Manage Test Cases, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
-| `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Superseded reads are canceled and duplicate mutations are guarded; typecheck/build/source contracts pass, but live admin mutations were not executed. |
+| `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Create/edit modals cover sheets, sections, and association metadata; edit payload IDs and cache invalidation are regression-tested, but live authenticated mutations were not executed. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
 
 ### F. DSA Sheet Feature (`src/features/dsaSheet/`)
@@ -226,6 +228,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `RUNTIME-VERIFIED` | Connected to Redux Toolkit (`dsaSheetSlice`); accessible two-path toggle, TTL caching, accordion question fetching, error retries, and superseded request cancellation. |
 | `redux/dsaSheetSlice.ts` | Learning sheets, sections, questions Redux slice | `RUNTIME-VERIFIED` | 5-minute TTL caching, section accordion state, and error handling tested in `dsaSheetSlice.test.mjs`. |
 | `types.ts` | Learning sheet, section, question-link, and mutation DTOs | `RUNTIME-VERIFIED` | Used by strict service validation and contract tests. |
+| `utils/questionRoute.ts` | DSA association-to-problem route resolver | `RUNTIME-VERIFIED` | Always selects nested `question.id`; regression test proves outer association IDs cannot enter problem URLs. |
 
 ### G. Profile, Bookmarks, Landing, Settings, Roadmaps
 | File Path | Role | Status | Notes |
@@ -248,13 +251,13 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 152
-- **Total Automated Test Suites in `scripts/tests/`**: 21
-- **Total Executed Automated Unit Tests**: 318 (318 Passed, 0 Failed; 99 reported suites across 21 files)
+- **Total First-Party TypeScript/TSX Files in `src/`**: 155
+- **Total Automated Test Suites in `scripts/tests/`**: 22
+- **Total Executed Automated Unit Tests**: 334 (334 Passed, 0 Failed; 100 reported suites across 22 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.
-- **Documentation Integrity (`npm run verify:docs`)**: 266 internal links and source references passed.
-- **Architecture Verification (`npm run verify:architecture`)**: `NOT WORKING` in this workspace only because a pre-existing ignored local `.env` exists; the API proxy, noindex deep-link shell, no-soft-404 contract, and source architecture checks reported no failure. Passes in CI without local `.env`.
+- **Documentation Integrity (`npm run verify:docs`)**: 272 internal links and source references passed.
+- **Architecture Verification (`npm run verify:architecture`)**: `RUNTIME-VERIFIED` — 159 source files scanned successfully, including API transport, endpoint-domain, environment, route, and prohibited-pattern checks.
 - **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 11 bundle assets.
 

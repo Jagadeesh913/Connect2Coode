@@ -1,7 +1,7 @@
 import { apiClient, isRequestCanceled } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
-import type { Problem, ProblemFilter } from '../core/types/domain';
+import type { Problem, ProblemFilter, QuestionListItem, QuestionListRequest } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
 import {
   fetchResilientQuestionPage,
@@ -44,7 +44,7 @@ export const problemService = {
       ? params.search.trim()
       : null;
 
-    const payload: Record<string, any> = {
+    const payload: QuestionListRequest = {
       level: levelArr,
       companies: companiesArr,
       topic: topicArr,
@@ -62,37 +62,23 @@ export const problemService = {
     }
 
     try {
-      const res: any = await fetchResilientQuestionPage(payload as any, signal);
-      const rawData = res?.data || res;
-
-
-      let list: any[] = [];
-      let total = 0;
-
-      if (rawData && Array.isArray(rawData.content)) {
-        list = rawData.content;
-        total = typeof rawData.totalElements === 'number' ? rawData.totalElements : list.length;
-      } else if (Array.isArray(rawData)) {
-        list = rawData;
-        total = list.length;
-      } else if (rawData && typeof rawData === 'object' && Array.isArray(rawData.data)) {
-        list = rawData.data;
-        total = typeof rawData.total === 'number' ? rawData.total : list.length;
-      } else {
+      const res = await fetchResilientQuestionPage(payload, signal);
+      const page = res.data;
+      if (!page || !Array.isArray(page.content)) {
         throw new Error('Unexpected problems response format');
       }
-
-      const mappedList: ProblemItem[] = list.map((item: any) => mapProblemDto(item));
+      const total = typeof page.totalElements === 'number' ? page.totalElements : page.content.length;
+      const mappedList: ProblemItem[] = page.content.map((item) => mapProblemDto(item));
 
       return {
         statusCode: 200,
         message: 'Problems retrieved successfully',
         data: mappedList,
         meta: {
-          page: rawData?.number !== undefined ? rawData.number + 1 : params.page || 1,
+          page: typeof page.number === 'number' ? page.number + 1 : params.page || 1,
           limit: pageSize,
           total,
-          totalPages: rawData?.totalPages || Math.ceil(total / pageSize) || 1,
+          totalPages: page.totalPages || Math.ceil(total / pageSize) || 1,
         },
       };
     } catch (err) {
@@ -114,13 +100,15 @@ export const problemService = {
     // Numeric detail requests use the verified full-detail contract first.
     if (isNumericId) {
       try {
-        const res: any = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(numericId), { signal });
-        const data = res?.data;
-        if (data && (data.id || data.title)) {
+        const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(numericId), { signal });
+        const data = res.data;
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
           return {
-            statusCode: res?.statusCode || 200,
-            message: res?.message || 'Problem details fetched',
+            statusCode: res.statusCode,
+            message: res.message,
             data: mapProblemDto(data),
+            errors: res.errors,
+            timestamp: res.timestamp,
           };
         }
       } catch (err) {
@@ -137,7 +125,7 @@ export const problemService = {
     try {
       const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 
-      const payload: Record<string, any> = {
+      const payload: QuestionListRequest = {
         level: [],
         companies: [],
         topic: [],
@@ -150,25 +138,18 @@ export const problemService = {
         },
       };
 
-      const resList: any = await fetchResilientQuestionPage(payload as any, signal);
-      const rawList = resList?.data || resList;
-      const items = Array.isArray(rawList?.content)
-        ? rawList.content
-        : Array.isArray(rawList)
-        ? rawList
-        : Array.isArray(rawList?.data)
-        ? rawList.data
-        : [];
+      const resList = await fetchResilientQuestionPage(payload, signal);
+      const items = resList.data.content;
 
       const targetStr = String(id).trim().toLowerCase();
-      let matched = items.find((item: any) => {
+      let matched = items.find((item: QuestionListItem) => {
         const itemId = String(item.id ?? '').trim().toLowerCase();
         const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
         return itemId === targetStr || itemTitle === targetStr;
       });
 
       if (!matched && pageNumber !== 0) {
-        const res0: any = await fetchResilientQuestionPage(
+        const res0 = await fetchResilientQuestionPage(
           {
             level: null,
             companies: null,
@@ -179,15 +160,9 @@ export const problemService = {
           signal
         );
 
-        const items0 = Array.isArray(res0?.data?.content)
-          ? res0.data.content
-          : Array.isArray(res0?.content)
-          ? res0.content
-          : Array.isArray(res0?.data)
-          ? res0.data
-          : [];
+        const items0 = res0.data.content;
 
-        matched = items0.find((item: any) => {
+        matched = items0.find((item: QuestionListItem) => {
           const itemId = String(item.id ?? '').trim().toLowerCase();
           const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
           return itemId === targetStr || itemTitle === targetStr;
@@ -205,7 +180,7 @@ export const problemService = {
           data: mapProblemDto(problemItem),
         };
       }
-    } catch (catalogErr: any) {
+    } catch (catalogErr: unknown) {
       if (isRequestCanceled(catalogErr)) {
         throw catalogErr;
       }

@@ -101,15 +101,19 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
   const options = useMemo(() => synthesizeMcqOptions(question), [question]);
   const correctOption = useMemo(() => options.find((o) => o.isCorrect === true), [options]);
 
-  const rawDiff = String(question.difficultyRefName || question.difficultyRefCode || '').toUpperCase();
-  const diffLabel: 'Basic' | 'Easy' | 'Medium' | 'Hard' =
-    rawDiff.includes('HARD')
-      ? 'Hard'
-      : rawDiff.includes('MEDIUM')
-      ? 'Medium'
-      : rawDiff.includes('BASIC') || rawDiff.includes('SCHOOL')
-      ? 'Basic'
-      : 'Easy';
+  const difficultyLabel = String(
+    question.difficultyRefName || question.difficultyRefCode || 'Unspecified'
+  ).trim();
+  const difficultyKey = String(question.difficultyRefCode || difficultyLabel).toUpperCase();
+  const difficultyDotClass = difficultyKey.includes('HARD')
+    ? 'bg-rose-500'
+    : difficultyKey.includes('MEDIUM')
+    ? 'bg-amber-500'
+    : difficultyKey.includes('EASY')
+    ? 'bg-emerald-500'
+    : difficultyKey.includes('BASIC') || difficultyKey.includes('SCHOOL')
+    ? 'bg-sky-500'
+    : 'bg-slate-500';
 
   const tags = [question.topicRefName, question.subjectRefName].filter(Boolean) as string[];
 
@@ -163,18 +167,8 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
 
         {/* Difficulty Badge */}
         <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              diffLabel === 'Basic'
-                ? 'bg-sky-500'
-                : diffLabel === 'Easy'
-                ? 'bg-emerald-500'
-                : diffLabel === 'Medium'
-                ? 'bg-amber-500'
-                : 'bg-rose-500'
-            }`}
-          />
-          <span>{diffLabel}</span>
+          <span className={`w-2 h-2 rounded-full ${difficultyDotClass}`} />
+          <span>{difficultyLabel}</span>
         </div>
       </div>
 
@@ -386,7 +380,12 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     error: topicsError,
     retry: retryTopics,
   } = useReferenceGroup(draftSubject);
-  const { items: difficultyReferences } = useReferenceGroup('DIFF');
+  const {
+    items: difficultyReferences,
+    loading: difficultiesLoading,
+    error: difficultiesError,
+    retry: retryDifficulties,
+  } = useReferenceGroup('DIFF');
 
   // Load companies once
   useEffect(() => {
@@ -573,18 +572,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     return filteredCompanies.slice(0, showMoreCompanies ? filteredCompanies.length : 8);
   }, [filteredCompanies, showMoreCompanies]);
 
-  // Default difficulties fallback
-  const DEFAULT_DIFFICULTIES = useMemo(
-    () => [
-      { id: 1, refCode: 'BASIC', refName: 'Basic' },
-      { id: 2, refCode: 'EASY', refName: 'Easy' },
-      { id: 3, refCode: 'MEDIUM', refName: 'Medium' },
-      { id: 4, refCode: 'HARD', refName: 'Hard' },
-    ],
-    []
-  );
-
-  // Sorted difficulties: Row 1 = Basic, Easy | Row 2 = Medium, Hard (matches Practice page)
+  // Preserve the API order for unknown/new codes while keeping familiar tiers grouped.
   const sortedDifficulties = useMemo(() => {
     const order: Record<string, number> = {
       basic: 1,
@@ -593,15 +581,14 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       medium: 3,
       hard: 4,
     };
-    const list = difficultyReferences.length > 0 ? difficultyReferences : DEFAULT_DIFFICULTIES;
-    return [...list].sort((a, b) => {
+    return [...difficultyReferences].sort((a, b) => {
       const aKey = (a.refCode || a.refName || '').toLowerCase().trim();
       const bKey = (b.refCode || b.refName || '').toLowerCase().trim();
       const aOrder = order[aKey] ?? 99;
       const bOrder = order[bKey] ?? 99;
       return aOrder - bOrder;
     });
-  }, [difficultyReferences, DEFAULT_DIFFICULTIES]);
+  }, [difficultyReferences]);
 
   // Resolve selected difficulty names against the live DIFF reference group.
   const selectedDifficultyIds = useMemo(() => {
@@ -629,6 +616,13 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       setLoading(subjectsLoading);
       if (!subjectsLoading) {
         setError(subjectsError || 'Subject reference data is unavailable.');
+      }
+      return;
+    }
+    if (appliedDifficulties.length > 0 && selectedDifficultyIds.length === 0) {
+      setLoading(difficultiesLoading);
+      if (!difficultiesLoading) {
+        setError(difficultiesError || 'Difficulty reference data is unavailable.');
       }
       return;
     }
@@ -712,7 +706,10 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     activeSubjectId,
     subjectsLoading,
     subjectsError,
+    appliedDifficulties.length,
     selectedDifficultyIds,
+    difficultiesLoading,
+    difficultiesError,
     appliedTopicIds,
     appliedCompanyIds,
     appliedSearch,
@@ -1027,7 +1024,18 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                   </button>
                 )}
               </div>
+              <RequestStatus
+                pending={difficultiesLoading}
+                error={difficultiesError}
+                onRetry={retryDifficulties}
+                label="Loading difficulty options…"
+              />
               <div className="grid grid-cols-2 gap-2">
+                {!difficultiesLoading && !difficultiesError && sortedDifficulties.length === 0 && (
+                  <div className="col-span-2 text-xs text-slate-400 py-2 text-center">
+                    No difficulty options available
+                  </div>
+                )}
                 {sortedDifficulties.map((diff) => {
                   const isSelected = draftDifficulties.some(
                     (d) =>

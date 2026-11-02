@@ -1,4 +1,10 @@
-import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
 import { isTokenValid } from '../security/jwt';
 import { publishAuthSessionEvent } from '../security/authSessionSync';
@@ -112,7 +118,17 @@ export const getGoogleOAuthUrl = (): string => {
 
 export const isRequestCanceled = (error: unknown): boolean => axios.isCancel(error);
 
-export const apiClient: AxiosInstance = axios.create({
+type UnwrappedApiClient = Omit<AxiosInstance, 'request' | 'get' | 'delete' | 'post' | 'put' | 'patch'> & {
+  <T = any>(config: AxiosRequestConfig): Promise<T>;
+  request<T = any>(config: AxiosRequestConfig): Promise<T>;
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+  post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+};
+
+export const apiClient = axios.create({
   baseURL: BASE_URL,
   timeout: 60000,
   withCredentials: true,
@@ -120,7 +136,7 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
     Accept: 'application/json',
   },
-});
+}) as UnwrappedApiClient;
 
 type AuthListener = (token: string, data: any) => void;
 type AuthFailureListener = () => void;
@@ -216,23 +232,64 @@ export const executeRefreshToken = async (): Promise<string> => {
  * Recursively removes duplicate/invalid 'token' and 'jwttoken' fields at any depth
  * within objects and arrays. Only 'jwtToken' is permitted as the valid field.
  */
-function purgeDuplicateTokenFields(obj: any): void {
-  if (!obj || typeof obj !== 'object' || obj instanceof FormData) return;
-  if (Array.isArray(obj)) {
-    for (const item of obj) {
-      purgeDuplicateTokenFields(item);
-    }
-    return;
-  }
-  for (const key of Object.keys(obj)) {
+const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
+  if (!value || typeof value !== 'object' || value instanceof FormData) return value;
+  if (Array.isArray(value)) return value.map(cloneWithoutDuplicateTokenFields);
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
     const lowerKey = key.toLowerCase();
-    if (lowerKey === 'token' || (lowerKey === 'jwttoken' && key !== 'jwtToken') || lowerKey === 'jwt_token') {
-      delete obj[key];
-    } else if (typeof obj[key] === 'object' && obj[key] !== null) {
-      purgeDuplicateTokenFields(obj[key]);
+    if (
+      lowerKey === 'token' ||
+      (lowerKey === 'jwttoken' && key !== 'jwtToken') ||
+      lowerKey === 'jwt_token'
+    ) {
+      continue;
+    }
+    sanitized[key] = cloneWithoutDuplicateTokenFields(child);
+  }
+  return sanitized;
+};
+
+/**
+ * Produces the canonical body for an authenticated mutating request without
+ * changing the caller-owned payload. DELETE receives an object body as well,
+ * so backends that inspect `jwtToken` do not depend on every service remembering
+ * an Axios-specific `{ data: {} }` workaround.
+ */
+export const prepareAuthenticatedRequestData = (
+  data: unknown,
+  method: string,
+  token: string | null,
+  isPublicAuthEndpoint = false
+): unknown => {
+  const normalizedMethod = method.toLowerCase();
+  if (!['post', 'put', 'patch', 'delete'].includes(normalizedMethod)) return data;
+
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data);
+      return JSON.stringify(
+        prepareAuthenticatedRequestData(parsed, normalizedMethod, token, isPublicAuthEndpoint)
+      );
+    } catch {
+      return data;
     }
   }
-}
+
+  if (data instanceof FormData) return data;
+  const sanitized = cloneWithoutDuplicateTokenFields(data ?? {});
+  if (
+    token &&
+    !isPublicAuthEndpoint &&
+    sanitized &&
+    typeof sanitized === 'object' &&
+    !Array.isArray(sanitized)
+  ) {
+    return { ...(sanitized as Record<string, unknown>), jwtToken: token };
+  }
+  return sanitized;
+};
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
@@ -278,34 +335,12 @@ apiClient.interceptors.request.use(
     // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
     // and strictly guarantee duplicate/invalid 'token' field is removed across each and every API call
     const method = (config.method || 'get').toLowerCase();
-    if (['post', 'put', 'patch', 'delete'].includes(method)) {
-      if (typeof config.data === 'string') {
-        try {
-          const parsed = JSON.parse(config.data);
-          if (parsed && typeof parsed === 'object') {
-            purgeDuplicateTokenFields(parsed);
-            if (token && !isPublicAuthEndpoint && !parsed.jwtToken && !Array.isArray(parsed)) {
-              parsed.jwtToken = token;
-            }
-            config.data = JSON.stringify(parsed);
-          }
-        } catch {}
-      } else {
-        if (!config.data && method !== 'delete') {
-          config.data = {};
-        }
-        if (
-          config.data &&
-          typeof config.data === 'object' &&
-          !(config.data instanceof FormData)
-        ) {
-          purgeDuplicateTokenFields(config.data);
-          if (token && !isPublicAuthEndpoint && !config.data.jwtToken && !Array.isArray(config.data)) {
-            config.data.jwtToken = token;
-          }
-        }
-      }
-    }
+    config.data = prepareAuthenticatedRequestData(
+      config.data,
+      method,
+      token,
+      isPublicAuthEndpoint
+    );
     return config;
   },
   (error) => Promise.reject(error)

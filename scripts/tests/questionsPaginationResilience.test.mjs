@@ -418,9 +418,9 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
               message: 'Questions Fetched Successfully',
               data: {
                 content: [
-                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'LeetCode' },
-                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy', questionPlatform: 'GeeksforGeeks' },
-                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'GeeksforGeeks' },
+                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium', qpfId: 24, questionPlatform: 'LeetCode' },
+                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
+                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
                 ],
               },
             };
@@ -506,9 +506,9 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
               message: 'Questions Fetched Successfully',
               data: {
                 content: [
-                  { id: 10, title: 'GFG Problem', questionPlatform: 'GeeksforGeeks' },
-                  { id: 20, title: 'LeetCode Problem', questionPlatform: 'LeetCode' },
-                  { id: 30, title: 'HackerRank Problem', questionPlatform: 'HackerRank' },
+                  { id: 10, title: 'GFG Problem', qpfRefCode: 'GFG', questionPlatform: 'GeeksforGeeks' },
+                  { id: 20, title: 'LeetCode Problem', qpfRefCode: 'LEETCODE', questionPlatform: 'LeetCode' },
+                  { id: 30, title: 'HackerRank Problem', qpfRefCode: 'HACKERRANK', questionPlatform: 'HackerRank' },
                 ],
               },
             };

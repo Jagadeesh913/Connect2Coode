@@ -23,7 +23,7 @@ Connect-2-code/
 │   ├── smoke-preview.mjs         # Production preview build route & asset verification
 │   ├── verify-architecture.mjs   # AST & string check for banned imports/patterns
 │   ├── verify-documentation.mjs  # Documentation integrity and link validator
-│   └── tests/                    # 15 Node test runner test suites (192 passing tests)
+│   └── tests/                    # 22 Node test runner files (334 passing tests)
 ├── src/
 │   ├── App.tsx                   # Top-level providers, theme, toast, error boundary
 │   ├── main.tsx                  # React 19 entry point and DOM mounting
@@ -80,6 +80,8 @@ Connect-2-code/
 All HTTP communication MUST go through `apiClient` in [`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts).
 - **Prohibited**: Direct imports of `axios` outside `src/core/api/apiClient.ts`.
 - **Prohibited**: Direct calls to `window.fetch()` in UI components or feature code.
+- **Transport ownership**: Services send business fields only. The client clones mutating request bodies, removes legacy token aliases, attaches the canonical `jwtToken`, and creates the authenticated DELETE body when needed.
+- **Response ownership**: The response interceptor returns the backend `ApiResponse<T>` envelope directly. Services consume its `data` field once and must not guess between Axios, nested-envelope, and raw payload shapes.
 - **Enforcement**: [`scripts/verify-architecture.mjs`](../../scripts/verify-architecture.mjs) scans all files in `src/` and fails CI if direct `axios` or `fetch()` calls exist.
 
 ### B. Path Aliasing

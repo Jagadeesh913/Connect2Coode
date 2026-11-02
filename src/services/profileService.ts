@@ -8,7 +8,7 @@ export type UserProfileData = UserProfile;
 
 export const profileService = {
   /** Fetches immutable identity fields supplied by the authenticated session. */
-  async getProfile(): Promise<ApiResponse<UserProfileData>> {
+  async getProfile(): Promise<ApiResponse<UserProfileData | null>> {
     const storedUser = tokenStorage.getUser();
     if (storedUser) {
       const profile: UserProfileData = {
@@ -31,7 +31,7 @@ export const profileService = {
     return {
       statusCode: 200,
       message: 'No profile found',
-      data: null as any,
+      data: null,
     };
   },
 
@@ -43,8 +43,11 @@ export const profileService = {
     userId: string | number,
     signal?: AbortSignal
   ): Promise<ApiResponse<UserInfoData | null>> {
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.USER_INFO(userId), { signal });
-    const rawData = res?.data ?? null;
+    const res: ApiResponse<UserInfoData | null> = await apiClient.get(
+      API_ENDPOINTS.USER.USER_INFO(userId),
+      { signal }
+    );
+    const rawData = res.data;
     const normalizedData: UserInfoData | null = rawData
       ? {
           ...rawData,
@@ -54,8 +57,8 @@ export const profileService = {
         }
       : null;
     return {
-      statusCode: res?.statusCode || 200,
-      message: res?.message || 'User profile fetched successfully',
+      statusCode: res.statusCode,
+      message: res.message,
       data: normalizedData,
       errors: res?.errors ?? null,
     };
@@ -69,9 +72,7 @@ export const profileService = {
     userId: string | number,
     payload: SaveUserInfoPayload
   ): Promise<ApiResponse<UserInfoData>> {
-    const token = tokenStorage.getAccessToken();
-    const effectiveToken = token || payload.jwtToken;
-    const payloadWithToken: Record<string, any> = {
+    const requestPayload = {
       id: payload.id !== undefined && payload.id !== null ? Number(payload.id) : null,
       userId: Number(userId),
       regNumber: payload.regNumber,
@@ -82,22 +83,24 @@ export const profileService = {
       bio: payload.bio ?? '',
       gender: payload.gender ?? null,
       dob: payload.dob ?? null,
-      jwtToken: effectiveToken,
     };
-    const res: any = await apiClient.post(API_ENDPOINTS.USER.USER_INFO(userId), payloadWithToken);
-    const rawData = res?.data ?? res;
-    const normalizedData: UserInfoData = rawData
-      ? {
-          ...rawData,
-          college: rawData.college || rawData.collegeName || payload.college || '',
-          collegeName: rawData.collegeName || rawData.college || payload.college || '',
-        }
-      : rawData;
+    const res: ApiResponse<UserInfoData> = await apiClient.post(
+      API_ENDPOINTS.USER.USER_INFO(userId),
+      requestPayload
+    );
+    if (!res.data || typeof res.data !== 'object') {
+      throw new Error('Unexpected saved user profile response format');
+    }
+    const normalizedData: UserInfoData = {
+      ...res.data,
+      college: res.data.college || res.data.collegeName || payload.college,
+      collegeName: res.data.collegeName || res.data.college || payload.college,
+    };
     return {
-      statusCode: res?.statusCode || 200,
-      message: res?.message || 'User profile saved successfully',
+      statusCode: res.statusCode,
+      message: res.message,
       data: normalizedData,
-      errors: res?.errors ?? null,
+      errors: res.errors ?? null,
     };
   },
 };

@@ -138,7 +138,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(capturedPayload.userId, 68);
       assert.equal(capturedPayload.regNumber, '22CS101');
       assert.equal(capturedPayload.college, 'ABC Engineering College');
-      assert.equal(capturedPayload.jwtToken, 'mock_session_jwt_token_123');
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
       assert.equal(res.statusCode, 200);
@@ -147,7 +147,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.college, 'ABC Engineering College');
     });
 
-    it('sends POST /userInfo/{userId} matching exact contract (userId: 89, regNumber, collegeId, gender, dob, jwtToken)', async () => {
+    it('sends POST /userInfo/{userId} business fields and leaves jwtToken to apiClient', async () => {
       let capturedUrl = '';
       let capturedPayload = null;
 
@@ -210,7 +210,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         isActive: true,
       });
       assert.equal(capturedPayload.dob, '2002-01-14');
-      assert.equal(capturedPayload.jwtToken, 'sample_access_jwt_token_xyz');
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
       assert.equal(res.statusCode, 200);
@@ -223,10 +223,10 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
     });
   });
 
-  describe('Comprehensive jwtToken verification across all API services', () => {
+  describe('Centralized jwtToken ownership across API services', () => {
     const TEST_TOKEN = 'verified_access_jwt_token_999';
 
-    it('companyService.getCompaniesPaginated sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('companyService.getCompaniesPaginated sends only business fields before interception', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -235,12 +235,12 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       tokenStorage.setAccessToken(TEST_TOKEN);
 
       await companyService.getCompaniesPaginated({ pageNumber: 0, pageSize: 10 });
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('companyService.getCompanyExamsList sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('companyService.getCompanyExamsList leaves authentication to apiClient', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -249,12 +249,12 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       tokenStorage.setAccessToken(TEST_TOKEN);
 
       await companyService.getCompanyExamsList(12);
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('adminCompanyService.getCompanies sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('adminCompanyService reads through the shared company service without injecting credentials', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -263,12 +263,12 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       tokenStorage.setAccessToken(TEST_TOKEN);
 
       await adminCompanyService.getCompanies();
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('adminCompanyService.saveOrUpdateCompany sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('adminCompanyService.saveOrUpdateCompany leaves authentication to apiClient', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -277,12 +277,12 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       tokenStorage.setAccessToken(TEST_TOKEN);
 
       await adminCompanyService.saveOrUpdateCompany({ id: 5, name: 'Microsoft' });
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('adminCompanyService.saveOrUpdateCompanyRole sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('adminCompanyService.saveOrUpdateCompanyRole leaves authentication to apiClient', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -298,12 +298,12 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         salary: '15 LPA',
         description: 'Software Engineer',
       });
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('adminCompanyService.saveOrUpdateExamSection sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('adminCompanyService.saveOrUpdateExamSection requires API reference IDs and leaves authentication to apiClient', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -315,13 +315,15 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         id: null,
         companyExamId: 10,
         sectionName: 'Coding Round',
+        sectionTypeId: 501,
       });
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.deepEqual(capturedPayload.sectionType, { id: 501 });
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });
 
-    it('adminCompanyService.saveOrUpdateCompanyExam sends jwtToken and no duplicate token/jwttoken', async () => {
+    it('adminCompanyService.saveOrUpdateCompanyExam leaves authentication to apiClient', async () => {
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
@@ -339,7 +341,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         totalQuestions: 3,
         totalMarks: 100,
       });
-      assert.equal(capturedPayload.jwtToken, TEST_TOKEN);
+      assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
     });

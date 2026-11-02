@@ -1,5 +1,6 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
+import type { ApiResponse } from '../core/types/api';
 import type {
   CodeExecutionPayload,
   ExecutionResult,
@@ -89,11 +90,15 @@ export const executionService = {
     }
 
     languageFetchPromise = (async () => {
-      const res: any = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
-      const data = res?.data || res;
+      const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
+      const data = res.data;
       if (Array.isArray(data) && data.length > 0) {
-        const list: LanguageDropdownItem[] = data.map((item: any) => {
+        const list: LanguageDropdownItem[] = data.map((value) => {
+          const item = value && typeof value === 'object'
+            ? value as Record<string, unknown>
+            : null;
           if (
+            !item ||
             !Number.isFinite(Number(item.id)) ||
             typeof item.languageName !== 'string' ||
             item.languageName.trim() === ''
@@ -112,7 +117,7 @@ export const executionService = {
                 ? Number(item.referenceId)
                 : undefined,
             judge0LanguageId: item.judge0LanguageId ? Number(item.judge0LanguageId) : undefined,
-            version: item.version,
+            version: typeof item.version === 'string' ? item.version : undefined,
             isActive: item.isActive !== false,
           };
         });
@@ -211,8 +216,8 @@ export const executionService = {
   async runCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_RUN, finalPayload, { signal });
-    return normalizeExecutionResult(res?.data || res);
+    const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_RUN, finalPayload, { signal });
+    return normalizeExecutionResult(res.data);
   },
 
   /**
@@ -222,8 +227,8 @@ export const executionService = {
   async submitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_SUBMIT, finalPayload, { signal });
-    return normalizeExecutionResult(res?.data || res);
+    const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.EXECUTION.USER_SUBMIT, finalPayload, { signal });
+    return normalizeExecutionResult(res.data);
   },
 
   /**
@@ -234,8 +239,8 @@ export const executionService = {
   async adminTestCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_RUN, finalPayload, { signal });
-    return normalizeExecutionResult(res?.data || res);
+    const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_RUN, finalPayload, { signal });
+    return normalizeExecutionResult(res.data);
   },
 
   /**
@@ -246,8 +251,8 @@ export const executionService = {
   async adminSubmitCode(payload: CodeExecutionPayload, signal?: AbortSignal): Promise<ExecutionResultData> {
     const finalPayload = await this.prepareExecutionPayload(payload);
     signal?.throwIfAborted();
-    const res: any = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload, { signal });
-    return normalizeExecutionResult(res?.data || res);
+    const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.EXECUTION.ADMIN_SUBMIT, finalPayload, { signal });
+    return normalizeExecutionResult(res.data);
   },
 
 };

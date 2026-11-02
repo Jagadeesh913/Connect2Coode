@@ -38,6 +38,7 @@ const { questionService } = await import('../../src/services/questionService.ts'
 const { problemService } = await import('../../src/services/problemService.ts');
 const { learningSheetService } = await import('../../src/services/learningSheetService.ts');
 const { adminLearningSheetService } = await import('../../src/services/admin/adminLearningSheetService.ts');
+const { getDsaQuestionProblemPath } = await import('../../src/features/dsaSheet/utils/questionRoute.ts');
 
 describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   describe('1. Endpoint URL Formatting & Route Definitions', () => {
@@ -93,6 +94,54 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   });
 
   describe('DSA learning sheet contracts', () => {
+    it('uses the nested question ID for problem navigation and never the association ID', () => {
+      assert.equal(
+        getDsaQuestionProblemPath({ id: 999, question: { id: 13 } }),
+        '/problems/13'
+      );
+    });
+
+    it('sends resource IDs only for DSA save operations in edit mode', async () => {
+      const originalPost = apiClient.post;
+      const calls = [];
+      apiClient.post = async (...args) => {
+        calls.push(args);
+        return { statusCode: 200, message: 'Saved', data: {} };
+      };
+      try {
+        await adminLearningSheetService.saveSheet({
+          id: 4,
+          sheetCode: 'JAVA-DSA-001',
+          sheetName: 'Java DSA',
+          description: 'Updated',
+          isActive: true,
+        });
+        await adminLearningSheetService.saveSection({
+          id: 8,
+          sheetId: 4,
+          parentSectionId: null,
+          sectionName: 'Arrays',
+          displayOrder: 2,
+          isActive: true,
+        });
+        await adminLearningSheetService.linkQuestion({
+          id: 12,
+          sectionId: 8,
+          question: { id: 13 },
+          displayOrder: 3,
+          isActive: false,
+        });
+
+        assert.deepEqual(calls, [
+          ['/admin/learningSheet', { id: 4, sheetCode: 'JAVA-DSA-001', sheetName: 'Java DSA', description: 'Updated', isActive: true }],
+          ['/admin/learningSheet/section', { id: 8, sheetId: 4, parentSectionId: null, sectionName: 'Arrays', displayOrder: 2, isActive: true }],
+          ['/admin/learningSheet/question', { id: 12, sectionId: 8, question: { id: 13 }, displayOrder: 3, isActive: false }],
+        ]);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
     it('orders top-level sections and excludes nested sections from the supplied list contract', async () => {
       const originalGet = apiClient.get;
       apiClient.get = async () => ({
@@ -121,7 +170,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
-    it('sends a mutable body on DSA delete calls so apiClient can attach jwtToken', async () => {
+    it('leaves DELETE body ownership to the central apiClient interceptor', async () => {
       const originalDelete = apiClient.delete;
       const calls = [];
       apiClient.delete = async (...args) => {
@@ -132,8 +181,8 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         await adminLearningSheetService.deleteSection(5);
         await adminLearningSheetService.unlinkQuestion(5, 9);
         assert.deepEqual(calls, [
-          ['/admin/learningSheet/section/5', { data: {} }],
-          ['/admin/learningSheet/section/5/question/9', { data: {} }],
+          ['/admin/learningSheet/section/5'],
+          ['/admin/learningSheet/section/5/question/9'],
         ]);
       } finally {
         apiClient.delete = originalDelete;
@@ -274,7 +323,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         assert.equal(getCalls, 1, 'consecutive reads should reuse the language cache');
         assert.equal(beforeMutation[0].name, 'Java');
 
-        await adminLanguageService.createLanguage({ referenceId: 6, judge0LanguageId: 71 });
+        await adminLanguageService.saveLanguage({ referenceId: 6, judge0LanguageId: 71 });
         const afterMutation = await executionService.getLanguageDropdown();
         assert.equal(getCalls, 2, 'successful admin mutation must invalidate the language cache');
         assert.equal(afterMutation[0].name, 'Python');

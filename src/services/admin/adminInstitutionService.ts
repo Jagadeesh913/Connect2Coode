@@ -10,7 +10,7 @@ import type {
 } from '../../core/types/domain';
 
 export type InstitutionItem = Institution;
-export type InstitutionPageResponse = ApiPage<Institution> | Institution[];
+export type InstitutionPageResponse = ApiPage<Institution>;
 
 /**
  * Dedicated Admin Institution Service Layer
@@ -21,32 +21,28 @@ export const adminInstitutionService = {
   /**
    * GET /api/v1/admin/institutions
    * Fetches institutions with pagination and optional filters.
-   * Supports query (name/AISHE), type/institutionType, state, district, activeOnly/isActive.
+   * Supports the canonical query, type, state, district, and activeOnly parameters.
    */
   async getInstitutions(
     params?: InstitutionFilterParams,
     signal?: AbortSignal
   ): Promise<ApiResponse<InstitutionPageResponse>> {
-    const queryParams: Record<string, any> = {};
+    const queryParams: Record<string, string | number | boolean> = {};
 
     if (params) {
       if (params.page !== undefined) queryParams.page = params.page;
       if (params.size !== undefined) queryParams.size = params.size;
       if (params.query?.trim()) queryParams.query = params.query.trim();
 
-      const instType = params.type || params.institutionType;
-      if (instType) {
-        queryParams.type = instType;
-        queryParams.institutionType = instType;
+      if (params.type) {
+        queryParams.type = params.type;
       }
 
       if (params.state?.trim()) queryParams.state = params.state.trim();
       if (params.district?.trim()) queryParams.district = params.district.trim();
 
-      const activeVal = params.activeOnly !== undefined ? params.activeOnly : params.isActive;
-      if (activeVal !== undefined) {
-        queryParams.activeOnly = activeVal;
-        queryParams.isActive = activeVal;
+      if (params.activeOnly !== undefined) {
+        queryParams.activeOnly = params.activeOnly;
       }
     }
 
@@ -61,9 +57,6 @@ export const adminInstitutionService = {
     signal?: AbortSignal
   ): Promise<ApiResponse<Institution[]>> {
     const first = await this.getInstitutions({ ...params, page: 0, size: 100 }, signal);
-    if (Array.isArray(first.data)) {
-      return { ...first, data: first.data };
-    }
     if (!first.data || !Array.isArray(first.data.content)) {
       throw new Error('Unexpected institutions response format');
     }
@@ -73,9 +66,7 @@ export const adminInstitutionService = {
     for (let page = 1; page < totalPages; page += 1) {
       signal?.throwIfAborted();
       const response = await this.getInstitutions({ ...params, page, size: 100 }, signal);
-      if (Array.isArray(response.data)) {
-        pages.push(response.data);
-      } else if (response.data && Array.isArray(response.data.content)) {
+      if (response.data && Array.isArray(response.data.content)) {
         pages.push(response.data.content);
       } else {
         throw new Error('Unexpected institutions response format');

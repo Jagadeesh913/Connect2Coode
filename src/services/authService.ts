@@ -87,7 +87,7 @@ export const authService = {
   // Login: POST /api/v1/auth/login
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
   async login(payload: LoginPayload): Promise<ApiResponse<AuthResponseData>> {
-    const response: any = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, { timeout: 120000 });
+    const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, { timeout: 120000 });
     if (response?.data) {
       persistAuthSession(response.data);
       publishAuthSessionEvent('session-updated');
@@ -122,7 +122,7 @@ export const authService = {
     const token = explicitRefreshToken || tokenStorage.getRefreshToken();
     const payload = token ? { refreshToken: token } : {};
 
-    const response: any = await apiClient.post(
+    const response: ApiResponse<AuthResponseData> = await apiClient.post(
       API_ENDPOINTS.AUTH.REFRESH,
       payload,
       { withCredentials: true, timeout: 60000 }
@@ -130,7 +130,7 @@ export const authService = {
     if (response?.data) {
       persistAuthSession({
         ...response.data,
-        refreshToken: response.data.refreshToken || token,
+        refreshToken: response.data.refreshToken || token || undefined,
       });
       publishAuthSessionEvent('session-updated');
     }

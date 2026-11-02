@@ -86,11 +86,9 @@ describe('BATCH-10: Institution Management API & Service Contracts', () => {
         size: 20,
         query: 'Vignan',
         type: 'UNIVERSITY',
-        institutionType: 'UNIVERSITY',
         state: 'Andhra Pradesh',
         district: 'Guntur',
         activeOnly: true,
-        isActive: true,
       });
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.content[0].aisheCode, 'U-0043');

@@ -11,7 +11,7 @@ import { adminMcqService } from '../../../services/admin/adminMcqService';
 import { companyService } from '../../../services/companyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
-import type { McqQuestion, Company, AdminCreateMcqPayload } from '../../../core/types/domain';
+import type { McqQuestion, Company, AdminSaveMcqPayload } from '../../../core/types/domain';
 import { cleanQuestionText, synthesizeMcqOptions } from '../../aptitude/utils/mcqUtils';
 import {
   Plus,
@@ -379,7 +379,7 @@ export const AdminMcqs: React.FC = () => {
         ? companies.find((c) => String(c.id) === String(formCompanyId))
         : null;
 
-      const payload: AdminCreateMcqPayload = {
+      const payload: AdminSaveMcqPayload = {
         ...(editingMcq ? { id: Number(editingMcq.id) } : {}),
         subjectGroupCode: 'SUBJECT',
         subjectRefCode: formSubjectRefCode,
@@ -399,7 +399,10 @@ export const AdminMcqs: React.FC = () => {
       };
 
       if (editingMcq) {
-        const res = await adminMcqService.updateMcq(editingMcq.id, payload);
+        const res = await adminMcqService.saveMcq({
+          ...payload,
+          id: Number(editingMcq.id),
+        });
         const updatedRaw = res.data;
 
         // Immediate optimistic update with the selected correct option
@@ -420,7 +423,7 @@ export const AdminMcqs: React.FC = () => {
         );
         toast.success('MCQ question updated successfully');
       } else {
-        await adminMcqService.createMcq(payload);
+        await adminMcqService.saveMcq(payload);
         toast.success('MCQ question created successfully');
       }
 

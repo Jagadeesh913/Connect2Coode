@@ -2,8 +2,12 @@ import { apiClient } from '../../core/api/apiClient';
 import { API_ENDPOINTS } from '../../core/api/endpoints';
 import type { ApiResponse } from '../../core/types/api';
 import type { Company, Problem } from '../../core/types/domain';
-import { tokenStorage } from '../../core/security/tokenStorage';
 import { companyService } from '../companyService';
+import type {
+  CompanyExamItem,
+  CompanyExamSectionItem,
+  CompanyRoleItem,
+} from '../../features/companies/types/companyExam';
 
 export type CompanyItem = Company;
 
@@ -41,7 +45,6 @@ export const adminCompanyService = {
    * inventing client-only URL aliases.
    */
   async saveOrUpdateCompany(payload: CompanyItem): Promise<ApiResponse<Company>> {
-    const token = tokenStorage.getAccessToken();
     const formattedPayload = {
       id: payload.id ? Number(payload.id) : null,
       name: payload.name.trim(),
@@ -49,7 +52,6 @@ export const adminCompanyService = {
       logo: payload.logo || '',
       description: payload.description || '',
       isActive: payload.isActive ?? true,
-      jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_BASE, formattedPayload);
   },
@@ -65,7 +67,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/companyRole
    * Saves or updates a company exam role
-   * Request Payload: { "id": null, "companyExamId": 1, "roleName": "Ninja", "roleCode": "NINJA", "salary": "...", "description": "...", "jwtToken": "..." }
+   * Authentication fields are attached centrally by apiClient.
    */
   async saveOrUpdateCompanyRole(payload: {
     id: number | null;
@@ -74,8 +76,7 @@ export const adminCompanyService = {
     roleCode: string;
     salary: string;
     description: string;
-  }): Promise<ApiResponse<any>> {
-    const token = tokenStorage.getAccessToken();
+  }): Promise<ApiResponse<CompanyRoleItem>> {
     const formattedPayload = {
       id: payload.id ? Number(payload.id) : null,
       companyExamId: Number(payload.companyExamId),
@@ -83,7 +84,6 @@ export const adminCompanyService = {
       roleCode: payload.roleCode.trim(),
       salary: payload.salary.trim(),
       description: payload.description?.trim() || '',
-      jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_ROLE, formattedPayload);
   },
@@ -91,7 +91,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/examSection
    * Saves or updates an exam section / round
-   * Request Payload: { "id": 10, "companyExamId": 1, "parentSectionId": 9, "sectionName": "SQL", "sectionType": { "id": 100 }, "questionType": { "id": 89 }, "questionCount": 10, "durationMinutes": 15, "totalMarks": 10, "sequenceNumber": 1, "jwtToken": "..." }
+   * Section and question type IDs must come from the reference library.
    */
   async saveOrUpdateExamSection(payload: {
     id: number | null;
@@ -106,17 +106,23 @@ export const adminCompanyService = {
     durationMinutes?: number | null;
     totalMarks?: number | null;
     sequenceNumber?: number;
-  }): Promise<ApiResponse<any>> {
-    const token = tokenStorage.getAccessToken();
+  }): Promise<ApiResponse<CompanyExamSectionItem>> {
     const sectionTypeId =
       typeof payload.sectionType === 'object' && payload.sectionType
         ? payload.sectionType.id
-        : Number(payload.sectionTypeId || payload.sectionType || 100);
+        : Number(payload.sectionTypeId || payload.sectionType);
 
     const questionTypeId =
       typeof payload.questionType === 'object' && payload.questionType
         ? payload.questionType.id
         : (payload.questionTypeId || payload.questionType ? Number(payload.questionTypeId || payload.questionType) : null);
+
+    if (!Number.isInteger(sectionTypeId) || sectionTypeId <= 0) {
+      throw new Error('Section classification must be selected from the reference library.');
+    }
+    if (questionTypeId !== null && (!Number.isInteger(questionTypeId) || questionTypeId <= 0)) {
+      throw new Error('Question type must be selected from the reference library.');
+    }
 
     const formattedPayload = {
       id: payload.id ? Number(payload.id) : null,
@@ -129,7 +135,6 @@ export const adminCompanyService = {
       durationMinutes: payload.durationMinutes !== undefined && payload.durationMinutes !== null ? Number(payload.durationMinutes) : null,
       totalMarks: payload.totalMarks !== undefined && payload.totalMarks !== null ? Number(payload.totalMarks) : null,
       sequenceNumber: payload.sequenceNumber ? Number(payload.sequenceNumber) : 1,
-      jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_EXAM_SECTION, formattedPayload);
   },
@@ -137,7 +142,7 @@ export const adminCompanyService = {
   /**
    * POST /api/v1/admin/companyExam
    * Saves or updates a company exam
-   * Request Payload: { "id": 1, "companyId": 1, "examName": "TCS NQT", "year": 2026, "description": "...", "totalDurationMinutes": 120, "totalQuestions": 65, "totalMarks": 100, "sourceUrl": "...", "jwtToken": "..." }
+   * Authentication fields are attached centrally by apiClient.
    */
   async saveOrUpdateCompanyExam(payload: {
     id: number | null;
@@ -150,8 +155,7 @@ export const adminCompanyService = {
     totalMarks: number;
     sourceUrl?: string;
     isActive?: boolean;
-  }): Promise<ApiResponse<any>> {
-    const token = tokenStorage.getAccessToken();
+  }): Promise<ApiResponse<CompanyExamItem>> {
     const formattedPayload = {
       id: payload.id ? Number(payload.id) : null,
       companyId: Number(payload.companyId),
@@ -163,7 +167,6 @@ export const adminCompanyService = {
       totalMarks: Number(payload.totalMarks) || 0,
       sourceUrl: payload.sourceUrl?.trim() || '',
       isActive: payload.isActive ?? true,
-      jwtToken: token,
     };
     return apiClient.post(API_ENDPOINTS.COMPANY.ADMIN_EXAM, formattedPayload);
   },

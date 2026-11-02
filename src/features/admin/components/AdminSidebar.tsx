@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   X,
   ShieldCheck,
+  LibraryBig,
   LucideIcon,
 } from 'lucide-react';
 
@@ -70,6 +71,12 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: 'Institutions',
     icon: GraduationCap,
     description: 'Colleges & Universities',
+  },
+  {
+    to: '/admin/references',
+    label: 'Reference Library',
+    icon: LibraryBig,
+    description: 'Taxonomy groups & codes',
   },
 ];
 

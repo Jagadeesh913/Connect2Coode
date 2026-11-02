@@ -8,6 +8,26 @@ export interface ReferenceItem {
   isActive: boolean;
 }
 
+export interface CreateReferenceItemRequest {
+  refGroupCode: string;
+  refGroupName: string;
+  refCode: string;
+  refName: string;
+  isActive: boolean;
+}
+
+export interface UpdateReferenceItemRequest {
+  id: number;
+  refGroupCode: string;
+  refCode: string;
+  refName: string;
+  isActive: boolean;
+}
+
+export type SaveReferenceItemRequest =
+  | CreateReferenceItemRequest
+  | UpdateReferenceItemRequest;
+
 export interface Company {
   id?: string | number | null;
   name: string;
@@ -142,6 +162,12 @@ export interface QuestionListItem {
   difficultyName?: string;
   topicId?: number;
   topicName?: string;
+  qpfId?: number;
+  qpfRefCode?: string;
+  qpfRefName?: string;
+  questionPlatform?: string;
+  platformName?: string;
+  companies?: Array<string | { id?: number; name?: string }>;
   isOwnProblem?: boolean;
   isActive?: boolean;
 }
@@ -157,6 +183,7 @@ export interface QuestionListRequest {
   level: number[] | null;
   companies: number[] | null;
   topic: number[] | null;
+  platform?: Array<number | string> | null;
   searchText: string | null;
   pageRequest: PageRequest;
 }
@@ -209,7 +236,6 @@ export interface SaveUserInfoPayload {
   bio: string;
   gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
   dob?: string | null;
-  jwtToken?: string;
 }
 
 export interface UserProfile {
@@ -307,11 +333,9 @@ export interface InstitutionFilterParams {
   page?: number;
   size?: number;
   query?: string;
-  institutionType?: InstitutionType;
   type?: InstitutionType;
   state?: string;
   district?: string;
-  isActive?: boolean;
   activeOnly?: boolean;
 }
 
@@ -383,7 +407,7 @@ export interface McqQueryPayload {
   };
 }
 
-export interface AdminCreateMcqPayload {
+export interface AdminSaveMcqPayload {
   id?: number;
   subjectGroupCode: string;
   subjectRefCode: string;

@@ -42,11 +42,7 @@ const extractArrayResponse = <T>(response: unknown, label: string): T[] => {
     : null;
   const data = envelope?.data;
 
-  if (Array.isArray(response)) return response as T[];
   if (Array.isArray(data)) return data as T[];
-  if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).data)) {
-    return (data as Record<string, unknown>).data as T[];
-  }
 
   throw new Error(`Unexpected ${label} response format`);
 };
@@ -102,7 +98,7 @@ export const userQuestionService = {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId), { signal });
+    const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId), { signal });
     return extractArrayResponse<UserBookmarkQuestionResponse>(res, 'bookmarks');
   },
 
@@ -117,7 +113,7 @@ export const userQuestionService = {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
+    const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
     return extractArrayResponse<UserSubmittedQuestionItem>(res, 'solved questions');
   },
 
@@ -142,7 +138,7 @@ export const userQuestionService = {
     if (!userId) {
       return [];
     }
-    const res: any = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
+    const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
     return extractArrayResponse<UserAttemptedQuestionItem>(res, 'attempted questions');
   },
 
@@ -158,7 +154,7 @@ export const userQuestionService = {
     if (!userId || !questionId) {
       return [];
     }
-    const res: any = await apiClient.get(
+    const res: ApiResponse<unknown> = await apiClient.get(
       API_ENDPOINTS.USER.QUESTION_SUBMISSIONS(userId, questionId),
       { signal }
     );

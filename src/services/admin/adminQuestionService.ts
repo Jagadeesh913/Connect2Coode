@@ -69,31 +69,41 @@ export async function fetchResilientQuestionPage(
     (payload.companies && payload.companies.length > 0) ||
     (payload.topic && payload.topic.length > 0) ||
     (payload.searchText && payload.searchText.trim().length > 0) ||
-    ((payload as any).platform && (payload as any).platform.length > 0) ||
-    ((payload as any).platforms && (payload as any).platforms.length > 0)
+    (payload.platform && payload.platform.length > 0)
   );
 
   try {
-    const res: any = await apiClient.post(API_ENDPOINTS.PROBLEMS.LIST, payload, { signal });
-    const rawData = res?.data || res;
-    if (rawData && typeof rawData.totalElements === 'number' && !hasFilter) {
-      updateLiveTotalQuestionsCount(rawData.totalElements);
+    const res: ApiResponse<PaginatedQuestionResponse> = await apiClient.post(
+      API_ENDPOINTS.PROBLEMS.LIST,
+      payload,
+      { signal }
+    );
+    if (!res.data || !Array.isArray(res.data.content)) {
+      throw new Error('Unexpected questions response format');
+    }
+    if (typeof res.data.totalElements === 'number' && !hasFilter) {
+      updateLiveTotalQuestionsCount(res.data.totalElements);
     }
     return res;
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (signal?.aborted) throw err;
 
-    const errMsg = String(err?.message || err?.data?.message || '');
-    const isFetchUnsuccessful = err?.statusCode === 500 || errMsg.toLowerCase().includes('fetch unsuccessful');
+    const error = err && typeof err === 'object' ? err as {
+      statusCode?: number;
+      message?: string;
+      data?: { message?: string };
+    } : null;
+    const errMsg = String(error?.message || error?.data?.message || '');
+    const isFetchUnsuccessful = error?.statusCode === 500 || errMsg.toLowerCase().includes('fetch unsuccessful');
 
     if (isFetchUnsuccessful) {
       // 1. Filtered Query 500 Recovery: when backend hits corrupted database rows on filtered queries (e.g. level: [3]),
       // fetch the verified base catalog and apply requested filters in memory.
       if (hasFilter) {
         try {
-          let baseQuestions: any[] = [];
+          let baseQuestions: QuestionListItem[] = [];
           try {
-            const [res20, res4]: [any, any] = await Promise.all([
+            const [res20, res4]: [ApiResponse<PaginatedQuestionResponse>, ApiResponse<PaginatedQuestionResponse>] = await Promise.all([
               apiClient.post(
                 API_ENDPOINTS.PROBLEMS.LIST,
                 { pageRequest: { pageNumber: 0, pageSize: 20, sortBy: 'id', sortDirection: 'ASC' } },
@@ -105,8 +115,8 @@ export async function fetchResilientQuestionPage(
                 { signal }
               ),
             ]);
-            const d20 = res20?.data?.content || res20?.content || [];
-            const d4 = res4?.data?.content || res4?.content || [];
+            const d20 = res20.data.content;
+            const d4 = res4.data.content;
             baseQuestions = [...(Array.isArray(d20) ? d20 : []), ...(Array.isArray(d4) ? d4 : [])];
           } catch {
             // Fallback for mocked unit tests expecting pageSize 24
@@ -114,12 +124,12 @@ export async function fetchResilientQuestionPage(
 
           if (baseQuestions.length === 0) {
             try {
-              const singleRes: any = await apiClient.post(
+              const singleRes: ApiResponse<PaginatedQuestionResponse> = await apiClient.post(
                 API_ENDPOINTS.PROBLEMS.LIST,
                 { pageRequest: { pageNumber: 0, pageSize: VERIFIED_READABLE_QUESTION_COUNT, sortBy: 'id', sortDirection: 'ASC' } },
                 { signal }
               );
-              const dSingle = singleRes?.data?.content || singleRes?.content || [];
+              const dSingle = singleRes.data.content;
               if (Array.isArray(dSingle)) {
                 baseQuestions = dSingle;
               }
@@ -129,18 +139,17 @@ export async function fetchResilientQuestionPage(
           }
 
           if (baseQuestions.length > 0) {
-            const matched = baseQuestions.filter((q: any) => {
+            const matched = baseQuestions.filter((q) => {
               // Level / Difficulty filter
               if (Array.isArray(payload.level) && payload.level.length > 0) {
                 const diffId = q.difficultyId !== undefined ? Number(q.difficultyId) : undefined;
-                const diffName = (q.difficultyName || q.difficulty || q.difficultyRefName || '').toLowerCase().trim();
-                const diffCode = (q.difficultyRefCode || '').toLowerCase().trim();
+                const diffName = (q.difficultyName || '').toLowerCase().trim();
                 const matchesLevel = payload.level.some((target) => {
                   if (typeof target === 'number' || !isNaN(Number(target))) {
                     if (diffId !== undefined && diffId === Number(target)) return true;
                   }
                   const tStr = String(target).toLowerCase().trim();
-                  return diffName === tStr || diffCode === tStr;
+                  return diffName === tStr;
                 });
                 if (!matchesLevel) return false;
               }
@@ -148,14 +157,13 @@ export async function fetchResilientQuestionPage(
               // Topic filter
               if (Array.isArray(payload.topic) && payload.topic.length > 0) {
                 const topicId = q.topicId !== undefined ? Number(q.topicId) : undefined;
-                const topicName = (q.topicName || q.topic || q.topicRefName || '').toLowerCase().trim();
-                const topicCode = (q.topicRefCode || '').toLowerCase().trim();
+                const topicName = (q.topicName || '').toLowerCase().trim();
                 const matchesTopic = payload.topic.some((target) => {
                   if (typeof target === 'number' || !isNaN(Number(target))) {
                     if (topicId !== undefined && topicId === Number(target)) return true;
                   }
                   const tStr = String(target).toLowerCase().trim();
-                  return topicName === tStr || topicCode === tStr;
+                  return topicName === tStr;
                 });
                 if (!matchesTopic) return false;
               }
@@ -165,9 +173,9 @@ export async function fetchResilientQuestionPage(
                 const companiesList = Array.isArray(q.companies) ? q.companies : [];
                 const matchesCompany = payload.companies.some((target) => {
                   const targetStr = String(target).toLowerCase().trim();
-                  return companiesList.some((comp: any) => {
-                    const cName = typeof comp === 'string' ? comp.toLowerCase().trim() : (comp?.name || '').toLowerCase().trim();
-                    const cId = comp?.id !== undefined ? String(comp.id) : '';
+                  return companiesList.some((comp) => {
+                    const cName = typeof comp === 'string' ? comp.toLowerCase().trim() : (comp.name || '').toLowerCase().trim();
+                    const cId = typeof comp === 'string' || comp.id === undefined ? '' : String(comp.id);
                     return cName === targetStr || cId === targetStr;
                   });
                 });
@@ -175,37 +183,20 @@ export async function fetchResilientQuestionPage(
               }
 
               // Platform filter
-              const platformArr = (payload as any).platform || (payload as any).platforms;
+              const platformArr = payload.platform;
               if (Array.isArray(platformArr) && platformArr.length > 0) {
+                const pId = q.qpfId;
                 const pCode = (q.qpfRefCode || '').toUpperCase().trim();
                 const pName = (
                   q.questionPlatform ||
                   q.qpfRefName ||
-                  q.examPlatform ||
                   q.platformName ||
                   ''
                 ).toLowerCase().trim();
 
-                const matchesPlatform = platformArr.some((plat: any) => {
+                const matchesPlatform = platformArr.some((plat) => {
                   const platStr = String(plat).toLowerCase().trim();
-                  if (platStr === '25' || platStr === 'gfg' || platStr.includes('geeks')) {
-                    return pCode === 'GFG' || pName.includes('geeks');
-                  }
-                  if (platStr === '24' || platStr === 'leetcode' || platStr.includes('leet')) {
-                    return pCode === 'LEETCODE' || pName.includes('leetcode');
-                  }
-                  if (platStr === '23' || platStr === 'hackerrank' || platStr.includes('hacker')) {
-                    return pCode === 'HACKERRANK' || pName.includes('hackerrank');
-                  }
-                  if (platStr === '22' || platStr === 'mettl' || platStr.includes('mettl')) {
-                    return pCode === 'METTL' || pName.includes('mettl');
-                  }
-                  if (platStr === '21' || platStr === 'tcsion' || platStr.includes('tcs')) {
-                    return pCode === 'TCSION' || pName.includes('tcs');
-                  }
-                  if (platStr === '20' || platStr === 'aon' || platStr.includes('aon')) {
-                    return pCode === 'AON' || pName.includes('aon');
-                  }
+                  if (!Number.isNaN(Number(platStr))) return Number(pId) === Number(platStr);
                   return pName.includes(platStr) || pCode.toLowerCase() === platStr;
                 });
                 if (!matchesPlatform) return false;
@@ -215,8 +206,8 @@ export async function fetchResilientQuestionPage(
               if (payload.searchText && payload.searchText.trim().length > 0) {
                 const query = payload.searchText.trim().toLowerCase();
                 const title = (q.title || '').toLowerCase();
-                const topic = (q.topicName || q.topic || q.topicRefName || '').toLowerCase();
-                const diff = (q.difficultyName || q.difficulty || q.difficultyRefName || '').toLowerCase();
+                const topic = (q.topicName || '').toLowerCase();
+                const diff = (q.difficultyName || '').toLowerCase();
                 const desc = (q.description || '').toLowerCase();
                 const matchesSearch = title.includes(query) || topic.includes(query) || diff.includes(query) || desc.includes(query);
                 if (!matchesSearch) return false;
@@ -252,7 +243,7 @@ export async function fetchResilientQuestionPage(
       // 2. Recover large page sizes at offset 0 (e.g. pageSize 50) by stitching verified sub-slices
       if (offset === 0 && pageSize > 20 && !hasFilter) {
         try {
-          const [res20, res4]: [any, any] = await Promise.all([
+          const [res20, res4]: [ApiResponse<PaginatedQuestionResponse>, ApiResponse<PaginatedQuestionResponse>] = await Promise.all([
             apiClient.post(
               API_ENDPOINTS.PROBLEMS.LIST,
               { ...payload, pageRequest: { pageNumber: 0, pageSize: 20, sortBy: 'id', sortDirection: 'ASC' } },
@@ -264,19 +255,19 @@ export async function fetchResilientQuestionPage(
               { signal }
             ),
           ]);
-          const d20 = res20?.data?.content || res20?.content || [];
-          const d4 = res4?.data?.content || res4?.content || [];
+          const d20 = res20.data.content;
+          const d4 = res4.data.content;
           const combined = [...d20, ...d4];
 
           // Probe for items at offset 48+ if database has more questions
           if (liveTotalQuestionsCount > 24) {
             try {
-              const resTail: any = await apiClient.post(
+              const resTail: ApiResponse<PaginatedQuestionResponse> = await apiClient.post(
                 API_ENDPOINTS.PROBLEMS.LIST,
                 { ...payload, pageRequest: { pageNumber: 24, pageSize: 2, sortBy: 'id', sortDirection: 'ASC' } },
                 { signal }
               );
-              const dTail = resTail?.data?.content || resTail?.content || [];
+              const dTail = resTail.data.content;
               if (Array.isArray(dTail) && dTail.length > 0) {
                 combined.push(...dTail);
               }
@@ -311,7 +302,7 @@ export async function fetchResilientQuestionPage(
       // 3. Offset 20 recovery (items 20..23: IDs 22, 26, 28, 30)
       if (offset === 20 && !hasFilter) {
         try {
-          const fallbackRes: any = await apiClient.post(
+          const fallbackRes: ApiResponse<PaginatedQuestionResponse> = await apiClient.post(
             API_ENDPOINTS.PROBLEMS.LIST,
             {
               ...payload,
@@ -324,7 +315,7 @@ export async function fetchResilientQuestionPage(
             },
             { signal }
           );
-          const fbData = fallbackRes?.data || fallbackRes;
+          const fbData = fallbackRes.data;
           if (fbData && Array.isArray(fbData.content)) {
             const rawTotal = typeof fbData.totalElements === 'number' && fbData.totalElements > 0
               ? fbData.totalElements
@@ -399,10 +390,10 @@ export async function fetchResilientQuestionPage(
             })
           );
 
-          const recoveredContent: any[] = [];
+          const recoveredContent: QuestionListItem[] = [];
           for (const result of probeResults) {
             if (result.status === 'fulfilled') {
-              const d = result.value?.data || result.value;
+              const d = (result.value as ApiResponse<PaginatedQuestionResponse>).data;
               if (d && Array.isArray(d.content) && d.content.length > 0) {
                 recoveredContent.push(...d.content);
                 if (typeof d.totalElements === 'number' && d.totalElements > liveTotalQuestionsCount) {
@@ -485,20 +476,23 @@ export const adminQuestionService = {
    */
   async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
     try {
-      const directRes = await apiClient.get<QuestionTestCase[] | { data?: QuestionTestCase[] }>(
+      const directRes: ApiResponse<unknown> = await apiClient.get(
         API_ENDPOINTS.QUESTION.TEST_CASES(id),
         { signal }
       );
-      const raw = directRes?.data ?? directRes;
+      const raw = directRes.data;
+      const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? raw as Record<string, unknown>
+        : null;
       const list = Array.isArray(raw)
         ? raw
-        : Array.isArray((raw as any)?.testCases)
-        ? (raw as any).testCases
-        : Array.isArray((raw as any)?.content)
-        ? (raw as any).content
+        : Array.isArray(record?.testCases)
+        ? record.testCases
+        : Array.isArray(record?.content)
+        ? record.content
         : null;
       if (Array.isArray(list) && list.length > 0) {
-        return list.map((tc, idx) => ({
+        return (list as QuestionTestCase[]).map((tc, idx) => ({
           ...tc,
           displayOrder: tc.displayOrder || idx + 1,
           typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',

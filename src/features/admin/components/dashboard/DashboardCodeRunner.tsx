@@ -527,12 +527,7 @@ export const DashboardCodeRunner: React.FC = () => {
         searchText: searchFilter.trim(),
         pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
-      const raw: any = res?.data || res;
-      const list = Array.isArray(raw?.content)
-        ? raw.content
-        : Array.isArray(raw)
-        ? raw
-        : [];
+      const list = res.data.content;
 
       if (list.length > 0) {
         setQuestions((prev) => {
@@ -609,7 +604,7 @@ export const DashboardCodeRunner: React.FC = () => {
         let qData: any = null;
         try {
           const res = await adminQuestionService.getQuestionById(num);
-          qData = res?.data || res;
+          qData = res.data;
         } catch {
           const res2 = await problemService.getProblemById(num);
           qData = res2?.data;
@@ -716,13 +711,12 @@ export const DashboardCodeRunner: React.FC = () => {
       );
       if (controller.signal.aborted) return;
 
-      const data = (res as any)?.data || res;
-      setResult(data);
-      setExecutionMessage((res as any)?.message || 'Executed Sample Test Cases Successfully');
-      if (isExecutionResultSuccessful(data)) {
-        toast.success(`Passed all ${data.totalTestCases} sample test cases!`);
+      setResult(res);
+      setExecutionMessage('Executed Sample Test Cases Successfully');
+      if (isExecutionResultSuccessful(res)) {
+        toast.success(`Passed all ${res.totalTestCases} sample test cases!`);
       } else {
-        toast.error(`${data.failedTestCases} of ${data.totalTestCases} sample test cases failed.`);
+        toast.error(`${res.failedTestCases} of ${res.totalTestCases} sample test cases failed.`);
       }
     } catch (err: any) {
       if (controller.signal.aborted) return;
@@ -767,13 +761,12 @@ export const DashboardCodeRunner: React.FC = () => {
       );
       if (controller.signal.aborted) return;
 
-      const data = (res as any)?.data || res;
-      setResult(data);
-      setExecutionMessage((res as any)?.message || 'Validated against All Test Cases');
-      if (isExecutionResultSuccessful(data)) {
-        toast.success(`Accepted! Passed all ${data.totalTestCases} validation test cases.`);
+      setResult(res);
+      setExecutionMessage('Validated against All Test Cases');
+      if (isExecutionResultSuccessful(res)) {
+        toast.success(`Accepted! Passed all ${res.totalTestCases} validation test cases.`);
       } else {
-        toast.error(`${data.failedTestCases} of ${data.totalTestCases} validation test cases failed.`);
+        toast.error(`${res.failedTestCases} of ${res.totalTestCases} validation test cases failed.`);
       }
     } catch (err: any) {
       if (controller.signal.aborted) return;

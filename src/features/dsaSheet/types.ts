@@ -37,14 +37,16 @@ export interface DsaSheetQuestionLink {
   sectionId: number | null;
 }
 
-export interface CreateDsaSheetPayload {
+export interface SaveDsaSheetPayload {
+  id?: number;
   sheetCode: string;
   sheetName: string;
   description: string;
   isActive: boolean;
 }
 
-export interface CreateDsaSheetSectionPayload {
+export interface SaveDsaSheetSectionPayload {
+  id?: number;
   sheetId: number;
   parentSectionId: number | null;
   sectionName: string;
@@ -53,7 +55,7 @@ export interface CreateDsaSheetSectionPayload {
 }
 
 export interface LinkDsaSheetQuestionPayload {
-  id: null;
+  id: number | null;
   sectionId: number;
   question: { id: number };
   displayOrder: number;

@@ -1,4 +1,4 @@
-import { apiClient } from '../core/api/apiClient';
+import { apiClient, isRequestCanceled } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Institution, InstitutionOptionDTO } from '../core/types/domain';
@@ -27,31 +27,27 @@ export const institutionService = {
     }
 
     try {
-      const res: any = await apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.SEARCH, {
+      const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.SEARCH, {
         params: { query: trimmed },
         signal,
       });
-      const rawData = res?.data || res;
-      let list: any[] = [];
-      if (rawData && Array.isArray(rawData.content)) {
-        list = rawData.content;
-      } else if (Array.isArray(rawData)) {
-        list = rawData;
-      } else if (rawData && typeof rawData === 'object' && Array.isArray(rawData.data)) {
-        list = rawData.data;
-      } else {
+      if (!Array.isArray(res.data)) {
+        throw new Error('Unexpected institution search response format');
+      }
+      const list = res.data;
+      if (list.some((item) => !item || typeof item !== 'object' || typeof item.id !== 'number' || typeof item.name !== 'string')) {
         throw new Error('Unexpected institution search response format');
       }
 
       return {
-        statusCode: res?.statusCode || 200,
-        message: res?.message || 'Institutions fetched successfully',
+        statusCode: res.statusCode,
+        message: res.message,
         data: list as InstitutionOptionDTO[],
+        errors: res.errors,
+        timestamp: res.timestamp,
       };
-    } catch (err: any) {
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
-        throw err;
-      }
+    } catch (err: unknown) {
+      if (isRequestCanceled(err)) throw err;
       throw err;
     }
   },

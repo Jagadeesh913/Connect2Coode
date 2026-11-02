@@ -25,7 +25,7 @@ const initialState: ProfileState = {
 };
 
 export const fetchUserProfile = createAsyncThunk<
-  UserProfile,
+  UserProfile | null,
   { force?: boolean } | boolean | void
 >(
   'profile/fetch',

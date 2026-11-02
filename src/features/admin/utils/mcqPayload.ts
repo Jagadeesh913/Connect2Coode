@@ -1,4 +1,4 @@
-import type { AdminCreateMcqPayload, McqOption } from '../../../core/types/domain';
+import type { AdminSaveMcqPayload, McqOption } from '../../../core/types/domain';
 
 export interface EditableMcqOption {
   id?: number;
@@ -21,7 +21,7 @@ export function normalizeApiMcqOptions(options: readonly McqOption[] | null | un
 }
 
 /** Serializes only the Spring API's option DTO fields; no guessed aliases. */
-export function serializeMcqOptions(options: readonly EditableMcqOption[]): AdminCreateMcqPayload['options'] {
+export function serializeMcqOptions(options: readonly EditableMcqOption[]): AdminSaveMcqPayload['options'] {
   return options.map((option, index) => ({
     ...(option.id ? { id: Number(option.id) } : {}),
     optionLabel: option.optionLabel || String.fromCharCode(65 + index),

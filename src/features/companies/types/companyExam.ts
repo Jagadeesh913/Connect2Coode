@@ -1,12 +1,6 @@
-import type { Company } from '../../../core/types/domain';
+import type { Company, ReferenceItem } from '../../../core/types/domain';
 
-export interface ReferenceRef {
-  id: number;
-  refGroupCode: string;
-  refCode: string;
-  refName: string;
-  isActive: boolean;
-}
+export type ReferenceRef = ReferenceItem;
 
 export type CompanyItem = Company;
 
@@ -67,49 +61,4 @@ export interface PageRequestPayload {
   pageSize: number;
   sortBy?: string;
   sortDirection?: 'ASC' | 'DESC';
-  jwtToken?: string | null;
-}
-
-// Admin Payloads
-export interface SaveCompanyPayload {
-  id: number | null;
-  name: string;
-  websiteUrl?: string | null;
-  logoUrl?: string | null;
-  description?: string | null;
-  isActive?: boolean;
-}
-
-export interface SaveCompanyRolePayload {
-  id: number | null;
-  companyExamId: number;
-  roleName: string;
-  roleCode: string;
-  salary: string;
-  description: string;
-}
-
-export interface SaveExamSectionPayload {
-  id: number | null;
-  companyExamId: number;
-  parentSectionId: number | null;
-  sectionName: string;
-  sectionType: { id: number };
-  questionType?: { id: number } | null;
-  questionCount?: number | null;
-  durationMinutes?: number | null;
-  totalMarks?: number | null;
-  sequenceNumber?: number;
-}
-
-export interface SaveCompanyExamPayload {
-  id: number | null;
-  companyId: number;
-  examName: string;
-  year: number;
-  description: string;
-  totalDurationMinutes: number;
-  totalQuestions: number;
-  totalMarks: number;
-  sourceUrl: string;
 }

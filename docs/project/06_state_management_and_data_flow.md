@@ -83,7 +83,8 @@ export const useAppStore = useStore.withTypes<AppStore>();
 ### 7. `referenceSlice` ([`src/features/references/redux/referenceSlice.ts`](../../src/features/references/redux/referenceSlice.ts))
 - **Responsibilities**: Shared API taxonomy for `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, dynamic subject groups, `GENDER`, `LANG`, and `TESTCASETYPE`.
 - **Cache semantics**: Group codes are normalized, identical in-flight requests are deduplicated, successful results (including empty arrays) have a 30-minute TTL, and explicit retry uses `force`. Each group tracks its owning request ID so an older response cannot replace a newer refresh.
-- **Component boundary**: Components use `useReferenceGroup`; direct reference-service calls outside the slice are prohibited.
+- **Component boundary**: Components obtain group records through `useReferenceGroup`; the admin group-code catalog uses the validated `referenceService.getGroupCodes` read because it is a distinct endpoint and is not per-group state.
+- **API-owned values**: Consumers never create static reference records or substitute legacy numeric IDs when a group is unavailable. This includes difficulty/platform metadata and admin exam classification from `EXAM SECTION TYPE` and `QUESTION TYPE`. Missing records remain unavailable and errors are surfaced for retry.
 - **MCQ list coordination**: Unfiltered aptitude and admin MCQ list requests use stable empty ID arrays. Reference-group hydration therefore does not recreate the list callback, abort the first `/mcq` request, and issue an identical second request.
 
 ### 8. `languageSlice` ([`src/features/languages/redux/languageSlice.ts`](../../src/features/languages/redux/languageSlice.ts))
@@ -99,6 +100,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - Invalidation & Error Reset: `invalidateDsaSheetCache` and `resetDsaSheetErrors` provide programmatic cache flushes and retry resets.
 - **Superseded Request Cancellation**:
   - In `DsaSheetPage`, `useEffect` calls capture the returned thunk promise and invoke `promise.abort()` during unmount or parameter transitions.
+  - Successful admin sheet, section, association edit/delete operations dispatch `invalidateDsaSheetCache`, preventing an admin from seeing the previous five-minute cached student view after navigation.
 
 ### Persistence Middleware
 
