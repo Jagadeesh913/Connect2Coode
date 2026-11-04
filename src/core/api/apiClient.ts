@@ -181,6 +181,7 @@ export const executeRefreshToken = async (): Promise<string> => {
   }
 
   refreshTokenPromise = (async () => {
+    const sessionEpoch = tokenStorage.getSessionEpoch();
     try {
       const storedRefreshToken = tokenStorage.getRefreshToken();
       const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
@@ -205,6 +206,9 @@ export const executeRefreshToken = async (): Promise<string> => {
       const newRefreshToken = tokenData?.refreshToken || storedRefreshToken;
 
       if (newAccessToken) {
+        if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
+          throw new Error('Authentication session changed while refresh was in progress');
+        }
         tokenStorage.setAccessToken(newAccessToken);
         if (newRefreshToken) {
           tokenStorage.setRefreshToken(newRefreshToken);
@@ -216,8 +220,10 @@ export const executeRefreshToken = async (): Promise<string> => {
         throw new Error('No access token returned from refresh endpoint');
       }
     } catch (refreshErr) {
-      tokenStorage.clearTokens();
-      notifyAuthFailure();
+      if (tokenStorage.getSessionEpoch() === sessionEpoch) {
+        tokenStorage.clearTokens();
+        notifyAuthFailure();
+      }
       throw refreshErr;
     } finally {
       refreshTokenPromise = null;
@@ -228,21 +234,45 @@ export const executeRefreshToken = async (): Promise<string> => {
 };
 
 // Request Interceptor: Attach Access Token & Proactively Refresh if Expired
-/**
- * Recursively removes duplicate/invalid 'token' and 'jwttoken' fields at any depth
- * within objects and arrays. Only 'jwtToken' is permitted as the valid field.
- */
+const isPlainObject = (value: unknown): value is Record<string, unknown> => {
+  if (!value || typeof value !== 'object') return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+};
+
+/** Recursively removes credentials from request bodies at every nesting level. */
 const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
-  if (!value || typeof value !== 'object' || value instanceof FormData) return value;
+  if (!value || typeof value !== 'object') return value;
+  if (value instanceof FormData) {
+    const sanitized = new FormData();
+    value.forEach((child, key) => {
+      const lowerKey = key.toLowerCase();
+      if (lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token') return;
+      sanitized.append(key, child);
+    });
+    return sanitized;
+  }
+  if (value instanceof URLSearchParams) {
+    const sanitized = new URLSearchParams();
+    value.forEach((child, key) => {
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token'
+      ) {
+        return;
+      }
+      sanitized.append(key, child);
+    });
+    return sanitized;
+  }
   if (Array.isArray(value)) return value.map(cloneWithoutDuplicateTokenFields);
+  if (!isPlainObject(value)) return value;
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
     const lowerKey = key.toLowerCase();
     if (
-      lowerKey === 'token' ||
-      (lowerKey === 'jwttoken' && key !== 'jwtToken') ||
-      lowerKey === 'jwt_token'
+      lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token'
     ) {
       continue;
     }
@@ -252,50 +282,36 @@ const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
 };
 
 /**
- * Produces the canonical body for an authenticated mutating request without
- * changing the caller-owned payload. DELETE receives an object body as well,
- * so backends that inspect `jwtToken` do not depend on every service remembering
- * an Axios-specific `{ data: {} }` workaround.
+ * Clones request bodies and removes legacy credential fields without changing
+ * caller-owned data. Authentication belongs exclusively to the Authorization
+ * header.
  */
-export const prepareAuthenticatedRequestData = (
-  data: unknown,
-  method: string,
-  token: string | null,
-  isPublicAuthEndpoint = false
-): unknown => {
-  const normalizedMethod = method.toLowerCase();
-  if (!['post', 'put', 'patch', 'delete'].includes(normalizedMethod)) return data;
-
+export const sanitizeRequestData = (data: unknown): unknown => {
   if (typeof data === 'string') {
     try {
       const parsed = JSON.parse(data);
-      return JSON.stringify(
-        prepareAuthenticatedRequestData(parsed, normalizedMethod, token, isPublicAuthEndpoint)
-      );
+      return JSON.stringify(sanitizeRequestData(parsed));
     } catch {
       return data;
     }
   }
 
-  if (data instanceof FormData) return data;
-  const sanitized = cloneWithoutDuplicateTokenFields(data ?? {});
-  if (
-    token &&
-    !isPublicAuthEndpoint &&
-    sanitized &&
-    typeof sanitized === 'object' &&
-    !Array.isArray(sanitized)
-  ) {
-    return { ...(sanitized as Record<string, unknown>), jwtToken: token };
-  }
-  return sanitized;
+  return cloneWithoutDuplicateTokenFields(data);
 };
+
+export const getPreparedRequestContentType = (data: unknown): string | null | undefined =>
+  data instanceof URLSearchParams
+    ? 'application/x-www-form-urlencoded;charset=UTF-8'
+    : typeof FormData !== 'undefined' && data instanceof FormData
+      ? null
+      : undefined;
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     const reqUrl = config.url || '';
     const isPublicAuthEndpoint =
       reqUrl.includes('/auth/login') ||
+      reqUrl.includes('/auth/logout') ||
       reqUrl.includes('/signUp') ||
       reqUrl.includes('/auth/refresh') ||
       reqUrl.includes('/auth/generatePasswordResetOtp') ||
@@ -332,15 +348,24 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // Attach logged in user JWT token with the payload for API endpoints that inspect the request body
-    // and strictly guarantee duplicate/invalid 'token' field is removed across each and every API call
-    const method = (config.method || 'get').toLowerCase();
-    config.data = prepareAuthenticatedRequestData(
-      config.data,
-      method,
-      token,
-      isPublicAuthEndpoint
-    );
+    // Credentials are bearer-header only. Strip legacy body token fields so a
+    // caller cannot accidentally duplicate or leak the active credential.
+    config.data = sanitizeRequestData(config.data);
+    const preparedContentType = getPreparedRequestContentType(config.data);
+    if (preparedContentType === null) {
+      if (typeof (config.headers as any).delete === 'function') {
+        (config.headers as any).delete('Content-Type');
+      } else {
+        delete config.headers['Content-Type'];
+        delete config.headers['content-type'];
+      }
+    } else if (preparedContentType) {
+      if (typeof (config.headers as any).set === 'function') {
+        (config.headers as any).set('Content-Type', preparedContentType);
+      } else {
+        config.headers['Content-Type'] = preparedContentType;
+      }
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -355,6 +380,7 @@ apiClient.interceptors.response.use(
     const isPublicAuthEndpoint =
       reqUrl.includes('/auth/refresh') ||
       reqUrl.includes('/auth/login') ||
+      reqUrl.includes('/auth/logout') ||
       reqUrl.includes('/signUp') ||
       reqUrl.includes('/auth/generatePasswordResetOtp') ||
       reqUrl.includes('/auth/verifyPasswordResetOtp');
@@ -450,6 +476,7 @@ apiClient.interceptors.response.use(
       if (
         reqUrl.includes('/auth/refresh') ||
         reqUrl.includes('/auth/login') ||
+        reqUrl.includes('/auth/logout') ||
         reqUrl.includes('/signUp') ||
         reqUrl.includes('/auth/generatePasswordResetOtp') ||
         reqUrl.includes('/auth/verifyPasswordResetOtp')

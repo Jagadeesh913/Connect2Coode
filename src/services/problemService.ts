@@ -102,7 +102,12 @@ export const problemService = {
       try {
         const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.QUESTION.DETAILS(numericId), { signal });
         const data = res.data;
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
+        const hasIdentity =
+          data &&
+          typeof data === 'object' &&
+          !Array.isArray(data) &&
+          Number((data as Record<string, unknown>).id) === numericId;
+        if (hasIdentity) {
           return {
             statusCode: res.statusCode,
             message: res.message,

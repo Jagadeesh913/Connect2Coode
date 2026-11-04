@@ -14,7 +14,7 @@ import { Skeleton, AptitudeQuestionSkeleton } from '../../../shared/components/u
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { openAuthModal } from '../../auth/redux/authSlice';
-import { Lock } from 'lucide-react';
+import { Check, Lock, X } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { fetchCompanies } from '../../companies/redux/companySlice';
 
@@ -217,21 +217,21 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
                   type="button"
                   disabled={isSubmitted}
                   onClick={() => handleSelectOption(opt.optionText)}
-                  className={`p-3.5 rounded-xl text-left border text-xs sm:text-sm font-medium transition-all flex items-center justify-between gap-3 cursor-pointer disabled:cursor-default ${cardStyles}`}
+                  className={`p-3.5 rounded-xl text-left border text-xs sm:text-sm font-medium transition-all flex items-start justify-between gap-3 cursor-pointer disabled:cursor-default ${cardStyles}`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-start gap-3 min-w-0">
                     <span
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${badgeStyles}`}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 transition-colors ${badgeStyles}`}
                     >
                       {opt.optionLabel}
                     </span>
-                    <span className="leading-snug break-words">{opt.optionText}</span>
+                    <span className="min-w-0 leading-snug break-words">{opt.optionText}</span>
                   </div>
                   {isThisCorrect && (
-                    <i className="fa-solid fa-check text-emerald-600 dark:text-emerald-400 text-sm font-bold shrink-0"></i>
+                    <Check aria-hidden="true" className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                   )}
                   {isThisWrong && (
-                    <i className="fa-solid fa-xmark text-rose-600 dark:text-rose-400 text-sm font-bold shrink-0"></i>
+                    <X aria-hidden="true" className="h-4 w-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
                   )}
                 </button>
               );

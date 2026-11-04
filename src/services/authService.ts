@@ -87,8 +87,17 @@ export const authService = {
   // Login: POST /api/v1/auth/login
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
   async login(payload: LoginPayload): Promise<ApiResponse<AuthResponseData>> {
+    // Supersede any older refresh/login without clearing a still-valid session.
+    // A logout or newer login will advance the epoch again and reject this response.
+    const sessionEpoch = tokenStorage.claimSessionOwnership();
     const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, { timeout: 120000 });
     if (response?.data) {
+      if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
+        throw new Error('Authentication session changed while login was in progress');
+      }
+      // Advance the epoch before installing the new account so any older login
+      // or refresh response cannot overwrite this session after it resolves.
+      tokenStorage.clearTokens({ broadcast: false });
       persistAuthSession(response.data);
       publishAuthSessionEvent('session-updated');
     }
@@ -98,14 +107,18 @@ export const authService = {
   // Logout: POST /api/v1/auth/logout with credentials
   // Backend invalidates session and clears HttpOnly refresh cookie via Set-Cookie
   async logout(): Promise<ApiResponse<string>> {
+    const token = tokenStorage.getRefreshToken();
+    // Local logout must be immediate and must invalidate any in-flight login or
+    // refresh response before waiting on the network.
+    tokenStorage.clearTokens();
     try {
-      const token = tokenStorage.getRefreshToken();
       const payload = token ? { refreshToken: token } : {};
-      await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, payload, { withCredentials: true });
+      await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, payload, {
+        withCredentials: true,
+        timeout: 30_000,
+      });
     } catch (e) {
       console.warn('Logout API warning:', e);
-    } finally {
-      tokenStorage.clearTokens();
     }
     return {
       statusCode: 200,
@@ -119,6 +132,7 @@ export const authService = {
   // Refresh Token: POST /api/v1/auth/refresh with credentials
   // Browser automatically transmits HttpOnly refreshToken cookie to backend origin
   async refreshToken(explicitRefreshToken?: string): Promise<ApiResponse<AuthResponseData>> {
+    const sessionEpoch = tokenStorage.getSessionEpoch();
     const token = explicitRefreshToken || tokenStorage.getRefreshToken();
     const payload = token ? { refreshToken: token } : {};
 
@@ -128,6 +142,9 @@ export const authService = {
       { withCredentials: true, timeout: 60000 }
     );
     if (response?.data) {
+      if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
+        throw new Error('Authentication session changed while refresh was in progress');
+      }
       persistAuthSession({
         ...response.data,
         refreshToken: response.data.refreshToken || token || undefined,

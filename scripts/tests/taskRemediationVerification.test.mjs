@@ -152,6 +152,72 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
       dashboardCodeRunnerSource.includes('pageSize: 10'),
       'DashboardCodeRunner.tsx must use pageSize: 10 matching /admin/questions'
     );
+    assert.equal(
+      dashboardCodeRunnerSource.includes('pagesToFetch'),
+      false,
+      'DashboardCodeRunner must not fan out requests for every remaining question page'
+    );
+    assert.equal(
+      dashboardCodeRunnerSource.includes('subPageResults'),
+      false,
+      'DashboardCodeRunner must load additional questions through on-demand search'
+    );
+    assert.match(
+      dashboardCodeRunnerSource,
+      /searchText: searchFilter\.trim\(\)/,
+      'DashboardCodeRunner must retain backend search for questions beyond the initial page'
+    );
+    assert.match(dashboardCodeRunnerSource, /const loadNextQuestionPage = async/);
+    assert.match(dashboardCodeRunnerSource, /pageNumber: nextPage/);
+    assert.match(dashboardCodeRunnerSource, /Load more problems/);
+    assert.match(dashboardCodeRunnerSource, /selectedQuestionIdRef\.current/);
+  });
+
+  it('DashboardCodeRunner ignores stale page responses without refetching selected details on catalog merges', async () => {
+    const fs = await import('node:fs');
+    const source = fs.readFileSync('src/features/admin/components/dashboard/DashboardCodeRunner.tsx', 'utf-8');
+    assert.match(source, /const questionsRef = useRef<QuestionOption\[\]>\(\[\]\)/);
+    assert.match(source, /questionsRef\.current = questions/);
+    assert.match(source, /questionsRef\.current\.find\(\(q\) => q\.id === selectedQuestionId\)/);
+    assert.match(source, /\}, \[selectedQuestionId\]\);/);
+    assert.match(source, /const pageGenerationRef = useRef\(0\)/);
+    assert.match(source, /const generation = \+\+pageGenerationRef\.current/);
+    assert.match(source, /if \(generation !== pageGenerationRef\.current\) return/);
+    assert.match(source, /setResourcesLoading\(true\);[\s\S]*?setIsSearchingBackend\(false\)/);
+    assert.match(source, /setIsSearchingBackend\(true\);[\s\S]*?setResourcesLoading\(false\)/);
+    assert.match(source, /item\.difficulty \|\| item\.difficultyRefName \|\| item\.difficultyName/);
+    assert.match(source, /item\.topicRefName \|\| item\.topicName/);
+    assert.match(source, /const matchDescription = \(item\.description \|\| ''\)\.toLowerCase\(\)\.includes\(query\)/);
+    assert.match(source, /matchTopic \|\| matchDescription/);
+    assert.match(
+      source,
+      /if \(list\.length > 0\) \{\s*setQuestionPage\(0\);\s*setQuestionTotalPages\(res\.data\.totalPages \?\? 1\);\s*setQuestionPageSearch\(searchText\)/
+    );
+  });
+
+  it('F-09: preserves code drafts independently for every question and language', async () => {
+    const fs = await import('node:fs');
+    const source = fs.readFileSync('src/features/admin/components/dashboard/DashboardCodeRunner.tsx', 'utf-8');
+    assert.match(source, /const \[_codeDrafts, setCodeDrafts\] = useState<Record<string, string>>\(\{\}\)/);
+    assert.match(source, /const key = `\$\{selectedQuestionId\}_\$\{selectedLanguageId\}`/);
+    assert.match(source, /setCodeDrafts\(\(prev\) => \{\s*if \(prev\[key\] !== undefined\) \{\s*setSourceCode\(prev\[key\]\)/);
+    assert.match(source, /setCodeDrafts\(\(prev\) => \(\{ \.\.\.prev, \[key\]: val \}\)\)/);
+  });
+
+  it('keeps manual question selection synchronized without nested state updates', async () => {
+    const fs = await import('node:fs');
+    const source = fs.readFileSync('src/features/admin/components/dashboard/DashboardCodeRunner.tsx', 'utf-8');
+    assert.match(
+      source,
+      /const selectQuestionId = useCallback\(\(questionId: number\) => \{\s*selectedQuestionIdRef\.current = questionId;\s*setSelectedQuestionId\(questionId\)/
+    );
+    assert.match(
+      source,
+      /if \(uniqueList\.length > 0 && selectedQuestionIdRef\.current === null\) \{\s*const initialQuestionId = uniqueList\[0\]\.id;\s*selectQuestionId\(initialQuestionId\);\s*setManualQuestionId\(String\(initialQuestionId\)\)/
+    );
+    assert.doesNotMatch(source, /setSelectedQuestionId\(\(prev\)[\s\S]*?setManualQuestionId/);
+    assert.match(source, /selectQuestionId\(qId\);\s*setManualQuestionId\(String\(qId\)\)/);
+    assert.match(source, /selectQuestionId\(num\)/);
   });
 
   it('AdminQuestions and AdminMcqs combine Identifier + Difficulty into # column and style inactive items in red', async () => {
@@ -213,5 +279,54 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
       adminMcqsSource,
       /\}, \[debouncedSearch, pageNumber, pageSize, selectedDifficultyIds, selectedSubjectIds\]\);/
     );
+  });
+
+  it('CR Audit Fixes: pagination supports itemLabel and CompanyDetails uses examTotal', async () => {
+    const fs = await import('node:fs');
+    const paginationSource = fs.readFileSync('src/shared/components/ui/Pagination.tsx', 'utf-8');
+    const adminCompaniesSource = fs.readFileSync('src/features/admin/pages/AdminCompanies.tsx', 'utf-8');
+    const companyDetailsSource = fs.readFileSync('src/features/companies/pages/CompanyDetails.tsx', 'utf-8');
+    const authSliceSource = fs.readFileSync('src/features/auth/redux/authSlice.ts', 'utf-8');
+    const oauthCallbackSource = fs.readFileSync('src/features/auth/pages/OAuthCallback.tsx', 'utf-8');
+    const practicePageSource = fs.readFileSync('src/features/problems/pages/PracticePage.tsx', 'utf-8');
+    const problemServiceSource = fs.readFileSync('src/services/problemService.ts', 'utf-8');
+    const profileSettingsSource = fs.readFileSync('src/features/profile/pages/ProfileSettings.tsx', 'utf-8');
+
+    // Pagination itemLabel check
+    assert.match(paginationSource, /itemLabel\s*=\s*'problems'/);
+    assert.match(paginationSource, /\{totalElements\}<\/strong>\s*\{itemLabel\}/);
+    assert.match(adminCompaniesSource, /itemLabel="companies"/);
+    assert.match(adminCompaniesSource, /const \[availableCompanies, setAvailableCompanies\] = useState<CompanyItem\[]>\(\[\]\)/);
+    assert.match(adminCompaniesSource, /adminCompanyService\.getCompanies\(controller\.signal\)/);
+    assert.match(adminCompaniesSource, /availableCompanies=\{availableCompanies\}/);
+
+    // CompanyDetails examTotal & section totals check
+    assert.match(companyDetailsSource, /examTotal > 0/);
+    assert.doesNotMatch(companyDetailsSource, /exams\.length > 0[\s\S]*?\{exams\.length\}/);
+    assert.match(companyDetailsSource, /setSectionTotals/);
+    assert.match(companyDetailsSource, /useLayoutEffect\(\(\) => \{[\s\S]*?activeSection !== 'coding'[\s\S]*?setCodingLoading\(false\)/);
+    assert.match(companyDetailsSource, /if \(!debouncedQuestionSearch && !selectedDifficultyId\) \{\s*setSectionTotals/);
+    assert.doesNotMatch(companyDetailsSource, /sectionTotals\.coding \?\? questionTotal/);
+    assert.match(companyDetailsSource, /itemLabel="exams"/);
+    assert.match(companyDetailsSource, /itemLabel="questions"/);
+    assert.match(companyDetailsSource, /codingError \? \([\s\S]*?<td colSpan=\{6\}><RequestStatus error=\{codingError\}/);
+
+    // Auth slice & OAuth callback check
+    assert.match(authSliceSource, /if \(!res\?\.data\) \{[\s\S]*return rejectWithValue/);
+    assert.doesNotMatch(oauthCallbackSource, /setUnauthenticatedSession/);
+
+    // PracticePage clamp and filter race condition checks
+    assert.match(practicePageSource, /hasPendingFilterResolution/);
+    assert.match(practicePageSource, /fulfilledKey !== currentRequestKey/);
+    assert.match(practicePageSource, /const difficultyIdsKey = Array\.from\(resolvedDifficultyIds\)\.join\(','\)/);
+    assert.match(practicePageSource, /difficultyIdsKey \? difficultyIdsKey\.split\(','\)\.map\(Number\) : \[\]/);
+
+    // ProblemService degraded object check
+    assert.match(problemServiceSource, /Number\(\(data as Record<string, unknown>\)\.id\) === numericId/);
+
+    // ProfileSettings memoized initialData check
+    assert.match(profileSettingsSource, /personalInfoInitialData = useMemo/);
+    assert.match(profileSettingsSource, /initialData=\{personalInfoInitialData\}/);
+    assert.match(profileSettingsSource, /useEffect\(\(\) => \{\s*void dispatch\(fetchUserProfile\(\)\);\s*if \(effectiveUserId\)/);
   });
 });

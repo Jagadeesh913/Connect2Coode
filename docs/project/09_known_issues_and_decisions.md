@@ -5,7 +5,7 @@
 - **Status**: `PARTIALLY VERIFIED`
 - **Decision**: The crawler-only User-Agent rewrite and metadata-only response were removed. [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs) now produces meaningful route-specific HTML for the five stable public hubs, so browsers and crawlers receive the same document before React mounts. It also emits the canonical apex sitemap, a separate noindex application shell, and a noindex `404.html`.
 - **Privacy and failure behavior**: [`vercel.json`](../../vercel.json) allowlists valid SPA deep links, sends `X-Robots-Tag` headers for authentication, authenticated, admin, API-backed detail, coming-soon, and error routes, and rewrites those routes to the noindex shell. Unknown paths no longer use a catch-all 200 rewrite. The client metadata owner still replaces route metadata on SPA navigation and accepts dynamic names only from a successful current-route response.
-- **Authenticated dynamic-data boundary**: The documented question/company/exam list and detail contracts require authentication and `jwtToken`; a deployment build must not receive or expose a user credential. Those detail URLs are therefore excluded from the sitemap and remain `noindex` until the backend provides an approved public read contract or the application gains credential-safe server rendering. No slugs or entity data are fabricated when API calls fail.
+- **Authenticated dynamic-data boundary**: The documented question/company/exam list and detail contracts require bearer authentication; a deployment build must not receive or expose a user credential. Those detail URLs are therefore excluded from the sitemap and remain `noindex` until the backend provides an approved public read contract or the application gains credential-safe server rendering. No slugs or entity data are fabricated when API calls fail.
 - **Deployment boundary**: Build output and routing configuration are regression-tested locally, but Vercel response status/header behavior, production DNS, apex/`www` redirects, and social-debugger fetches remain `PARTIALLY VERIFIED` until a deployment owner validates them. Production must set `VITE_SITE_URL=https://connect2code.in`; indexing is a later Google-controlled outcome and is never implied by a successful build.
 
 ---
@@ -79,7 +79,7 @@
 ### Decision 0: Learning Sheet API as the DSA Sheet Product Boundary
 - **Context**: The backend exposes a generic `learningSheet` name, but the supplied product scope is DSA preparation only. The section-question response also returns `sectionId: null`, even though the request path already identifies the owning section; no sheet delete or child-section read endpoint was supplied. Admin editing reuses the existing save POSTs by including the resource/association `id` only in edit mode.
 - **Decision**: Present the feature exclusively as **DSA Sheet** in routes and UI while preserving the backend endpoint names in services. Treat the outer question-link `id` as the association deletion ID, navigate to problems using nested `question.id`, retain only top-level sections (`parentSectionId: null`), and do not invent editing, sheet deletion, or nested-section behavior.
-- **Authentication Boundary**: GET calls use the bearer token automatically attached by `apiClient`; mutating bodies receive canonical `jwtToken`. The central client creates DELETE bodies, so services contain no transport-specific token workaround.
+- **Authentication Boundary**: Every authenticated method uses the bearer token automatically attached by `apiClient`; request bodies contain business fields only and bodyless DELETE requests remain bodyless.
 - **Verification Boundary**: Endpoint formatting, response validation, ordering, and DELETE request shape are locally runtime-tested. Live production reads and admin mutations remain `PARTIALLY VERIFIED` because this implementation did not mutate production data.
 
 ### Decision 1: Local Recruiter Logos in `public/companies/`
@@ -90,7 +90,7 @@
 
 ### Decision 2: Central, Non-Mutating Request and Response Ownership
 - **Context**: Legacy services independently read credentials, injected multiple token spellings, supplied Axios-specific DELETE bodies, and guessed whether a result was an Axios response, a backend envelope, or a nested payload. That distributed transport policy caused duplicates, inconsistent names, caller-payload mutation risk, and false empty states.
-- **Decision**: `apiClient` clones mutating request bodies, recursively removes `token`, `jwttoken`, and `jwt_token`, injects only `jwtToken`, and creates DELETE bodies centrally. Its TypeScript facade models the response interceptor's unwrapped `ApiResponse<T>` behavior; services send business fields and consume one envelope layer only.
+- **Decision**: `apiClient` authenticates exclusively with the bearer header and recursively removes `jwtToken`, `token`, `jwttoken`, and `jwt_token` from every outgoing body. Its TypeScript facade models the response interceptor's unwrapped `ApiResponse<T>` behavior; services send business fields and consume one envelope layer only. Live comparison proved body-token-only authentication returns 401.
 - **Benefits**: Authentication and envelope rules now have one owner, service payloads remain reusable and testable, and malformed successful responses fail explicitly instead of passing through compatibility guesses.
 
 ### Decision 3: Option-Level `isCorrect` Flag for MCQs
@@ -108,7 +108,7 @@
 
 ### Decision 6: Cookie-Only Session Persistence and Server-Owned Academic Records
 - **Context**: The previous client mirrored credentials and profile objects into `localStorage` and `sessionStorage`, while the profile page retained an unscoped academic-record cache. This contradicted the documented storage policy and could leave sensitive data after a session.
-- **Decision**: Keep the established cookie/in-memory session contract for the backend that returns tokens in JSON, remove web-storage reads/writes for credentials and profile metadata, clean legacy copies on session writes/logout, and fetch academic records solely through `/userInfo/{userId}`.
+- **Decision**: Keep the established cookie/in-memory session contract for the backend that returns tokens in JSON, remove web-storage reads/writes for credentials and profile metadata, and fetch academic records solely through `/userInfo/{userId}`. Logout now clears memory and every known client-readable cookie/storage alias before its network request, expires cookies across legacy paths/domains with both `Max-Age=0` and a past `Expires`, and advances a session epoch so an in-flight login or refresh cannot recreate the cleared session. The captured refresh token is still sent to `/auth/logout` so the backend can invalidate the server session and its HttpOnly cookie.
 - **Guardrail**: An expired access token with a refresh session remains in `LOADING` until refresh succeeds or fails, so session restoration is not erased or redirected prematurely.
 
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
@@ -162,8 +162,8 @@
 - **Benefits**: Read data is visible in admin editing and display paths without an alias fallback, and request construction is constrained to the server's observed entity names.
 
 ### Decision 17: Postman MCP Limitation Is Not Contract Evidence
-- **Context**: The required Postman MCP authentication succeeded, but `getEnabledTools` repeatedly returned an auth-handshake message and the discovered surface exposed workspace-resource operations rather than a live request sender.
-- **Decision**: No Postman collection, example, or summary was treated as contract authority. This repository retains only direct live read evidence and labels unexecuted mutation contracts as unverified.
+- **Context**: Earlier sessions could inspect workspace resources but not execute live collection requests. On 2026-11-03 `getEnabledTools` reported the full 233-tool MCP surface; live read-only contract probes were executed with Postman CLI because the MCP collection itself is incomplete and contains legacy-host requests.
+- **Decision**: Collection metadata remains discovery evidence only. Request/response claims require a completed live read or an executable repository test; unexecuted mutation contracts remain unverified.
 
 ### Decision 18: Async Lists Own Their Visible Query
 
@@ -174,8 +174,13 @@
 
 ### Decision 19: URL State, Scroll, and Loading Geometry
 
-- **Context**: Company search, industry, and pagination state was component-local, so browser back/forward discarded the user's catalog context. Several nested detail requests and the generic route fallback used text-only spinners, while the shared admin table retained stale rows during refreshes.
-- **Decision**: Company catalog controls now round-trip through query parameters and clamp invalid pages without polluting history. Explicit page changes scroll the result boundary into view, while React Router's `ScrollRestoration` remains authoritative for route back/forward restoration. Route chunks, admin refreshes, DSA hierarchy loads, company modal subresources, and detail records use geometry-matched shimmer states until the owning response arrives.
+- **Context**: Company pagination was previously simulated by downloading every backend page and slicing a locally filtered array. Live probes later proved that `/company/list` supports pagination but ignores all attempted search fields and provides no industry filter contract.
+- **Decision**: Company page state round-trips through the URL and each page change calls `/company/list`. Unsupported search and industry controls were removed rather than presented as server filters. Explicit page changes scroll the result boundary into view, while React Router's `ScrollRestoration` remains authoritative for route back/forward restoration. Route chunks, admin refreshes, DSA hierarchy loads, company modal subresources, and detail records use geometry-matched shimmer states until the owning response arrives.
+
+### Decision 23: Server Pagination and Filter Ownership
+
+- **Context**: Practice requested only `{ page: 1, limit: 100 }` and locally filtered/sliced the returned rows. Company lists loaded all 57 companies, and company detail tabs fetched fixed first pages (50 questions or 20 exams) before filtering locally. These patterns produced plausible but incomplete totals and controls that made no request.
+- **Decision**: Every visible catalog page control now changes a request page. Every visible question/MCQ filter maps to an observed backend field and numeric reference ID. Practice uses `level`, `topic`, `companies`, `platform`, `searchText`, and `pageRequest`; company-detail MCQs use `subject`, `difficulty`, `companies`, `searchText`, and `pageRequest`. Unsupported company search/industry and client-only difficulty sort/status catalog filters are not shown. This is runtime-verified with read-only Postman probes and regression-tested at source-contract level.
 - **Concurrency**: Problem queries begin in a layout effect so a changed URL cannot paint the previous query's rows for one frame. DSA hierarchy selection uses current-selection refs and abort ownership so a refresh cannot leave a downstream loader stuck.
 
 ### Decision 20: Dynamic Admin Dashboard Metrics & Code Execution Sandbox Overhaul
@@ -188,6 +193,26 @@
   - **Authoritative Metrics & Difficulty Resolution**: Dynamically maps difficulty levels through `useReferenceGroup('DIFF')` instead of assuming sequential IDs. A metric request is omitted when its API reference is unavailable; no legacy fallback ID is sent. Integrates `learningSheetService.getSheets` to populate the 8th metric card (`DSA Sheets`) in a balanced 4x2 grid.
   - **Safe MCQ Pagination Contract**: Sanitizes `adminMcqService.getMcqs` payload to include full `pageRequest` and empty filter arrays, preventing Spring Boot 500 NPEs.
 
+### Decision 21: CodeRabbit Frontend Review Remediation Boundaries
+
+- **Context**: The local CodeRabbit report grouped seven actionable frontend findings and used F-08 for two different UI concerns. Its F-09 claim treated the code-runner draft state as unused even though functional state updates read and preserve that cache.
+- **Decision**: Confirm findings against source and callers before editing. F-01 is resolved by keeping `ProfileSettings` limited to session identity, `/userInfo/{userId}` fields, and the API-backed password-reset action; unsupported email-notification, interface-language, and profile-level theme controls are removed instead of stored in the browser. Legacy academic and personal properties on the identity model are not used as fallbacks. URL-encoded authenticated bodies are cloned without losing repeated fields and retain the correct content type; dashboard metric requests are separated by dependency; profile `null` is a cacheable fetched result; expired JWTs receive no localhost grace; question-bank paging is user-driven and bounded; and the DSA carousel pauses explicitly for visibility, reduced motion, pointer, focus, and user controls. The aptitude option layout is top-aligned on narrow screens.
+- **Not applicable**: F-09 requires no code change because `_codeDrafts` is the previous-state value used by functional `setCodeDrafts` updates. Removing it would discard existing per-question/per-language drafts.
+- **Boundary**: No Spring Boot implementation, endpoint, request field, or API contract was changed. The two F-08 descriptions are tracked independently: carousel background motion is covered with the carousel remediation, while mobile option alignment is covered in the aptitude UI.
+
+### Decision 22: CodeRabbit N-01–N-08 Follow-Up Ownership
+
+- **Theme ownership (N-01/N-02)**: `theme_pref` is authoritative in `userScopedStorage`. A legacy global theme may seed the guest scope without being consumed, then migrates once into an authenticated account scope and is removed. Direct setters and toggles use one scoped persistence path.
+- **Profile continuity (N-03/N-04)**: The personal modal uses the same session identity fallbacks as the profile header. Token-only session refresh actions preserve the current identity, fetched-null marker, and `/userInfo` cache; an explicit account change still clears them.
+- **Runner concurrency (N-05/N-06)**: Catalog merges update a ref without retriggering question details. Reload, search, and load-more responses are generation-owned; superseding operations clear stale loading flags, empty searches preserve catalog pagination, and search filtering covers every service-matched list field. Per-question/per-language draft state remains required and regression-tested, so F-09 is still not applicable.
+- **Accessibility and iconography (N-07/N-08)**: Reduced-motion users receive a truthful disabled-control label. Inactive carousel slides are inert, hidden from assistive technology, and excluded from the tab order. Aptitude correctness marks use `lucide-react` `Check` and `X` components.
+
+### Decision 24: Complete Post-Remediation CodeRabbit Audit
+
+- **Context**: A fresh CodeRabbit review of the latest commit and every current working-tree scope found request-ownership races, unsafe partial filtered-question recovery, a degraded question-detail identity check, and state that could survive account, route, or section changes. Several other suggestions were rejected because they relied on the old body-token contract or reviewed one directory without its current cross-directory dependency.
+- **Decision**: Filtered `/questions` recovery is accepted only when the unfiltered fallback proves it contains the complete reported catalog; otherwise the original backend failure is propagated instead of publishing incomplete totals. Numeric problem details require the requested ID before mapping. Login advances the session epoch before installing a new account, empty refresh responses clean invalid credentials, and profile reads are user/request-owned. Reference-group lists, theme scopes, company-detail counts, and dashboard difficulty metrics now discard or clear superseded state. Exam sections require an explicit classification and cannot save while question taxonomy is disabled.
+- **Verification boundary**: Regression tests cover incomplete-catalog rejection, degraded detail fallback, stale profile/reference ownership, auth ordering, and the UI contracts. No production mutation was executed; admin mutation endpoints remain `PARTIALLY VERIFIED`.
+
 ---
 
 ## 3. Unresolved Questions & Future Work
@@ -199,3 +224,14 @@
 3. **Draft Features Activation**: The `/interviews` and `/roadmaps/:slug` features are toggle-gated behind `VITE_SHOW_COMING_SOON`. Once backend endpoints for roadmaps are finalized, toggle `VITE_SHOW_COMING_SOON=false` to promote them to production.
 4. **Base Profile and Avatar Mutation**: `/user/profile` is unmapped in the available direct probes. Name/email are session-derived and read-only, and avatar editing is disabled until the backend exposes a verified mutation contract.
 5. **High-Stakes Proctoring Contract**: A secure assessment mode requires backend-owned exam-session state, server-side attempt/time limits, signed audit events, and a reviewed proctoring/privacy policy. No such verified API contract is present in this repository.
+### Decision 25: Post-remediation CodeRabbit residual race and error-state fixes (2026-11-04)
+
+- A login now claims authentication-session epoch ownership before its request without clearing an existing valid session. This makes an older refresh result stale while preserving protection from a later logout or newer login.
+- OAuth provider error callbacks retain any existing authenticated Redux session instead of creating a cookie/Redux split-brain state.
+- Admin dashboard difficulty-reference failures are reported once rather than copied into both reference and metric error channels.
+- Refresh-thunk cleanup is epoch-owned, so an older failed refresh cannot clear or invalidate a newer login attempt.
+- Practice-list request dependencies are stable by resolved filter value, preventing reference hydration from aborting and resending an equivalent `/questions` request.
+- Profile loading always requests the session-owned profile even when no numeric user ID is available; numeric IDs remain required only for user-info and progress endpoints.
+- Admin company autofill uses the complete paginated company catalog rather than only the currently visible admin table page.
+- Sanitized `FormData` requests clear the inherited JSON content type so Axios/browser multipart handling supplies the required boundary.
+- The legacy theme key is migration-only; all new guest/account preferences remain in `userScopedStorage`, and auth-status transitions reload the correct scope after startup refresh success or failure.

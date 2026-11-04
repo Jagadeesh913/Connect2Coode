@@ -4,6 +4,9 @@ import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../../../co
 
 export interface ProfileState {
   profile: UserProfile | null;
+  profileFetched: boolean;
+  profileRequestId: string | null;
+  activeProfileUserId: string | number | null;
   userInfo: UserInfoData | null;
   loading: boolean;
   userInfoLoading: boolean;
@@ -15,6 +18,9 @@ export interface ProfileState {
 
 const initialState: ProfileState = {
   profile: null,
+  profileFetched: false,
+  profileRequestId: null,
+  activeProfileUserId: null,
   userInfo: null,
   loading: false,
   userInfoLoading: false,
@@ -25,25 +31,34 @@ const initialState: ProfileState = {
 };
 
 export const fetchUserProfile = createAsyncThunk<
-  UserProfile | null,
+  { userId: string | number | null; data: UserProfile | null },
   { force?: boolean } | boolean | void
 >(
   'profile/fetch',
-  async () => {
+  async (_, { getState }) => {
+    const state = getState() as {
+      auth?: { user?: { id?: string | number; email?: string } | null };
+    };
+    const userId = state.auth?.user?.id ?? state.auth?.user?.email ?? null;
     const res = await profileService.getProfile();
-    return res.data;
+    return { userId, data: res.data };
   },
   {
     condition: (arg, { getState }) => {
-      const state = getState() as { profile: ProfileState };
-      if (state.profile?.loading) {
+      const state = getState() as {
+        profile: ProfileState;
+        auth?: { user?: { id?: string | number; email?: string } | null };
+      };
+      const userId = state.auth?.user?.id ?? state.auth?.user?.email ?? null;
+      const sameUser = String(state.profile.activeProfileUserId ?? '') === String(userId ?? '');
+      if (state.profile?.loading && sameUser) {
         return false;
       }
       const force = typeof arg === 'boolean' ? arg : Boolean(arg?.force);
       if (force) {
         return true;
       }
-      if (state.profile?.profile) {
+      if (sameUser && state.profile?.profileFetched) {
         return false;
       }
       return true;
@@ -119,16 +134,30 @@ const profileSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // fetchUserProfile
-      .addCase(fetchUserProfile.pending, (state) => {
+      .addCase(fetchUserProfile.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        state.profileRequestId = action.meta.requestId;
       })
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
+        if (state.profileRequestId !== action.meta.requestId) return;
+        if (
+          state.activeProfileUserId != null &&
+          action.payload.userId != null &&
+          String(state.activeProfileUserId) !== String(action.payload.userId)
+        ) {
+          return;
+        }
         state.loading = false;
-        state.profile = action.payload;
+        state.profileRequestId = null;
+        state.activeProfileUserId = action.payload.userId;
+        state.profile = action.payload.data;
+        state.profileFetched = true;
       })
       .addCase(fetchUserProfile.rejected, (state, action) => {
+        if (state.profileRequestId !== action.meta.requestId) return;
         state.loading = false;
+        state.profileRequestId = null;
         state.error = action.error.message || 'Failed to fetch profile';
       })
       // fetchUserInfo
@@ -187,6 +216,10 @@ const profileSlice = createSlice({
         (action) => action.type === 'auth/logout/fulfilled' || action.type === 'auth/logout/rejected',
         (state) => {
           state.profile = null;
+          state.profileFetched = false;
+          state.loading = false;
+          state.profileRequestId = null;
+          state.activeProfileUserId = null;
           state.userInfo = null;
           state.userInfoLoading = false;
           state.userInfoError = null;
@@ -201,6 +234,13 @@ const profileSlice = createSlice({
           action.type === 'auth/setAuthenticatedSession' ||
           action.type === 'auth/initializeAuth',
         (state, action: any) => {
+          if (
+            action.type === 'auth/setAuthenticatedSession' &&
+            !action.payload?.user
+          ) {
+            return;
+          }
+
           const nextUser = action.payload?.user || action.payload?.savedUser || action.payload;
           const nextUserId = nextUser?.id ?? null;
           const profileBelongsToNextUser =
@@ -209,7 +249,13 @@ const profileSlice = createSlice({
             state.activeUserInfoUserId != null &&
             String(state.activeUserInfoUserId) === String(nextUserId ?? '');
 
-          if (!profileBelongsToNextUser) state.profile = null;
+          if (!profileBelongsToNextUser) {
+            state.profile = null;
+            state.profileFetched = false;
+            state.loading = false;
+            state.profileRequestId = null;
+          }
+          state.activeProfileUserId = nextUserId;
           if (!userInfoBelongsToNextUser) {
             state.userInfo = null;
             state.userInfoLoading = false;

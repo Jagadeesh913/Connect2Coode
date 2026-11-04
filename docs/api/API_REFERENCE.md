@@ -228,7 +228,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/refresh`
 - **Purpose**: Exchanges a valid refresh token for a fresh short-lived JWT access token and rolling refresh token.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.refreshToken`), Axios response interceptor in `src/core/api/apiClient.ts`
-- **Authentication Requirement**: `AUTHENTICATED` (Token-based via payload)
+- **Authentication Requirement**: `SESSION_RENEWAL` (`refreshToken` body only; no access JWT)
 - **Required Role(s)**: Any valid authenticated session (`USER` or `ADMIN`)
 - **Bearer Token Behavior**: Does not require an Authorization header; relies on `refreshToken` in request body.
 - **Required Headers**: `Content-Type: application/json`
@@ -353,7 +353,7 @@ To ensure complete technical precision, every documented endpoint separates thre
 - **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/logout`
 - **Purpose**: Invalidates the active refresh token session on the server.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.logout`)
-- **Authentication Requirement**: `PUBLIC` (Accepts session token in payload)
+- **Authentication Requirement**: `PUBLIC` (Accepts only the refresh token used for server-side session invalidation)
 - **Required Role(s)**: Any
 - **Request Body Schema**:
   ```json

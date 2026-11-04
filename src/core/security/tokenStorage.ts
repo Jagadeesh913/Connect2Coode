@@ -20,6 +20,20 @@ import { publishAuthSessionEvent } from './authSessionSync';
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const USER_PROFILE_KEY = 'user_profile';
+const ACCESS_TOKEN_COOKIE_KEYS = [
+  ACCESS_TOKEN_KEY,
+  'token',
+  'access_token',
+  'jwt',
+  'jwtToken',
+  'jwttoken',
+  'jwt_token',
+  'authToken',
+] as const;
+const REFRESH_TOKEN_COOKIE_KEYS = [REFRESH_TOKEN_KEY, 'refresh_token', 'refresh-token'] as const;
+const USER_COOKIE_KEYS = [USER_PROFILE_KEY, 'user'] as const;
+const KNOWN_COOKIE_PATHS = ['/', '/auth', '/api', '/api/v1', '/api/v1/auth'] as const;
+const COOKIE_EXPIRY = 'Thu, 01 Jan 1970 00:00:00 GMT';
 
 function cookieSecurityAttributes(): string {
   return typeof window !== 'undefined' && window.location.protocol === 'https:'
@@ -49,24 +63,73 @@ function getCookie(name: string): string | null {
   return null;
 }
 
-function removeCookie(name: string): void {
-  try {
-    document.cookie =
-      `${name}=; path=/; max-age=0; SameSite=Lax${cookieSecurityAttributes()}`;
-  } catch {}
+function getCookiePaths(): string[] {
+  const paths = new Set<string>(KNOWN_COOKIE_PATHS);
+  if (typeof window !== 'undefined') {
+    const segments = window.location.pathname.split('/').filter(Boolean);
+    while (segments.length > 0) {
+      paths.add(`/${segments.join('/')}`);
+      segments.pop();
+    }
+  }
+  return [...paths];
 }
 
-function removeLegacyBrowserStorage(key: string): void {
+function getCookieDomains(): Array<string | null> {
+  const domains: Array<string | null> = [null];
+  if (typeof window === 'undefined') return domains;
+
+  const hostname = window.location.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost' || /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname)) {
+    return domains;
+  }
+
+  domains.push(hostname, `.${hostname}`);
+  const labels = hostname.split('.');
+  if (labels.length > 2) {
+    const parentDomain = labels.slice(-2).join('.');
+    domains.push(parentDomain, `.${parentDomain}`);
+  }
+  return [...new Set(domains)];
+}
+
+function removeCookie(name: string): void {
   try {
-    for (const storage of [localStorage, sessionStorage]) {
-      storage.removeItem(`c2c_${key}`);
-      storage.removeItem(key);
+    for (const path of getCookiePaths()) {
+      for (const domain of getCookieDomains()) {
+        const domainAttribute = domain ? `; Domain=${domain}` : '';
+        document.cookie =
+          `${name}=; Path=${path}; Max-Age=0; Expires=${COOKIE_EXPIRY}; SameSite=Lax${domainAttribute}${cookieSecurityAttributes()}`;
+      }
     }
   } catch {}
 }
 
+function removeLegacyBrowserStorage(key: string): void {
+  const stores: Array<Storage | null> = [];
+  try {
+    stores.push(typeof localStorage !== 'undefined' ? localStorage : null);
+  } catch {
+    stores.push(null);
+  }
+  try {
+    stores.push(typeof sessionStorage !== 'undefined' ? sessionStorage : null);
+  } catch {
+    stores.push(null);
+  }
+
+  for (const storage of stores) {
+    if (!storage) continue;
+    try {
+      storage.removeItem(`c2c_${key}`);
+      storage.removeItem(key);
+    } catch {}
+  }
+}
+
 let inMemoryAccessToken: string | null = null;
 let inMemoryRefreshToken: string | null = null;
+let sessionEpoch = 0;
 
 export const tokenStorage = {
   getAccessToken(): string | null {
@@ -86,31 +149,18 @@ export const tokenStorage = {
   setAccessToken(token: string, maxAgeSeconds: number = 900): void {
     inMemoryAccessToken = token;
     setCookie(ACCESS_TOKEN_KEY, token, maxAgeSeconds);
-    removeCookie('token');
-    removeCookie('access_token');
-    removeCookie('jwt');
-    removeCookie('jwtToken');
-    removeCookie('jwttoken');
-    removeCookie('authToken');
-    removeLegacyBrowserStorage(ACCESS_TOKEN_KEY);
-    removeLegacyBrowserStorage('token');
-    removeLegacyBrowserStorage('access_token');
-    removeLegacyBrowserStorage('jwtToken');
-    removeLegacyBrowserStorage('jwttoken');
+    for (const key of ACCESS_TOKEN_COOKIE_KEYS) {
+      if (key !== ACCESS_TOKEN_KEY) removeCookie(key);
+      removeLegacyBrowserStorage(key);
+    }
   },
 
   removeAccessToken(): void {
     inMemoryAccessToken = null;
-    removeCookie(ACCESS_TOKEN_KEY);
-    removeCookie('token');
-    removeCookie('access_token');
-    removeCookie('jwtToken');
-    removeCookie('jwttoken');
-    removeLegacyBrowserStorage(ACCESS_TOKEN_KEY);
-    removeLegacyBrowserStorage('token');
-    removeLegacyBrowserStorage('access_token');
-    removeLegacyBrowserStorage('jwtToken');
-    removeLegacyBrowserStorage('jwttoken');
+    for (const key of ACCESS_TOKEN_COOKIE_KEYS) {
+      removeCookie(key);
+      removeLegacyBrowserStorage(key);
+    }
   },
 
   getRefreshToken(): string | null {
@@ -125,19 +175,18 @@ export const tokenStorage = {
   setRefreshToken(token: string, maxAgeSeconds: number = 604800): void {
     inMemoryRefreshToken = token;
     setCookie(REFRESH_TOKEN_KEY, token, maxAgeSeconds);
-    removeCookie('refresh_token');
-    removeLegacyBrowserStorage(REFRESH_TOKEN_KEY);
-    removeLegacyBrowserStorage('refresh_token');
+    for (const key of REFRESH_TOKEN_COOKIE_KEYS) {
+      if (key !== REFRESH_TOKEN_KEY) removeCookie(key);
+      removeLegacyBrowserStorage(key);
+    }
   },
 
   removeRefreshToken(): void {
     inMemoryRefreshToken = null;
-    removeCookie(REFRESH_TOKEN_KEY);
-    removeCookie('refresh_token');
-    removeCookie('refreshToken');
-    removeLegacyBrowserStorage(REFRESH_TOKEN_KEY);
-    removeLegacyBrowserStorage('refresh_token');
-    removeLegacyBrowserStorage('refreshToken');
+    for (const key of REFRESH_TOKEN_COOKIE_KEYS) {
+      removeCookie(key);
+      removeLegacyBrowserStorage(key);
+    }
   },
 
   // User profile is UI/session metadata, not an authentication credential (F-013).
@@ -162,10 +211,10 @@ export const tokenStorage = {
   },
 
   removeUser(): void {
-    removeCookie(USER_PROFILE_KEY);
-    removeCookie('user');
-    removeLegacyBrowserStorage(USER_PROFILE_KEY);
-    removeLegacyBrowserStorage('user');
+    for (const key of USER_COOKIE_KEYS) {
+      removeCookie(key);
+      removeLegacyBrowserStorage(key);
+    }
   },
 
   /**
@@ -173,15 +222,28 @@ export const tokenStorage = {
    * broadcast is suppressed only while processing another tab's notification.
    */
   clearTokens(options: { broadcast?: boolean } = {}): void {
+    sessionEpoch += 1;
     this.removeAccessToken();
     this.removeRefreshToken();
     this.removeUser();
-    // Clear any residual legacy cookies from earlier versions
-    removeCookie(ACCESS_TOKEN_KEY);
-    removeCookie(REFRESH_TOKEN_KEY);
     if (options.broadcast !== false) {
       publishAuthSessionEvent('session-cleared');
     }
+  },
+
+  /** Used to reject authentication responses that complete after logout. */
+  getSessionEpoch(): number {
+    return sessionEpoch;
+  },
+
+  /**
+   * Claims ownership for new authentication work without clearing the current
+   * session. Older login/refresh responses become stale, while a later logout
+   * or login can still supersede this owner.
+   */
+  claimSessionOwnership(): number {
+    sessionEpoch += 1;
+    return sessionEpoch;
   },
 
   /** Discards stale per-tab token caches so shared cookies become authoritative. */

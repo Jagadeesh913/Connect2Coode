@@ -47,8 +47,6 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     register,
     handleSubmit,
     reset,
-    getValues,
-    setValue,
     formState: { errors },
   } = useForm<ExamSectionFormData>({
     defaultValues: {
@@ -115,13 +113,6 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     }
   }, [initialData, companyExamId, existingSections.length, reset]);
 
-  useEffect(() => {
-    const firstSectionTypeId = sectionTypeReferences[0]?.id;
-    if (isOpen && !initialData && firstSectionTypeId && !getValues('sectionTypeId')) {
-      setValue('sectionTypeId', firstSectionTypeId, { shouldValidate: true });
-    }
-  }, [getValues, initialData, isOpen, sectionTypeReferences, setValue]);
-
   const handleFormSubmit = (data: ExamSectionFormData) => {
     onSubmit({
       ...data,
@@ -162,7 +153,7 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit(handleFormSubmit)}
-            disabled={submitting || sectionTypesLoading || sectionTypes.length === 0}
+            disabled={submitting || sectionTypesLoading || questionTypesLoading || sectionTypes.length === 0}
             className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer font-sans disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {submitting ? 'Saving...' : isEditing ? 'Update Section' : 'Save Section'}

@@ -7,6 +7,8 @@ import type {
   CompanyExamItem,
   CompanyExamSectionItem,
   CompanyRoleItem,
+  PageRequestPayload,
+  PaginatedData,
 } from '../../features/companies/types/companyExam';
 
 export type CompanyItem = Company;
@@ -21,9 +23,16 @@ export type CompanyItem = Company;
  * Uses shared `apiClient` to interact with Java Spring Boot backend.
  */
 export const adminCompanyService = {
+  async getCompaniesPaginated(
+    pageRequest: Partial<PageRequestPayload>,
+    signal?: AbortSignal
+  ): Promise<ApiResponse<PaginatedData<Company>>> {
+    return companyService.getCompaniesPaginated(pageRequest, signal);
+  },
+
   /**
    * POST /api/v1/company/list
-   * Fetches company list from backend database with JWT token in request payload.
+   * Fetches the company list with bearer authentication and business fields only.
    */
   async getCompanies(signal?: AbortSignal): Promise<ApiResponse<Company[]>> {
     return companyService.getAllCompanies(signal);

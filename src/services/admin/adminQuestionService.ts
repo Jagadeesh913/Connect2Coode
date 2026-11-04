@@ -102,6 +102,7 @@ export async function fetchResilientQuestionPage(
       if (hasFilter) {
         try {
           let baseQuestions: QuestionListItem[] = [];
+          let baseCatalogTotal: number | null = null;
           try {
             const [res20, res4]: [ApiResponse<PaginatedQuestionResponse>, ApiResponse<PaginatedQuestionResponse>] = await Promise.all([
               apiClient.post(
@@ -118,6 +119,9 @@ export async function fetchResilientQuestionPage(
             const d20 = res20.data.content;
             const d4 = res4.data.content;
             baseQuestions = [...(Array.isArray(d20) ? d20 : []), ...(Array.isArray(d4) ? d4 : [])];
+            const reportedTotals = [res20.data.totalElements, res4.data.totalElements]
+              .filter((value): value is number => typeof value === 'number' && value >= 0);
+            baseCatalogTotal = reportedTotals.length > 0 ? Math.max(...reportedTotals) : null;
           } catch {
             // Fallback for mocked unit tests expecting pageSize 24
           }
@@ -132,6 +136,10 @@ export async function fetchResilientQuestionPage(
               const dSingle = singleRes.data.content;
               if (Array.isArray(dSingle)) {
                 baseQuestions = dSingle;
+                baseCatalogTotal =
+                  typeof singleRes.data.totalElements === 'number' && singleRes.data.totalElements >= 0
+                    ? singleRes.data.totalElements
+                    : null;
               }
             } catch {
               // Ignore
@@ -139,6 +147,15 @@ export async function fetchResilientQuestionPage(
           }
 
           if (baseQuestions.length > 0) {
+            baseQuestions = Array.from(
+              new Map(baseQuestions.map((question) => [String(question.id), question])).values()
+            );
+            // Client filtering is safe only when the fallback response proves
+            // that it contains the complete catalog. Returning totals from a
+            // partial 24-row recovery would hide later matching questions.
+            if (baseCatalogTotal === null || baseQuestions.length < baseCatalogTotal) {
+              throw new Error('Filtered question recovery returned an incomplete catalog');
+            }
             const matched = baseQuestions.filter((q) => {
               // Level / Difficulty filter
               if (Array.isArray(payload.level) && payload.level.length > 0) {

@@ -299,6 +299,46 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         apiClient.post = originalPost;
       }
     });
+
+    it('rejects a title-only degraded detail payload and resolves the requested ID from the catalog', async () => {
+      const originalGet = apiClient.get;
+      const originalPost = apiClient.post;
+      let catalogCalls = 0;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        message: 'Degraded details response',
+        data: { title: 'Title without identity' },
+      });
+      apiClient.post = async () => {
+        catalogCalls += 1;
+        return {
+          statusCode: 200,
+          message: 'Questions Fetched Successfully',
+          data: {
+            content: [{
+              id: 3,
+              title: 'Catalog question',
+              description: 'Visible description',
+              difficultyName: 'Easy',
+              topicName: 'Arrays',
+              questionPlatform: 'Practice',
+              companies: [],
+            }],
+            totalElements: 1,
+            totalPages: 1,
+          },
+        };
+      };
+
+      try {
+        const result = await problemService.getProblemById(3);
+        assert.equal(Number(result.data?.id), 3);
+        assert.equal(catalogCalls, 1);
+      } finally {
+        apiClient.get = originalGet;
+        apiClient.post = originalPost;
+      }
+    });
   });
 
   describe('4. Language ID Mapping & Execution Payload Resolution', () => {

@@ -5,6 +5,7 @@ import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
 import { AdminErrorState } from '../components/AdminErrorState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
+import { Pagination } from '../../../shared/components/ui/Pagination';
 import { CompanyFormModal, CompanyFormData } from '../components/companies/CompanyFormModal';
 import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
@@ -14,7 +15,6 @@ import { getActionableErrorMessage } from '../../../core/validation';
 import {
   Plus,
   RotateCw,
-  Search,
   LayoutGrid,
   List,
   ExternalLink,
@@ -26,11 +26,14 @@ import {
 
 export const AdminCompanies: React.FC = () => {
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
+  const [availableCompanies, setAvailableCompanies] = useState<CompanyItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Search & View Mode State
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [pageNumber, setPageNumber] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalElements, setTotalElements] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
 
   // Modals State
@@ -48,6 +51,7 @@ export const AdminCompanies: React.FC = () => {
    * Fetches target company records directly from Backend database.
    */
   const listController = useRef<AbortController | null>(null);
+  const catalogController = useRef<AbortController | null>(null);
   const fetchCompanies = useCallback(async () => {
     listController.current?.abort();
     const controller = new AbortController();
@@ -55,12 +59,20 @@ export const AdminCompanies: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await adminCompanyService.getCompanies(controller.signal);
+      const res = await adminCompanyService.getCompaniesPaginated(
+        { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' },
+        controller.signal
+      );
       if (controller.signal.aborted) return;
-      if (!Array.isArray(res?.data)) {
+      if (!Array.isArray(res?.data?.content)) {
         throw new Error('Unexpected company list response format');
       }
-      setCompanies(res.data);
+      setCompanies(res.data.content);
+      setTotalElements(res.data.totalElements);
+      setTotalPages(Math.max(1, res.data.totalPages));
+      if (res.data.totalElements > 0 && pageNumber >= res.data.totalPages) {
+        setPageNumber(Math.max(0, res.data.totalPages - 1));
+      }
     } catch (err: any) {
       if (controller.signal.aborted) return;
       const msg = getActionableErrorMessage(err, 'Failed to fetch companies list.');
@@ -69,12 +81,31 @@ export const AdminCompanies: React.FC = () => {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
+  }, [pageNumber, pageSize]);
+
+  const fetchAvailableCompanies = useCallback(async () => {
+    catalogController.current?.abort();
+    const controller = new AbortController();
+    catalogController.current = controller;
+    try {
+      const response = await adminCompanyService.getCompanies(controller.signal);
+      if (!controller.signal.aborted && Array.isArray(response?.data)) {
+        setAvailableCompanies(response.data);
+      }
+    } catch {
+      if (!controller.signal.aborted) setAvailableCompanies([]);
+    }
   }, []);
 
   useEffect(() => {
     fetchCompanies();
     return () => listController.current?.abort();
   }, [fetchCompanies]);
+
+  useEffect(() => {
+    void fetchAvailableCompanies();
+    return () => catalogController.current?.abort();
+  }, [fetchAvailableCompanies]);
 
   const inspectionId = useRef(0);
   useEffect(() => () => { inspectionId.current++; }, []);
@@ -150,7 +181,7 @@ export const AdminCompanies: React.FC = () => {
       await adminCompanyService.saveOrUpdateCompany(payload);
       toast.success(formData.id ? 'Company updated successfully!' : 'Company registered successfully!');
       setIsFormOpen(false);
-      await fetchCompanies();
+      await Promise.all([fetchCompanies(), fetchAvailableCompanies()]);
     } catch (err: any) {
       toast.error(getActionableErrorMessage(err, 'Failed to save company entity.'));
     } finally {
@@ -158,16 +189,6 @@ export const AdminCompanies: React.FC = () => {
       setSubmitting(false);
     }
   };
-
-  const filteredCompanies = companies.filter((c) => {
-    const q = searchTerm.toLowerCase().trim();
-    if (!q) return true;
-    return (
-      c.name?.toLowerCase().includes(q) ||
-      c.description?.toLowerCase().includes(q) ||
-      c.website?.toLowerCase().includes(q)
-    );
-  });
 
   const columns: Column<CompanyItem>[] = [
     {
@@ -268,7 +289,7 @@ export const AdminCompanies: React.FC = () => {
         description="Manage company profiles, brand assets, and link them to DSA question tags for company-specific interview preparation."
         badge={
           <AdminBadge variant="primary">
-            {companies.length} Indexed
+            {totalElements} Indexed
           </AdminBadge>
         }
         actions={
@@ -292,19 +313,22 @@ export const AdminCompanies: React.FC = () => {
         }
       />
 
-      {/* Filter and View Bar */}
+      {/* Pagination size and view controls. The live backend list contract has
+          no company-search field, so the admin UI does not advertise one. */}
       <div className="p-4 bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-        {/* Search Input */}
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by company name or domain..."
-            className="w-full pl-10 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <select
+          value={pageSize}
+          onChange={(event) => {
+            setPageNumber(0);
+            setPageSize(Number(event.target.value));
+          }}
+          className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-200"
+          aria-label="Companies per page"
+        >
+          <option value={10}>10 / page</option>
+          <option value={20}>20 / page</option>
+          <option value={50}>50 / page</option>
+        </select>
 
         {/* View Toggle */}
         <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl">
@@ -342,12 +366,12 @@ export const AdminCompanies: React.FC = () => {
       {(!error || companies.length > 0) && viewMode === 'table' && (
         <AdminTable<CompanyItem>
           columns={columns}
-          data={filteredCompanies}
+          data={companies}
           loading={loading}
           keyExtractor={(row) => row.id || row.name}
           onRowClick={(row) => row.id && handleInspect(row.id)}
           emptyTitle="No Companies Found"
-          emptyDescription="There are currently no companies registered matching your search query."
+          emptyDescription="There are currently no companies registered in the catalog."
           emptyAction={
             <button
               onClick={handleCreateClick}
@@ -371,12 +395,12 @@ export const AdminCompanies: React.FC = () => {
                 <Skeleton className="mt-6 h-8 w-full" />
               </div>
             ))
-          ) : filteredCompanies.length === 0 ? (
+          ) : companies.length === 0 ? (
             <div className="col-span-full min-h-52 rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-slate-700">
               <p className="font-bold text-slate-800 dark:text-slate-100">No Companies Found</p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">No companies match the current search.</p>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">There are currently no companies registered in the catalog.</p>
             </div>
-          ) : filteredCompanies.map((c) => {
+          ) : companies.map((c) => {
             return (
               <div
                 key={c.id || c.name}
@@ -470,6 +494,18 @@ export const AdminCompanies: React.FC = () => {
         </div>
       )}
 
+      {totalPages > 1 && (
+        <Pagination
+          currentPage={pageNumber + 1}
+          totalPages={totalPages}
+          totalElements={totalElements}
+          pageSize={pageSize}
+          itemLabel="companies"
+          disabled={loading}
+          onPageChange={(page) => setPageNumber(page - 1)}
+        />
+      )}
+
       {/* Company Form Modal */}
       <CompanyFormModal
         isOpen={isFormOpen}
@@ -480,7 +516,7 @@ export const AdminCompanies: React.FC = () => {
         }}
         onSubmit={handleSaveCompany}
         initialData={selectedCompany}
-        availableCompanies={companies}
+        availableCompanies={availableCompanies}
         submitting={submitting}
       />
 

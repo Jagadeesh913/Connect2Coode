@@ -44,8 +44,8 @@ sequenceDiagram
     Note over User,API: 2. Authenticated Request with Auto-Attached Token
     User->>Client: problemService.getProblems(...)
     Client->>Storage: getAccessToken()
-    Client->>Client: Request Interceptor: Append Authorization: Bearer <token> & inject jwtToken in body
-    Client->>API: POST /questions { jwtToken: "...", ... }
+    Client->>Client: Request Interceptor: Append Authorization: Bearer <token>
+    Client->>API: POST /questions { business fields only }
     API-->>Client: 200 OK { statusCode: 200, data: { content: [...] } }
 
     Note over User,API: 3. Automatic Token Refresh on 401 / Expired Token
@@ -65,24 +65,28 @@ sequenceDiagram
 - **Refresh Token**: Stored in cookie (`refreshToken`).
 - **Cookie Security Attributes**: Automatically appends `; Secure` on HTTPS origins and `SameSite=Lax`.
 - **No Web-Storage Credentials**: `tokenStorage` does not read or write access tokens, refresh tokens, or user profiles in `localStorage` or `sessionStorage`; it removes legacy copies when a session is written or cleared.
+- **Immediate Logout Hygiene**: Logout captures the refresh token, increments the local session epoch, clears memory/cookies/web-storage aliases, and broadcasts the cleared state before waiting for the backend. Cookie deletion uses both `Max-Age=0` and a past `Expires` date across canonical, legacy, current-route, API-route, host, and parent-domain scopes.
+- **Stale-Response Rejection**: Login and refresh responses capture the session epoch and cannot restore credentials after a logout that completed while their request was in flight.
 - **Expired-Access Startup**: An expired access token with a refresh token/profile keeps authentication in `LOADING` until the one bootstrap refresh completes, preventing a premature protected-route redirect.
+- **Environment parity**: JWT expiry uses the token's `exp` claim identically on localhost and deployed origins, so development requests proactively refresh instead of sending access tokens that are already expired.
 - **Single-Flight Refresh Lock**: `executeRefreshToken()` uses a shared promise variable `refreshTokenPromise`. If multiple concurrent requests receive a 401 simultaneously, only ONE refresh request is dispatched to the backend; all waiting callers resolve with the new access token.
 - **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free `session-updated` and `session-cleared` events through `BroadcastChannel`, with a transient storage-event fallback only where that browser API is unavailable. Receiving tabs discard their in-memory token cache, then restore from the shared cookies or immediately become unauthenticated. A logout, refresh failure, sign-in, or refresh therefore cannot leave another open tab with stale Redux authentication state.
 
 ---
 
-## 3. The `jwtToken` Payload Contract
+## 3. Bearer-Only JWT Contract
 
 ### The Problem
-Historically, some services sent a payload field named `token` while others sent `jwtToken`, or both. The backend strictly expects `jwtToken` and throws validation errors if duplicate or conflicting token fields are present.
+Historically, the client sent `jwtToken` in mutating request bodies in addition to the bearer header. Authenticated production probes on 2026-11-03 proved that this was unnecessary and incorrect: bearer-only requests returned HTTP 200, while otherwise identical body-token-only requests returned HTTP 401 for `/questions`, `/mcq`, and `/company/list`.
 
 ### The Solution: Non-Mutating Canonicalization in `apiClient.ts`
-[`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts) implements `prepareAuthenticatedRequestData` over a recursive clone. In every outgoing `POST`, `PUT`, `PATCH`, or `DELETE` request:
+[`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts) implements `sanitizeRequestData` over a recursive clone. For every outgoing request body:
 
-1. The caller-owned body remains unchanged while a recursive clone removes `token`, `jwttoken`, and `jwt_token` aliases.
-2. The logged-in user's active access token is attached strictly as `jwtToken`; individual services do not read or inject access tokens.
-3. A DELETE without business data receives a canonical object body automatically, eliminating per-service Axios `{ data: {} }` workarounds.
-4. URL query parameters are checked to ensure no token is ever exposed in query strings.
+1. The caller-owned body remains unchanged while a recursive clone removes `jwtToken`, `token`, `jwttoken`, and `jwt_token`, including nested objects, arrays, `FormData`, and `URLSearchParams`.
+2. The access token is attached only as `Authorization: Bearer <token>`.
+3. DELETE without business data remains bodyless.
+4. URL query parameters are checked so credentials are never exposed in URLs.
+5. `URLSearchParams` bodies remain form-encoded and preserve repeated business fields after credential removal.
 
 ---
 
@@ -93,10 +97,12 @@ Historically, some services sent a payload field named `token` while others sent
 | :--- | :---: | :--- | :--- | :--- |
 | `/signUp` | `POST` | `PUBLIC` | `{ firstName, lastName, email, password, role: "USER", labelUserName, userName }` | `ApiResponse<AuthResponseData>` |
 | `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ token, refreshToken, role, id, firstName, lastName, email, isDarkTheme }>` (read-only production capture, 2026-10-23) |
-| `/auth/refresh` | `POST` | `USER_OR_ADMIN` | `{ refreshToken }` | `ApiResponse<{ accessToken, refreshToken }>` |
+| `/auth/refresh` | `POST` | `SESSION_RENEWAL` (refresh token only; no access JWT) | `{ refreshToken }` | `ApiResponse<{ token, refreshToken }>`; `authService` normalizes `token` as the access token |
 | `/auth/logout` | `POST` | `PUBLIC` | `{ refreshToken }` | `ApiResponse<string>` |
 | `/auth/generatePasswordResetOtp` | `POST` | `PUBLIC` | `{ email }` | `ApiResponse<unknown>` |
 | `/auth/verifyPasswordResetOtp` | `POST` | `PUBLIC` | `{ email, otp, password }` | `ApiResponse<unknown>` |
+
+`/auth/logout` remains a public-auth transport endpoint: the client clears its local session immediately, then sends the captured refresh token with credentials so the backend can invalidate the server session and expire any HttpOnly refresh cookie. Browser JavaScript cannot delete an HttpOnly cookie or revoke an already-issued stateless access JWT server-side; the backend owns those operations, while the client removes every readable credential and prevents stale responses from restoring it.
 
 ### B. Problems & Questions ([`src/services/problemService.ts`](../../src/services/problemService.ts), [`src/services/questionService.ts`](../../src/services/questionService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -121,9 +127,9 @@ Historically, some services sent a payload field named `token` while others sent
 ### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](../../src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](../../src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/company/list` | `POST` | `USER_OR_ADMIN` | Service payload: `{ pageNumber, pageSize, sortBy, sortDirection }`; `apiClient` adds `jwtToken`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
+| `/company/list` | `POST` | `USER_OR_ADMIN` | Service payload: `{ pageNumber, pageSize, sortBy, sortDirection }` with bearer authentication. The response page uses `content`, `pageNumber`, `pageSize`, `totalElements`, `totalPages`, `first`, and `last`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. Live 2026-11-03 probes confirmed pagination and also confirmed that `searchText`, `search`, `query`, `name`, and `companyName` are silently ignored; they must not be exposed as server filters. |
 | `/company/{id}` | `GET` | `USER_OR_ADMIN` | Company details by numeric ID; captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
-| `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Services send pagination/sort fields and `apiClient` adds `jwtToken`. |
+| `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Services send pagination/sort business fields with bearer authentication. |
 | `/company/exams/{examId}` | `GET` | `USER_OR_ADMIN` | Detailed exam blueprint (exam info, recruitment roles, exam sections). |
 | `/admin/company` | `POST` | `ADMIN_ONLY` | Creates or updates company record. |
 | `/admin/companyRole` | `POST` | `ADMIN_ONLY` | Creates or updates recruitment role (`roleName`, `roleCode`, `salary`). |
@@ -133,7 +139,7 @@ Historically, some services sent a payload field named `token` while others sent
 ### E. Aptitude & MCQ Assessment ([`src/services/mcqService.ts`](../../src/services/mcqService.ts), [`src/services/admin/adminMcqService.ts`](../../src/services/admin/adminMcqService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by subject, difficulty, company, search text with pagination. |
+| `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by `subject`, `difficulty`, `topic`, `companies`, and `searchText`, with `pageRequest`. Reference filters send numeric IDs loaded from the reference library. Live 2026-11-03 probes returned 86 total rows and different totals for search queries. |
 | `/mcq/{id}` | `GET` | `USER_OR_ADMIN` | Single MCQ question details and options. |
 | `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ. The request contains `id` for an update, taxonomy codes and names (`subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topicGroupCode`, `topicRefCode`, `topicRefName`, `difficultyGroupCode`, `difficultyRefCode`, `difficultyRefName`), optional `companyId` and `companyName`, `question`, optional `explanation`, `isActive`, and `options`. Each option contains only its persisted `id` when present, `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. Exactly one option must be correct. Legacy question-level answer fields and option aliases are not sent or used to determine correctness. |
 | `/admin/mcq/{id}` | `DELETE` | `ADMIN_ONLY` | Deletes an MCQ question. |
@@ -151,13 +157,13 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 | `/user/learningSheet/section/{sectionId}/questions` | `GET` | `USER_OR_ADMIN` | Returns question-link records ordered by `displayOrder`. The deletion identifier is the outer link `id`; problem navigation uses `question.id`. |
 | `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Saves a sheet. Create omits `id`; edit sends `{ id, sheetCode, sheetName, description, isActive }`. |
 | `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a top-level section. Create omits `id`; edit sends `{ id, sheetId, parentSectionId, sectionName, displayOrder, isActive }`. |
-| `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section. `apiClient` creates the authenticated body and injects `jwtToken`. |
+| `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section with bearer authentication and no invented credential body. |
 | `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Saves a problem association: create sends `id: null`; edit sends the outer association `id`, plus `{ sectionId, question: { id }, displayOrder, isActive }`. |
 | `/admin/learningSheet/section/{sectionId}/question/{linkId}` | `DELETE` | `ADMIN_ONLY` | Removes a section-question association without deleting the problem. The second path value is the association/link ID returned as the outer record `id`. |
 
 The problem route is deliberately built from the nested `question.id`, never the outer association `id` and never the nullable response `sectionId`. The production OpenAPI document requires authentication and could not be read anonymously on 2026-11-01; therefore live update acceptance remains `PARTIALLY VERIFIED` until an authenticated edit is executed against the backend.
 
-All calls use `apiClient`. GET requests carry the JWT in the bearer header; tokens are never put into query parameters. POST and DELETE bodies receive the canonical `jwtToken` from the interceptor, with duplicate token aliases removed.
+All calls use `apiClient`. Protected business requests carry the access JWT only in the bearer header; access-token aliases are removed from request bodies and query parameters. The session-specific `/auth/refresh` and `/auth/logout` contracts intentionally retain `{ refreshToken }` in their request bodies.
 
 ### G. Live Read-Only DTO Fields (2026-10-23)
 
@@ -192,7 +198,7 @@ Live MCQ verification on 2026-10-23 found that this is a record-level data bound
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/userInfo/{userId}` | `GET` | `USER_OR_ADMIN` | Fetches academic details (regNumber, joinedYear, passedOutYear, college). |
-| `/userInfo/{userId}` | `POST` | `USER_OR_ADMIN` | Saves/updates academic details. The service sends academic fields; `apiClient` adds `jwtToken`. |
+| `/userInfo/{userId}` | `POST` | `USER_OR_ADMIN` | Saves/updates academic details using business fields and bearer authentication. |
 | `/users/{userId}/questions/{questionId}/bookmark` | `POST` | `USER_ONLY` | Bookmarks a problem for the user. |
 | `/users/{userId}/questions/{questionId}/bookmark` | `DELETE` | `USER_ONLY` | Removes a problem bookmark. |
 | `/users/{userId}/questions/bookmarks` | `GET` | `USER_ONLY` | Retrieves all bookmarked questions for the user. |
@@ -222,7 +228,7 @@ Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, 
 | :--- | :---: | :--- | :--- |
 | `/referenceLibrary/refGroupCode/{groupCode}` | `GET` | `USER_OR_ADMIN` | Returns API-owned taxonomy terms. Current callers request `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, subject-specific topic groups, `GENDER`, `LANG`, and `TESTCASETYPE`. |
 | `/referenceLibrary/refGroupCode/list` | `GET` | `USER_OR_ADMIN` | Returns all reference group codes as strings. The authenticated 2026-11-01 response contained 15 codes; clients consume the returned list rather than hardcoding its length or membership. |
-| `/referenceLibrary` | `POST` | `ADMIN_ONLY` | Creates when no `id` is present using `{ refGroupCode, refGroupName, refCode, refName, isActive }`; updates when `id` is present using `{ id, refGroupCode, refCode, refName, isActive }`. The API injects canonical `jwtToken` centrally. A group is created by saving its first record. |
+| `/referenceLibrary` | `POST` | `ADMIN_ONLY` | Creates when no `id` is present using `{ refGroupCode, refGroupName, refCode, refName, isActive }`; updates when `id` is present using `{ id, refGroupCode, refCode, refName, isActive }`. Authentication is bearer-header only. A group is created by saving its first record. |
 | `/referenceLibrary/refGroupCode/{groupCode}/refCode/{refCode}` | `DELETE` | `ADMIN_ONLY` | Irreversible hard delete. The admin UI requires an explicit confirmation and URL-encodes both path segments. |
 | `/language` | `GET` | `USER_OR_ADMIN` | Compiler catalog with database table IDs and execution reference IDs. Values are consumed from response fields, not fixed client ranges. |
 | `/language/dropdown` | `GET` | `USER_OR_ADMIN` | Lightweight language selector for code runner. |

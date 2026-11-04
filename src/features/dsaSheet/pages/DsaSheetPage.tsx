@@ -8,6 +8,8 @@ import {
   ChevronRight,
   Circle,
   Lock,
+  Pause,
+  Play,
   Search,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
@@ -56,6 +58,24 @@ export const DsaSheetPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [activeSlide, setActiveSlide] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocusedWithin, setIsFocusedWithin] = useState(false);
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const [isDocumentVisible, setIsDocumentVisible] = useState(true);
+
+  useEffect(() => {
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const syncMotionPreference = () => setPrefersReducedMotion(motionQuery.matches);
+    const syncVisibility = () => setIsDocumentVisible(document.visibilityState === 'visible');
+    syncMotionPreference();
+    syncVisibility();
+    motionQuery.addEventListener('change', syncMotionPreference);
+    document.addEventListener('visibilitychange', syncVisibility);
+    return () => {
+      motionQuery.removeEventListener('change', syncMotionPreference);
+      document.removeEventListener('visibilitychange', syncVisibility);
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -115,14 +135,28 @@ export const DsaSheetPage: React.FC = () => {
     }
   }, [activeSlide, sheetSlides.length]);
 
-  // Automatic right-to-left slide transition (2.6s interval, paused on hover)
+  // Automatic right-to-left slide transition with user, focus, motion, and visibility guards.
   useEffect(() => {
-    if (sheetSlides.length <= 1 || isHovered) return;
+    if (
+      sheetSlides.length <= 1 ||
+      isHovered ||
+      isFocusedWithin ||
+      isCarouselPaused ||
+      prefersReducedMotion ||
+      !isDocumentVisible
+    ) return;
     const timer = setInterval(() => {
       setActiveSlide((prev) => (prev + 1) % sheetSlides.length);
     }, 2600);
     return () => clearInterval(timer);
-  }, [isHovered, sheetSlides.length]);
+  }, [
+    isCarouselPaused,
+    isDocumentVisible,
+    isFocusedWithin,
+    isHovered,
+    prefersReducedMotion,
+    sheetSlides.length,
+  ]);
 
   const handlePrevSlide = () => {
     setActiveSlide((prev) => (prev === 0 ? sheetSlides.length - 1 : prev - 1));
@@ -164,11 +198,19 @@ export const DsaSheetPage: React.FC = () => {
         ) : (
           <>
             {/* Centered DSA Sheet Selector Carousel (Animates right-to-left, showing two sheets at a time) */}
-            <div className="w-full flex flex-col items-center justify-center mb-8">
+            <div
+              className="w-full flex flex-col items-center justify-center mb-8"
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
+              onFocusCapture={() => setIsFocusedWithin(true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  setIsFocusedWithin(false);
+                }
+              }}
+            >
               <div
                 className="relative flex items-center justify-center gap-2 sm:gap-3 w-full max-w-2xl mx-auto"
-                onMouseEnter={() => setIsHovered(true)}
-                onMouseLeave={() => setIsHovered(false)}
               >
                 {/* Left Arrow Button */}
                 {sheetSlides.length > 1 && (
@@ -189,12 +231,14 @@ export const DsaSheetPage: React.FC = () => {
                   className="w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1.5 dark:border-slate-800 dark:bg-slate-900/70 shadow-xs"
                 >
                   <div
-                    className="flex transition-transform duration-500 ease-in-out"
+                    className={`flex ${prefersReducedMotion ? '' : 'transition-transform duration-500 ease-in-out'}`}
                     style={{ transform: `translateX(-${activeSlide * 100}%)` }}
                   >
                     {sheetSlides.map((slide, slideIdx) => (
                       <div
                         key={slideIdx}
+                        aria-hidden={slideIdx !== activeSlide}
+                        inert={slideIdx !== activeSlide}
                         className="w-full shrink-0 grid grid-cols-1 sm:grid-cols-2 gap-2"
                       >
                         {slide.map((sheet, itemIdx) => {
@@ -203,6 +247,7 @@ export const DsaSheetPage: React.FC = () => {
                             <button
                               key={`${slideIdx}-${sheet.id}-${itemIdx}`}
                               type="button"
+                              tabIndex={slideIdx === activeSlide ? 0 : -1}
                               aria-pressed={isSelected}
                               onClick={() => {
                                 if (sheet.id === selectedSheetId) return;
@@ -257,6 +302,27 @@ export const DsaSheetPage: React.FC = () => {
                       aria-label={`Go to slide ${idx + 1}`}
                     />
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => setIsCarouselPaused((paused) => !paused)}
+                    disabled={prefersReducedMotion}
+                    aria-pressed={isCarouselPaused || prefersReducedMotion}
+                    aria-label={
+                      prefersReducedMotion
+                        ? 'Automatic sheet slides disabled by reduced-motion settings'
+                        : isCarouselPaused
+                        ? 'Resume automatic sheet slides'
+                        : 'Pause automatic sheet slides'
+                    }
+                    className="ml-2 inline-flex h-7 w-7 items-center justify-center rounded-full text-slate-500 hover:bg-white hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    title={prefersReducedMotion ? 'Automatic slides are disabled by reduced-motion settings' : undefined}
+                  >
+                    {isCarouselPaused || prefersReducedMotion ? (
+                      <Play className="h-3.5 w-3.5" />
+                    ) : (
+                      <Pause className="h-3.5 w-3.5" />
+                    )}
+                  </button>
                 </div>
               )}
 

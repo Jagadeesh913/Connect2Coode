@@ -47,6 +47,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - `detailCache`: TTL 5 minutes, max 40 entries. Keys based on normalized problem slug or ID.
   - LRU Trimming: `trimCache` evicts oldest cache entries when capacity is reached.
 - **Visible-query invariant**: When a page/filter request changes the list cache key, the reducer immediately swaps to a fresh matching cache entry or clears the visible rows and initializes pagination for the requested page. It never presents rows from the previous query under new controls. Same-query refreshes may retain their current rows while the refresh status is shown.
+- **Server-owned list controls**: Practice sends URL-backed difficulty, topic, company, platform, search, page, and page-size values through `fetchProblems` to `POST /questions`; it does not load a large catalog and slice it in the browser. Company directories request the selected `/company/list` page directly. Company-detail coding and MCQ tabs debounce search, resolve difficulty/subject IDs from reference groups, and request each page from `/questions` or `/mcq`. Controls without an observed backend field are not rendered as catalog filters.
 - **Request ownership**: Only the latest list request may replace visible rows or release its loading state; superseded responses may warm their own cache entry but cannot overwrite the active query.
 
 ### 3. `companySlice` ([`src/features/companies/redux/companySlice.ts`](../../src/features/companies/redux/companySlice.ts))
@@ -76,7 +77,10 @@ export const useAppStore = useStore.withTypes<AppStore>();
 ### 6. `profileSlice` ([`src/features/profile/redux/profileSlice.ts`](../../src/features/profile/redux/profileSlice.ts))
 - **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` academic/personal fields. Activity metrics belong to `progressSlice`.
 - **Persistence boundary**: Academic records are server-derived and held only in Redux/component memory for the active session. `ProfileSettings` no longer caches them in `localStorage`.
+- **API-field boundary**: `ProfileSettings` exposes only fields represented by the authenticated identity or `/userInfo/{userId}` contracts. Academic and editable personal values never fall back to legacy fields on the identity object. The unsupported email-notification, interface-language, and profile-level theme controls were removed rather than persisted locally. Global theme behavior remains owned by `ThemeProvider`.
 - **Single source of truth**: `ProfileSettings` renders academic data directly from the slice rather than maintaining a second component copy.
+- **Nullable identity cache**: `profileFetched` distinguishes an API-confirmed `null` identity result from the not-yet-requested state, preventing route remounts from repeating the same read and allowing the page to leave its initial skeleton.
+- **Refresh continuity**: A token-only `setAuthenticatedSession` action preserves the current identity and `/userInfo` caches; only an explicit different user clears them. The personal-information modal uses the same session-identity fallback rendered in the profile header.
 - **Request ownership**: Fetch and save actions carry a request ID and user ID. A late fetch for an old user, or a fetch superseded by a save, cannot overwrite current academic data.
 - **Empty response caching and account switches**: A valid API `null` is cached for that user to prevent duplicate requests. Auth transitions clear the previous user's record immediately, and an omitted response `userId` is filled from the requested route identity before reducer ownership checks.
 
@@ -129,7 +133,7 @@ graph LR
     end
 ```
 
-Credentials and user-profile metadata are intentionally excluded from `localStorage` and `sessionStorage`. `tokenStorage` uses in-memory values plus the existing cookie contract; legacy web-storage copies are deleted during session writes and logout. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained scoped storage is limited to manual/offline progress and COMPANY/APTITUDE bookmark fallbacks, for which the observed API contracts do not provide equivalent full persistence; theme, notification, language, and post-login redirect are non-sensitive UI preferences/state.
+Credentials and user-profile metadata are intentionally excluded from `localStorage` and `sessionStorage`. `tokenStorage` uses in-memory values plus the existing cookie contract; legacy web-storage copies are deleted during session writes and logout. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained user-scoped storage is limited to manual/offline progress, COMPANY/APTITUDE bookmark fallbacks, and the active identity's theme preference. `ProtectedRoute` stores `post_auth_redirect` separately in `sessionStorage` for the current tab. Unsupported profile notification and interface-language preferences are not persisted.
 
 ### `userScopedStorage` Architecture
 Browser storage is shared across users on the same machine. To eliminate privacy leaks when a user logs out and another logs in:

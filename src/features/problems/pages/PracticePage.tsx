@@ -18,16 +18,6 @@ import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
 const EMPTY_REFERENCES: ReferenceItem[] = [];
 const EMPTY_COMPANIES: CompanyItem[] = [];
 
-const getDifficultyRank = (diff?: string): number => {
-  if (!diff) return 99;
-  const d = diff.toLowerCase().trim();
-  if (d.includes('basic') || d.includes('school')) return 1;
-  if (d.includes('easy')) return 2;
-  if (d.includes('medium')) return 3;
-  if (d.includes('hard')) return 4;
-  return 99;
-};
-
 const parseListParam = (val: string | null): string[] => {
   if (!val) return [];
   return val
@@ -38,12 +28,21 @@ const parseListParam = (val: string | null): string[] => {
 
 export const PracticePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { problems: apiProblems, listLoading: loading, listError: error } = useAppSelector((state) => state.problems);
+  const {
+    problems: apiProblems,
+    pagination: serverPagination,
+    listLoading: loading,
+    listError: error,
+  } = useAppSelector((state) => state.problems);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const { solvedByProblemId } = useAppSelector((state) => state.progress);
   const referenceGroups = useAppSelector((state) => state.references.groups);
+  const referenceLoading = useAppSelector((state) => state.references.loading);
+  const referenceErrors = useAppSelector((state) => state.references.errors);
   const serverCompanies = useAppSelector((state) => state.companies.companies);
+  const companiesLoading = useAppSelector((state) => state.companies.loading);
+  const companiesError = useAppSelector((state) => state.companies.error);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawLimit = searchParams.get('limit') || searchParams.get('pageSize');
@@ -57,8 +56,6 @@ export const PracticePage: React.FC = () => {
   const selectedDifficulties = useMemo(() => parseListParam(searchParams.get('difficulty')), [searchParams]);
   const selectedCompanies = useMemo(() => parseListParam(searchParams.get('company')), [searchParams]);
   const selectedPlatforms = useMemo(() => parseListParam(searchParams.get('platform')), [searchParams]);
-  const selectedStatus = searchParams.get('status') || '';
-  const selectedSort = searchParams.get('sort') || '';
   const rawPage = searchParams.get('page');
   const parsedPage = Number(rawPage || '1');
   const currentPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -108,8 +105,6 @@ export const PracticePage: React.FC = () => {
     count += selectedCompanies.length;
     count += selectedPlatforms.length;
     if (searchInputParam.trim()) count++;
-    if (selectedStatus) count++;
-    if (selectedSort) count++;
     return count;
   }, [
     selectedDifficulties,
@@ -117,8 +112,6 @@ export const PracticePage: React.FC = () => {
     selectedCompanies,
     selectedPlatforms,
     searchInputParam,
-    selectedStatus,
-    selectedSort,
   ]);
 
   const draftFilterCount = useMemo(() => {
@@ -278,6 +271,15 @@ export const PracticePage: React.FC = () => {
     return ids;
   }, [selectedPlatforms, apiPlatforms]);
 
+  const difficultyIdsKey = Array.from(resolvedDifficultyIds).join(',');
+  const topicIdsKey = Array.from(resolvedTopicIds).join(',');
+  const companyIdsKey = Array.from(resolvedCompanyIds).join(',');
+  const platformIdsKey = Array.from(resolvedPlatformIds).join(',');
+  const difficultyIds = useMemo(() => difficultyIdsKey ? difficultyIdsKey.split(',').map(Number) : [], [difficultyIdsKey]);
+  const topicIds = useMemo(() => topicIdsKey ? topicIdsKey.split(',').map(Number) : [], [topicIdsKey]);
+  const companyIds = useMemo(() => companyIdsKey ? companyIdsKey.split(',').map(Number) : [], [companyIdsKey]);
+  const platformIds = useMemo(() => platformIdsKey ? platformIdsKey.split(',').map(Number) : [], [platformIdsKey]);
+
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
   // Load catalog reference data from APIs once
@@ -290,7 +292,88 @@ export const PracticePage: React.FC = () => {
 
   const [retryAttempt, setRetryAttempt] = useState(0);
 
-  // Load the full problems catalog so filtering operates across all items without being pre-sliced by pagination
+  const hasPendingFilterResolution = useMemo(() => {
+    const hasUnresolvedDiff = selectedDifficulties.some(
+      (val) =>
+        isNaN(Number(val)) &&
+        !apiDifficulties.some(
+          (d) =>
+            d.refName.toLowerCase() === val.toLowerCase() ||
+            d.refCode?.toLowerCase() === val.toLowerCase()
+        )
+    );
+    if (hasUnresolvedDiff && (referenceLoading['DIFF'] || (!referenceGroups['DIFF'] && !referenceErrors['DIFF']))) return true;
+
+    const hasUnresolvedTopic = selectedTopics.some(
+      (val) =>
+        isNaN(Number(val)) &&
+        !apiTopics.some(
+          (t) =>
+            t.refName.toLowerCase() === val.toLowerCase() ||
+            t.refCode?.toLowerCase() === val.toLowerCase()
+        )
+    );
+    if (hasUnresolvedTopic && (referenceLoading['TOPIC'] || (!referenceGroups['TOPIC'] && !referenceErrors['TOPIC']))) return true;
+
+    const hasUnresolvedPlatform = selectedPlatforms.some(
+      (val) =>
+        isNaN(Number(val)) &&
+        !apiPlatforms.some(
+          (p) =>
+            p.refName.toLowerCase() === val.toLowerCase() ||
+            p.refCode?.toLowerCase() === val.toLowerCase() ||
+            String(p.id) === val
+        )
+    );
+    if (hasUnresolvedPlatform && (referenceLoading['QPF'] || (!referenceGroups['QPF'] && !referenceErrors['QPF']))) return true;
+
+    const hasUnresolvedCompany = selectedCompanies.some(
+      (val) =>
+        isNaN(Number(val)) &&
+        !apiCompanies.some(
+          (c) =>
+            c.name.toLowerCase() === val.toLowerCase() ||
+            c.slug?.toLowerCase() === val.toLowerCase() ||
+            String(c.id) === val
+        )
+    );
+    if (hasUnresolvedCompany && (companiesLoading || (serverCompanies.length === 0 && !companiesError))) return true;
+
+    return false;
+  }, [
+    selectedDifficulties,
+    apiDifficulties,
+    referenceLoading,
+    referenceGroups,
+    referenceErrors,
+    selectedTopics,
+    apiTopics,
+    selectedPlatforms,
+    apiPlatforms,
+    selectedCompanies,
+    apiCompanies,
+    companiesLoading,
+    serverCompanies,
+    companiesError,
+  ]);
+
+  const currentRequestKey = useMemo(() => {
+    return JSON.stringify({
+      page: currentPage,
+      limit: pageSize,
+      search: searchInputParam.trim(),
+      difficulty: difficultyIds,
+      topic: topicIds,
+      companies: companyIds,
+      platform: platformIds,
+    });
+  }, [currentPage, pageSize, searchInputParam, difficultyIds, topicIds, companyIds, platformIds]);
+
+  const [fulfilledKey, setFulfilledKey] = useState<string | null>(null);
+
+  // Every backend-supported filter and page is owned by POST /questions. Keep
+  // the URL as the UI source of truth, but never hydrate a large client-side
+  // catalog and pretend its slices are server pages.
   useLayoutEffect(() => {
     let active = true;
     if (!isAuthenticated) {
@@ -298,15 +381,27 @@ export const PracticePage: React.FC = () => {
       return;
     }
 
+    if (hasPendingFilterResolution) {
+      return;
+    }
+
     const request = dispatch(
       fetchProblems({
-        page: 1,
-        limit: 100,
+        page: currentPage,
+        limit: pageSize,
+        searchText: searchInputParam,
+        difficulty: difficultyIds,
+        topic: topicIds,
+        companies: companyIds,
+        platform: platformIds,
       })
     );
 
     request
       .unwrap()
+      .then(() => {
+        if (active) setFulfilledKey(currentRequestKey);
+      })
       .catch(() => {})
       .finally(() => {
         if (active) setHasFetchedOnce(true);
@@ -316,7 +411,20 @@ export const PracticePage: React.FC = () => {
       active = false;
       request.abort();
     };
-  }, [dispatch, isAuthenticated, retryAttempt]);
+  }, [
+    dispatch,
+    isAuthenticated,
+    retryAttempt,
+    currentPage,
+    pageSize,
+    searchInputParam,
+    difficultyIds,
+    topicIds,
+    companyIds,
+    platformIds,
+    hasPendingFilterResolution,
+    currentRequestKey,
+  ]);
 
   const isProblemsLoading = (loading || !hasFetchedOnce) && apiProblems.length === 0;
 
@@ -503,177 +611,27 @@ export const PracticePage: React.FC = () => {
     );
   }, [apiCompanies, companyFilterSearch]);
 
-  // Filter problems across all criteria without prior pagination restrictions (production standard)
-  const filteredProblems = useMemo(() => {
-    let list = apiProblems;
+  const displayedProblems = apiProblems;
 
-    // 1. Search Query filter
-    if (searchInputParam.trim()) {
-      const q = searchInputParam.trim().toLowerCase();
-      list = list.filter((p) => {
-        const title = (p.title || '').toLowerCase();
-        const desc = (p.description || '').toLowerCase();
-        const topic = (p.topic || '').toLowerCase();
-        const diff = (p.difficulty || '').toLowerCase();
-        return title.includes(q) || desc.includes(q) || topic.includes(q) || diff.includes(q);
-      });
-    }
-
-    // 2. Difficulty filter (matches if problem matches ANY selected difficulty)
-    if (selectedDifficulties.length > 0) {
-      list = list.filter((p) => {
-        const pDiffId = p.difficultyId !== undefined ? Number(p.difficultyId) : undefined;
-        if (pDiffId !== undefined && resolvedDifficultyIds.has(pDiffId)) return true;
-        const diffName = (p.difficulty || '').toLowerCase().trim();
-        return selectedDifficulties.some((target) => {
-          const targetItem = apiDifficulties.find(
-            (d) =>
-              String(d.id) === target ||
-              d.refName.toLowerCase() === target.toLowerCase() ||
-              d.refCode?.toLowerCase() === target.toLowerCase()
-          );
-          const targetName = (targetItem?.refName || target).toLowerCase().trim();
-          const targetCode = (targetItem?.refCode || '').toLowerCase().trim();
-          return diffName === targetName || (targetCode && diffName === targetCode);
-        });
-      });
-    }
-
-    // 3. Topic filter (matches if problem matches ANY selected topic)
-    if (selectedTopics.length > 0) {
-      list = list.filter((p) => {
-        const pTopicId = p.topicId !== undefined ? Number(p.topicId) : undefined;
-        if (pTopicId !== undefined && resolvedTopicIds.has(pTopicId)) return true;
-        const topicName = (p.topic || '').toLowerCase().trim();
-        return selectedTopics.some((target) => {
-          const targetItem = apiTopics.find(
-            (t) =>
-              String(t.id) === target ||
-              t.refName.toLowerCase() === target.toLowerCase() ||
-              t.refCode?.toLowerCase() === target.toLowerCase()
-          );
-          const targetName = (targetItem?.refName || target).toLowerCase().trim();
-          return topicName === targetName;
-        });
-      });
-    }
-
-    // 4. Company filter (matches if problem matches ANY selected company)
-    if (selectedCompanies.length > 0) {
-      list = list.filter((p) => {
-        if (!Array.isArray(p.companies) || p.companies.length === 0) return false;
-        return selectedCompanies.some((selComp) => {
-          const targetComp = (
-            apiCompanies.find(
-              (c) =>
-                String(c.id) === selComp ||
-                c.name.toLowerCase() === selComp.toLowerCase() ||
-                c.slug?.toLowerCase() === selComp.toLowerCase()
-            )?.name || selComp
-          ).toLowerCase().trim();
-
-          return p.companies.some((c: any) => {
-            if (c?.id !== undefined && resolvedCompanyIds.has(Number(c.id))) {
-              return true;
-            }
-            const compStr = (typeof c === 'string' ? c : c?.name || String(c?.id || '')).toLowerCase().trim();
-            return compStr === targetComp || compStr.includes(targetComp);
-          });
-        });
-      });
-    }
-
-    // 5. Platform filter (matches if problem matches ANY selected platform)
-    if (selectedPlatforms.length > 0) {
-      list = list.filter((prob) => {
-        const code = (prob.qpfRefCode || '').toUpperCase().trim();
-        const name = (
-          prob.questionPlatform ||
-          prob.qpfRefName ||
-          prob.examPlatform ||
-          prob.platformName ||
-          ''
-        ).toLowerCase().trim();
-
-        return selectedPlatforms.some((selPlat) => {
-          const selectedItem = apiPlatforms.find(
-            (p) =>
-              resolvedPlatformIds.has(p.id) ||
-              String(p.id) === selPlat ||
-              p.refCode.toLowerCase() === selPlat.toLowerCase() ||
-              p.refName.toLowerCase() === selPlat.toLowerCase()
-          );
-          const targetCode = (selectedItem?.refCode || selPlat).toUpperCase().trim();
-          const targetName = (selectedItem?.refName || '').toLowerCase().trim();
-
-          if (code && code === targetCode) return true;
-          if (targetName && name.includes(targetName)) return true;
-          if (targetCode === 'GFG' && name.includes('geeks')) return true;
-          if (targetCode === 'LEETCODE' && name.includes('leetcode')) return true;
-          if (targetCode === 'HACKERRANK' && name.includes('hackerrank')) return true;
-          if (targetCode === 'METTL' && name.includes('mettl')) return true;
-          if (targetCode === 'TCSION' && (name.includes('tcs') || name.includes('ion'))) return true;
-          if (targetCode === 'AON' && name.includes('aon')) return true;
-          return false;
-        });
-      });
-    }
-
-    // 6. Status filter
-    if (selectedStatus === 'solved') {
-      list = list.filter((prob) => Boolean(solvedByProblemId[String(prob.id)]));
-    } else if (selectedStatus === 'bookmarked') {
-      list = list.filter((prob) => bookmarks.some((b) => isBookmarkItem(b, prob.id, 'PROBLEM')));
-    }
-
-    // 7. Sort filter
-    if (selectedSort === 'easy-to-hard') {
-      list = [...list].sort(
-        (a, b) => getDifficultyRank(a.difficulty) - getDifficultyRank(b.difficulty)
-      );
-    } else if (selectedSort === 'hard-to-easy') {
-      list = [...list].sort(
-        (a, b) => getDifficultyRank(b.difficulty) - getDifficultyRank(a.difficulty)
-      );
-    }
-
-    return list;
-  }, [
-    apiProblems,
-    searchInputParam,
-    selectedDifficulties,
-    resolvedDifficultyIds,
-    apiDifficulties,
-    selectedTopics,
-    resolvedTopicIds,
-    apiTopics,
-    selectedCompanies,
-    resolvedCompanyIds,
-    apiCompanies,
-    selectedPlatforms,
-    resolvedPlatformIds,
-    apiPlatforms,
-    selectedStatus,
-    solvedByProblemId,
-    bookmarks,
-    selectedSort,
-  ]);
-
-  const totalMatching = filteredProblems.length;
-  const totalPages = Math.max(1, Math.ceil(totalMatching / pageSize));
+  const totalMatching = serverPagination.total;
+  const totalPages = Math.max(1, serverPagination.totalPages);
 
   // Reset page to 1 if current page is out of range
   useEffect(() => {
+    if (!hasFetchedOnce || loading) return;
+    if (fulfilledKey !== currentRequestKey) return;
     if (currentPage > totalPages && totalPages > 0) {
       updatePracticeParams({ page: '1' });
     }
-  }, [currentPage, totalPages, updatePracticeParams]);
-
-  // Paginate AFTER filtering across the entire dataset (production standard)
-  const displayedProblems = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    return filteredProblems.slice(startIndex, startIndex + pageSize);
-  }, [filteredProblems, currentPage, pageSize]);
+  }, [
+    currentPage,
+    totalPages,
+    updatePracticeParams,
+    hasFetchedOnce,
+    loading,
+    fulfilledKey,
+    currentRequestKey,
+  ]);
 
   // Company lookup map for retrieving authentic logos and websites
   const companyMap = useMemo(() => {
@@ -812,55 +770,8 @@ export const PracticePage: React.FC = () => {
             </button>
           </form>
 
-          {/* Quick Filters Beside Search: Status, Sort, Problems Per Page */}
+          {/* Page size is part of the canonical server request. */}
           <div className="flex items-center gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap shrink-0">
-            {/* 1. Status Dropdown */}
-            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[120px]">
-              <select
-                value={selectedStatus}
-                onChange={(e) => {
-                  updatePracticeParams({ status: e.target.value || null, page: '1' });
-                }}
-                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
-                aria-label="Filter by status"
-              >
-                <option value="" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Status
-                </option>
-                <option value="solved" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Solved
-                </option>
-                <option value="bookmarked" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Bookmarked
-                </option>
-              </select>
-              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-            </div>
-
-            {/* 2. Sort Dropdown */}
-            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[140px]">
-              <select
-                value={selectedSort}
-                onChange={(e) => {
-                  updatePracticeParams({ sort: e.target.value || null, page: '1' });
-                }}
-                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
-                aria-label="Sort problems"
-              >
-                <option value="" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Sort
-                </option>
-                <option value="easy-to-hard" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Easy to Hard
-                </option>
-                <option value="hard-to-easy" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  Hard to Easy
-                </option>
-              </select>
-              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-            </div>
-
-            {/* 3. Problems Per Page Dropdown */}
             <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[115px]">
               <select
                 value={pageSize}
@@ -906,34 +817,6 @@ export const PracticePage: React.FC = () => {
                   }}
                   className="hover:text-rose-500 transition-colors cursor-pointer"
                   title="Remove search filter"
-                >
-                  <i className="fa-solid fa-xmark text-[10px]"></i>
-                </button>
-              </span>
-            )}
-
-            {selectedStatus && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200/60 dark:border-purple-800/60 shadow-2xs">
-                <span>{selectedStatus === 'solved' ? 'Solved' : 'Bookmarked'}</span>
-                <button
-                  type="button"
-                  onClick={() => updatePracticeParams({ status: null, page: '1' })}
-                  className="hover:text-rose-500 transition-colors cursor-pointer"
-                  title="Remove status filter"
-                >
-                  <i className="fa-solid fa-xmark text-[10px]"></i>
-                </button>
-              </span>
-            )}
-
-            {selectedSort && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 shadow-2xs">
-                <span>{selectedSort === 'easy-to-hard' ? 'Easy to Hard' : 'Hard to Easy'}</span>
-                <button
-                  type="button"
-                  onClick={() => updatePracticeParams({ sort: null, page: '1' })}
-                  className="hover:text-rose-500 transition-colors cursor-pointer"
-                  title="Remove sort"
                 >
                   <i className="fa-solid fa-xmark text-[10px]"></i>
                 </button>

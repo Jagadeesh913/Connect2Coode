@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { CompanyCardSkeleton } from '../../../shared/components/ui/Skeleton';
@@ -9,7 +9,6 @@ import { openAuthModal } from '../../auth/redux/authSlice';
 import { companyService } from '../../../services/companyService';
 import type { CompanyItem } from '../types/companyExam';
 import {
-  Search,
   ExternalLink,
   ArrowRight,
   Building2,
@@ -27,12 +26,12 @@ export const CompanyList: React.FC = () => {
   // Pagination & Data State
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [pageSize] = useState<number>(24);
+  const [totalElements, setTotalElements] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const searchTerm = searchParams.get('q') || '';
-  const selectedIndustry = searchParams.get('industry') || 'all';
   const rawPage = searchParams.get('page');
   const parsedPage = Number(rawPage || '1');
   const pageNumber = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage - 1 : 0;
@@ -56,10 +55,15 @@ export const CompanyList: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await companyService.getAllCompanies(signal);
+        const res = await companyService.getCompaniesPaginated(
+          { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' },
+          signal
+        );
 
         if (signal?.aborted || requestId !== requestSequence.current) return;
-        setCompanies(res.data);
+        setCompanies(res.data.content);
+        setTotalElements(res.data.totalElements);
+        setTotalPages(Math.max(1, res.data.totalPages));
       } catch (err: any) {
         if (requestId !== requestSequence.current || err?.name === 'CanceledError' || signal?.aborted) return;
         setError(err?.message || 'Failed to fetch companies');
@@ -67,7 +71,7 @@ export const CompanyList: React.FC = () => {
         if (!signal?.aborted && requestId === requestSequence.current) setLoading(false);
       }
     },
-    []
+    [pageNumber, pageSize]
   );
 
   useEffect(() => {
@@ -78,42 +82,6 @@ export const CompanyList: React.FC = () => {
     };
   }, [loadCompanies]);
 
-  // Extract industries dynamically
-  const availableIndustries = useMemo(() => {
-    const set = new Set<string>();
-    companies.forEach((c) => {
-      if (c.industry && typeof c.industry === 'string' && c.industry.trim()) {
-        set.add(c.industry.trim());
-      }
-    });
-    return Array.from(set).sort();
-  }, [companies]);
-
-  // Filter companies matching search query or industry
-  const filteredCompanies = useMemo(() => {
-    return companies.filter((company) => {
-      const query = searchTerm.toLowerCase().trim();
-      const matchesSearch =
-        !query ||
-        company.name.toLowerCase().includes(query) ||
-        (company.industry && company.industry.toLowerCase().includes(query)) ||
-        (company.description && company.description.toLowerCase().includes(query));
-
-      const matchesIndustry =
-        selectedIndustry === 'all' ||
-        (company.industry && company.industry.toLowerCase() === selectedIndustry.toLowerCase());
-
-      return matchesSearch && matchesIndustry;
-    });
-  }, [companies, searchTerm, selectedIndustry]);
-
-  const totalElements = filteredCompanies.length;
-  const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
-  const visibleCompanies = useMemo(
-    () => filteredCompanies.slice(pageNumber * pageSize, (pageNumber + 1) * pageSize),
-    [filteredCompanies, pageNumber, pageSize]
-  );
-
   useEffect(() => {
     if (rawPage !== null && (!Number.isInteger(parsedPage) || parsedPage < 1)) {
       updateCatalogParams({ page: '1' }, true);
@@ -121,10 +89,10 @@ export const CompanyList: React.FC = () => {
   }, [parsedPage, rawPage, updateCatalogParams]);
 
   useEffect(() => {
-    if (!loading && pageNumber >= totalPages) {
+    if (!loading && !error && pageNumber >= totalPages) {
       updateCatalogParams({ page: String(totalPages) }, true);
     }
-  }, [loading, pageNumber, totalPages, updateCatalogParams]);
+  }, [loading, error, pageNumber, totalPages, updateCatalogParams]);
 
   const handlePageChange = (nextPage: number) => {
     updateCatalogParams({ page: nextPage > 0 ? String(nextPage + 1) : null });
@@ -157,54 +125,13 @@ export const CompanyList: React.FC = () => {
           </div>
         </section>
 
-        {/* 2. SEARCH & INDUSTRY FILTER BAR */}
-        <div className="mt-2 mb-8 bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-2xl p-3 sm:p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          {/* Search Input */}
-          <div className="relative flex-1 w-full">
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search companies by name or keyword..."
-              value={searchTerm}
-              onChange={(e) => updateCatalogParams({ q: e.target.value || null, page: null }, true)}
-              className="w-full bg-transparent pl-11 pr-4 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
-            />
-          </div>
-
-          {/* Real Count Badge */}
-          {companies.length > 0 && (
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111A2E] text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 text-xs font-semibold shrink-0">
+        {/* The live company contract exposes pagination only. Do not render
+            search/industry controls that the backend silently ignores. */}
+        <div className="mt-2 mb-8 flex justify-end">
+          {totalElements > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#111A2E] text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-800 text-xs font-semibold">
               <Building2 className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>
-                {totalElements === companies.length
-                  ? `${companies.length} Companies`
-                  : `${totalElements} of ${companies.length} Companies`}
-              </span>
-            </div>
-          )}
-
-          {/* Industry Dropdown */}
-          {availableIndustries.length > 0 && (
-            <div className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-3 shrink-0">
-              <span className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300">
-                Industry
-              </span>
-              <div className="relative flex-1 sm:flex-initial">
-                <select
-                  value={selectedIndustry}
-                  onChange={(e) => updateCatalogParams({ industry: e.target.value === 'all' ? null : e.target.value, page: null })}
-                  className="bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-slate-100 appearance-none font-semibold w-full pr-8 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer"
-                >
-                  <option value="all" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-white">
-                    All Industries
-                  </option>
-                  {availableIndustries.map((ind) => (
-                    <option key={ind} value={ind} className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-white">
-                      {ind}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <span>{totalElements} Companies</span>
             </div>
           )}
         </div>
@@ -241,21 +168,17 @@ export const CompanyList: React.FC = () => {
               Retry Loading
             </button>
           </div>
-        ) : filteredCompanies.length === 0 ? (
+        ) : companies.length === 0 ? (
           <div className="my-12">
             <EmptyState
               title="No companies found"
-              description="No company matches your current search or industry filter."
-              actionText="Reset Filters"
-              onAction={() => {
-                updateCatalogParams({ q: null, industry: null, page: null });
-              }}
+              description="The company catalog is currently empty."
               icon={<Building2 className="w-12 h-12 text-slate-400" />}
             />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {visibleCompanies.map((company) => {
+            {companies.map((company) => {
               const companyTargetId = company.id || company.slug;
 
               return (

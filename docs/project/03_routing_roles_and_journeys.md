@@ -109,7 +109,7 @@ The application distinguishes between two primary user roles:
 3. **Account Creation**: Calls `POST /api/v1/signUp`. On success, automatically proceeds to login or directs user to sign in.
 4. **Academic Setup**: User navigates to `/profile` (protected by `ProtectedRoute`).
 5. **College Search**: User types college name in `InstitutionAutocomplete`. After 3 characters, it calls `GET /api/v1/institutions/search?query=...` and displays matched institutions with AISHE codes.
-6. **Save Profile**: User saves academic details (passing year, graduation year, registration number). Dispatches `POST /api/v1/userInfo/{userId}` with `jwtToken`.
+6. **Save Profile**: User saves academic details (passing year, graduation year, registration number). Dispatches `POST /api/v1/userInfo/{userId}` with bearer authentication and business fields only.
 
 ### Journey 2: DSA Problem Solving & Live Code Compilation
 1. **Catalog Navigation**: Student navigates to `/practice` for the general catalog or `/dsa-sheet` for an ordered learning path.

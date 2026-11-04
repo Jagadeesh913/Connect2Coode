@@ -83,6 +83,34 @@ describe('shared UX interaction contracts', () => {
     assert.match(pageSource, /getDsaQuestionProblemPath\(link\)/);
   });
 
+  it('DSA carousel exposes pause controls and stops motion for focus, reduced motion, and hidden tabs', async () => {
+    const source = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
+    assert.match(source, /matchMedia\('\(prefers-reduced-motion: reduce\)'\)/);
+    assert.match(source, /document\.addEventListener\('visibilitychange'/);
+    assert.match(source, /onFocusCapture=/);
+    assert.match(source, /onBlurCapture=/);
+    assert.match(source, /className="w-full flex flex-col items-center justify-center mb-8"\s*onMouseEnter/);
+    assert.match(source, /isCarouselPaused/);
+    assert.match(source, /!isDocumentVisible/);
+    assert.match(source, /prefersReducedMotion\s*\? 'Automatic sheet slides disabled by reduced-motion settings'/);
+    assert.match(source, /: isCarouselPaused\s*\? 'Resume automatic sheet slides'/);
+    assert.match(source, /aria-hidden=\{slideIdx !== activeSlide\}/);
+    assert.match(source, /inert=\{slideIdx !== activeSlide\}/);
+    assert.match(source, /tabIndex=\{slideIdx === activeSlide \? 0 : -1\}/);
+  });
+
+  it('aptitude options keep long mobile text and result icons top-aligned', async () => {
+    const source = await readSource('src/features/aptitude/pages/AptitudePrep.tsx');
+    assert.match(source, /transition-all flex items-start justify-between gap-3/);
+    assert.match(source, /<div className="flex items-start gap-3 min-w-0">/);
+    assert.match(source, /className="min-w-0 leading-snug break-words"/);
+    assert.match(source, /import \{ Check, Lock, X \} from 'lucide-react'/);
+    assert.match(source, /<Check aria-hidden="true"[^>]*shrink-0 mt-0\.5/);
+    assert.match(source, /<X aria-hidden="true"[^>]*shrink-0 mt-0\.5/);
+    assert.doesNotMatch(source, /fa-solid fa-check text-emerald/);
+    assert.doesNotMatch(source, /fa-solid fa-xmark text-rose/);
+  });
+
   it('problem list URL transitions dispatch before paint to prevent one-frame stale rows', async () => {
     for (const path of [
       'src/features/problems/pages/PracticePage.tsx',
@@ -93,12 +121,14 @@ describe('shared UX interaction contracts', () => {
     }
   });
 
-  it('company catalog state is URL-backed and keyboard accessible', async () => {
+  it('company catalog pagination is URL-backed, server-owned, and keyboard accessible', async () => {
     const list = await readSource('src/features/companies/pages/CompanyList.tsx');
     assert.match(list, /useSearchParams/);
-    assert.match(list, /searchParams\.get\('q'\)/);
-    assert.match(list, /searchParams\.get\('industry'\)/);
     assert.match(list, /searchParams\.get\('page'\)/);
+    assert.match(list, /getCompaniesPaginated\(/);
+    assert.match(list, /\{ pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' \}/);
+    assert.doesNotMatch(list, /getAllCompanies\(/);
+    assert.doesNotMatch(list, /filteredCompanies\.slice/);
     assert.match(list, /scrollIntoView/);
     assert.match(list, /role="group"/);
     assert.match(list, /<Link[\s\S]*?View Recruitment Exams/);
@@ -107,6 +137,29 @@ describe('shared UX interaction contracts', () => {
     const skeletonGuard = details.indexOf('isDetailsLoading && !company');
     const notFoundGuard = details.indexOf('if (!company)');
     assert.ok(skeletonGuard >= 0 && notFoundGuard > skeletonGuard);
+    assert.match(details, /getCompanyProblemsPaginated\(/);
+    assert.match(details, /searchText: debouncedQuestionSearch/);
+    assert.match(details, /difficultyReferences\.map\(\(difficulty\) =>/);
+    assert.match(details, /value=\{difficulty\.id\}/);
+    assert.doesNotMatch(details, /<option value="Easy"/);
+    assert.equal(
+      (details.match(/pageNumber: questionPage - 1/g) || []).length,
+      2,
+      'coding and MCQ requests must both translate the 1-based UI page to the 0-based API page'
+    );
+    assert.doesNotMatch(details, /list = list\.filter/);
+  });
+
+  it('practice filters and page controls dispatch the canonical server query', async () => {
+    const source = await readSource('src/features/problems/pages/PracticePage.tsx');
+    assert.match(source, /fetchProblems\(\{[\s\S]*?page: currentPage/);
+    assert.match(source, /searchText: searchInputParam/);
+    assert.match(source, /difficulty: difficultyIds/);
+    assert.match(source, /topic: topicIds/);
+    assert.match(source, /companies: companyIds/);
+    assert.match(source, /platform: platformIds/);
+    assert.match(source, /const totalMatching = serverPagination\.total/);
+    assert.doesNotMatch(source, /filteredProblems\.slice/);
   });
 
   it('clickable admin table rows expose keyboard activation', async () => {
@@ -136,6 +189,53 @@ describe('shared UX interaction contracts', () => {
       assert.match(source, /PendingRef\.current = true/);
       assert.match(source, /finally[\s\S]*?PendingRef\.current = false/);
     }
+  });
+
+  it('profile settings expose only API-backed profile fields and account actions', async () => {
+    const source = await readSource('src/features/profile/pages/ProfileSettings.tsx');
+    const themeSource = await readSource('src/shared/context/ThemeContext.tsx');
+    assert.doesNotMatch(source, /email_notifications|theme_pref|languagePreference/);
+    assert.doesNotMatch(source, /Email Notifications|Theme Preference|Choose your interface language/);
+    assert.doesNotMatch(
+      source,
+      /profile\?\.(?:institution|collegeName|regNumber|joinedYear|graduationYear|passedOutYear|bio|gender|dob)/
+    );
+    assert.doesNotMatch(source, /profile\.(?:regNumber|collegeName|institutionId|joinedYear|graduationYear|passedOutYear|bio|dob)/);
+    assert.match(source, /bio: userInfo\?\.bio/);
+    assert.match(source, /gender: userInfo\?\.gender/);
+    assert.match(source, /dob: userInfo\?\.dob/);
+    assert.match(source, /fullName,\s*firstName: profile\?\.firstName \|\| authUser\?\.firstName,\s*email,/);
+    assert.match(source, /defaultCollege=\{userInfo\?\.college \|\| userInfo\?\.collegeName \|\| ''\}/);
+    assert.match(source, /Account Security/);
+    assert.match(source, /generatePasswordResetOtpThunk/);
+    assert.match(source, /saveUserInfoThunk/);
+    assert.match(themeSource, /const loadScopedThemePreference = \(\): ThemePreference =>/);
+    assert.match(themeSource, /userScopedStorage\.getItem\('theme_pref'\)/);
+    assert.match(themeSource, /localStorage\.getItem\(LEGACY_THEME_KEY\)/);
+    assert.match(themeSource, /userScopedStorage\.setItem\('theme_pref', migratedPreference\)/);
+    assert.match(themeSource, /const scopedUser = tokenStorage\.getUser\(\)/);
+    assert.match(themeSource, /if \(hasAccountScope\(\)\) removeLegacyTheme\(\)/);
+    assert.match(themeSource, /localStorage\.removeItem\(LEGACY_THEME_KEY\)/);
+    assert.match(themeSource, /\}, \[authStatus, isAuthenticated, scopeKey\]\)/);
+    assert.match(themeSource, /preference === 'system'/);
+    assert.match(themeSource, /mediaQuery\.addEventListener\('change', applyPreference\)/);
+    assert.match(themeSource, /email:\$\{String\(user\.email\)\.trim\(\)\.toLowerCase\(\)\}/);
+    assert.match(themeSource, /const updateTheme = useCallback/);
+    assert.match(themeSource, /userScopedStorage\.setItem\('theme_pref', nextPreference\)/);
+    assert.match(themeSource, /const setTheme = useCallback[\s\S]*?updateTheme\(nextPreference\)/);
+    assert.match(themeSource, /updateTheme\(theme === 'dark' \? 'light' : 'dark'\)/);
+    assert.doesNotMatch(themeSource, /localStorage\.setItem\(LEGACY_THEME_KEY/);
+  });
+
+  it('admin dashboard separates primary metrics from reference-dependent difficulty requests', async () => {
+    const source = await readSource('src/features/admin/pages/AdminDashboard.tsx');
+    assert.match(source, /const fetchDashboardData = useCallback\(async \(\) => \{[\s\S]*?\}, \[\]\);/);
+    assert.match(source, /const fetchDifficultyCounts = useCallback/);
+    assert.match(source, /difficultyRequestRef\.current\?\.abort/);
+    assert.match(source, /if \(difficultiesLoading\) \{\s*setDifficultyMetricsLoading\(false\)/);
+    assert.match(source, /if \(difficultyReferences\.length === 0\)[\s\S]*?easyCount: null[\s\S]*?setDifficultyMetricsError/);
+    assert.match(source, /const dashboardError = \[error, difficultiesError, difficultyMetricsError\]/);
+    assert.match(source, /difficultiesError \? null : 'Difficulty references are unavailable/);
   });
 
   it('detail modals use skeletons while requested records are unavailable', async () => {

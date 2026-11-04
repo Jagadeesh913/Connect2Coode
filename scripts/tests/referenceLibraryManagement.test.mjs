@@ -88,9 +88,17 @@ describe('reference library management contract', () => {
     assert.doesNotMatch(modal, /value=\{?(?:87|88|89|99|100)\}?/);
     assert.doesNotMatch(service, /sectionTypeId \|\| payload\.sectionType \|\| 100/);
     assert.match(service, /Section classification must be selected from the reference library/);
+    assert.doesNotMatch(modal, /firstSectionTypeId/);
+    assert.match(modal, /disabled=\{submitting \|\| sectionTypesLoading \|\| questionTypesLoading \|\| sectionTypes\.length === 0\}/);
   });
 
-  it('keeps authentication and response-envelope ownership inside the central API client', () => {
+  it('discards superseded reference-group catalog responses', () => {
+    const page = read('src/features/admin/pages/AdminReferences.tsx');
+    assert.match(page, /groupsRequestGenerationRef/);
+    assert.match(page, /requestGeneration !== groupsRequestGenerationRef\.current/);
+  });
+
+  it('keeps every service payload free of access JWT fields and centralizes authentication', () => {
     const services = readServiceSources();
     const institutionService = read('src/services/admin/adminInstitutionService.ts');
     const institutionTypes = read('src/core/types/domain.ts');

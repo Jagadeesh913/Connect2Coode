@@ -42,13 +42,14 @@ const { default: bookmarkReducer, fetchBookmarks, toggleBookmarkItem, clearBookm
 const progressModule = await import('../../src/features/progress/redux/progressSlice.ts');
 const { default: progressReducer, hydrateProgress } = progressModule;
 const profileModule = await import('../../src/features/profile/redux/profileSlice.ts');
-const { default: profileReducer, fetchUserInfoThunk } = profileModule;
+const { default: profileReducer, fetchUserProfile, fetchUserInfoThunk } = profileModule;
 const referenceModule = await import('../../src/features/references/redux/referenceSlice.ts');
 const { default: referenceReducer, fetchReferenceGroup } = referenceModule;
 const languageModule = await import('../../src/features/languages/redux/languageSlice.ts');
 const { default: languageReducer, fetchLanguages } = languageModule;
 const { configureStore } = await import('@reduxjs/toolkit');
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
+const { profileService } = await import('../../src/services/profileService.ts');
 
 describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & Automation', () => {
 
@@ -528,6 +529,26 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.equal('data' in state.userInfo, false);
     });
 
+    it('caches an API-confirmed null identity profile without issuing repeated reads', async () => {
+      const originalGetProfile = profileService.getProfile;
+      let requestCount = 0;
+      profileService.getProfile = async () => {
+        requestCount += 1;
+        return { statusCode: 200, message: 'No profile found', data: null };
+      };
+      const store = configureStore({ reducer: { profile: profileReducer } });
+
+      try {
+        await store.dispatch(fetchUserProfile());
+        await store.dispatch(fetchUserProfile());
+        assert.equal(requestCount, 1);
+        assert.equal(store.getState().profile.profile, null);
+        assert.equal(store.getState().profile.profileFetched, true);
+      } finally {
+        profileService.getProfile = originalGetProfile;
+      }
+    });
+
     it('injects the requested user ID when a valid profile response omits it', () => {
       let state = profileReducer(undefined, {
         type: fetchUserInfoThunk.pending.type,
@@ -555,8 +576,64 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       });
 
       assert.equal(state.profile, null);
+      assert.equal(state.profileFetched, false);
       assert.equal(state.userInfo, null);
       assert.equal(state.activeUserInfoUserId, 'B');
+    });
+
+    it('ignores a previous account profile response after a new account starts its own request', () => {
+      let state = profileReducer(undefined, {
+        type: 'auth/setAuthenticatedSession',
+        payload: { user: { id: 'A', email: 'a@example.test' } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserProfile.pending.type,
+        meta: { requestId: 'profile-A', arg: undefined },
+      });
+      state = profileReducer(state, {
+        type: 'auth/setAuthenticatedSession',
+        payload: { user: { id: 'B', email: 'b@example.test' } },
+      });
+      state = profileReducer(state, {
+        type: fetchUserProfile.pending.type,
+        meta: { requestId: 'profile-B', arg: undefined },
+      });
+      state = profileReducer(state, {
+        type: fetchUserProfile.fulfilled.type,
+        payload: { userId: 'A', data: { id: 'A', email: 'a@example.test' } },
+        meta: { requestId: 'profile-A', arg: undefined },
+      });
+
+      assert.equal(state.loading, true);
+      assert.equal(state.profileRequestId, 'profile-B');
+      assert.equal(state.profile, null);
+
+      state = profileReducer(state, {
+        type: fetchUserProfile.fulfilled.type,
+        payload: { userId: 'B', data: { id: 'B', email: 'b@example.test' } },
+        meta: { requestId: 'profile-B', arg: undefined },
+      });
+      assert.equal(state.profile?.id, 'B');
+      assert.equal(state.profileFetched, true);
+    });
+
+    it('preserves cached profile identity and user info on token-only session refresh', () => {
+      const previousState = {
+        ...profileReducer(undefined, { type: '@@init' }),
+        profile: { id: 'A', email: 'a@example.test' },
+        profileFetched: true,
+        userInfo: { userId: 'A', regNumber: 'A-1' },
+        activeUserInfoUserId: 'A',
+      };
+      const state = profileReducer(previousState, {
+        type: 'auth/setAuthenticatedSession',
+        payload: { token: 'refreshed-token' },
+      });
+
+      assert.deepEqual(state.profile, previousState.profile);
+      assert.equal(state.profileFetched, true);
+      assert.deepEqual(state.userInfo, previousState.userInfo);
+      assert.equal(state.activeUserInfoUserId, 'A');
     });
   });
 

@@ -1,14 +1,14 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { fetchCompanyBySlug, fetchCompanyProblems } from '../redux/companySlice';
+import { fetchCompanyBySlug } from '../redux/companySlice';
 import { CompanyDetailsSkeleton, TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { toast } from 'react-hot-toast';
 import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
 import { mcqService } from '../../../services/mcqService';
-import type { McqQuestion } from '../../../core/types/domain';
+import type { McqQuestion, Problem } from '../../../core/types/domain';
 import {
   SynthesizedOption,
   cleanQuestionText,
@@ -22,6 +22,7 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { GraduationCap, Code2 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
+import { Pagination } from '../../../shared/components/ui/Pagination';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -82,12 +83,9 @@ export const CompanyDetails: React.FC = () => {
   const {
     selectedCompany,
     companyDetailRequestKey,
-    companyProblems,
     detailsLoading,
     loading,
-    companyProblemsLoading,
     detailError: companyError,
-    problemsError,
   } = useAppSelector((state) => state.companies);
   const routeMatches = companyDetailRequestKey === slug?.trim().toLowerCase();
   const company = routeMatches ? selectedCompany : null;
@@ -100,6 +98,11 @@ export const CompanyDetails: React.FC = () => {
     loading: subjectsLoading,
     error: subjectsError,
   } = useReferenceGroup('SUBJECT');
+  const {
+    items: difficultyReferences,
+    loading: difficultiesLoading,
+    error: difficultiesError,
+  } = useReferenceGroup('DIFF');
 
   // Section Selection (Coding, Aptitude, Reasoning, Verbal, Pseudocode)
   const [activeSection, setActiveSection] = useState<CompanySection>('coding');
@@ -111,9 +114,18 @@ export const CompanyDetails: React.FC = () => {
 
   // Filters matching Image 1
   const [questionSearch, setQuestionSearch] = useState('');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'All' | 'Easy' | 'Medium' | 'Hard'>('All');
-  const [sortBy, setSortBy] = useState<'default' | 'difficulty-asc' | 'difficulty-desc'>('default');
-  const [loadedCompanyKey, setLoadedCompanyKey] = useState<string | null>(null);
+  const [debouncedQuestionSearch, setDebouncedQuestionSearch] = useState('');
+  const [selectedDifficulty, setSelectedDifficulty] = useState('');
+  const [questionPage, setQuestionPage] = useState(1);
+  const [questionTotal, setQuestionTotal] = useState(0);
+  const [questionTotalPages, setQuestionTotalPages] = useState(1);
+  const [sectionTotals, setSectionTotals] = useState<Partial<Record<CompanySection, number>>>({});
+  const [codingTotalCount, setCodingTotalCount] = useState<number>(0);
+  const [codingProblems, setCodingProblems] = useState<Problem[]>([]);
+  const [codingLoading, setCodingLoading] = useState(false);
+  const [codingError, setCodingError] = useState<string | null>(null);
+  const [codingRetry, setCodingRetry] = useState(0);
+  const pageSize = 10;
 
   // Solve Modal State for MCQs
   const [activeSolveMcq, setActiveSolveMcq] = useState<McqQuestion | null>(null);
@@ -126,12 +138,26 @@ export const CompanyDetails: React.FC = () => {
   const [exams, setExams] = useState<CompanyExamItem[]>([]);
   const [examsLoading, setExamsLoading] = useState<boolean>(true);
   const [examsError, setExamsError] = useState<string | null>(null);
+  const [examPage, setExamPage] = useState(1);
+  const [examTotal, setExamTotal] = useState(0);
+  const [examTotalPages, setExamTotalPages] = useState(1);
 
   useEffect(() => {
     if (!slug) return;
-    setLoadedCompanyKey(null);
     setMcqsLoading(true);
     setMcqsBySection({});
+    setSectionTotals({});
+    setCodingTotalCount(0);
+    setCodingProblems([]);
+    setCodingLoading(false);
+    setCodingError(null);
+    setQuestionTotal(0);
+    setQuestionTotalPages(1);
+    setExamTotal(0);
+    setExamTotalPages(1);
+    setExams([]);
+    setExamPage(1);
+    setQuestionPage(1);
     const request = dispatch(fetchCompanyBySlug(slug));
     return () => {
       request.abort();
@@ -139,7 +165,6 @@ export const CompanyDetails: React.FC = () => {
   }, [dispatch, slug]);
 
   const companyId = company?.id;
-  const companyName = company?.name;
 
   usePageMetadata(
     company
@@ -167,11 +192,17 @@ export const CompanyDetails: React.FC = () => {
       try {
         const res = await companyService.getCompanyExamsList(
           safeTargetId,
-          { pageNumber: 0, pageSize: 20, sortBy: 'year', sortDirection: 'DESC' },
+          { pageNumber: examPage - 1, pageSize: 12, sortBy: 'year', sortDirection: 'DESC' },
           controller.signal
         );
         if (isMounted) {
+          if (res.data.totalElements > 0 && examPage > Math.max(1, res.data.totalPages)) {
+            setExamPage(Math.max(1, res.data.totalPages));
+            return;
+          }
           setExams(res.data.content || []);
+          setExamTotal(res.data.totalElements);
+          setExamTotalPages(Math.max(1, res.data.totalPages));
         }
       } catch (err: any) {
         if (isMounted && err?.name !== 'CanceledError') {
@@ -191,28 +222,57 @@ export const CompanyDetails: React.FC = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [companyId, slug, examsRetry]);
+  }, [companyId, slug, examsRetry, examPage]);
 
   useEffect(() => {
-    if (companyId === undefined && !companyName) return;
-    const currentKey = `${companyId ?? ''}-${companyName ?? ''}`;
-    let isSubscribed = true;
+    const timer = window.setTimeout(() => setDebouncedQuestionSearch(questionSearch.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [questionSearch]);
 
-    const request = dispatch(fetchCompanyProblems({ id: companyId ?? undefined, name: companyName }));
-    request
-      .unwrap()
-      .catch(() => {})
-      .finally(() => {
-        if (isSubscribed) {
-          setLoadedCompanyKey(currentKey);
-        }
-      });
+  const selectedDifficultyId = useMemo(() => {
+    if (!selectedDifficulty) return null;
+    const id = Number(selectedDifficulty);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  }, [selectedDifficulty]);
 
-    return () => {
-      isSubscribed = false;
-      request.abort();
-    };
-  }, [dispatch, companyId, companyName]);
+  useEffect(() => {
+    setQuestionPage(1);
+  }, [activeSection, debouncedQuestionSearch, selectedDifficulty]);
+
+  useLayoutEffect(() => {
+    if (!companyId) return;
+    if (activeSection !== 'coding') {
+      setCodingLoading(false);
+      return;
+    }
+    const controller = new AbortController();
+    setCodingLoading(true);
+    setCodingError(null);
+    companyService.getCompanyProblemsPaginated(
+      Number(companyId),
+      {
+        difficulty: selectedDifficultyId ? [Number(selectedDifficultyId)] : [],
+        searchText: debouncedQuestionSearch,
+        pageNumber: questionPage - 1,
+        pageSize,
+      },
+      controller.signal
+    ).then((response) => {
+      if (controller.signal.aborted) return;
+      setCodingProblems(response.data.content);
+      setQuestionTotal(response.data.totalElements);
+      setQuestionTotalPages(response.data.totalPages);
+      if (!debouncedQuestionSearch && !selectedDifficultyId) {
+        setSectionTotals((prev) => ({ ...prev, coding: response.data.totalElements }));
+        setCodingTotalCount(response.data.totalElements);
+      }
+    }).catch((error) => {
+      if (!controller.signal.aborted) setCodingError(error?.message || 'Unable to load coding problems.');
+    }).finally(() => {
+      if (!controller.signal.aborted) setCodingLoading(false);
+    });
+    return () => controller.abort();
+  }, [activeSection, companyId, debouncedQuestionSearch, pageSize, questionPage, selectedDifficultyId, codingRetry]);
 
   // Load only the selected section; errors settle independently and are retryable.
   useEffect(() => {
@@ -231,10 +291,12 @@ export const CompanyDetails: React.FC = () => {
     const controller = new AbortController();
     setMcqsLoading(true);
     setMcqError(null);
+    setMcqsBySection((previous) => ({ ...previous, [activeSection]: undefined }));
     mcqService.getMcqList({
       subject: [Number(subjectId)], companies: [Number(companyId)],
-      difficulty: [], topic: [], searchText: '',
-      pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
+      difficulty: selectedDifficultyId ? [Number(selectedDifficultyId)] : [],
+      topic: [], searchText: debouncedQuestionSearch,
+      pageRequest: { pageNumber: questionPage - 1, pageSize, sortBy: 'id', sortDirection: 'ASC' },
     }, controller.signal).then((res) => {
       if (controller.signal.aborted) return;
       const pageData = res.data;
@@ -242,50 +304,23 @@ export const CompanyDetails: React.FC = () => {
         throw new Error('Unexpected company MCQ response format');
       }
       const list = pageData.content;
+      const total = typeof pageData.totalElements === 'number' ? pageData.totalElements : list.length;
       setMcqsBySection((prev) => ({ ...prev, [activeSection]: list }));
+      setQuestionTotal(total);
+      setQuestionTotalPages(Math.max(1, pageData.totalPages || 1));
+      if (!debouncedQuestionSearch && !selectedDifficultyId) {
+        setSectionTotals((prev) => ({ ...prev, [activeSection]: total }));
+      }
     }).catch((err) => {
       if (!controller.signal.aborted) setMcqError(err?.message || 'Unable to load questions.');
     }).finally(() => {
       if (!controller.signal.aborted) setMcqsLoading(false);
     });
     return () => controller.abort();
-  }, [companyId, activeSection, mcqRetry, subjectReferences, subjectsError, subjectsLoading]);
+  }, [companyId, activeSection, mcqRetry, subjectReferences, subjectsError, subjectsLoading, selectedDifficultyId, debouncedQuestionSearch, questionPage, pageSize]);
 
-  const currentKey = company ? `${company.id ?? ''}-${company.name ?? ''}` : null;
-  const isQuestionsLoading =
-    isDetailsLoading ||
-    companyProblemsLoading ||
-    !company ||
-    (currentKey !== null && loadedCompanyKey !== currentKey);
-
-  // Coding Problems Filter
-  const filteredProblems = useMemo(() => {
-    let list = [...companyProblems];
-
-    if (questionSearch.trim()) {
-      const q = questionSearch.toLowerCase().trim();
-      list = list.filter(
-        (p) =>
-          p.title.toLowerCase().includes(q) ||
-          p.topic?.toLowerCase().includes(q) ||
-          p.category?.toLowerCase().includes(q)
-      );
-    }
-
-    if (selectedDifficulty !== 'All') {
-      list = list.filter((p) => p.difficulty?.toLowerCase() === selectedDifficulty.toLowerCase());
-    }
-
-    if (sortBy === 'difficulty-asc') {
-      const rank: Record<string, number> = { easy: 1, medium: 2, hard: 3 };
-      list.sort((a, b) => (rank[a.difficulty.toLowerCase()] || 2) - (rank[b.difficulty.toLowerCase()] || 2));
-    } else if (sortBy === 'difficulty-desc') {
-      const rank: Record<string, number> = { easy: 1, medium: 2, hard: 3 };
-      list.sort((a, b) => (rank[b.difficulty.toLowerCase()] || 2) - (rank[a.difficulty.toLowerCase()] || 2));
-    }
-
-    return list;
-  }, [companyProblems, questionSearch, selectedDifficulty, sortBy]);
+  const isQuestionsLoading = isDetailsLoading || codingLoading || !company;
+  const filteredProblems = codingProblems;
 
   // Helper for normalizing MCQ difficulty
   const getMcqDifficultyLabel = (q: McqQuestion): 'Easy' | 'Medium' | 'Hard' => {
@@ -301,33 +336,7 @@ export const CompanyDetails: React.FC = () => {
     () => mcqsBySection[activeSection] || [],
     [activeSection, mcqsBySection]
   );
-  const filteredMcqs = useMemo(() => {
-    let list = [...currentMcqList];
-
-    if (questionSearch.trim()) {
-      const q = questionSearch.toLowerCase().trim();
-      list = list.filter(
-        (m) =>
-          cleanQuestionText(m.question).toLowerCase().includes(q) ||
-          m.topicRefName?.toLowerCase().includes(q) ||
-          m.subjectRefName?.toLowerCase().includes(q)
-      );
-    }
-
-    if (selectedDifficulty !== 'All') {
-      list = list.filter((m) => getMcqDifficultyLabel(m) === selectedDifficulty);
-    }
-
-    if (sortBy === 'difficulty-asc') {
-      const rank: Record<string, number> = { Easy: 1, Medium: 2, Hard: 3 };
-      list.sort((a, b) => rank[getMcqDifficultyLabel(a)] - rank[getMcqDifficultyLabel(b)]);
-    } else if (sortBy === 'difficulty-desc') {
-      const rank: Record<string, number> = { Easy: 1, Medium: 2, Hard: 3 };
-      list.sort((a, b) => rank[getMcqDifficultyLabel(b)] - rank[getMcqDifficultyLabel(a)]);
-    }
-
-    return list;
-  }, [currentMcqList, questionSearch, selectedDifficulty, sortBy]);
+  const filteredMcqs = currentMcqList;
 
   const handleBookmarkToggle = (q: any, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -514,10 +523,15 @@ export const CompanyDetails: React.FC = () => {
 
               {/* Stats Badges Row */}
               <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-                {companyProblems.length > 0 && (
+                {(codingTotalCount > 0 || (sectionTotals.coding ?? 0) > 0) && (
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 shadow-2xs">
                     <i className="fa-solid fa-code text-xs"></i>
-                    <span>{companyProblems.length} {companyProblems.length === 1 ? 'Coding Problem' : 'Coding Problems'}</span>
+                    <span>
+                      {codingTotalCount || sectionTotals.coding}{' '}
+                      {(codingTotalCount || sectionTotals.coding) === 1
+                        ? 'Practice Question'
+                        : 'Practice Questions'}
+                    </span>
                   </span>
                 )}
 
@@ -557,7 +571,7 @@ export const CompanyDetails: React.FC = () => {
           >
             <GraduationCap className="w-4 h-4" />
             <span>Recruitment Exams</span>
-            {exams.length > 0 && (
+            {examTotal > 0 && (
               <span
                 className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
                   activeTab === 'exams'
@@ -565,7 +579,7 @@ export const CompanyDetails: React.FC = () => {
                     : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                 }`}
               >
-                {exams.length}
+                {examTotal}
               </span>
             )}
           </button>
@@ -621,6 +635,7 @@ export const CompanyDetails: React.FC = () => {
                 />
               </div>
             ) : (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {exams.map((exam) => (
                   <CompanyExamCard
@@ -631,6 +646,18 @@ export const CompanyDetails: React.FC = () => {
                   />
                 ))}
               </div>
+              {examTotalPages > 1 && (
+                <Pagination
+                  currentPage={examPage}
+                  totalPages={examTotalPages}
+                  totalElements={examTotal}
+                  pageSize={12}
+                  itemLabel="exams"
+                  disabled={examsLoading}
+                  onPageChange={setExamPage}
+                />
+              )}
+              </>
             )}
           </section>
         )}
@@ -644,8 +671,8 @@ export const CompanyDetails: React.FC = () => {
             const isActive = activeSection === sec.id;
             const count =
               sec.id === 'coding'
-                ? (isQuestionsLoading ? null : companyProblems.length)
-                : (mcqsBySection[sec.id] !== undefined ? mcqsBySection[sec.id]!.length : null);
+                ? (isQuestionsLoading ? null : (sectionTotals.coding ?? null))
+                : (sectionTotals[sec.id] ?? null);
 
             return (
               <button
@@ -654,8 +681,8 @@ export const CompanyDetails: React.FC = () => {
                 onClick={() => {
                   setActiveSection(sec.id);
                   setQuestionSearch('');
-                  setSelectedDifficulty('All');
-                  setSortBy('default');
+                  setSelectedDifficulty('');
+                  setQuestionPage(1);
                 }}
                 className={`flex items-center gap-2.5 px-4 sm:px-5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0 cursor-pointer ${
                   isActive
@@ -701,42 +728,39 @@ export const CompanyDetails: React.FC = () => {
               />
             </div>
 
-            {/* Difficulty & Sort Dropdowns */}
+            {/* Difficulty dropdown */}
             <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
               {/* Difficulty Dropdown */}
               <div className="relative flex-1 sm:flex-initial">
                 <select
                   value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value as any)}
+                  onChange={(e) => setSelectedDifficulty(e.target.value)}
+                  disabled={difficultiesLoading || Boolean(difficultiesError)}
                   className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
                 >
-                  <option value="All" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty: All</option>
-                  <option value="Easy" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Easy</option>
-                  <option value="Medium" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Medium</option>
-                  <option value="Hard" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Hard</option>
+                  <option value="" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">
+                    {difficultiesError ? 'Difficulty unavailable' : 'Difficulty: All'}
+                  </option>
+                  {difficultyReferences.map((difficulty) => (
+                    <option
+                      key={difficulty.id}
+                      value={difficulty.id}
+                      className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200"
+                    >
+                      {difficulty.refName}
+                    </option>
+                  ))}
                 </select>
                 <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
               </div>
 
-              {/* Sort By Dropdown */}
-              <div className="relative flex-1 sm:flex-initial">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
-                >
-                  <option value="default" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Sort by: Default</option>
-                  <option value="difficulty-asc" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty (Easy to Hard)</option>
-                  <option value="difficulty-desc" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">Difficulty (Hard to Easy)</option>
-                </select>
-                <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-              </div>
             </div>
 
           </div>
 
           {/* VIEW 1: CODING PROBLEMS TABLE */}
           {activeSection === 'coding' ? (
+            <>
             <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[560px]">
                 <thead>
@@ -753,7 +777,7 @@ export const CompanyDetails: React.FC = () => {
                 <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-xs sm:text-sm">
                   {isQuestionsLoading ? (
                     <TableRowSkeleton rows={8} />
-                  ) : !isAuthenticated && companyProblems.length === 0 ? (
+                  ) : !isAuthenticated && codingProblems.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-14 text-center text-slate-500 dark:text-slate-400">
                         <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
@@ -774,8 +798,8 @@ export const CompanyDetails: React.FC = () => {
                         </div>
                       </td>
                     </tr>
-                  ) : problemsError ? (
-                    <tr><td colSpan={8}><RequestStatus error={problemsError} onRetry={() => dispatch(fetchCompanyProblems({ id: companyId ?? undefined, name: companyName }))} /></td></tr>
+                  ) : codingError ? (
+                    <tr><td colSpan={6}><RequestStatus error={codingError} onRetry={() => setCodingRetry((value) => value + 1)} /></td></tr>
                   ) : filteredProblems.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
@@ -783,7 +807,7 @@ export const CompanyDetails: React.FC = () => {
                           <i className="fa-solid fa-code text-2xl text-slate-300 dark:text-slate-600"></i>
                           <span className="font-semibold text-sm">No coding problems found</span>
                           <span className="text-xs text-slate-400">
-                            {companyProblems.length === 0
+                            {codingTotalCount === 0 && !debouncedQuestionSearch && !selectedDifficulty
                               ? 'Coding problems for this company will appear once added.'
                               : 'Try adjusting your search or difficulty filter.'}
                           </span>
@@ -803,7 +827,7 @@ export const CompanyDetails: React.FC = () => {
                         >
                           {/* # Index */}
                           <td className="py-3.5 px-4 text-center font-mono text-xs font-semibold text-slate-400">
-                            {index + 1}
+                            {(questionPage - 1) * pageSize + index + 1}
                           </td>
 
                           {/* Title */}
@@ -894,6 +918,19 @@ export const CompanyDetails: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {questionTotalPages > 1 && (
+              <Pagination
+                className="mt-5"
+                currentPage={questionPage}
+                totalPages={questionTotalPages}
+                totalElements={questionTotal}
+                pageSize={pageSize}
+                itemLabel="problems"
+                disabled={codingLoading}
+                onPageChange={setQuestionPage}
+              />
+            )}
+            </>
           ) : (
             /* VIEW 2: MCQ SECTIONS TABLE (Aptitude, Reasoning, Verbal, Pseudocode) */
             <>
@@ -945,7 +982,7 @@ export const CompanyDetails: React.FC = () => {
                         >
                           {/* # Index */}
                           <td className="py-3.5 px-4 text-center font-mono text-xs font-semibold text-slate-400">
-                            {index + 1}
+                            {(questionPage - 1) * pageSize + index + 1}
                           </td>
 
                           {/* Question text */}
@@ -1030,6 +1067,18 @@ export const CompanyDetails: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            {questionTotalPages > 1 && (
+              <Pagination
+                className="mt-5"
+                currentPage={questionPage}
+                totalPages={questionTotalPages}
+                totalElements={questionTotal}
+                pageSize={pageSize}
+                itemLabel="questions"
+                disabled={mcqsLoading}
+                onPageChange={setQuestionPage}
+              />
+            )}
             </>
           )}
 

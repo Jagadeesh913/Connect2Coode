@@ -44,6 +44,7 @@ export const AdminReferences: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const mutationPendingRef = useRef(false);
+  const groupsRequestGenerationRef = useRef(0);
   const {
     items,
     loading: itemsLoading,
@@ -69,10 +70,12 @@ export const AdminReferences: React.FC = () => {
   });
 
   const loadGroups = useCallback(async (signal?: AbortSignal, preferredGroup?: string) => {
+    const requestGeneration = ++groupsRequestGenerationRef.current;
     setGroupsLoading(true);
     setGroupsError(null);
     try {
       const response = await referenceService.getGroupCodes(signal);
+      if (signal?.aborted || requestGeneration !== groupsRequestGenerationRef.current) return null;
       const codes = [...new Set(response.data.map(normalizeGroupCode).filter(Boolean))].sort();
       setGroupCodes(codes);
       setSelectedGroup((current) => {
@@ -83,11 +86,13 @@ export const AdminReferences: React.FC = () => {
       });
       return codes;
     } catch (error: unknown) {
-      if (signal?.aborted) return null;
+      if (signal?.aborted || requestGeneration !== groupsRequestGenerationRef.current) return null;
       setGroupsError(getActionableErrorMessage(error, 'Failed to load reference groups.'));
       return null;
     } finally {
-      if (!signal?.aborted) setGroupsLoading(false);
+      if (!signal?.aborted && requestGeneration === groupsRequestGenerationRef.current) {
+        setGroupsLoading(false);
+      }
     }
   }, []);
 

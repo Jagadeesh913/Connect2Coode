@@ -26,7 +26,7 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 // Import real production security modules, types, and reducers
-const { decodeJwtPayload, isJwtAdmin } = await import('../../src/core/security/jwt.ts');
+const { decodeJwtPayload, isJwtAdmin, isJwtExpired } = await import('../../src/core/security/jwt.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 const { isAuthSessionEvent } = await import('../../src/core/security/authSessionSync.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
@@ -145,6 +145,20 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       const pastTimestamp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
       const expiredToken = createMockJwt({ role: 'ADMIN', exp: pastTimestamp });
       assert.equal(isJwtAdmin(expiredToken), false);
+    });
+
+    it('treats expired JWTs as expired on localhost so proactive refresh is not bypassed', () => {
+      const previousWindow = globalThis.window;
+      globalThis.window = { location: { hostname: 'localhost' } };
+      try {
+        assert.equal(
+          isJwtExpired({ exp: Math.floor(Date.now() / 1000) - 60 }),
+          true
+        );
+      } finally {
+        if (previousWindow === undefined) delete globalThis.window;
+        else globalThis.window = previousWindow;
+      }
     });
 
     it('safely rejects malformed, empty, or non-JWT strings', () => {
@@ -317,25 +331,34 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
     it('stores the typed User profile in the session cookie without mirroring it into web storage', () => {
       // Mock browser persistence for the Node.js test environment.
       const memoryStore = new Map();
+      const sessionMemoryStore = new Map();
       globalThis.localStorage = {
         getItem: (k) => memoryStore.get(k) || null,
         setItem: (k, v) => memoryStore.set(k, v),
         removeItem: (k) => memoryStore.delete(k),
         clear: () => memoryStore.clear(),
       };
+      globalThis.sessionStorage = {
+        getItem: (k) => sessionMemoryStore.get(k) || null,
+        setItem: (k, v) => sessionMemoryStore.set(k, v),
+        removeItem: (k) => sessionMemoryStore.delete(k),
+        clear: () => sessionMemoryStore.clear(),
+      };
       const cookieStore = new Map();
+      const cookieWrites = [];
       Object.defineProperty(globalThis, 'document', {
         value: {
           get cookie() {
             return Array.from(cookieStore.entries()).map(([key, value]) => `${key}=${value}`).join('; ');
           },
           set cookie(value) {
+            cookieWrites.push(value);
             const [nameValue, ...attributes] = value.split(';').map((part) => part.trim());
             const separator = nameValue.indexOf('=');
             const name = nameValue.slice(0, separator);
             const cookieValue = nameValue.slice(separator + 1);
             const maxAge = attributes.find((attribute) => attribute.toLowerCase().startsWith('max-age='));
-            if (maxAge === 'max-age=0') cookieStore.delete(name);
+            if (maxAge?.toLowerCase() === 'max-age=0') cookieStore.delete(name);
             else cookieStore.set(name, cookieValue);
           },
         },
@@ -359,8 +382,71 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(retrieved?.role, 'USER');
       assert.equal(memoryStore.size, 0, 'Session metadata must not be mirrored into localStorage');
 
+      document.cookie = 'accessToken=active-access; path=/';
+      document.cookie = 'refreshToken=active-refresh; path=/';
+      document.cookie = 'jwt=legacy-access; path=/';
+      document.cookie = 'authToken=legacy-auth; path=/';
+      document.cookie = 'refresh_token=legacy-refresh; path=/';
+      localStorage.setItem('c2c_jwt', 'legacy-access');
+      sessionStorage.setItem('refresh_token', 'legacy-refresh');
+
+      const epochBeforeLogout = tokenStorage.getSessionEpoch();
       tokenStorage.clearTokens();
       assert.equal(tokenStorage.getUser(), null);
+      assert.equal(tokenStorage.getAccessToken(), null);
+      assert.equal(tokenStorage.getRefreshToken(), null);
+      assert.equal(cookieStore.size, 0, 'Every current and legacy session cookie must be expired');
+      assert.equal(memoryStore.size, 0, 'Legacy localStorage credentials must be removed');
+      assert.equal(sessionMemoryStore.size, 0, 'Legacy sessionStorage credentials must be removed');
+      assert.equal(tokenStorage.getSessionEpoch(), epochBeforeLogout + 1);
+      assert.ok(
+        cookieWrites.some((value) => value.includes('Expires=Thu, 01 Jan 1970 00:00:00 GMT')),
+        'Cookie expiry must include an absolute past date as well as Max-Age=0'
+      );
+      assert.ok(
+        cookieWrites.some((value) => value.includes('Path=/api/v1/auth')),
+        'Known backend auth cookie paths must be explicitly expired'
+      );
+    });
+
+    it('clears the local session before the logout network request and rejects stale refreshes', async () => {
+      const fs = await import('node:fs');
+      const authServiceSource = fs.readFileSync('src/services/authService.ts', 'utf8');
+      const apiClientSource = fs.readFileSync('src/core/api/apiClient.ts', 'utf8');
+      const logoutBody = authServiceSource.match(/async logout\(\)[\s\S]*?return \{/u)?.[0] || '';
+
+      assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') >= 0);
+      assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') < logoutBody.indexOf('apiClient.post'));
+      assert.match(authServiceSource, /getSessionEpoch\(\)[\s\S]*Authentication session changed while refresh was in progress/);
+      assert.match(apiClientSource, /getSessionEpoch\(\)[\s\S]*Authentication session changed while refresh was in progress/);
+      assert.match(apiClientSource, /reqUrl\.includes\('\/auth\/logout'\)/);
+    });
+
+    it('invalidates older auth work before persisting a successful login and cleans empty refreshes', async () => {
+      const fs = await import('node:fs');
+      const authServiceSource = fs.readFileSync('src/services/authService.ts', 'utf8');
+      const authSliceSource = fs.readFileSync('src/features/auth/redux/authSlice.ts', 'utf8');
+      const loginBody = authServiceSource.match(/async login\(payload: LoginPayload\)[\s\S]*?return response;/u)?.[0] || '';
+
+      assert.ok(loginBody.indexOf('tokenStorage.claimSessionOwnership()') >= 0);
+      assert.ok(loginBody.indexOf('tokenStorage.claimSessionOwnership()') < loginBody.indexOf('apiClient.post'));
+      assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") >= 0);
+      assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") < loginBody.indexOf('persistAuthSession'));
+      assert.match(
+        authSliceSource,
+        /const refreshEpoch = tokenStorage\.getSessionEpoch\(\)[\s\S]*?if \(!res\?\.data\) \{[\s\S]*?getSessionEpoch\(\) === refreshEpoch[\s\S]*?tokenStorage\.clearTokens\(\)[\s\S]*?catch[\s\S]*?getSessionEpoch\(\) === refreshEpoch[\s\S]*?tokenStorage\.clearTokens\(\)/
+      );
+    });
+
+    it('claims auth ownership without clearing the active session', () => {
+      tokenStorage.setAccessToken('still-valid');
+      const previousEpoch = tokenStorage.getSessionEpoch();
+
+      const claimedEpoch = tokenStorage.claimSessionOwnership();
+
+      assert.equal(claimedEpoch, previousEpoch + 1);
+      assert.equal(tokenStorage.getAccessToken(), 'still-valid');
+      tokenStorage.clearTokens();
     });
   });
 

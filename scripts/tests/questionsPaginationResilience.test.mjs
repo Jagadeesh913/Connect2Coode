@@ -338,6 +338,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 9, title: 'Check Palindrome String', topicName: 'String' },
                   { id: 11, title: 'Reverse a String', topicName: 'String' },
                 ],
+                totalElements: 4,
               },
             };
           }
@@ -356,6 +357,43 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
         assert.equal(res.data.content.length, 2);
         assert.equal(res.data.content[0].id, 1);
         assert.equal(res.data.content[1].id, 3);
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('propagates a filtered failure when the fallback catalog is incomplete', async () => {
+      const originalPost = apiClient.post;
+      try {
+        apiClient.post = async (_url, payload) => {
+          if (payload.searchText === 'Tail Match') {
+            const err = new Error('Questions Fetch Unsuccessful');
+            err.statusCode = 500;
+            throw err;
+          }
+          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
+            return {
+              statusCode: 200,
+              message: 'Partial fallback',
+              data: {
+                content: [{ id: 1, title: 'First question' }],
+                totalElements: 50,
+              },
+            };
+          }
+          throw new Error('Unexpected call');
+        };
+
+        await assert.rejects(
+          () => adminQuestionService.getQuestions({
+            level: null,
+            companies: [7],
+            topic: null,
+            searchText: 'Tail Match',
+            pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+          }),
+          /Questions Fetch Unsuccessful/
+        );
       } finally {
         apiClient.post = originalPost;
       }
@@ -380,6 +418,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy' },
                   { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'GeeksforGeeks' },
                 ],
+                totalElements: 3,
               },
             };
           }
@@ -422,6 +461,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
                   { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
                 ],
+                totalElements: 3,
               },
             };
           }
@@ -468,6 +508,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 3, title: 'Medium DP', difficultyId: 3, difficultyName: 'Medium' },
                   { id: 4, title: 'Hard Graph', difficultyId: 4, difficultyName: 'Hard' },
                 ],
+                totalElements: 4,
               },
             };
           }
@@ -510,6 +551,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
                   { id: 20, title: 'LeetCode Problem', qpfRefCode: 'LEETCODE', questionPlatform: 'LeetCode' },
                   { id: 30, title: 'HackerRank Problem', qpfRefCode: 'HACKERRANK', questionPlatform: 'HackerRank' },
                 ],
+                totalElements: 3,
               },
             };
           }

@@ -28,7 +28,7 @@ The authoritative project documentation lives in [`docs/project/`](docs/project/
 | [**02_architecture_and_conventions.md**](docs/project/02_architecture_and_conventions.md) | Architecture layers, directory layout, entry points, prohibited patterns, and coding conventions. |
 | [**03_routing_roles_and_journeys.md**](docs/project/03_routing_roles_and_journeys.md) | Full route map, route guards (`ProtectedRoute`, `GuestRoute`, `AdminRoute`), and user journeys. |
 | [**04_ui_design_and_components.md**](docs/project/04_ui_design_and_components.md) | Design tokens, Tailwind v4, dark/light themes, brand logo policy, and UI component catalog. |
-| [**05_api_contracts_and_security.md**](docs/project/05_api_contracts_and_security.md) | REST endpoints, JWT authentication, `jwtToken` payload contract, refresh lock, and security rules. |
+| [**05_api_contracts_and_security.md**](docs/project/05_api_contracts_and_security.md) | REST endpoints, bearer JWT authentication, refresh lock, and security rules. |
 | [**06_state_management_and_data_flow.md**](docs/project/06_state_management_and_data_flow.md) | Redux Toolkit slices (8 total), caching strategies, async thunks, and user-scoped storage. |
 | [**07_testing_and_verification_guide.md**](docs/project/07_testing_and_verification_guide.md) | Test runner (`node:test`), verification commands, mocking strategies, and regression coverage. |
 | [**08_dev_environment_and_operations.md**](docs/project/08_dev_environment_and_operations.md) | Local setup, proxying, `.env` conventions, Vercel SPA rewrites, and GitHub Actions CI. |
@@ -62,7 +62,7 @@ flowchart TD
    - Never import `axios` directly outside [`src/core/api/apiClient.ts`](src/core/api/apiClient.ts).
    - Never make direct `fetch()` calls in feature components.
    - Never use `Math.random()` for application data or IDs.
-   - Always route authenticated payloads through `apiClient` which enforces `jwtToken` and purges obsolete `token` fields.
+   - Always route authenticated requests through `apiClient`, which attaches the bearer header and purges obsolete body/query token fields.
 3. **Execute Verification Checks**:
    - `npm test`: Runs Node.js test runner across all test suites in `scripts/tests/`.
    - `npm run typecheck`: Runs `tsc -p tsconfig.json --noEmit`. Must exit with 0 errors.
@@ -82,7 +82,7 @@ flowchart TD
 ## 4. Architectural Rules That Must Never Be Broken
 
 - **API Domain**: The production API domain is strictly `https://api.connect2code.in/api/v1`. Never use `.com` or the legacy Render domain.
-- **Token Field Contract**: The Spring Boot backend expects the access token inside request bodies as `jwtToken`. Duplicate fields named `token`, `jwttoken`, or `jwt_token` must be stripped by `purgeDuplicateTokenFields` in `apiClient.ts`.
+- **Token Contract**: The Spring Boot backend authenticates with `Authorization: Bearer <token>`. Request bodies and query parameters must not contain `jwtToken`, `token`, `jwttoken`, or `jwt_token`; `apiClient.ts` strips legacy aliases centrally.
 - **MCQ Option Correctness**: In MCQ authoring and practice, correctness is determined strictly by the `isCorrect: true/false` property on individual options in `options[]`. Never rely solely on top-level `correctOption` or `correctAnswer` strings, which may be stale.
 - **Logo Policy**: All company and brand logos are bundled locally in `public/companies/` and registered in [`src/features/companies/utils/companyLogoRegistry.ts`](src/features/companies/utils/companyLogoRegistry.ts). Never replace them with generic external placeholders.
 - **Multi-Tenant User Storage**: All user progress, bookmarks, and local state stored in browser storage must use [`src/core/storage/userScopedStorage.ts`](src/core/storage/userScopedStorage.ts) to prevent cross-user data bleed.

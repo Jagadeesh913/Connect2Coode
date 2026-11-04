@@ -28,7 +28,10 @@ export const AdminDashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [hasData, setHasData] = useState(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [difficultyMetricsLoading, setDifficultyMetricsLoading] = useState(false);
+  const [difficultyMetricsError, setDifficultyMetricsError] = useState<string | null>(null);
   const dashboardRequestRef = useRef<AbortController | null>(null);
+  const difficultyRequestRef = useRef<AbortController | null>(null);
   const {
     items: difficultyReferences,
     loading: difficultiesLoading,
@@ -83,75 +86,7 @@ export const AdminDashboard: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      // 2. Dynamically resolve difficulty IDs from the live reference library
-      const easyItem = difficultyReferences.find(
-        (d) => d.refName?.toLowerCase() === 'easy' || d.refCode?.toLowerCase() === 'easy'
-      );
-      const medItem = difficultyReferences.find(
-        (d) =>
-          d.refName?.toLowerCase() === 'medium' ||
-          d.refCode?.toLowerCase() === 'med' ||
-          d.refCode?.toLowerCase() === 'medium'
-      );
-      const hardItem = difficultyReferences.find(
-        (d) => d.refName?.toLowerCase() === 'hard' || d.refCode?.toLowerCase() === 'hard'
-      );
-
-      // 3. Query difficulty breakdowns using dynamically resolved IDs
-      const [easyRes, medRes, hardRes] = await Promise.allSettled([
-        easyItem ? adminQuestionService.getQuestions(
-          {
-            level: [easyItem.id],
-            companies: null,
-            topic: null,
-            searchText: null,
-            pageRequest: {
-              pageNumber: 0,
-              pageSize: 1,
-              sortBy: 'id',
-              sortDirection: 'ASC',
-            },
-          },
-          controller.signal
-        ) : Promise.reject(new Error('EASY reference is unavailable')),
-        medItem ? adminQuestionService.getQuestions(
-          {
-            level: [medItem.id],
-            companies: null,
-            topic: null,
-            searchText: null,
-            pageRequest: {
-              pageNumber: 0,
-              pageSize: 1,
-              sortBy: 'id',
-              sortDirection: 'ASC',
-            },
-          },
-          controller.signal
-        ) : Promise.reject(new Error('MEDIUM reference is unavailable')),
-        hardItem ? adminQuestionService.getQuestions(
-          {
-            level: [hardItem.id],
-            companies: null,
-            topic: null,
-            searchText: null,
-            pageRequest: {
-              pageNumber: 0,
-              pageSize: 1,
-              sortBy: 'id',
-              sortDirection: 'ASC',
-            },
-          },
-          controller.signal
-        ) : Promise.reject(new Error('HARD reference is unavailable')),
-      ]);
-
-      if (controller.signal.aborted) return;
-
       let totalProblems = 0;
-      let easyCount = 0;
-      let mediumCount = 0;
-      let hardCount = 0;
       let totalCompanies = 0;
       let totalInstitutions = 0;
       let totalMcqs = 0;
@@ -162,17 +97,6 @@ export const AdminDashboard: React.FC = () => {
         const pageData = probRes.value.data;
         const questionsList = Array.isArray(pageData?.content) ? pageData.content : [];
         totalProblems = pageData?.totalElements ?? getLiveTotalQuestionsCount() ?? questionsList.length;
-      }
-
-      // 1b. Difficulty counts from dedicated filtered queries
-      if (easyRes.status === 'fulfilled' && typeof easyRes.value?.data?.totalElements === 'number') {
-        easyCount = easyRes.value.data.totalElements;
-      }
-      if (medRes.status === 'fulfilled' && typeof medRes.value?.data?.totalElements === 'number') {
-        mediumCount = medRes.value.data.totalElements;
-      }
-      if (hardRes.status === 'fulfilled' && typeof hardRes.value?.data?.totalElements === 'number') {
-        hardCount = hardRes.value.data.totalElements;
       }
 
       // 2. Companies
@@ -207,25 +131,15 @@ export const AdminDashboard: React.FC = () => {
             : null
         )
         .filter(Boolean);
-      const difficultyFailures = [easyRes, medRes, hardRes]
-        .map((result, index) =>
-          result.status === 'rejected' ? ['Easy', 'Medium', 'Hard'][index] : null
-        )
-        .filter(Boolean);
-
       setError(
         criticalFailures.length > 0
           ? 'Could not refresh ' + criticalFailures.join(', ') + '. Previous values, if available, are retained.'
-          : difficultyFailures.length > 0
-          ? 'Could not refresh ' + difficultyFailures.join(', ') + ' difficulty metrics. Previous values, if available, are retained.'
           : null
       );
       setHasData(true);
       setStats((previous) => ({
+        ...previous,
         totalProblems: probRes.status === 'fulfilled' ? totalProblems : previous.totalProblems,
-        easyCount: easyRes.status === 'fulfilled' ? easyCount : previous.easyCount,
-        mediumCount: medRes.status === 'fulfilled' ? mediumCount : previous.mediumCount,
-        hardCount: hardRes.status === 'fulfilled' ? hardCount : previous.hardCount,
         totalCompanies: compRes.status === 'fulfilled' ? totalCompanies : previous.totalCompanies,
         totalInstitutions: instRes.status === 'fulfilled' ? totalInstitutions : previous.totalInstitutions,
         totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
@@ -240,6 +154,81 @@ export const AdminDashboard: React.FC = () => {
         setLoading(false);
       }
     }
+  }, []);
+
+  const fetchDifficultyCounts = useCallback(async () => {
+    if (difficultyReferences.length === 0) return;
+
+    difficultyRequestRef.current?.abort();
+    const controller = new AbortController();
+    difficultyRequestRef.current = controller;
+    setDifficultyMetricsLoading(true);
+    setDifficultyMetricsError(null);
+
+    const findDifficulty = (name: string, aliases: string[] = []) =>
+      difficultyReferences.find((item) => {
+        const refName = item.refName?.toLowerCase();
+        const refCode = item.refCode?.toLowerCase();
+        return refName === name || refCode === name || aliases.includes(refCode || '');
+      });
+    const difficultyItems = [
+      findDifficulty('easy'),
+      findDifficulty('medium', ['med']),
+      findDifficulty('hard'),
+    ];
+
+    try {
+      const results = await Promise.allSettled(
+        difficultyItems.map((item) =>
+          item
+            ? adminQuestionService.getQuestions(
+                {
+                  level: [item.id],
+                  companies: null,
+                  topic: null,
+                  searchText: null,
+                  pageRequest: {
+                    pageNumber: 0,
+                    pageSize: 1,
+                    sortBy: 'id',
+                    sortDirection: 'ASC',
+                  },
+                },
+                controller.signal
+              )
+            : Promise.reject(new Error('Difficulty reference is unavailable'))
+        )
+      );
+      if (controller.signal.aborted) return;
+
+      const labels = ['Easy', 'Medium', 'Hard'];
+      const counts = results.map((result) =>
+        result.status === 'fulfilled' && typeof result.value?.data?.totalElements === 'number'
+          ? result.value.data.totalElements
+          : null
+      );
+      const failures = results
+        .map((result, index) => (result.status === 'rejected' ? labels[index] : null))
+        .filter(Boolean);
+
+      setStats((previous) => ({
+        ...previous,
+        easyCount: counts[0] ?? previous.easyCount,
+        mediumCount: counts[1] ?? previous.mediumCount,
+        hardCount: counts[2] ?? previous.hardCount,
+      }));
+      setDifficultyMetricsError(
+        failures.length > 0
+          ? 'Could not refresh ' + failures.join(', ') + ' difficulty metrics. Previous values, if available, are retained.'
+          : null
+      );
+    } catch (err) {
+      if (controller.signal.aborted) return;
+      console.warn('Dashboard difficulty fetch error:', err);
+      setDifficultyMetricsError('Difficulty metrics could not be refreshed. Previous values, if available, are retained.');
+    } finally {
+      if (!controller.signal.aborted) setDifficultyMetricsLoading(false);
+    }
   }, [difficultyReferences]);
 
   const refreshDashboard = useCallback(() => {
@@ -253,6 +242,35 @@ export const AdminDashboard: React.FC = () => {
       dashboardRequestRef.current?.abort();
     };
   }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (difficultiesLoading) {
+      setDifficultyMetricsLoading(false);
+      return;
+    }
+    if (difficultyReferences.length === 0) {
+      difficultyRequestRef.current?.abort();
+      setDifficultyMetricsLoading(false);
+      setStats((previous) => ({
+        ...previous,
+        easyCount: null,
+        mediumCount: null,
+        hardCount: null,
+      }));
+      setDifficultyMetricsError(
+        difficultiesError ? null : 'Difficulty references are unavailable, so tier metrics cannot be calculated.'
+      );
+      return;
+    }
+    void fetchDifficultyCounts();
+    return () => {
+      difficultyRequestRef.current?.abort();
+    };
+  }, [difficultiesError, difficultiesLoading, difficultyReferences.length, fetchDifficultyCounts]);
+
+  const dashboardError = [error, difficultiesError, difficultyMetricsError]
+    .filter((message): message is string => Boolean(message))
+    .join(' ');
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
@@ -274,11 +292,11 @@ export const AdminDashboard: React.FC = () => {
             </button>
             <button
               onClick={refreshDashboard}
-              disabled={loading || difficultiesLoading}
+              disabled={loading || difficultiesLoading || difficultyMetricsLoading}
               className="px-4 py-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50 shadow-xs"
               title="Refresh Data"
             >
-              <RotateCw className={`w-3.5 h-3.5 ${loading || difficultiesLoading ? 'animate-spin text-blue-500' : ''}`} />
+                <RotateCw className={`w-3.5 h-3.5 ${loading || difficultiesLoading || difficultyMetricsLoading ? 'animate-spin text-blue-500' : ''}`} />
               <span>Refresh</span>
             </button>
           </div>
@@ -290,8 +308,8 @@ export const AdminDashboard: React.FC = () => {
 
       {/* 2. Real-Time Platform Metrics Grid */}
       <RequestStatus
-        pending={loading || difficultiesLoading}
-        error={error || difficultiesError}
+        pending={loading || difficultiesLoading || difficultyMetricsLoading}
+        error={dashboardError || null}
         onRetry={refreshDashboard}
         label="Refreshing metrics…"
       />

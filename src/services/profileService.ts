@@ -66,7 +66,7 @@ export const profileService = {
 
   /**
    * POST /api/v1/userInfo/{userId}
-   * Creates or updates academic user profile info with token in payload
+   * Creates or updates academic profile data with bearer authentication.
    */
   async saveUserInfo(
     userId: string | number,

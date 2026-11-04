@@ -147,7 +147,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.college, 'ABC Engineering College');
     });
 
-    it('sends POST /userInfo/{userId} business fields and leaves jwtToken to apiClient', async () => {
+    it('sends POST /userInfo/{userId} with business fields only', async () => {
       let capturedUrl = '';
       let capturedPayload = null;
 
@@ -223,7 +223,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
     });
   });
 
-  describe('Centralized jwtToken ownership across API services', () => {
+  describe('Business-only payloads across authenticated API services', () => {
     const TEST_TOKEN = 'verified_access_jwt_token_999';
 
     it('companyService.getCompaniesPaginated sends only business fields before interception', async () => {

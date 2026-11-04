@@ -19,7 +19,6 @@ import { decodeJwtPayload } from '../../../core/security/jwt';
 import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
-import { useTheme } from '../../../shared/context/ThemeContext';
 
 // Lucide Icons
 import {
@@ -34,17 +33,14 @@ import {
   GraduationCap,
   Settings,
   Lock,
-  Bell,
-  Moon,
-  Globe,
 } from 'lucide-react';
 
 export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { setTheme } = useTheme();
 
   const {
     profile,
+    profileFetched,
     userInfo,
     loading: profileLoading,
     userInfoLoading: academicLoading,
@@ -68,20 +64,6 @@ export const UserProfilePage: React.FC = () => {
     loading: activityLoading,
     error: activityError,
   } = useAppSelector((state) => state.progress);
-
-  // Preferences local state
-  const [emailNotifications, setEmailNotifications] = useState<boolean>(() => {
-    const saved = localStorage.getItem('c2c_email_notifications');
-    return saved !== null ? saved === 'true' : true;
-  });
-
-  const [themePreference, setThemePreference] = useState<string>(() => {
-    return localStorage.getItem('c2c_theme_pref') || 'system';
-  });
-
-  const [languagePreference, setLanguagePreference] = useState<string>(() => {
-    return localStorage.getItem('c2c_language') || 'English';
-  });
 
   // Effective User ID from authenticated session (Must be numeric Long for backend APIs)
   const effectiveUserId = useMemo(() => {
@@ -111,9 +93,6 @@ export const UserProfilePage: React.FC = () => {
     }
     return null;
   }, [authUser, profile]);
-
-  // Refs to guarantee profile and user-info are only fetched once per user session
-  const hasFetchedProfileRef = useRef(false);
 
   // Calculate Streak from submission history
   const calculateStreak = (submissions: Array<{ submittedDate?: string }>): number => {
@@ -167,11 +146,7 @@ export const UserProfilePage: React.FC = () => {
 
   // Initial Data Fetching from real API
   useEffect(() => {
-    if (!hasFetchedProfileRef.current) {
-      hasFetchedProfileRef.current = true;
-      void dispatch(fetchUserProfile());
-    }
-
+    void dispatch(fetchUserProfile());
     if (effectiveUserId) {
       try {
         // Remove the legacy browser cache: academic records are server-owned.
@@ -190,16 +165,9 @@ export const UserProfilePage: React.FC = () => {
     }
   }, [dispatch, effectiveUserId, sectionRetry]);
 
-  // Synchronize institution from profile if available
-  useEffect(() => {
-    if (profile?.institution) {
-      setInstitution(profile.institution);
-    }
-  }, [profile?.institution]);
-
   // Auto-enrich institution metadata from real API if college is present
   useEffect(() => {
-    const collegeName = userInfo?.college || profile?.collegeName;
+    const collegeName = userInfo?.college || userInfo?.collegeName;
     if (!collegeName || (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase())) return;
 
     const controller = new AbortController();
@@ -230,7 +198,7 @@ export const UserProfilePage: React.FC = () => {
     return () => {
       controller.abort();
     };
-  }, [userInfo?.college, profile?.collegeName, institution?.name]);
+  }, [userInfo?.college, userInfo?.collegeName, institution?.name]);
 
   // Handle Personal Info Submit
   const handleSavePersonalInfo = async (data: any) => {
@@ -375,34 +343,6 @@ export const UserProfilePage: React.FC = () => {
   };
 
   // Theme switch handler
-  const handleThemeChange = (newPref: string) => {
-    setThemePreference(newPref);
-    localStorage.setItem('c2c_theme_pref', newPref);
-    if (newPref === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
-    } else if (newPref === 'light' || newPref === 'dark') {
-      setTheme(newPref);
-    }
-  };
-
-  // Notification toggle handler
-  const handleToggleNotifications = () => {
-    setEmailNotifications((prev) => {
-      const next = !prev;
-      localStorage.setItem('c2c_email_notifications', String(next));
-      toast.success(next ? 'Email notifications enabled' : 'Email notifications disabled');
-      return next;
-    });
-  };
-
-  // Language selection handler
-  const handleLanguageChange = (newLang: string) => {
-    setLanguagePreference(newLang);
-    localStorage.setItem('c2c_language', newLang);
-    toast.success(`Language set to ${newLang}`);
-  };
-
   // Real live question statistics strictly from backend API (no mockups / fake fallbacks)
   const realSolvedCount = solvedItems.length;
   const realAttemptedCount = attemptedItems.length;
@@ -434,25 +374,42 @@ export const UserProfilePage: React.FC = () => {
   }, [fullName, email]);
 
   // Real academic values from userInfo API
-  const regNumber = userInfo?.regNumber || profile?.regNumber || '';
-  const collegeName = userInfo?.college || userInfo?.collegeName || institution?.name || profile?.collegeName || '';
-  const joinedYear = userInfo?.joinedYear || profile?.joinedYear;
-  const passedOutYear = userInfo?.passedOutYear || profile?.graduationYear || profile?.passedOutYear;
-  const bio = userInfo?.bio || profile?.bio || '';
+  const regNumber = userInfo?.regNumber || '';
+  const collegeName = userInfo?.college || userInfo?.collegeName || '';
+  const joinedYear = userInfo?.joinedYear;
+  const passedOutYear = userInfo?.passedOutYear;
+  const bio = userInfo?.bio || '';
   const genderDisplay: string =
     userInfo?.gender?.refName ||
     userInfo?.gender?.refCode ||
-    (typeof profile?.gender === 'object' && profile?.gender
-      ? (profile.gender as any).refName || (profile.gender as any).refCode || ''
-      : (profile?.gender as string)) ||
     '—';
-  const dobDisplay = userInfo?.dob || profile?.dob || '—';
+  const dobDisplay = userInfo?.dob || '—';
   const collegeIdDisplay =
     userInfo?.collegeId !== undefined && userInfo?.collegeId !== null
       ? String(userInfo.collegeId)
       : institution?.id
       ? String(institution.id)
       : null;
+
+  const personalInfoInitialData = useMemo(
+    () => ({
+      fullName,
+      firstName: profile?.firstName || authUser?.firstName,
+      email,
+      bio: userInfo?.bio,
+      gender: userInfo?.gender,
+      dob: userInfo?.dob,
+    }),
+    [
+      fullName,
+      profile?.firstName,
+      authUser?.firstName,
+      email,
+      userInfo?.bio,
+      userInfo?.gender,
+      userInfo?.dob,
+    ]
+  );
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
   const token = tokenStorage.getAccessToken();
@@ -479,7 +436,7 @@ export const UserProfilePage: React.FC = () => {
     );
   }
 
-  if ((profileLoading || !profileError) && !profile) {
+  if ((profileLoading || (!profileFetched && !profileError)) && !profile) {
     return (
       <div className="w-full min-h-screen bg-[#F8FAFC] dark:bg-[#070A13] font-sans transition-colors duration-200 overflow-x-hidden pb-16">
         <ProfilePageSkeleton />
@@ -758,7 +715,7 @@ export const UserProfilePage: React.FC = () => {
             </div>
           </div>
 
-          {/* Card 3: Account & Preferences */}
+          {/* Card 3: Account security */}
           <div
             id="preferences-card"
             className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
@@ -770,14 +727,14 @@ export const UserProfilePage: React.FC = () => {
                   <Settings className="w-4 h-4" />
                 </div>
                 <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  Account & Preferences
+                  Account Security
                 </h2>
               </div>
             </div>
 
-            {/* Preference Items */}
+            {/* API-backed account action */}
             <div className="space-y-4 text-xs sm:text-sm">
-              {/* Row 1: Password */}
+              {/* Password reset uses the authentication API. */}
               <div className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
@@ -801,96 +758,6 @@ export const UserProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 2: Email Notifications */}
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
-                    <Bell className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
-                      Email Notifications
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Get updates about new problems, contests and more
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={emailNotifications}
-                    onClick={handleToggleNotifications}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                      emailNotifications ? 'bg-blue-600' : 'bg-slate-300 dark:bg-neutral-700'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        emailNotifications ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              {/* Row 3: Theme Preference */}
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
-                    <Moon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
-                      Theme Preference
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Choose your preferred appearance
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <select
-                    value={themePreference}
-                    onChange={(e) => handleThemeChange(e.target.value)}
-                    className="text-xs font-medium bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="system">System</option>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Row 4: Language */}
-              <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-neutral-800 text-slate-600 dark:text-slate-400 flex items-center justify-center shrink-0">
-                    <Globe className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
-                      Language
-                    </p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Choose your interface language
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <select
-                    value={languagePreference}
-                    onChange={(e) => handleLanguageChange(e.target.value)}
-                    className="text-xs font-medium bg-slate-50 dark:bg-neutral-800 border border-slate-200 dark:border-neutral-700 text-slate-800 dark:text-slate-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  >
-                    <option value="English">English</option>
-                    <option value="Hindi">Hindi</option>
-                    <option value="Telugu">Telugu</option>
-                    <option value="Spanish">Spanish</option>
-                  </select>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -901,16 +768,7 @@ export const UserProfilePage: React.FC = () => {
         isOpen={isPersonalModalOpen}
         onClose={() => setIsPersonalModalOpen(false)}
         onSubmit={handleSavePersonalInfo}
-        initialData={
-          profile
-            ? {
-                ...profile,
-                bio: userInfo?.bio || profile?.bio || '',
-                gender: userInfo?.gender || profile?.gender,
-                dob: userInfo?.dob || profile?.dob,
-              }
-            : null
-        }
+        initialData={personalInfoInitialData}
         submitting={submitting}
       />
 
@@ -919,21 +777,8 @@ export const UserProfilePage: React.FC = () => {
         isOpen={isAcademicModalOpen}
         onClose={() => setIsAcademicModalOpen(false)}
         onSubmit={handleSaveAcademic}
-        initialData={
-          userInfo || (profile?.regNumber ? {
-            id: null,
-            userId: effectiveUserId ? Number(effectiveUserId) : undefined,
-            regNumber: profile.regNumber || '',
-            college: profile.collegeName || institution?.name || '',
-            collegeId: profile.institutionId ? String(profile.institutionId) : null,
-            joinedYear: profile.joinedYear,
-            passedOutYear: profile.graduationYear || profile.passedOutYear,
-            bio: profile.bio || '',
-            gender: null,
-            dob: profile.dob || '',
-          } : null)
-        }
-        defaultCollege={userInfo?.college || userInfo?.collegeName || institution?.name || profile?.collegeName || ''}
+        initialData={userInfo}
+        defaultCollege={userInfo?.college || userInfo?.collegeName || ''}
         submitting={submitting}
       />
 

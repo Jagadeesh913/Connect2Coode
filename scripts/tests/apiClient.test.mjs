@@ -27,21 +27,69 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 
 // Import real apiClient implementation
 const apiClientModule = await import('../../src/core/api/apiClient.ts');
-const { resolveApiBaseUrl, BASE_URL, prepareAuthenticatedRequestData } = apiClientModule;
+const {
+  resolveApiBaseUrl,
+  BASE_URL,
+  sanitizeRequestData,
+  getPreparedRequestContentType,
+} = apiClientModule;
 
 describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-006)', () => {
-  it('centrally injects canonical jwtToken without mutating caller payloads', () => {
-    const payload = { token: 'old', nested: { jwt_token: 'old', value: 1 } };
-    const prepared = prepareAuthenticatedRequestData(payload, 'post', 'active-jwt');
-    assert.deepEqual(prepared, { nested: { value: 1 }, jwtToken: 'active-jwt' });
-    assert.deepEqual(payload, { token: 'old', nested: { jwt_token: 'old', value: 1 } });
+  it('strips every payload token alias without mutating caller payloads', () => {
+    const payload = { token: 'old', jwtToken: 'old-too', nested: { jwt_token: 'old', value: 1 } };
+    const prepared = sanitizeRequestData(payload, 'post');
+    assert.deepEqual(prepared, { nested: { value: 1 } });
+    assert.deepEqual(payload, { token: 'old', jwtToken: 'old-too', nested: { jwt_token: 'old', value: 1 } });
   });
 
-  it('creates an authenticated body for DELETE without service-level workarounds', () => {
-    assert.deepEqual(
-      prepareAuthenticatedRequestData(undefined, 'delete', 'active-jwt'),
-      { jwtToken: 'active-jwt' }
+  it('does not invent a DELETE request body', () => {
+    assert.equal(sanitizeRequestData(undefined, 'delete'), undefined);
+  });
+
+  it('preserves URLSearchParams fields while canonicalizing token aliases without mutation', () => {
+    const payload = new URLSearchParams([
+      ['name', 'Ada Lovelace'],
+      ['tag', 'math'],
+      ['tag', 'code'],
+      ['token', 'obsolete'],
+      ['jwt_token', 'obsolete-too'],
+      ['jwttoken', 'obsolete-three'],
+    ]);
+
+    const prepared = sanitizeRequestData(payload, 'post');
+
+    assert.ok(prepared instanceof URLSearchParams);
+    assert.notEqual(prepared, payload);
+    assert.equal(prepared.get('name'), 'Ada Lovelace');
+    assert.deepEqual(prepared.getAll('tag'), ['math', 'code']);
+    assert.equal(prepared.get('jwtToken'), null);
+    assert.equal(prepared.has('token'), false);
+    assert.equal(prepared.has('jwt_token'), false);
+    assert.equal(prepared.has('jwttoken'), false);
+    assert.equal(payload.get('token'), 'obsolete');
+    assert.equal(payload.get('jwtToken'), null);
+    assert.equal(
+      getPreparedRequestContentType(prepared),
+      'application/x-www-form-urlencoded;charset=UTF-8'
     );
+    assert.equal(getPreparedRequestContentType({ name: 'Ada Lovelace' }), undefined);
+    assert.equal(getPreparedRequestContentType(new FormData()), null);
+  });
+
+  it('preserves non-plain objects like Date without stripping or spreading them', () => {
+    const testDate = new Date('2026-11-03T12:00:00Z');
+    const payload = {
+      title: 'Scheduled Assessment',
+      scheduledAt: testDate,
+      token: 'obsolete',
+    };
+
+    const prepared = sanitizeRequestData(payload, 'post');
+    assert.equal(prepared.title, 'Scheduled Assessment');
+    assert.equal(prepared.scheduledAt instanceof Date, true);
+    assert.equal(prepared.scheduledAt.toISOString(), testDate.toISOString());
+    assert.equal(prepared.jwtToken, undefined);
+    assert.equal(prepared.token, undefined);
   });
 
   it('F-006: supports relative API base paths starting with "/" and trims trailing slashes', () => {

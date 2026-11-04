@@ -245,26 +245,7 @@ export interface UserProfile {
   fullName?: string;
   email: string;
   role?: string;
-  collegeName?: string;
-  graduationYear?: number | string;
-  phone?: string;
-  githubUrl?: string;
-  linkedinUrl?: string;
-  leetcodeUrl?: string;
-  bio?: string;
   avatarUrl?: string;
-  dob?: string | null;
-  gender?: string | ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
-  location?: string;
-  degree?: string;
-  branch?: string;
-  currentYear?: string;
-  joinedYear?: number | string;
-  passedOutYear?: number | string;
-  regNumber?: string;
-  institutionId?: number | null;
-  institution?: Institution | null;
-  userInfo?: UserInfoData | null;
 }
 
 export type User = UserProfile;

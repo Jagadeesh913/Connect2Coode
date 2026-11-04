@@ -1,7 +1,7 @@
 import { apiClient, isRequestCanceled } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
-import type { Company, Problem } from '../core/types/domain';
+import type { Company, Problem, QuestionListRequest } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
 import { fetchResilientQuestionPage } from './admin/adminQuestionService';
 import type {
@@ -368,6 +368,46 @@ export const companyService = {
       data: problemsList,
       errors: null,
       timestamp: new Date().toISOString(),
+    };
+  },
+
+  async getCompanyProblemsPaginated(
+    companyId: number,
+    filters: {
+      difficulty?: number[];
+      searchText?: string;
+      pageNumber?: number;
+      pageSize?: number;
+    } = {},
+    signal?: AbortSignal
+  ): Promise<ApiResponse<PaginatedData<Problem>>> {
+    const pageNumber = filters.pageNumber ?? 0;
+    const pageSize = filters.pageSize ?? 10;
+    const payload: QuestionListRequest = {
+      level: filters.difficulty?.length ? filters.difficulty : null,
+      companies: [companyId],
+      topic: null,
+      searchText: filters.searchText?.trim() || null,
+      pageRequest: {
+        pageNumber,
+        pageSize,
+        sortBy: 'id',
+        sortDirection: 'ASC',
+      },
+    };
+    const response = await fetchResilientQuestionPage(payload, signal);
+    const page = response.data;
+    return {
+      ...response,
+      data: {
+        content: page.content.map(mapProblemDto),
+        pageNumber: typeof page.number === 'number' ? page.number : pageNumber,
+        pageSize: typeof page.size === 'number' ? page.size : pageSize,
+        totalElements: typeof page.totalElements === 'number' ? page.totalElements : page.content.length,
+        totalPages: Math.max(1, typeof page.totalPages === 'number' ? page.totalPages : 1),
+        first: typeof page.first === 'boolean' ? page.first : pageNumber === 0,
+        last: typeof page.last === 'boolean' ? page.last : pageNumber + 1 >= page.totalPages,
+      },
     };
   },
 };

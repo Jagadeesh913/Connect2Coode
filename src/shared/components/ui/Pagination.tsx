@@ -9,6 +9,7 @@ export interface PaginationProps {
   pageSize?: number;
   className?: string;
   disabled?: boolean;
+  itemLabel?: string;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
@@ -19,6 +20,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   pageSize,
   className = '',
   disabled = false,
+  itemLabel = 'problems',
 }) => {
   const safeTotalPages = Math.max(1, totalPages || 1);
   const safeCurrentPage = Math.min(Math.max(1, currentPage || 1), safeTotalPages);
@@ -75,7 +77,7 @@ export const Pagination: React.FC<PaginationProps> = ({
           <span>
             Showing <strong className="text-slate-900 dark:text-white font-semibold">{startItem}</strong> to{' '}
             <strong className="text-slate-900 dark:text-white font-semibold">{endItem}</strong> of{' '}
-            <strong className="text-slate-900 dark:text-white font-semibold">{totalElements}</strong> problems
+            <strong className="text-slate-900 dark:text-white font-semibold">{totalElements}</strong> {itemLabel}
           </span>
         ) : (
           <span>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import type { UserProfile } from '../../../../core/types/domain';
+import type { UserInfoData, UserProfile } from '../../../../core/types/domain';
 import { personalInfoSchema, PersonalInfoFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { User, Mail, FileText, X, Loader2, CheckCircle2, Calendar, Lock } from 'lucide-react';
@@ -11,7 +11,10 @@ interface EditPersonalInfoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: PersonalInfoFormData) => Promise<void>;
-  initialData?: (Omit<UserProfile, 'gender' | 'dob'> & { bio?: string; dob?: string | null; gender?: any }) | null;
+  initialData?: Partial<
+    Pick<UserProfile, 'fullName' | 'firstName' | 'email'> &
+      Pick<UserInfoData, 'bio' | 'dob' | 'gender'>
+  > | null;
   submitting?: boolean;
 }
 

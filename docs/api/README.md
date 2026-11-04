@@ -96,7 +96,7 @@ sequenceDiagram
    ```http
    Authorization: Bearer <JWT_ACCESS_TOKEN>
    ```
-2. **Automatic Token Attachment**: The Axios client in `src/core/api/apiClient.ts` uses a request interceptor to pull the current access token from `tokenStorage` (`src/core/security/tokenStorage.ts`) and append it to all outgoing requests.
+2. **Automatic Bearer Header**: The Axios client in `src/core/api/apiClient.ts` reads the current access token from `tokenStorage` (`src/core/security/tokenStorage.ts`) and attaches it only as `Authorization: Bearer <token>`. Request bodies and query parameters are stripped of access-token aliases.
 3. **Redaction Policy**: **Never** commit, log, or display real JWT access tokens, refresh tokens, passwords, or session cookies in plain text. All logs and audit documentation use sanitized tokens (e.g., `[REDACTED_ACCESS_TOKEN]`).
 
 ---

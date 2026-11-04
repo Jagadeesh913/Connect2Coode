@@ -41,6 +41,29 @@ interface QuestionOption {
   testCases?: QuestionTestCase[];
 }
 
+const toQuestionOption = (item: any): QuestionOption | null => {
+  if (!item || typeof item.id !== 'number') return null;
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    constraints: item.constraints,
+    difficulty: item.difficulty || item.difficultyRefName || item.difficultyName,
+    difficultyRefName: item.difficultyRefName || item.difficulty || item.difficultyName,
+    topicRefName: item.topicRefName || item.topicName,
+    testCases: item.testCases,
+  };
+};
+
+const mergeQuestionOptions = (
+  current: QuestionOption[],
+  incoming: QuestionOption[]
+): QuestionOption[] => {
+  const merged = new Map(current.map((item) => [item.id, item]));
+  incoming.forEach((item) => merged.set(item.id, item));
+  return Array.from(merged.values()).sort((a, b) => a.id - b.id);
+};
+
 /**
  * Verified working demo solutions for quick runtime verification testing.
  */
@@ -191,11 +214,31 @@ export const DashboardCodeRunner: React.FC = () => {
 
   // Question options & dynamic search
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
+  const questionsRef = useRef<QuestionOption[]>([]);
+  const pageGenerationRef = useRef(0);
   const [totalKnownQuestions, setTotalKnownQuestions] = useState<number>(0);
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
+  const selectedQuestionIdRef = useRef<number | null>(null);
   const [manualQuestionId, setManualQuestionId] = useState<string>('');
   const [searchFilter, setSearchFilter] = useState<string>('');
   const [isSearchingBackend, setIsSearchingBackend] = useState<boolean>(false);
+  const [isLoadingMoreQuestions, setIsLoadingMoreQuestions] = useState(false);
+  const [questionPage, setQuestionPage] = useState(0);
+  const [questionTotalPages, setQuestionTotalPages] = useState(1);
+  const [questionPageSearch, setQuestionPageSearch] = useState<string | null>(null);
+
+  useEffect(() => {
+    selectedQuestionIdRef.current = selectedQuestionId;
+  }, [selectedQuestionId]);
+
+  const selectQuestionId = useCallback((questionId: number) => {
+    selectedQuestionIdRef.current = questionId;
+    setSelectedQuestionId(questionId);
+  }, []);
+
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
 
   // Selected question statement & test cases
   const [selectedQuestionDetails, setSelectedQuestionDetails] = useState<Question | null>(null);
@@ -229,10 +272,13 @@ export const DashboardCodeRunner: React.FC = () => {
   const [resourcesError, setResourcesError] = useState<string | null>(null);
   const [resourcesRetry, setResourcesRetry] = useState(0);
 
-  // 1. Fetch available questions dynamically across the full bank using pageSize: 10
+  // 1. Fetch the first question page; backend search and manual IDs cover the full bank on demand.
   const loadQuestionBank = useCallback(async (signal?: AbortSignal) => {
+    const generation = ++pageGenerationRef.current;
     setResourcesLoading(true);
     setResourcesError(null);
+    setIsLoadingMoreQuestions(false);
+    setIsSearchingBackend(false);
     try {
       const initialRes = await adminQuestionService.getQuestions(
         {
@@ -244,8 +290,9 @@ export const DashboardCodeRunner: React.FC = () => {
         },
         signal
       );
+      if (generation !== pageGenerationRef.current) return;
       const raw: any = initialRes?.data || initialRes;
-      let allItems: any[] = Array.isArray(raw?.content)
+      const allItems: any[] = Array.isArray(raw?.content)
         ? raw.content
         : Array.isArray(raw)
         ? raw
@@ -255,71 +302,67 @@ export const DashboardCodeRunner: React.FC = () => {
         typeof raw?.totalElements === 'number'
           ? raw.totalElements
           : getLiveTotalQuestionsCount();
-      const totalPages =
+      setTotalKnownQuestions(totalElements);
+      setQuestionPage(0);
+      setQuestionTotalPages(
         typeof raw?.totalPages === 'number'
           ? raw.totalPages
-          : Math.max(1, Math.ceil(totalElements / 10));
-      setTotalKnownQuestions(totalElements);
-
-      // Dynamically load all available pages with pageSize: 10 matching /admin/questions contract
-      if (totalPages > 1) {
-        const pagesToFetch = Array.from({ length: totalPages - 1 }, (_, i) => i + 1);
-        const subPageResults = await Promise.allSettled(
-          pagesToFetch.map((pageNum) =>
-            adminQuestionService.getQuestions(
-              {
-                level: null,
-                companies: null,
-                topic: null,
-                searchText: null,
-                pageRequest: { pageNumber: pageNum, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-              },
-              signal
-            )
-          )
-        );
-
-        for (const subRes of subPageResults) {
-          if (subRes.status === 'fulfilled') {
-            const pageRaw: any = subRes.value?.data || subRes.value;
-            const content = Array.isArray(pageRaw?.content) ? pageRaw.content : [];
-            allItems = allItems.concat(content);
-          }
-        }
-      }
+          : Math.max(1, Math.ceil(totalElements / 10))
+      );
+      setQuestionPageSearch(null);
 
       // Deduplicate by ID and map
-      const uniqueMap = new Map<number, QuestionOption>();
-      allItems.forEach((item) => {
-        if (item && typeof item.id === 'number') {
-          uniqueMap.set(item.id, {
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            constraints: item.constraints,
-            difficulty: item.difficulty || item.difficultyRefName,
-            difficultyRefName: item.difficultyRefName || item.difficulty,
-            topicRefName: item.topicRefName,
-            testCases: item.testCases,
-          });
-        }
-      });
-      const uniqueList = Array.from(uniqueMap.values()).sort((a, b) => a.id - b.id);
+      const uniqueList = allItems
+        .map(toQuestionOption)
+        .filter((item): item is QuestionOption => item !== null);
 
-      setQuestions(uniqueList);
-      if (uniqueList.length > 0) {
-        setSelectedQuestionId((prev) => {
-          if (prev && uniqueList.some((q) => q.id === prev)) return prev;
-          setManualQuestionId(String(uniqueList[0].id));
-          return uniqueList[0].id;
-        });
+      setQuestions((current) => {
+        const selected = current.find((item) => item.id === selectedQuestionIdRef.current);
+        return mergeQuestionOptions([], selected ? [...uniqueList, selected] : uniqueList);
+      });
+      if (uniqueList.length > 0 && selectedQuestionIdRef.current === null) {
+        const initialQuestionId = uniqueList[0].id;
+        selectQuestionId(initialQuestionId);
+        setManualQuestionId(String(initialQuestionId));
       }
     } catch {
+      if (generation !== pageGenerationRef.current || signal?.aborted) return;
       setResourcesError('Unable to load question catalog.');
     } finally {
-      setResourcesLoading(false);
+      if (generation === pageGenerationRef.current) {
+        setResourcesLoading(false);
+      }
     }
-  }, []);
+  }, [selectQuestionId]);
+
+  const loadNextQuestionPage = async () => {
+    if (isLoadingMoreQuestions || questionPage + 1 >= questionTotalPages) return;
+    const generation = pageGenerationRef.current;
+    const nextPage = questionPage + 1;
+    setIsLoadingMoreQuestions(true);
+    try {
+      const response = await adminQuestionService.getQuestions({
+        level: null,
+        companies: null,
+        topic: null,
+        searchText: questionPageSearch,
+        pageRequest: { pageNumber: nextPage, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+      });
+      if (generation !== pageGenerationRef.current) return;
+      const incoming = response.data.content
+        .map(toQuestionOption)
+        .filter((item): item is QuestionOption => item !== null);
+      setQuestions((current) => mergeQuestionOptions(current, incoming));
+      setQuestionPage(nextPage);
+    } catch (err: any) {
+      if (generation !== pageGenerationRef.current) return;
+      toast.error('Unable to load more questions: ' + (err?.message || 'Server error'));
+    } finally {
+      if (generation === pageGenerationRef.current) {
+        setIsLoadingMoreQuestions(false);
+      }
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -402,7 +445,7 @@ export const DashboardCodeRunner: React.FC = () => {
 
       // Tier 3: Lookup in already-loaded questions list
       if (!details) {
-        const cached = questions.find((q) => q.id === selectedQuestionId);
+        const cached = questionsRef.current.find((q) => q.id === selectedQuestionId);
         if (cached) {
           details = {
             id: cached.id,
@@ -455,7 +498,7 @@ export const DashboardCodeRunner: React.FC = () => {
     return () => {
       active = false;
     };
-  }, [selectedQuestionId, questions]);
+  }, [selectedQuestionId]);
 
   // Synchronize editor code per problem challenge and runtime language
   useEffect(() => {
@@ -511,14 +554,18 @@ export const DashboardCodeRunner: React.FC = () => {
       const matchTitle = (item.title || '').toLowerCase().includes(query);
       const matchDiff = (item.difficulty || item.difficultyRefName || '').toLowerCase().includes(query);
       const matchTopic = (item.topicRefName || '').toLowerCase().includes(query);
-      return matchId || matchTitle || matchDiff || matchTopic;
+      const matchDescription = (item.description || '').toLowerCase().includes(query);
+      return matchId || matchTitle || matchDiff || matchTopic || matchDescription;
     });
   }, [questions, searchFilter]);
 
   // Dynamic backend search for terms beyond local page
   const handleBackendSearch = async () => {
     if (!searchFilter.trim()) return;
+    const generation = ++pageGenerationRef.current;
     setIsSearchingBackend(true);
+    setIsLoadingMoreQuestions(false);
+    setResourcesLoading(false);
     try {
       const res = await adminQuestionService.getQuestions({
         level: null,
@@ -527,37 +574,33 @@ export const DashboardCodeRunner: React.FC = () => {
         searchText: searchFilter.trim(),
         pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
+      if (generation !== pageGenerationRef.current) return;
       const list = res.data.content;
+      const searchText = searchFilter.trim();
 
       if (list.length > 0) {
+        setQuestionPage(0);
+        setQuestionTotalPages(res.data.totalPages ?? 1);
+        setQuestionPageSearch(searchText);
         setQuestions((prev) => {
-          const map = new Map(prev.map((item) => [item.id, item]));
-          list.forEach((item: any) => {
-            if (item && item.id) {
-              map.set(item.id, {
-                id: item.id,
-                title: item.title,
-                description: item.description,
-                constraints: item.constraints,
-                difficulty: item.difficulty || item.difficultyRefName,
-                difficultyRefName: item.difficultyRefName || item.difficulty,
-                topicRefName: item.topicRefName,
-                testCases: item.testCases,
-              });
-            }
-          });
-          return Array.from(map.values()).sort((a, b) => a.id - b.id);
+          const incoming = list
+            .map(toQuestionOption)
+            .filter((item): item is QuestionOption => item !== null);
+          return mergeQuestionOptions(prev, incoming);
         });
-        setSelectedQuestionId(list[0].id);
+        selectQuestionId(list[0].id);
         setManualQuestionId(String(list[0].id));
         toast.success(`Found ${list.length} question(s) matching "${searchFilter}"`);
       } else {
         toast.error(`No questions found matching "${searchFilter}"`);
       }
     } catch (err: any) {
+      if (generation !== pageGenerationRef.current) return;
       toast.error('Search failed: ' + (err?.message || 'Server error'));
     } finally {
-      setIsSearchingBackend(false);
+      if (generation === pageGenerationRef.current) {
+        setIsSearchingBackend(false);
+      }
     }
   };
 
@@ -579,7 +622,7 @@ export const DashboardCodeRunner: React.FC = () => {
   const handleQuestionSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const qId = Number(e.target.value);
     if (!qId || isNaN(qId)) return;
-    setSelectedQuestionId(qId);
+    selectQuestionId(qId);
     setManualQuestionId(String(qId));
     setResult(null);
     setExecutionMessage('');
@@ -590,7 +633,7 @@ export const DashboardCodeRunner: React.FC = () => {
     setManualQuestionId(val);
     const num = Number(val);
     if (!isNaN(num) && num > 0) {
-      setSelectedQuestionId(num);
+      selectQuestionId(num);
       setResult(null);
     }
   };
@@ -622,7 +665,7 @@ export const DashboardCodeRunner: React.FC = () => {
             testCases: qData.testCases,
           };
           setQuestions((prev) => [...prev, newOpt].sort((a, b) => a.id - b.id));
-          setSelectedQuestionId(num);
+          selectQuestionId(num);
           toast.success(`Loaded Question #${num}: ${qData.title}`);
         } else {
           toast.error(`Question #${num} not found`);
@@ -712,7 +755,7 @@ export const DashboardCodeRunner: React.FC = () => {
       if (controller.signal.aborted) return;
 
       setResult(res);
-      setExecutionMessage('Executed Sample Test Cases Successfully');
+      setExecutionMessage('Executed sample test cases');
       if (isExecutionResultSuccessful(res)) {
         toast.success(`Passed all ${res.totalTestCases} sample test cases!`);
       } else {
@@ -871,7 +914,7 @@ export const DashboardCodeRunner: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void loadQuestionBank()}
-                  title="Reload all questions from server"
+                  title="Reload the initial question page from the server"
                   disabled={isBusy || combinedResourcesLoading}
                   className="text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors p-0.5"
                 >
@@ -896,6 +939,19 @@ export const DashboardCodeRunner: React.FC = () => {
                   <option value="">No matching questions found</option>
                 )}
               </select>
+              {questionPage + 1 < questionTotalPages &&
+                (questionPageSearch === null
+                  ? !searchFilter.trim()
+                  : questionPageSearch === searchFilter.trim()) && (
+                  <button
+                    type="button"
+                    onClick={() => void loadNextQuestionPage()}
+                    disabled={isBusy || combinedResourcesLoading || isLoadingMoreQuestions}
+                    className="text-[11px] font-semibold text-blue-600 dark:text-sky-400 hover:underline disabled:opacity-50 disabled:no-underline"
+                  >
+                    {isLoadingMoreQuestions ? 'Loading more…' : 'Load more problems'}
+                  </button>
+                )}
             </div>
 
             {/* Manual ID Input */}

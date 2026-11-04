@@ -73,12 +73,20 @@ export const refreshSessionThunk = createAsyncThunk<
 >(
   'auth/refreshSession',
   async (explicitToken, { rejectWithValue }) => {
+    const refreshEpoch = tokenStorage.getSessionEpoch();
     try {
       const res = await authService.refreshToken(explicitToken);
+      if (!res?.data) {
+        const currentToken = tokenStorage.getAccessToken();
+        if (tokenStorage.getSessionEpoch() === refreshEpoch && (!currentToken || !isTokenValid(currentToken))) {
+          tokenStorage.clearTokens();
+        }
+        return rejectWithValue('Session refresh returned no data');
+      }
       return res.data;
     } catch (err: any) {
       const currentToken = tokenStorage.getAccessToken();
-      if (!currentToken || !isTokenValid(currentToken)) {
+      if (tokenStorage.getSessionEpoch() === refreshEpoch && (!currentToken || !isTokenValid(currentToken))) {
         tokenStorage.clearTokens();
       }
       const errMsg = err?.message || (err?.errors && err?.errors[0]) || 'Session refresh failed';
@@ -226,7 +234,7 @@ const authSlice = createSlice({
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.error = null;
-        state.token = action.payload.accessToken || action.payload.token || state.token;
+        state.token = action.payload?.accessToken || action.payload?.token || state.token;
         state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(refreshSessionThunk.rejected, (state) => {
