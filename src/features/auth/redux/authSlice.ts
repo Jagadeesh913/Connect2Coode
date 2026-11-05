@@ -69,6 +69,7 @@ const buildUserProfile = (
       'User',
     email: String(email || ''),
     role: raw?.role ?? fallback?.role,
+    avatarUrl: raw?.avatarUrl ?? fallback?.avatarUrl,
     isDarkTheme: raw?.isDarkTheme ?? fallback?.isDarkTheme,
   };
 };

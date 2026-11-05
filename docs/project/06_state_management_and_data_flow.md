@@ -31,13 +31,13 @@ export const useAppStore = useStore.withTypes<AppStore>();
 ## 2. Redux Slice Inventory
 
 ### 1. `authSlice` ([`src/features/auth/redux/authSlice.ts`](../../src/features/auth/redux/authSlice.ts))
-- **Responsibilities**: User profile object, JWT access token, session authentication status (`LOADING`, `AUTHENTICATED`, `UNAUTHENTICATED`), global auth modal state (`login`, `signup`, `forgot`).
+- **Responsibilities**: User profile object, JWT access token, session authentication status (`LOADING`, `AUTHENTICATED`, `RECOVERY_REQUIRED`, `UNAUTHENTICATED`), global auth modal state (`login`, `signup`, `forgot`).
 - **Key Thunks**:
   - `loginUser`: Authenticates credentials with `POST /auth/login`, syncs `tokenStorage`.
   - `refreshSessionThunk`: Restores startup/OAuth sessions through the shared cross-tab refresh coordinator; protected-request refresh remains HTTP-401-driven.
   - `logoutUser`: Clears access/profile memory and every protected Redux cache on `pending`, redirects to login, and reports the real bodyless backend logout result.
 - **Bootstrap behavior**: If the access token is expired but refresh-session evidence exists, `initializeAuth` leaves the state at `LOADING` for `AppRouterLayout`'s refresh attempt instead of deleting the refresh session before it runs.
-- **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same same-tab/cross-tab coordinator. Validated token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
+- **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same same-tab/Web-Locks coordinator. A browser without Web Locks enters the recoverable failure path without sending an uncoordinated refresh. Validated token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
 - **Authorization presentation**: Admin routing/navigation uses only the role supplied by login/refresh response data. JWT payload claims are not decoded for authorization decisions.
 - **Session response boundary**: Login and refresh establish authentication only after validating `token`, `id`, `role`, and `email`.
 - **Startup recovery state**: `RECOVERY_REQUIRED` distinguishes network/5xx/contract failures from refresh HTTP 401. Route guards render a retry gate without exposing protected content; only HTTP 401 becomes `UNAUTHENTICATED`.

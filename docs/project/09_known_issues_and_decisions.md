@@ -123,8 +123,8 @@
 
 ### Decision 12: Credential-Free Cross-Tab Session Synchronization
 - **Context**: Browser cookies are shared between tabs, but Redux state and the in-memory access-token cache are per tab. Logging out in one tab previously left another tab displaying an authenticated session until reload or a failed request.
-- **Decision**: Publish only `{ type, occurredAt }` lifecycle events. Recipients clear per-tab memory/Redux on logout or refresh-401, and perform a cookie-backed refresh after another tab signs in. A cross-tab lock serializes rotating-cookie refresh requests without placing tokens or user data in the signal or lease. Ordinary token rotation does not broadcast another refresh cascade.
-- **Boundary**: This synchronizes tabs in the same browser origin. Server-side token revocation remains authoritative for other devices, browsers, or sessions.
+- **Decision**: Publish only `{ type, occurredAt }` lifecycle events. Recipients clear per-tab memory/Redux on logout or refresh-401, and perform a cookie-backed refresh after another tab signs in. The browser's atomic Web Locks API serializes rotating-cookie refresh requests without placing tokens or user data in the signal. A `localStorage` lease was rejected because read/write operations cannot implement atomic mutual exclusion. Browsers without Web Locks fail refresh safely before issuing the request. Ordinary token rotation does not broadcast another refresh cascade.
+- **Boundary**: This synchronizes tabs in the same browser origin when Web Locks are supported. Server-side token revocation remains authoritative for other devices, browsers, or sessions. Two-tab behavior and deployed cookie rotation remain `PARTIALLY VERIFIED` until exercised against the live backend.
 
 ### Decision 13: API-Field Audit Uses Captured Backend Evidence
 - **Context**: Read-only production captures on 2026-10-23 established exact DTOs for authentication, languages, references, MCQs, question lists, company reads, user progress lists, and institution search. The temporary account subsequently returned `401 Invalid Email or Password`, so no production mutation was attempted or inferred.
@@ -209,6 +209,8 @@
 3. **Draft Features Activation**: The `/interviews` and `/roadmaps/:slug` features are toggle-gated behind `VITE_SHOW_COMING_SOON`. Once backend endpoints for roadmaps are finalized, toggle `VITE_SHOW_COMING_SOON=false` to promote them to production.
 4. **Base Profile and Avatar Mutation**: `/user/profile` is unmapped in the available direct probes. Name/email are session-derived and read-only, and avatar editing is disabled until the backend exposes a verified mutation contract.
 5. **High-Stakes Proctoring Contract**: A secure assessment mode requires backend-owned exam-session state, server-side attempt/time limits, signed audit events, and a reviewed proctoring/privacy policy. No such verified API contract is present in this repository.
+6. **Deployed Refresh Response**: Verify that `POST /api/v1/auth/refresh` returns non-empty `token`, `id`, `role`, and `email`, and rotates the HttpOnly refresh cookie with the intended `Secure`, `SameSite`, Domain, and Path attributes. The frontend intentionally rejects incomplete identity payloads; this frontend checkout cannot prove the deployed Spring response.
+7. **Live Multi-Tab Rotation**: Run two real same-origin browser tabs against the deployed backend and verify that Web Locks allow only one in-flight refresh-cookie rotation, including simultaneous protected 401 responses. The automated lock test is not a substitute for observing real `Set-Cookie` behavior.
 ### Decision 25: Post-remediation CodeRabbit residual race and error-state fixes (2026-11-04)
 
 - A login now claims authentication-session epoch ownership before its request without clearing an existing valid session. This makes an older refresh result stale while preserving protection from a later logout or newer login.

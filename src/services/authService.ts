@@ -11,6 +11,7 @@ export interface AuthResponseData {
   firstName?: string;
   lastName?: string;
   fullName?: string;
+  avatarUrl?: string;
   email?: string;
   role?: string;
   isDarkTheme?: boolean;
@@ -20,6 +21,7 @@ export interface AuthResponseData {
     firstName?: string;
     lastName?: string;
     fullName?: string;
+    avatarUrl?: string;
     email?: string;
     role?: string;
     isDarkTheme?: boolean;
@@ -62,6 +64,7 @@ const persistAuthSession = (data: AuthSessionData): void => {
       firstName: responseUser.firstName ?? currentUser?.firstName,
       lastName: responseUser.lastName ?? currentUser?.lastName,
       fullName: responseUser.fullName ?? currentUser?.fullName,
+      avatarUrl: responseUser.avatarUrl ?? currentUser?.avatarUrl,
       role: responseUser.role ?? currentUser?.role,
       isDarkTheme: responseUser.isDarkTheme ?? currentUser?.isDarkTheme,
     });

@@ -2,6 +2,7 @@ import { tokenStorage } from '../security/tokenStorage';
 import type { User } from '../types/domain';
 
 const GUEST_SCOPE = 'guest';
+let lastResolvedAccountScope: string | null = null;
 
 function hashScope(value: string): string {
   let hash = 2166136261;
@@ -28,7 +29,10 @@ function getIdentityKey(): string {
 
 function getScope(): string {
   const identity = getIdentityKey();
-  return identity === GUEST_SCOPE ? GUEST_SCOPE : hashScope(identity);
+  if (identity === GUEST_SCOPE) return GUEST_SCOPE;
+  const scope = hashScope(identity);
+  lastResolvedAccountScope = scope;
+  return scope;
 }
 
 function getScopeForUser(user: Pick<User, 'id' | 'email'> | null): string {
@@ -71,8 +75,10 @@ export const userScopedStorage = {
     user: Pick<User, 'id' | 'email'> | null,
     options: { preserveKeys?: readonly string[] } = {}
   ): void {
-    const scope = getScopeForUser(user);
+    const explicitScope = getScopeForUser(user);
+    const scope = explicitScope === GUEST_SCOPE ? lastResolvedAccountScope : explicitScope;
     if (scope === GUEST_SCOPE) return;
+    if (!scope) return;
 
     const prefix = `c2c:user:${scope}:`;
     const preserved = new Set(options.preserveKeys || []);
@@ -84,6 +90,7 @@ export const userScopedStorage = {
         if (!preserved.has(storageKey.slice(prefix.length))) removals.push(storageKey);
       }
       removals.forEach((storageKey) => localStorage.removeItem(storageKey));
+      if (lastResolvedAccountScope === scope) lastResolvedAccountScope = null;
     } catch {}
   },
 };

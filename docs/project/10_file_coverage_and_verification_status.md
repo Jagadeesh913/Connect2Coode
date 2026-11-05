@@ -72,10 +72,10 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
 | `src/core/security/jwt.ts` | Response-role and safe-redirect helpers | `RUNTIME-VERIFIED` | Contains no JWT payload decoder; routing uses exact backend response roles only. |
 | `src/core/security/authSessionSync.ts` | Credential-free same-origin tab session event transport | `RUNTIME-VERIFIED` | BroadcastChannel with transient storage-event fallback; tested event validation. |
-| `src/core/security/authContract.ts` | Login/refresh response contract validator | `RUNTIME-VERIFIED` | Requires non-empty access token plus user ID, role, and email before authentication is established. |
-| `src/core/security/refreshCoordinator.ts` | Cross-tab refresh rotation lock | `RUNTIME-VERIFIED` | Uses Web Locks with a credential-free expiring storage-lease fallback; same-tab promise and cross-tab serialization are regression-covered. |
+| `src/core/security/authContract.ts` | Login/refresh response contract validator | `RUNTIME-VERIFIED` | Requires non-empty access token plus user ID, role, and email; preserves modeled non-sensitive profile fields such as `avatarUrl` and rejects arbitrary credential properties. The deployed refresh DTO remains unverified. |
+| `src/core/security/refreshCoordinator.ts` | Cross-tab refresh rotation lock | `PARTIALLY VERIFIED` | Uses atomic Web Locks only; browsers without them fail before issuing refresh. Mocked exclusivity and fail-safe paths are tested, but real two-tab cookie rotation remains unverified. |
 | `src/core/security/tokenStorage.ts` | Memory-only access token and session profile storage | `RUNTIME-VERIFIED` | Exposes no refresh-token API, never reads or creates the backend HttpOnly cookie, purges legacy JavaScript-readable token aliases, and advances the stale-response epoch on clear. |
-| `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Logout clears the departing user's scoped cache while retaining only explicitly preserved theme preference. |
+| `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Logout clears the departing user's scoped cache while retaining only explicitly preserved theme preference; a memory-only opaque last-resolved scope covers missing current identity without enumerating other users. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Canonical institution filters, reference save unions, nullable profile responses, strict session-identity fields, and MCQ save payloads reflect the active contracts. |
 | `src/core/validation/commonRules.ts` | Zod validators (email, password, name, phone, URL) | `RUNTIME-VERIFIED` | Migrated to Zod 4 error APIs and tested in `validationArchitecture.test.mjs`. |
@@ -256,7 +256,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 158
 - **Total Automated Test Files in `scripts/tests/`**: 23
-- **Total Executed Automated Unit Tests**: 367 (367 Passed, 0 Failed; 105 reported suites across 23 files)
+- **Total Executed Automated Unit Tests**: 368 (368 Passed, 0 Failed; 105 reported suites across 23 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 186 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.

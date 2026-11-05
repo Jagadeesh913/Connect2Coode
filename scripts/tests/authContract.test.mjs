@@ -60,6 +60,16 @@ const { requireAuthSessionData } = await import('../../src/core/security/authCon
 const { withCrossTabRefreshLock } = await import('../../src/core/security/refreshCoordinator.ts');
 const { userScopedStorage } = await import('../../src/core/storage/userScopedStorage.ts');
 
+const setNavigator = (value) => {
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value });
+};
+
+setNavigator({
+  locks: {
+    request: (_name, _options, callback) => callback(),
+  },
+});
+
 const installMemoryStorage = () => {
   const values = new Map();
   globalThis.localStorage = {
@@ -166,8 +176,20 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     );
     assert.deepEqual(
       requireAuthSessionData({ token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test' }),
-      { token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test', firstName: undefined, lastName: undefined, fullName: undefined, isDarkTheme: undefined }
+      { token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test', firstName: undefined, lastName: undefined, fullName: undefined, avatarUrl: undefined, isDarkTheme: undefined }
     );
+    const nested = requireAuthSessionData({
+      token: 'jwt',
+      user: {
+        id: 2,
+        role: 'USER',
+        email: 'user@c2c.test',
+        avatarUrl: 'https://cdn.c2c.test/avatar.png',
+        refreshToken: 'must-not-enter-profile-state',
+      },
+    });
+    assert.equal(nested.user?.avatarUrl, 'https://cdn.c2c.test/avatar.png');
+    assert.equal('refreshToken' in nested.user, false);
   });
 
   it('uses explicit request auth policy and never refreshes public HTTP 401 responses', async () => {
@@ -250,6 +272,33 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     }
   });
 
+  it('fails safely without Web Locks and never runs an uncoordinated refresh task', async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+    let taskCalls = 0;
+    setNavigator({});
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: () => { throw new Error('Storage denied'); },
+        setItem: () => { throw new Error('Storage denied'); },
+      },
+    });
+
+    try {
+      await assert.rejects(
+        () => withCrossTabRefreshLock(async () => { taskCalls += 1; }),
+        /Secure cross-tab session refresh is unavailable/
+      );
+      assert.equal(taskCalls, 0);
+    } finally {
+      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      else delete globalThis.navigator;
+      if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
+      else delete globalThis.localStorage;
+    }
+  });
+
   it('clears protected persisted data for the prior user while preserving theme preference', () => {
     installMemoryStorage();
     const user = { id: 7, email: 'user@c2c.test', role: 'USER' };
@@ -264,6 +313,13 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.equal(userScopedStorage.getItem('problem_progress'), null);
     assert.equal(userScopedStorage.getItem('myjo_bookmarks'), null);
     assert.equal(userScopedStorage.getItem('problem_code_draft_1_7'), null);
+    assert.equal(userScopedStorage.getItem('theme_pref'), 'dark');
+
+    userScopedStorage.setItem('problem_progress', '{"2":true}');
+    tokenStorage.removeUser();
+    userScopedStorage.clearForUser(null, { preserveKeys: ['theme_pref'] });
+    tokenStorage.setUser(user);
+    assert.equal(userScopedStorage.getItem('problem_progress'), null);
     assert.equal(userScopedStorage.getItem('theme_pref'), 'dark');
   });
 

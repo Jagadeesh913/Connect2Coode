@@ -8,6 +8,7 @@ export interface AuthSessionData {
   firstName?: string;
   lastName?: string;
   fullName?: string;
+  avatarUrl?: string;
   isDarkTheme?: boolean;
   user?: User;
 }
@@ -45,6 +46,7 @@ export function requireAuthSessionData(value: unknown): AuthSessionData {
   const firstName = requiredText(nestedUser?.firstName ?? data.firstName) ?? undefined;
   const lastName = requiredText(nestedUser?.lastName ?? data.lastName) ?? undefined;
   const fullName = requiredText(nestedUser?.fullName ?? data.fullName) ?? undefined;
+  const avatarUrl = requiredText(nestedUser?.avatarUrl ?? data.avatarUrl) ?? undefined;
   const isDarkTheme = typeof (nestedUser?.isDarkTheme ?? data.isDarkTheme) === 'boolean'
     ? Boolean(nestedUser?.isDarkTheme ?? data.isDarkTheme)
     : undefined;
@@ -57,6 +59,7 @@ export function requireAuthSessionData(value: unknown): AuthSessionData {
     firstName,
     lastName,
     fullName,
+    avatarUrl,
     isDarkTheme,
     ...(nestedUser ? {
       user: {
@@ -66,6 +69,7 @@ export function requireAuthSessionData(value: unknown): AuthSessionData {
         firstName,
         lastName,
         fullName,
+        avatarUrl,
         isDarkTheme,
       } satisfies User,
     } : {}),

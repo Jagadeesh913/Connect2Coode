@@ -23,7 +23,7 @@ Connect-2-code/
 │   ├── smoke-preview.mjs         # Production preview build route & asset verification
 │   ├── verify-architecture.mjs   # AST & string check for banned imports/patterns
 │   ├── verify-documentation.mjs  # Documentation integrity and link validator
-│   └── tests/                    # 23 Node test runner files (367 passing tests)
+│   └── tests/                    # 23 Node test runner files (368 passing tests)
 ├── src/
 │   ├── App.tsx                   # Top-level providers, theme, toast, error boundary
 │   ├── main.tsx                  # React 19 entry point and DOM mounting
