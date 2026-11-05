@@ -56,7 +56,7 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(mapped.examPlatform, undefined);
   });
 
-  it('preserves and resolves visible sample test cases for Question 3 (Reverse an Array)', () => {
+  it('does not invent sample test cases when the API and description omit examples', () => {
     const rawQuestion3 = {
       id: 3,
       title: 'Reverse an Array',
@@ -74,11 +74,7 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     const mapped = mapProblemDto(rawQuestion3);
     assert.equal(mapped.id, '3');
     assert.equal(mapped.title, 'Reverse an Array');
-    assert.ok(Array.isArray(mapped.testCases), 'testCases must be present for Question 3');
-    assert.ok(mapped.testCases.length > 0, 'testCases must not be empty');
-    assert.equal(mapped.testCases[0].isHidden, false, 'Sample test case must not be hidden');
-    assert.equal(mapped.testCases[0].typeRefCode, '', 'Classification must not be invented when the API omits it');
-    assert.match(mapped.testCases[0].input, /1 4 3 2 6 5|1 2 3 4 5/);
+    assert.deepEqual(mapped.testCases ?? [], []);
   });
 
   it('preserves explicitly supplied API test cases and constraints', () => {

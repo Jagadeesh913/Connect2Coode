@@ -2,6 +2,8 @@ import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import { tokenStorage } from '../core/security/tokenStorage';
 import { publishAuthSessionEvent } from '../core/security/authSessionSync';
+import { requireAuthSessionData, type AuthSessionData } from '../core/security/authContract';
+import { userScopedStorage } from '../core/storage/userScopedStorage';
 import type { ApiResponse } from '../core/types/api';
 
 export interface AuthResponseData {
@@ -13,7 +15,6 @@ export interface AuthResponseData {
   role?: string;
   isDarkTheme?: boolean;
   token?: string;
-  accessToken?: string;
   user?: {
     id?: number | string;
     firstName?: string;
@@ -44,17 +45,15 @@ export interface VerifyOtpPayload {
   password?: string;
 }
 
-const persistAuthSession = (data: AuthResponseData): void => {
-  const accessToken = data.accessToken || data.token;
-  if (accessToken) tokenStorage.setAccessToken(accessToken);
+const persistAuthSession = (data: AuthSessionData): void => {
+  tokenStorage.setAccessToken(data.token);
 
   const currentUser = tokenStorage.getUser();
   const responseUser = data.user || data;
   const email = responseUser.email || currentUser?.email;
   const id = responseUser.id ?? currentUser?.id;
 
-  // Refresh responses are allowed to contain only token/role/id. Preserve the
-  // existing profile instead of serializing tokens as user metadata.
+  // Only non-sensitive backend identity fields are kept with the access token.
   if (email) {
     tokenStorage.setUser({
       ...currentUser,
@@ -82,7 +81,10 @@ export const authService = {
       userName: payload.userName || sanitizedLabel,
       ...payload,
     };
-    return apiClient.post(API_ENDPOINTS.AUTH.SIGNUP, requestPayload, { timeout: 120000 });
+    return apiClient.post(API_ENDPOINTS.AUTH.SIGNUP, requestPayload, {
+      timeout: 120000,
+      authPolicy: 'public',
+    });
   },
 
   // Login: POST /api/v1/auth/login
@@ -91,16 +93,21 @@ export const authService = {
     // Supersede any older refresh/login without clearing a still-valid session.
     // A logout or newer login will advance the epoch again and reject this response.
     const sessionEpoch = tokenStorage.claimSessionOwnership();
-    const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, { timeout: 120000 });
+    const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, {
+      timeout: 120000,
+      authPolicy: 'public',
+    });
     if (response?.data) {
+      const session = requireAuthSessionData(response.data);
       if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
         throw new Error('Authentication session changed while login was in progress');
       }
       // Advance the epoch before installing the new account so any older login
       // or refresh response cannot overwrite this session after it resolves.
       tokenStorage.clearTokens({ broadcast: false });
-      persistAuthSession(response.data);
+      persistAuthSession(session);
       publishAuthSessionEvent('session-updated');
+      response.data = session;
     }
     return response;
   },
@@ -108,22 +115,31 @@ export const authService = {
   // Logout: POST /api/v1/auth/logout with credentials
   // Backend invalidates session and clears HttpOnly refresh cookie via Set-Cookie
   async logout(): Promise<ApiResponse<string>> {
+    const currentUser = tokenStorage.getUser();
+    userScopedStorage.clearForUser(currentUser, { preserveKeys: ['theme_pref'] });
     // Local logout must be immediate and must invalidate any in-flight login or
     // refresh response before waiting on the network.
     tokenStorage.clearTokens();
     return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, undefined, {
       withCredentials: true,
       timeout: 30_000,
+      authPolicy: 'public',
     });
   },
 
   // Generate Password Reset OTP: POST /api/v1/auth/generatePasswordResetOtp
   async generatePasswordResetOtp(email: string): Promise<ApiResponse<unknown>> {
-    return apiClient.post(API_ENDPOINTS.AUTH.GENERATE_PASSWORD_RESET_OTP, { email }, { timeout: 60000 });
+    return apiClient.post(API_ENDPOINTS.AUTH.GENERATE_PASSWORD_RESET_OTP, { email }, {
+      timeout: 60000,
+      authPolicy: 'public',
+    });
   },
 
   // Verify OTP and Reset Password: POST /api/v1/auth/verifyPasswordResetOtp
   async verifyPasswordResetOtp(payload: VerifyOtpPayload): Promise<ApiResponse<unknown>> {
-    return apiClient.post(API_ENDPOINTS.AUTH.VERIFY_PASSWORD_RESET_OTP, payload, { timeout: 60000 });
+    return apiClient.post(API_ENDPOINTS.AUTH.VERIFY_PASSWORD_RESET_OTP, payload, {
+      timeout: 60000,
+      authPolicy: 'public',
+    });
   },
 };

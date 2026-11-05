@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { PageLoading } from '../../shared/components/ui/PageLoading';
+import { SessionRecoveryState } from '../../features/auth/components/SessionRecoveryState';
 
 const GuardLoader = PageLoading;
 
@@ -14,6 +15,8 @@ export const ProtectedRoute: React.FC = () => {
   if (status === 'LOADING') {
     return <GuardLoader />;
   }
+
+  if (status === 'RECOVERY_REQUIRED') return <SessionRecoveryState />;
 
   if (!isAuthenticated) {
     try {

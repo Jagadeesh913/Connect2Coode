@@ -3,8 +3,9 @@ import { authService, type LoginPayload } from '../../../services/authService';
 import type { AuthResponseData } from '../../../services/authService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { executeRefreshToken } from '../../../core/api/apiClient';
+import type { AuthSessionData } from '../../../core/security/authContract';
 
-export type AuthStatus = 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
+export type AuthStatus = 'LOADING' | 'AUTHENTICATED' | 'RECOVERY_REQUIRED' | 'UNAUTHENTICATED';
 
 export interface UserProfile {
   id?: number | string;
@@ -74,7 +75,7 @@ const buildUserProfile = (
 
 // Canonical session refresh thunk. The browser supplies the HttpOnly cookie.
 export const refreshSessionThunk = createAsyncThunk<
-  AuthResponseData,
+  AuthSessionData,
   void,
   { rejectValue: RefreshFailure }
 >(
@@ -84,33 +85,31 @@ export const refreshSessionThunk = createAsyncThunk<
       return await executeRefreshToken();
     } catch (err: any) {
       const responseData = err?.response?.data;
-      const errMsg = responseData?.message || err?.message || (err?.errors && err?.errors[0]) || 'Session refresh failed';
+      const statusCode = Number(err?.response?.status || responseData?.statusCode || 0);
       return rejectWithValue({
-        message: errMsg,
-        statusCode: Number(err?.response?.status || responseData?.statusCode || 0),
+        message: statusCode === 401
+          ? 'Your session has expired. Please sign in again.'
+          : 'We could not verify your session. Please try again.',
+        statusCode,
       });
     }
   }
 );
 
-// Backward compatibility alias for silent refresh
-export const silentRefreshSession = refreshSessionThunk;
-
-// Backward compatibility alias for legacy Google login thunk
-export const loginWithGoogleRefreshToken = refreshSessionThunk;
-
-export const loginUser = createAsyncThunk<AuthResponseData, LoginPayload, { rejectValue: string }>(
+export const loginUser = createAsyncThunk<AuthSessionData, LoginPayload, { rejectValue: string }>(
   'auth/login',
   async (payload: LoginPayload, { rejectWithValue }) => {
     try {
       const res = await authService.login(payload);
-      if (res.statusCode === 200 && res.data) {
-        return res.data;
+      if (res.statusCode === 200 && res.data?.token) {
+        return res.data as AuthSessionData;
       }
-      return rejectWithValue(res.message || 'Invalid Email or Password');
+      return rejectWithValue('The authentication service returned an invalid response. Please try again.');
     } catch (err: any) {
-      const errMsg = err.message || (err.errors && err.errors[0]) || 'Invalid Email or Password';
-      return rejectWithValue(errMsg);
+      const statusCode = Number(err?.statusCode || err?.response?.status || 0);
+      if (statusCode === 401) return rejectWithValue('Invalid email or password.');
+      if (statusCode === 429) return rejectWithValue('Too many attempts. Please try again later.');
+      return rejectWithValue('Unable to sign in right now. Please try again.');
     }
   }
 );
@@ -192,16 +191,18 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Canonical Refresh Session (proactive background check does NOT block UI loading)
-      .addCase(refreshSessionThunk.pending, () => {
-        // Intentionally keep state.loading false so login form submit buttons remain interactive
+      // Canonical startup/OAuth/HTTP-401 session refresh lifecycle.
+      .addCase(refreshSessionThunk.pending, (state) => {
+        if (!state.isAuthenticated) state.status = 'LOADING';
+        state.loading = true;
+        state.error = null;
       })
       .addCase(refreshSessionThunk.fulfilled, (state, action) => {
         state.loading = false;
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.error = null;
-        state.token = action.payload?.accessToken || action.payload?.token || state.token;
+        state.token = action.payload.token;
         state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(refreshSessionThunk.rejected, (state, action) => {
@@ -210,10 +211,14 @@ const authSlice = createSlice({
         if (action.payload?.statusCode !== 401 && state.isAuthenticated && state.token) {
           // A transient refresh failure is not proof that the current session is invalid.
           state.status = 'AUTHENTICATED';
-        } else {
+        } else if (action.payload?.statusCode === 401) {
           state.user = null;
           state.token = null;
           state.status = 'UNAUTHENTICATED';
+          state.isAuthenticated = false;
+        } else {
+          // A temporary startup failure does not prove the HttpOnly cookie is invalid.
+          state.status = 'RECOVERY_REQUIRED';
           state.isAuthenticated = false;
         }
       })
@@ -227,7 +232,7 @@ const authSlice = createSlice({
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
         state.isAuthModalOpen = false;
-        state.token = action.payload.accessToken || action.payload.token || null;
+        state.token = action.payload.token;
         state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(loginUser.rejected, (state, action) => {

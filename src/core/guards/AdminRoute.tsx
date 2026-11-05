@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
 import { isAdminRole } from '../security/jwt';
 import { PageLoading } from '../../shared/components/ui/PageLoading';
+import { SessionRecoveryState } from '../../features/auth/components/SessionRecoveryState';
 
 const GuardLoader = PageLoading;
 
@@ -22,6 +23,8 @@ export const AdminRoute: React.FC = () => {
   if (status === 'LOADING') {
     return <GuardLoader />;
   }
+
+  if (status === 'RECOVERY_REQUIRED') return <SessionRecoveryState />;
 
   // 2. Check Authentication Status
   if (!isAuthenticated) {

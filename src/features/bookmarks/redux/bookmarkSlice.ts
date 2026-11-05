@@ -345,9 +345,7 @@ const bookmarkSlice = createSlice({
       .addMatcher(
         (action) =>
           action.type === 'auth/login/fulfilled' ||
-          action.type === 'auth/loginWithGoogleRefreshToken/fulfilled' ||
           action.type === 'auth/refreshSession/fulfilled' ||
-          action.type === 'auth/silentRefresh/fulfilled' ||
           action.type === 'auth/setAuthenticatedSession',
         (state, action: any) => {
           state.currentRequestId = null;

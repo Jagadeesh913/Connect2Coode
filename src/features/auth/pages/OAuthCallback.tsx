@@ -100,17 +100,10 @@ export const OAuthCallback: React.FC = () => {
 
           navigate(destination, { replace: true });
         } else {
-          const rawError = typeof result.payload === 'string'
-            ? result.payload
-            : result.payload?.message || '';
-          const errMsg =
-            rawError && !rawError.toLowerCase().includes('missing')
-              ? rawError
-              : 'Could not establish an authenticated session after Google sign-in. Please try again.';
-          setError(errMsg);
+          setError('Could not establish an authenticated session after Google sign-in. Please try again.');
         }
-      } catch (err: any) {
-        setError(err?.message || 'An unexpected error occurred completing authentication.');
+      } catch {
+        setError('An unexpected error occurred completing authentication. Please try again.');
       }
     };
 

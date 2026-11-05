@@ -60,7 +60,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Attaches the in-memory bearer token; refresh is bodyless, credentialed, single-flight, and triggered only by protected-request HTTP 401. Refresh HTTP 401 clears the session while temporary failures preserve it. |
+| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Resolves explicit public/protected request policy, attaches bearer only to protected calls, and allows one retry only for their HTTP 401. Refresh is bodyless and response-validated. |
 | `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `RUNTIME-VERIFIED` | Includes tested reference routes and semantic `SAVE` names for POST routes shared by create/update. |
 | `src/core/guards/AdminRoute.tsx` | Admin route gate using response profile role | `RUNTIME-VERIFIED` | Uses the backend-supplied login/refresh role; it does not decode JWT claims for authorization. |
 | `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Redirect selection uses the backend-supplied response profile role. |
@@ -70,10 +70,12 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
-| `src/core/security/jwt.ts` | Legacy JWT decoder plus response-role and redirect helpers | `RUNTIME-VERIFIED` | Source authorization callers use `isAdminRole` with backend response data; JWT claims are not used for routing or access decisions. |
+| `src/core/security/jwt.ts` | Response-role and safe-redirect helpers | `RUNTIME-VERIFIED` | Contains no JWT payload decoder; routing uses exact backend response roles only. |
 | `src/core/security/authSessionSync.ts` | Credential-free same-origin tab session event transport | `RUNTIME-VERIFIED` | BroadcastChannel with transient storage-event fallback; tested event validation. |
+| `src/core/security/authContract.ts` | Login/refresh response contract validator | `RUNTIME-VERIFIED` | Requires non-empty access token plus user ID, role, and email before authentication is established. |
+| `src/core/security/refreshCoordinator.ts` | Cross-tab refresh rotation lock | `RUNTIME-VERIFIED` | Uses Web Locks with a credential-free expiring storage-lease fallback; same-tab promise and cross-tab serialization are regression-covered. |
 | `src/core/security/tokenStorage.ts` | Memory-only access token and session profile storage | `RUNTIME-VERIFIED` | Exposes no refresh-token API, never reads or creates the backend HttpOnly cookie, purges legacy JavaScript-readable token aliases, and advances the stale-response epoch on clear. |
-| `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Tested in `taskRemediationVerification.test.mjs`. |
+| `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Logout clears the departing user's scoped cache while retaining only explicitly preserved theme preference. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Canonical institution filters, reference save unions, nullable profile responses, strict session-identity fields, and MCQ save payloads reflect the active contracts. |
 | `src/core/validation/commonRules.ts` | Zod validators (email, password, name, phone, URL) | `RUNTIME-VERIFIED` | Migrated to Zod 4 error APIs and tested in `validationArchitecture.test.mjs`. |
@@ -89,7 +91,7 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Login stores only response token/profile in memory. Logout clears locally immediately, sends no token body, and returns the real backend outcome rather than fabricating success. |
+| `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Login validates token/identity before memory storage. Logout clears memory and the previous user cache, sends no token body, and returns the real backend outcome. |
 | `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
 | `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `RUNTIME-VERIFIED` | Company-question recovery preserves the requested numeric company filter and never substitutes an unscoped name search. A non-empty live exam/detail DTO remains unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Language caching, API-only reference-ID resolution, custom-input payloads, malformed response rejection, and non-zero success verdicts are covered by tests; live execution remains backend-dependent. |
@@ -137,7 +139,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/EmptyState.tsx` | Empty state placeholder | `VERIFIED` | Used in empty tables/lists. |
 | `src/shared/components/ui/Footer.tsx` | Global footer | `RUNTIME-VERIFIED` | Verified in MainLayout. |
 | `src/shared/components/ui/FormFieldError.tsx` | Form validation message | `RUNTIME-VERIFIED` | Used across React Hook Form inputs. |
-| `src/shared/components/ui/Navbar.tsx` | Global top navigation bar | `RUNTIME-VERIFIED` | User avatar, theme toggle, nav links, and JWT-only admin navigation visibility. |
+| `src/shared/components/ui/Navbar.tsx` | Global top navigation bar | `RUNTIME-VERIFIED` | User avatar, theme toggle, nav links, and backend-response-role admin navigation visibility. |
 | `src/shared/components/ui/PageLoading.tsx` | Full-screen and container loading state | `RUNTIME-VERIFIED` | Route-shaped shimmer layouts, including a skeleton fallback for otherwise-unclassified routes. |
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
@@ -154,11 +156,12 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/GoogleSignInButton.tsx` | Google OAuth2 sign-in button | `RUNTIME-VERIFIED` | Triggers Google authorization popup. |
 | `hooks/useGoogleOAuthLogin.ts` | OAuth hook managing popup and postMessage | `RUNTIME-VERIFIED` | Tested in `googleOAuthLifecycle.test.mjs`. |
-| `pages/Login.tsx` | Login form page | `RUNTIME-VERIFIED` | Zod validation, authModalMode support, JWT-only admin redirect selection, and synchronous duplicate auth-action guards. |
+| `components/SessionRecoveryState.tsx` | Temporary startup-auth failure gate | `RUNTIME-VERIFIED` | Keeps protected content closed and offers a safe retry without treating network/5xx failure as logout. |
+| `pages/Login.tsx` | Login form page | `RUNTIME-VERIFIED` | Zod validation, authModalMode support, backend-response-role redirect selection, and synchronous duplicate auth-action guards. |
 | `pages/Signup.tsx` | Registration form page | `RUNTIME-VERIFIED` | Name, email, password matching validation. |
 | `pages/ForgotPassword.tsx` | Two-step OTP password reset | `RUNTIME-VERIFIED` | OTP generation & verification flow. |
-| `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Passes tokens to opener and uses JWT claims for admin redirect selection. |
-| `redux/authSlice.ts` | Auth Redux slice | `RUNTIME-VERIFIED` | Tested in `authSession.test.mjs`. |
+| `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Exchanges only the HttpOnly cookie, sends a credential-free popup signal, uses response role, and displays only safe errors. |
+| `redux/authSlice.ts` | Auth Redux slice | `RUNTIME-VERIFIED` | Distinguishes loading, authenticated, recoverable startup failure, and unauthenticated states. |
 
 ### B. Problems Feature (`src/features/problems/`)
 | File Path | Role | Status | Notes |
@@ -241,7 +244,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/features/languages/redux/languageSlice.ts` | Language Redux slice | `RUNTIME-VERIFIED` | TTL, force refresh, and stale-response ownership tested. |
 | `src/features/profile/components/modals/*` | Academic and personal modals | `VERIFIED` | Reference-backed gender, API-owned editable fields, and read-only authenticated identity; unsupported photo editor removed. |
 | `src/features/profile/pages/ProfileSettings.tsx` | Profile settings & performance metrics | `RUNTIME-VERIFIED` | Academic/personal records are API-driven with no legacy identity fallbacks; the modal shares header identity fallbacks, unsupported local-only preferences are absent, enrichment requests are cancellable, progress metrics avoid duplicate calls, and saves use a synchronous mutation lock. |
-| `src/features/profile/redux/profileSlice.ts` | Profile Redux slice | `RUNTIME-VERIFIED` | Identity and `/userInfo` reads are user/request-owned; late responses from a previous account are ignored, valid-null caching and token-only refresh continuity are tested. |
+| `src/features/profile/redux/profileSlice.ts` | Profile Redux slice | `RUNTIME-VERIFIED` | Identity and `/userInfo` reads are user/request-owned; late responses from a previous account are ignored and valid-null caching is tested. |
 | `src/features/progress/redux/progressSlice.ts` | Progress Redux slice | `RUNTIME-VERIFIED` | Remote/local merge, warning fallbacks, cancellation, immediate scope clearing, and stale-response protection are tested. |
 | `src/features/references/redux/referenceSlice.ts` | Reference taxonomy Redux slice | `RUNTIME-VERIFIED` | Empty-result TTL caching and stale-response ownership tested. |
 | `src/features/roadmaps/pages/RoadmapDetails.tsx` | DSA and engineering roadmaps | `VERIFIED` | Gated by `ComingSoon`. |
@@ -251,13 +254,13 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 155
+- **Total First-Party TypeScript/TSX Files in `src/`**: 158
 - **Total Automated Test Files in `scripts/tests/`**: 23
-- **Total Executed Automated Unit Tests**: 371 (371 Passed, 0 Failed; 105 reported suites across 23 files)
+- **Total Executed Automated Unit Tests**: 367 (367 Passed, 0 Failed; 105 reported suites across 23 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
-- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
+- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 186 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.
-- **Documentation Integrity (`npm run verify:docs`)**: 272 internal links and source references passed.
-- **Architecture Verification (`npm run verify:architecture`)**: `RUNTIME-VERIFIED` — 159 source files scanned successfully, including API transport, endpoint-domain, environment, route, and prohibited-pattern checks.
-- **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 14 bundle assets.
+- **Documentation Integrity (`npm run verify:docs`)**: 285 internal links and source references passed.
+- **Architecture Verification (`npm run verify:architecture`)**: `RUNTIME-VERIFIED` — 162 source files scanned successfully, including API transport, endpoint-domain, environment, route, and prohibited-pattern checks.
+- **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 13 bundle assets.
 

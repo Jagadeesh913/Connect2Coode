@@ -6,13 +6,15 @@ import { pathToFileURL } from 'node:url';
 const axiosStub = `
 let postImpl = async () => ({ data: {} });
 export const postCalls = [];
+export const requestHandlers = [];
+export const responseErrorHandlers = [];
 export function setPostImpl(next) { postImpl = next; }
 export function resetPostCalls() { postCalls.length = 0; }
 function create() {
   const client = async () => ({});
   client.interceptors = {
-    request: { use: () => undefined },
-    response: { use: () => undefined },
+    request: { use: (fulfilled) => requestHandlers.push(fulfilled) },
+    response: { use: (_fulfilled, rejected) => responseErrorHandlers.push(rejected) },
   };
   return client;
 }
@@ -54,6 +56,21 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 const axiosModule = await import('axios');
 const { executeRefreshToken } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
+const { requireAuthSessionData } = await import('../../src/core/security/authContract.ts');
+const { withCrossTabRefreshLock } = await import('../../src/core/security/refreshCoordinator.ts');
+const { userScopedStorage } = await import('../../src/core/storage/userScopedStorage.ts');
+
+const installMemoryStorage = () => {
+  const values = new Map();
+  globalThis.localStorage = {
+    get length() { return values.size; },
+    key: (index) => [...values.keys()][index] ?? null,
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: (key) => values.delete(key),
+    clear: () => values.clear(),
+  };
+};
 
 describe('Backend-owned refresh-cookie authentication contract', () => {
   it('shares one bodyless refresh request across concurrent callers', async () => {
@@ -104,8 +121,11 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
   });
 
   it('clears the in-memory session when refresh returns HTTP 401', async () => {
+    installMemoryStorage();
     tokenStorage.setAccessToken('expired-access');
     tokenStorage.setUser({ id: 42, email: 'user@c2c.test', role: 'USER' });
+    userScopedStorage.setItem('problem_progress', '{"1":true}');
+    userScopedStorage.setItem('theme_pref', 'dark');
     axiosModule.setPostImpl(async () => {
       throw { response: { status: 401, data: { message: 'Refresh cookie expired' } } };
     });
@@ -113,6 +133,10 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     await assert.rejects(() => executeRefreshToken());
     assert.equal(tokenStorage.getAccessToken(), null);
     assert.equal(tokenStorage.getUser(), null);
+    tokenStorage.setUser({ id: 42, email: 'user@c2c.test', role: 'USER' });
+    assert.equal(userScopedStorage.getItem('problem_progress'), null);
+    assert.equal(userScopedStorage.getItem('theme_pref'), 'dark');
+    tokenStorage.clearTokens();
   });
 
   it('keeps startup, retry, OAuth, and role decisions aligned with the contract', async () => {
@@ -129,5 +153,125 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.match(loginSource, /isAdminRole\(userObj\?\.user\?\.role \|\| userObj\?\.role\)/);
     assert.match(callbackSource, /dispatch\(refreshSessionThunk\(\)\)/);
     assert.doesNotMatch(`${loginSource}\n${callbackSource}`, /isJwtAdmin/);
+  });
+
+  it('rejects login or refresh payloads that cannot restore identity and role', () => {
+    assert.throws(
+      () => requireAuthSessionData({ token: 'token-only' }),
+      /missing token or required identity fields/
+    );
+    assert.throws(
+      () => requireAuthSessionData({ id: 1, role: 'ADMIN', email: 'admin@c2c.test' }),
+      /missing token or required identity fields/
+    );
+    assert.deepEqual(
+      requireAuthSessionData({ token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test' }),
+      { token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test', firstName: undefined, lastName: undefined, fullName: undefined, isDarkTheme: undefined }
+    );
+  });
+
+  it('uses explicit request auth policy and never refreshes public HTTP 401 responses', async () => {
+    tokenStorage.setAccessToken('in-memory-token');
+    const requestHandler = axiosModule.requestHandlers[0];
+    const publicConfig = await requestHandler({
+      url: '/institutions/search',
+      authPolicy: 'public',
+      headers: {},
+    });
+    const protectedConfig = await requestHandler({
+      url: '/questions',
+      authPolicy: 'protected',
+      headers: {},
+    });
+    assert.equal(publicConfig.headers.Authorization, undefined);
+    assert.equal(protectedConfig.headers.Authorization, 'Bearer in-memory-token');
+
+    axiosModule.resetPostCalls();
+    const responseErrorHandler = axiosModule.responseErrorHandlers[0];
+    await assert.rejects(() => responseErrorHandler({
+      config: { url: '/institutions/search', authPolicy: 'public' },
+      response: { status: 401, data: { message: 'Public request denied' } },
+      message: 'Unauthorized',
+    }));
+    assert.equal(axiosModule.postCalls.length, 0);
+
+    await assert.rejects(() => responseErrorHandler({
+      config: { url: '/questions', authPolicy: 'protected' },
+      response: { status: 403, data: { message: 'Forbidden' } },
+      message: 'Forbidden',
+    }));
+    await assert.rejects(() => responseErrorHandler({
+      config: { url: '/questions', authPolicy: 'protected', _retry: true },
+      response: { status: 401, data: { message: 'Unauthorized' } },
+      message: 'Unauthorized',
+    }));
+    assert.equal(axiosModule.postCalls.length, 0, '403 and already-retried 401 responses must never refresh');
+  });
+
+  it('routes refresh work through one exclusive browser lock across concurrent tab callers', async () => {
+    const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+    let lockQueue = Promise.resolve();
+    let active = 0;
+    let maxActive = 0;
+    const lockNames = [];
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: {
+        locks: {
+          request(name, options, callback) {
+            lockNames.push([name, options.mode]);
+            const run = lockQueue.then(async () => {
+              active += 1;
+              maxActive = Math.max(maxActive, active);
+              await new Promise((resolve) => setTimeout(resolve, 5));
+              try { return await callback(); } finally { active -= 1; }
+            });
+            lockQueue = run.catch(() => undefined);
+            return run;
+          },
+        },
+      },
+    });
+
+    try {
+      const results = await Promise.all([
+        withCrossTabRefreshLock(async () => 'tab-a'),
+        withCrossTabRefreshLock(async () => 'tab-b'),
+      ]);
+      assert.deepEqual(results, ['tab-a', 'tab-b']);
+      assert.equal(maxActive, 1);
+      assert.deepEqual(lockNames, [
+        ['c2c-auth-refresh', 'exclusive'],
+        ['c2c-auth-refresh', 'exclusive'],
+      ]);
+    } finally {
+      if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
+      else delete globalThis.navigator;
+    }
+  });
+
+  it('clears protected persisted data for the prior user while preserving theme preference', () => {
+    installMemoryStorage();
+    const user = { id: 7, email: 'user@c2c.test', role: 'USER' };
+    tokenStorage.setUser(user);
+    userScopedStorage.setItem('problem_progress', '{"1":true}');
+    userScopedStorage.setItem('myjo_bookmarks', '[]');
+    userScopedStorage.setItem('problem_code_draft_1_7', 'source');
+    userScopedStorage.setItem('theme_pref', 'dark');
+
+    userScopedStorage.clearForUser(user, { preserveKeys: ['theme_pref'] });
+
+    assert.equal(userScopedStorage.getItem('problem_progress'), null);
+    assert.equal(userScopedStorage.getItem('myjo_bookmarks'), null);
+    assert.equal(userScopedStorage.getItem('problem_code_draft_1_7'), null);
+    assert.equal(userScopedStorage.getItem('theme_pref'), 'dark');
+  });
+
+  it('keeps OAuth refresh failures generic and removes hardcoded problem samples', async () => {
+    const fs = await import('node:fs');
+    const callbackSource = fs.readFileSync('src/features/auth/pages/OAuthCallback.tsx', 'utf8');
+    const testCaseSource = fs.readFileSync('src/features/admin/utils/testCaseUtils.ts', 'utf8');
+    assert.doesNotMatch(callbackSource, /result\.payload\?\.message|err\?\.message/);
+    assert.doesNotMatch(testCaseSource, /getStandardSampleCases|1 4 3 2 6 5|10 20 30 40/);
   });
 });

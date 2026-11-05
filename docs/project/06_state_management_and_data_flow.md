@@ -34,11 +34,13 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Responsibilities**: User profile object, JWT access token, session authentication status (`LOADING`, `AUTHENTICATED`, `UNAUTHENTICATED`), global auth modal state (`login`, `signup`, `forgot`).
 - **Key Thunks**:
   - `loginUser`: Authenticates credentials with `POST /auth/login`, syncs `tokenStorage`.
-  - `refreshSessionThunk`: Proactively refreshes token with single-flight locking.
+  - `refreshSessionThunk`: Restores startup/OAuth sessions through the shared cross-tab refresh coordinator; protected-request refresh remains HTTP-401-driven.
   - `logoutUser`: Clears access/profile memory and every protected Redux cache on `pending`, redirects to login, and reports the real bodyless backend logout result.
 - **Bootstrap behavior**: If the access token is expired but refresh-session evidence exists, `initializeAuth` leaves the state at `LOADING` for `AppRouterLayout`'s refresh attempt instead of deleting the refresh session before it runs.
-- **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same single-flight coordinator. The response token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
+- **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same same-tab/cross-tab coordinator. Validated token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
 - **Authorization presentation**: Admin routing/navigation uses only the role supplied by login/refresh response data. JWT payload claims are not decoded for authorization decisions.
+- **Session response boundary**: Login and refresh establish authentication only after validating `token`, `id`, `role`, and `email`.
+- **Startup recovery state**: `RECOVERY_REQUIRED` distinguishes network/5xx/contract failures from refresh HTTP 401. Route guards render a retry gate without exposing protected content; only HTTP 401 becomes `UNAUTHENTICATED`.
 - **Reducer purity**: Cookie reads occur in the `initializeAuth` action prepare callback and token writes occur in `authService`; reducers only apply action payloads.
 
 ### 2. `problemSlice` ([`src/features/problems/redux/problemSlice.ts`](../../src/features/problems/redux/problemSlice.ts))
@@ -81,7 +83,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **API-field boundary**: `ProfileSettings` exposes only fields represented by the authenticated identity or `/userInfo/{userId}` contracts. Academic and editable personal values never fall back to legacy fields on the identity object. The unsupported email-notification, interface-language, and profile-level theme controls were removed rather than persisted locally. Global theme behavior remains owned by `ThemeProvider`.
 - **Single source of truth**: `ProfileSettings` renders academic data directly from the slice rather than maintaining a second component copy.
 - **Nullable identity cache**: `profileFetched` distinguishes an API-confirmed `null` identity result from the not-yet-requested state, preventing route remounts from repeating the same read and allowing the page to leave its initial skeleton.
-- **Refresh continuity**: A token-only `setAuthenticatedSession` action preserves the current identity and `/userInfo` caches; only an explicit different user clears them. The personal-information modal uses the same session-identity fallback rendered in the profile header.
+- **Refresh continuity**: A validated refresh carries identity and role. Reapplying the same user preserves `/userInfo` caches; an explicit different user clears them. The personal-information modal uses the same session-identity fallback rendered in the profile header.
 - **Request ownership**: Fetch and save actions carry a request ID and user ID. A late fetch for an old user, or a fetch superseded by a save, cannot overwrite current academic data.
 - **Empty response caching and account switches**: A valid API `null` is cached for that user to prevent duplicate requests. Auth transitions clear the previous user's record immediately, and an omitted response `userId` is filled from the requested route identity before reducer ownership checks.
 
@@ -133,6 +135,8 @@ graph LR
 ```
 
 Access credentials and session profile metadata are held only in per-tab memory/Redux. `tokenStorage` never reads or writes the HttpOnly refresh cookie; it only removes obsolete JavaScript-readable access/profile aliases left by older builds. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained user-scoped storage is limited to manual/offline progress, COMPANY/APTITUDE bookmark fallbacks, and the active identity's theme preference. `ProtectedRoute` stores `post_auth_redirect` separately in `sessionStorage` for the current tab.
+
+On logout, the application removes the departing user's complete scoped cache—including progress, local bookmarks, and code drafts—before clearing memory. Only the non-sensitive `theme_pref` preference is retained. Other users' hashed scopes are never read or modified.
 
 ### `userScopedStorage` Architecture
 Browser storage is shared across users on the same machine. To eliminate privacy leaks when a user logs out and another logs in:

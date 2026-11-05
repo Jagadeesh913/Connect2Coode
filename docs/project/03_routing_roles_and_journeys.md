@@ -95,9 +95,11 @@ The application distinguishes between two primary user roles:
 
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
-| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Checks `isAuthenticated && isTokenValid(token)`. If loading, renders `<PageLoading />`. Saves attempted destination in `sessionStorage.getItem('post_auth_redirect')`. | Redirects to `/login` |
+| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Waits for startup restoration, then trusts validated Redux authentication state. Saves the attempted destination in `sessionStorage.getItem('post_auth_redirect')`. JWT contents are never decoded. | Redirects to `/login` only after confirmed unauthentication |
 | **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Waits for startup refresh, then uses the backend response `role` to select `/admin/dashboard` or `/practice`. JWT claims are not decoded for routing. | Redirects to `/practice` or `/admin/dashboard` |
 | **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Requires authenticated Redux state and an exact `ADMIN`/`ROLE_ADMIN` value supplied by the latest login/refresh response. Backend authorization remains authoritative. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
+
+All three guard types keep protected/guest decisions closed during `LOADING`. A temporary startup refresh failure enters `RECOVERY_REQUIRED` and renders a safe retry screen; it does not redirect to login, infer that the cookie is invalid, or reveal protected route content. Refresh HTTP 401 alone transitions to `UNAUTHENTICATED`.
 
 ---
 

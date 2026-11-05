@@ -93,17 +93,17 @@
 
 ### Decision 6: Backend-Owned Refresh Cookie and Memory-Only Access Session
 - **Context**: The previous client mirrored credentials and profile objects into `localStorage` and `sessionStorage`, while the profile page retained an unscoped academic-record cache. This contradicted the documented storage policy and could leave sensitive data after a session.
-- **Decision**: Access tokens and session identity remain only in memory/Redux. The frontend exposes no refresh-token storage API and sends no refresh token in refresh/logout bodies; the backend owns the HttpOnly cookie and its rotation/revocation. Startup refresh is unconditional, and all refresh callers share one lock. Logout clears memory and protected caches immediately, then returns the real backend outcome.
-- **Guardrail**: Only refresh HTTP 401 proves the cookie invalid and clears authentication. Network and 5xx failures preserve an already-active in-memory session.
+- **Decision**: Access tokens and session identity remain only in memory/Redux. Login/refresh responses must contain `token`, `id`, `role`, and `email`. The frontend exposes no refresh-token storage API and sends no refresh token in refresh/logout bodies; the backend owns the HttpOnly cookie and its rotation/revocation. Startup refresh is unconditional, and refresh rotation is serialized both within and across tabs. Logout clears memory, Redux caches, and the departing user's persisted cache while preserving only theme preference.
+- **Guardrail**: Only refresh HTTP 401 proves the cookie invalid and clears authentication. Network, malformed response, and 5xx failures preserve an active session or enter the startup retry gate. Legacy readable refresh-cookie cleanup remains a backend `Set-Cookie` migration responsibility because frontend JavaScript must not manage that cookie.
 
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
 - **Context**: Admin question metadata and test cases were overridden or retained in browser storage, and two hard-coded fixtures included hidden evaluation cases. `ProblemDetails` also mirrored submitted source code and results even though the submission-history endpoint is available.
-- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible examples may be parsed for display, but missing test-case classification fields remain blank and must be selected from backend reference data; the client does not synthesize `SAMPLE`, `NECESSARY`, or display names as backend values.
+- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible Input/Output examples may be parsed from backend descriptions for display, but missing test-case classification fields remain blank and must be selected from backend reference data. ID/title-based sample fixtures and invented hidden cases are prohibited.
 - **Boundary**: Problem bookmarks remain server-authoritative. COMPANY/APTITUDE bookmarks have no corresponding API endpoint and use only user-scoped browser persistence; the persistence middleware explicitly excludes server-owned problem bookmarks.
 
 ### Decision 8: Deterministic Redux State and Request Ownership
-- **Context**: Bookmark/progress reducers wrote browser storage directly; bookmark identity ignored item type; async profile/progress responses could apply after the active user changed; and token-only refresh responses could replace complete user metadata.
-- **Decision**: Keep server-owned bookmarks only in Redux memory, key mutations by `type:itemId`, and guard user-specific async results with request/user ownership. Authentication merges token-only refresh responses with the current profile.
+- **Context**: Bookmark/progress reducers wrote browser storage directly; bookmark identity ignored item type; async profile/progress responses could apply after the active user changed; and incomplete refresh responses could not safely restore authorization after reload.
+- **Decision**: Keep server-owned bookmarks only in Redux memory, key mutations by `type:itemId`, and guard user-specific async results with request/user ownership. Authentication rejects refresh responses that omit required identity/role fields. Logout clears the prior user's persisted scope so cached progress, bookmarks, and drafts do not survive the session.
 - **Benefits**: Reducers stay deterministic, independent mutations compose safely, and late network responses cannot leak or overwrite another user's state.
 
 ### Decision 9: Shared Reference Taxonomy and API-Only Platform Metadata
@@ -123,7 +123,7 @@
 
 ### Decision 12: Credential-Free Cross-Tab Session Synchronization
 - **Context**: Browser cookies are shared between tabs, but Redux state and the in-memory access-token cache are per tab. Logging out in one tab previously left another tab displaying an authenticated session until reload or a failed request.
-- **Decision**: Publish only `{ type, occurredAt }` lifecycle events. Recipients clear per-tab memory/Redux on logout or refresh-401, and perform a cookie-backed refresh after another tab signs in. Ordinary token rotation does not broadcast another refresh cascade. Tokens and user data are never placed in the signal.
+- **Decision**: Publish only `{ type, occurredAt }` lifecycle events. Recipients clear per-tab memory/Redux on logout or refresh-401, and perform a cookie-backed refresh after another tab signs in. A cross-tab lock serializes rotating-cookie refresh requests without placing tokens or user data in the signal or lease. Ordinary token rotation does not broadcast another refresh cascade.
 - **Boundary**: This synchronizes tabs in the same browser origin. Server-side token revocation remains authoritative for other devices, browsers, or sessions.
 
 ### Decision 13: API-Field Audit Uses Captured Backend Evidence
@@ -195,7 +195,7 @@
 ### Decision 24: Authentication Contract and Data-Recovery Remediation Boundary
 
 - **Context**: The supplied source audit identified authentication-contract violations, unsafe partial filtered-question recovery, a degraded question-detail fallback, unscoped company search recovery, synthesized classification metadata, and missing-identity paths that reported false empty data. Each claim was rechecked against active source and callers; project documentation and Postman artifacts were not treated as contract evidence.
-- **Decision**: Filtered and paginated `/questions` recovery is accepted only when completeness is proven; numeric detail failures are never hidden by catalog rows. Authentication follows the backend-owned HttpOnly refresh-cookie contract, uses a shared single-flight lock, and distinguishes refresh 401 from temporary failures. Missing required user IDs reject rather than returning fake empty data. Company-ID question requests never fall back to an unscoped text search.
+- **Decision**: Filtered and paginated `/questions` recovery is accepted only when completeness is proven; numeric detail failures are never hidden by catalog rows. Authentication follows the backend-owned HttpOnly refresh-cookie contract, uses same-tab and cross-tab locking, and distinguishes refresh 401 from temporary failures. Missing required user IDs reject rather than returning fake empty data. Company-ID question requests never fall back to an unscoped text search.
 - **Verification boundary**: Source and unit/runtime regression tests cover these frontend behaviors. The Spring Boot source was not present in the public repository and no live integration or mutation was executed; unprovided backend DTOs remain `UNKNOWN` and admin mutation endpoints remain `PARTIALLY VERIFIED`.
 
 ---

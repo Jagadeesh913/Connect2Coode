@@ -30,6 +30,7 @@ export const institutionService = {
       const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.SEARCH, {
         params: { query: trimmed },
         signal,
+        authPolicy: 'public',
       });
       if (!Array.isArray(res.data)) {
         throw new Error('Unexpected institution search response format');
@@ -60,6 +61,9 @@ export const institutionService = {
     id: string | number,
     signal?: AbortSignal
   ): Promise<ApiResponse<Institution>> {
-    return apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.DETAILS(id), { signal });
+    return apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.DETAILS(id), {
+      signal,
+      authPolicy: 'public',
+    });
   },
 };

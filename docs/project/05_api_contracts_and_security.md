@@ -63,14 +63,16 @@ sequenceDiagram
 ### Storage Security Architecture (`tokenStorage.ts`)
 - **Access Token**: Held only in module memory for the current tab. Obsolete JavaScript-readable access-token cookies and web-storage aliases are deleted but never read.
 - **Refresh Token**: Owned only by the backend in an HttpOnly cookie. `tokenStorage` exposes no refresh-token getter, setter, or remover.
-- **Profile Metadata**: Held in memory/Redux and restored from login or refresh response data.
-- **Immediate Logout Hygiene**: Logout increments the local session epoch, clears in-memory access/profile state and protected Redux caches immediately, broadcasts the cleared state, then calls the backend bodyless logout endpoint. The caller receives the real backend success or failure.
+- **Profile Metadata**: Held in memory/Redux and restored from login or refresh response data. Both responses must provide a non-empty `token`, `id`, `role`, and `email`; incomplete success envelopes are rejected before authenticated state is established.
+- **Immediate Logout Hygiene**: Logout increments the local session epoch, clears in-memory access/profile state and protected Redux caches immediately, removes the previous user's persisted progress/bookmarks/drafts while preserving only `theme_pref`, broadcasts the cleared state, then calls the backend bodyless logout endpoint. The caller receives the real backend success or failure.
 - **Stale-Response Rejection**: Login and refresh responses capture the session epoch and cannot restore credentials after a logout that completed while their request was in flight.
 - **Unconditional Startup Restoration**: `AppRouterLayout` keeps auth status `LOADING` and calls `/auth/refresh` once on startup without inspecting cookies or persisted user state. Protected content stays gated until that request settles.
 - **401-Only Retry**: Requests are not proactively refreshed from decoded expiry. Only an HTTP 401 from a protected request enters the refresh flow; 403, other HTTP errors, successful envelopes containing an inner error code, and unexpected HTML never trigger refresh.
-- **Single-Flight Refresh Lock**: `executeRefreshToken()` owns the shared `refreshTokenPromise` used by startup, OAuth callback, and protected-request retries. Concurrent callers wait for the same rotation request.
-- **Failure Semantics**: A refresh HTTP 401 clears auth state and redirects through route guards. Network and 5xx failures do not prove the cookie invalid and therefore do not clear an otherwise active in-memory session.
-- **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free lifecycle events. A login event makes another tab perform its own cookie-backed refresh; logout and refresh-401 events clear per-tab state.
+- **Single-Flight Refresh Lock**: `executeRefreshToken()` owns the same-tab promise while `refreshCoordinator.ts` serializes refresh-token rotation across tabs with the Web Locks API and a credential-free expiring storage lease fallback. No token is written to the coordinator.
+- **Failure Semantics**: A refresh HTTP 401 clears auth state and redirects through route guards. Network, malformed success, and 5xx failures do not prove the cookie invalid: active sessions remain active, while startup enters `RECOVERY_REQUIRED` and shows a retry gate instead of rendering protected content or redirecting to login.
+- **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free lifecycle events. A login event makes another tab perform its own serialized cookie-backed refresh; logout and refresh-401 events clear per-tab state.
+- **Explicit Request Policy**: Every request is resolved to `public` or `protected`. Only protected requests receive the bearer header and only their first HTTP 401 may refresh/retry. Public institution and authentication calls are explicitly marked `public`; 400, 403, 404, 429, 500, and an already-retried 401 never refresh.
+- **Legacy Refresh-Cookie Migration**: Frontend JavaScript does not read or expire `refreshToken`, including a legacy readable cookie. The backend deployment must replace/expire legacy variants with `Set-Cookie` for every formerly used Path/Domain and issue only the canonical `HttpOnly; Secure; SameSite` cookie. This cannot be completed safely by frontend code.
 
 ---
 
@@ -97,7 +99,7 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 | :--- | :---: | :--- | :--- | :--- |
 | `/signUp` | `POST` | `PUBLIC` | `{ firstName, lastName, email, password, role: "USER", labelUserName, userName }` | `ApiResponse<AuthResponseData>` |
 | `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ token, role, id, firstName, lastName, email, isDarkTheme }>` plus backend `Set-Cookie` for the HttpOnly refresh token |
-| `/auth/refresh` | `POST` | `SESSION_RENEWAL` | No body; browser sends HttpOnly cookie | `ApiResponse<{ token, role, id/user fields }>` plus rotated refresh cookie |
+| `/auth/refresh` | `POST` | `SESSION_RENEWAL` | No body; browser sends HttpOnly cookie | `ApiResponse<{ token, id, role, email, firstName?, lastName?, isDarkTheme? }>` plus rotated refresh cookie; incomplete identity is rejected |
 | `/auth/logout` | `POST` | `PUBLIC` | No body; browser sends HttpOnly cookie | Real backend `ApiResponse<string>`; backend revokes and clears its cookie |
 | `/auth/generatePasswordResetOtp` | `POST` | `PUBLIC` | `{ email }` | `ApiResponse<unknown>` |
 | `/auth/verifyPasswordResetOtp` | `POST` | `PUBLIC` | `{ email, otp, password }` | `ApiResponse<unknown>` |
@@ -164,6 +166,8 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 The problem route is deliberately built from the nested `question.id`, never the outer association `id` and never the nullable response `sectionId`. The production OpenAPI document requires authentication and could not be read anonymously on 2026-11-01; therefore live update acceptance remains `PARTIALLY VERIFIED` until an authenticated edit is executed against the backend.
 
 All calls use `apiClient`. Protected business requests carry the access JWT only in the bearer header; access- and refresh-token aliases are removed from request bodies and query parameters. `/auth/refresh` and `/auth/logout` are bodyless and rely exclusively on the backend-managed HttpOnly cookie.
+
+Problem test cases are accepted only from backend DTOs, backend-provided `examples`, or genuine Input/Output examples parsed from the problem description. The frontend contains no ID/title-based sample fixtures and never invents hidden evaluation cases.
 
 ### G. Live Read-Only DTO Fields (2026-10-23)
 

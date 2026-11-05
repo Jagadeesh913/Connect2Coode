@@ -23,7 +23,7 @@ Connect-2-code/
 │   ├── smoke-preview.mjs         # Production preview build route & asset verification
 │   ├── verify-architecture.mjs   # AST & string check for banned imports/patterns
 │   ├── verify-documentation.mjs  # Documentation integrity and link validator
-│   └── tests/                    # 22 Node test runner files (355 passing tests)
+│   └── tests/                    # 23 Node test runner files (367 passing tests)
 ├── src/
 │   ├── App.tsx                   # Top-level providers, theme, toast, error boundary
 │   ├── main.tsx                  # React 19 entry point and DOM mounting
@@ -37,7 +37,7 @@ Connect-2-code/
 │   │   ├── api/                  # apiClient.ts, endpoints.ts
 │   │   ├── guards/               # AdminRoute.tsx, GuestRoute.tsx, ProtectedRoute.tsx
 │   │   ├── mappers/              # problemMapper.ts
-│   │   ├── security/             # jwt.ts, tokenStorage.ts
+│   │   ├── security/             # auth contract, refresh coordination, JWT/redirect helpers, token storage
 │   │   ├── storage/              # userScopedStorage.ts
 │   │   ├── types/                # api.ts, domain.ts
 │   │   └── validation/           # commonRules.ts, serverErrorMapper.ts, schemas/
@@ -80,7 +80,7 @@ Connect-2-code/
 All HTTP communication MUST go through `apiClient` in [`src/core/api/apiClient.ts`](../../src/core/api/apiClient.ts).
 - **Prohibited**: Direct imports of `axios` outside `src/core/api/apiClient.ts`.
 - **Prohibited**: Direct calls to `window.fetch()` in UI components or feature code.
-- **Transport ownership**: Services send business fields only. The client attaches `Authorization: Bearer <token>` and clones outgoing protected-business bodies only to remove access-token aliases; access credentials never belong in business payloads or query parameters. The documented `/auth/refresh` and `/auth/logout` session endpoints remain explicit exceptions that send `{ refreshToken }`.
+- **Transport ownership**: Services send business fields only. Requests resolve to an explicit `public` or `protected` policy. The client attaches `Authorization: Bearer <token>` only to protected calls and clones outgoing bodies to remove token aliases; credentials never belong in business payloads or query parameters. `/auth/refresh` and `/auth/logout` are bodyless and rely only on the backend-owned HttpOnly cookie.
 - **Response ownership**: The response interceptor returns the backend `ApiResponse<T>` envelope directly. Services consume its `data` field once and must not guess between Axios, nested-envelope, and raw payload shapes.
 - **Enforcement**: [`scripts/verify-architecture.mjs`](../../scripts/verify-architecture.mjs) scans all files in `src/` and fails CI if direct `axios` or `fetch()` calls exist.
 

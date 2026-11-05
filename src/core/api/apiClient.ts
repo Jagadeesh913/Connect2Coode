@@ -6,7 +6,9 @@ import type {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
-import type { User } from '../types/domain';
+import { requireAuthSessionData, type AuthSessionData } from '../security/authContract';
+import { withCrossTabRefreshLock } from '../security/refreshCoordinator';
+import { userScopedStorage } from '../storage/userScopedStorage';
 
 /**
  * Resolves and normalizes the API base URL.
@@ -117,14 +119,17 @@ export const getGoogleOAuthUrl = (): string => {
 
 export const isRequestCanceled = (error: unknown): boolean => axios.isCancel(error);
 
+export type AuthPolicy = 'public' | 'protected';
+export type C2CAxiosRequestConfig = AxiosRequestConfig & { authPolicy?: AuthPolicy };
+
 type UnwrappedApiClient = Omit<AxiosInstance, 'request' | 'get' | 'delete' | 'post' | 'put' | 'patch'> & {
-  <T = any>(config: AxiosRequestConfig): Promise<T>;
-  request<T = any>(config: AxiosRequestConfig): Promise<T>;
-  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
-  post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
-  put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
-  patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  <T = any>(config: C2CAxiosRequestConfig): Promise<T>;
+  request<T = any>(config: C2CAxiosRequestConfig): Promise<T>;
+  get<T = any>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
+  delete<T = any>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
+  post<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
+  put<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
+  patch<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
 };
 
 export const apiClient = axios.create({
@@ -171,28 +176,21 @@ function notifyAuthFailure() {
   });
 }
 
-export interface RefreshSessionData {
-  token?: string;
-  accessToken?: string;
-  id?: number | string;
-  firstName?: string;
-  lastName?: string;
-  fullName?: string;
-  email?: string;
-  role?: string;
-  isDarkTheme?: boolean;
-  user?: User;
+function clearInvalidSession(): void {
+  userScopedStorage.clearForUser(tokenStorage.getUser(), { preserveKeys: ['theme_pref'] });
+  tokenStorage.clearTokens();
+  notifyAuthFailure();
 }
 
-// One lock is shared by startup restoration, OAuth completion, and all 401 retries.
-let refreshTokenPromise: Promise<RefreshSessionData> | null = null;
+// One promise deduplicates this tab; the coordinator serializes rotation across tabs.
+let refreshTokenPromise: Promise<AuthSessionData> | null = null;
 
-export const executeRefreshToken = async (): Promise<RefreshSessionData> => {
+export const executeRefreshToken = async (): Promise<AuthSessionData> => {
   if (refreshTokenPromise) {
     return refreshTokenPromise;
   }
 
-  refreshTokenPromise = (async () => {
+  refreshTokenPromise = withCrossTabRefreshLock(async () => {
     const sessionEpoch = tokenStorage.getSessionEpoch();
     try {
       const refreshUrl = `${BASE_URL}/auth/refresh`;
@@ -211,48 +209,43 @@ export const executeRefreshToken = async (): Promise<RefreshSessionData> => {
       );
 
       const responseData = refreshRes.data;
-      const tokenData: RefreshSessionData = responseData?.data || responseData;
-      const newAccessToken = tokenData?.accessToken || tokenData?.token;
+      const tokenData = requireAuthSessionData(responseData?.data || responseData);
 
-      if (newAccessToken) {
-        if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
-          throw new Error('Authentication session changed while refresh was in progress');
-        }
-        tokenStorage.setAccessToken(newAccessToken);
-
-        const currentUser = tokenStorage.getUser();
-        const responseUser = tokenData.user || tokenData;
-        if (responseUser.email || responseUser.id !== undefined) {
-          tokenStorage.setUser({
-            ...currentUser,
-            id: responseUser.id ?? currentUser?.id,
-            email: responseUser.email || currentUser?.email || '',
-            firstName: responseUser.firstName ?? currentUser?.firstName,
-            lastName: responseUser.lastName ?? currentUser?.lastName,
-            fullName: responseUser.fullName ?? currentUser?.fullName,
-            role: responseUser.role ?? currentUser?.role,
-            isDarkTheme: responseUser.isDarkTheme ?? currentUser?.isDarkTheme,
-          });
-        }
-        notifyAuthListeners(newAccessToken, tokenData);
-        return tokenData;
-      } else {
-        throw new Error('No access token returned from refresh endpoint');
+      if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
+        throw new Error('Authentication session changed while refresh was in progress');
       }
+      tokenStorage.setAccessToken(tokenData.token);
+      tokenStorage.setUser(tokenData.user || tokenData);
+      notifyAuthListeners(tokenData.token, tokenData);
+      return tokenData;
     } catch (refreshErr) {
       const refreshStatus = (refreshErr as { response?: { status?: number } })?.response?.status;
       if (refreshStatus === 401 && tokenStorage.getSessionEpoch() === sessionEpoch) {
-        tokenStorage.clearTokens();
-        notifyAuthFailure();
+        clearInvalidSession();
       }
       throw refreshErr;
-    } finally {
-      refreshTokenPromise = null;
     }
-  })();
+  }).finally(() => {
+    refreshTokenPromise = null;
+  });
 
   return refreshTokenPromise;
 };
+
+const PUBLIC_AUTH_PATHS = [
+  '/auth/login',
+  '/auth/logout',
+  '/signUp',
+  '/auth/refresh',
+  '/auth/generatePasswordResetOtp',
+  '/auth/verifyPasswordResetOtp',
+] as const;
+
+const isPublicAuthPath = (url: string): boolean =>
+  PUBLIC_AUTH_PATHS.some((path) => url.includes(path));
+
+const getAuthPolicy = (config: C2CAxiosRequestConfig): AuthPolicy =>
+  isPublicAuthPath(config.url || '') ? 'public' : config.authPolicy || 'protected';
 
 // Request Interceptor: attach the current in-memory access token only.
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
@@ -334,18 +327,13 @@ export const getPreparedRequestContentType = (data: unknown): string | null | un
 
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const reqUrl = config.url || '';
-    const isPublicAuthEndpoint =
-      reqUrl.includes('/auth/login') ||
-      reqUrl.includes('/auth/logout') ||
-      reqUrl.includes('/signUp') ||
-      reqUrl.includes('/auth/refresh') ||
-      reqUrl.includes('/auth/generatePasswordResetOtp') ||
-      reqUrl.includes('/auth/verifyPasswordResetOtp');
+    const requestConfig = config as InternalAxiosRequestConfig & { authPolicy?: AuthPolicy };
+    const authPolicy = getAuthPolicy(requestConfig);
+    requestConfig.authPolicy = authPolicy;
 
     const token = tokenStorage.getAccessToken();
 
-    if (token && !isPublicAuthEndpoint) {
+    if (token && authPolicy === 'protected') {
       config.headers = config.headers || {};
       if (typeof (config.headers as any).set === 'function') {
         (config.headers as any).set('Authorization', `Bearer ${token}`);
@@ -423,8 +411,8 @@ apiClient.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const originalRequest = error.config || {};
-    const reqUrl = originalRequest?.url || '';
+    const originalRequest = (error.config || {}) as C2CAxiosRequestConfig & { _retry?: boolean };
+    const authPolicy = getAuthPolicy(originalRequest);
 
     // Handle Timeout Errors gracefully with user-friendly cold-start explanation
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
@@ -439,34 +427,12 @@ apiClient.interceptors.response.use(
     const isAuthFailure = status === 401;
 
     // Only an HTTP 401 from a protected request is eligible for refresh.
-    if (isAuthFailure && !originalRequest._retry) {
-      // Exclude public auth and refresh endpoints from the refresh loop to prevent recursion
-      if (
-        reqUrl.includes('/auth/refresh') ||
-        reqUrl.includes('/auth/login') ||
-        reqUrl.includes('/auth/logout') ||
-        reqUrl.includes('/signUp') ||
-        reqUrl.includes('/auth/generatePasswordResetOtp') ||
-        reqUrl.includes('/auth/verifyPasswordResetOtp')
-      ) {
-        if (reqUrl.includes('/auth/refresh')) {
-          tokenStorage.clearTokens();
-          notifyAuthFailure();
-        }
-        const errBody = error.response?.data || {};
-        return Promise.reject({
-          statusCode: error.response?.status || status,
-          message: errBody.message || 'Authentication error',
-          errors: errBody.errors || [error.message],
-        });
-      }
-
+    if (isAuthFailure && authPolicy === 'protected' && !originalRequest._retry) {
       originalRequest._retry = true;
 
       try {
         const refreshedSession = await executeRefreshToken();
-        const newAccessToken = refreshedSession.accessToken || refreshedSession.token;
-        if (!newAccessToken) throw new Error('No access token returned from refresh endpoint');
+        const newAccessToken = refreshedSession.token;
         originalRequest.headers = originalRequest.headers || {};
         if (typeof (originalRequest.headers as any).set === 'function') {
           (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);

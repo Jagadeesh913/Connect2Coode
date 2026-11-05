@@ -617,7 +617,7 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.equal(state.profileFetched, true);
     });
 
-    it('preserves cached profile identity and user info on token-only session refresh', () => {
+    it('preserves cached profile identity on a background auth update without replacement user data', () => {
       const previousState = {
         ...profileReducer(undefined, { type: '@@init' }),
         profile: { id: 'A', email: 'a@example.test' },

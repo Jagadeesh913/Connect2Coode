@@ -120,7 +120,7 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
     it('transitions to AUTHENTICATED on refreshSessionThunk.fulfilled', () => {
       tokenStorage.setAccessToken('new.jwt.access.token');
       const payload = {
-        accessToken: 'new.jwt.access.token',
+        token: 'new.jwt.access.token',
         user: {
           id: 42,
           email: 'coder@c2c.test',
@@ -143,13 +143,13 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
       assert.equal(nextState.user?.email, 'coder@c2c.test');
     });
 
-    it('transitions to UNAUTHENTICATED on refreshSessionThunk.rejected without crashing', () => {
+    it('keeps a recoverable startup state on a temporary refresh failure', () => {
       const nextState = authReducer(initialLoadingState, {
         type: refreshSessionThunk.rejected.type,
-        payload: 'No valid refresh session',
+        payload: { message: 'Session check unavailable', statusCode: 500 },
       });
 
-      assert.equal(nextState.status, 'UNAUTHENTICATED');
+      assert.equal(nextState.status, 'RECOVERY_REQUIRED');
       assert.equal(nextState.isAuthenticated, false);
       assert.equal(nextState.loading, false);
       assert.equal(nextState.token, null);
@@ -160,7 +160,7 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
       tokenStorage.setAccessToken('login.access.token');
       const payload = {
         id: 101,
-        accessToken: 'login.access.token',
+        token: 'login.access.token',
         email: 'developer@c2c.test',
         firstName: 'Jane',
         lastName: 'Dev',

@@ -230,7 +230,6 @@ const profileSlice = createSlice({
       .addMatcher(
         (action) =>
           action.type === 'auth/login/fulfilled' ||
-          action.type === 'auth/loginWithGoogleRefreshToken/fulfilled' ||
           action.type === 'auth/setAuthenticatedSession' ||
           action.type === 'auth/initializeAuth',
         (state, action: any) => {

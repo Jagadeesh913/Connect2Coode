@@ -82,8 +82,8 @@ graph TB
 ## 4. Scope, Verified Features, and Known Limitations
 
 ### Fully Verified Core Capabilities
-- **Authentication Lifecycle**: Email/password login, student signup, password reset with OTP, Google OAuth2 popup/callback, proactive token refresh, and single-flight concurrent refresh locking.
-- **API Transport Hardening**: Bearer-header authentication, recursive elimination of legacy body token fields, query-parameter token leak prevention, and a single refresh lock.
+- **Authentication Lifecycle**: Email/password login, student signup, password reset with OTP, Google OAuth2 popup/callback, startup restoration, HTTP-401-driven refresh, and same-tab/cross-tab refresh serialization.
+- **API Transport Hardening**: Explicit public/protected request policy, bearer-header authentication, strict login/refresh identity validation, recursive elimination of legacy body token fields, and query-parameter token leak prevention.
 - **Problem Catalog & Filters**: Multi-faceted filtering by difficulty, topic, recruiter company, platform (LeetCode, GFG, HackerRank), search query, and pagination.
 - **API-Driven DSA Sheets**: `/dsa-sheet` lists active learning sheets, ordered top-level sections, and lazily loaded linked questions with search and solved-state indicators. `/admin/dsa-sheets` creates sheets/sections and manages question associations through the supplied learning-sheet endpoints.
 - **Monaco Code Runner**: Code execution uses the `/language` API's table-ID-to-reference-ID mapping, automatic Java class sanitization (`Main`), and sample test case execution. The client does not guess compiler IDs when the catalog is unavailable.

@@ -26,26 +26,18 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 // Import real production security modules, types, and reducers
-const { decodeJwtPayload, isJwtAdmin, isJwtExpired, isAdminRole } = await import('../../src/core/security/jwt.ts');
+const { isAdminRole } = await import('../../src/core/security/jwt.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 const { isAuthSessionEvent } = await import('../../src/core/security/authSessionSync.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
 const { default: authReducer, logoutUser, refreshSessionThunk, initializeAuth } = authSliceModule;
-
-// Helper to create mock JWT tokens with base64url payload
-function createMockJwt(payload) {
-  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = 'mockSignatureString123';
-  return `${header}.${body}.${signature}`;
-}
 
 describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
   // =========================================================================
   // F-036: Admin UI follows the role supplied by login/refresh responses
   // =========================================================================
-  describe('F-036: Signed JWT Claims & Admin Authorization', () => {
+  describe('F-036: Backend Response Role Authorization', () => {
     it('admin gating, guest redirects, and navigation use response roles rather than decoded JWT claims', async () => {
       const fs = await import('node:fs');
       const adminRouteSource = fs.readFileSync('src/core/guards/AdminRoute.tsx', 'utf8');
@@ -56,118 +48,13 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.match(navbarSource, /isAdmin = isLoggedIn && isAdminRole\(currentUser\?\.role\)/);
       assert.doesNotMatch(`${adminRouteSource}\n${guestRouteSource}\n${navbarSource}`, /isJwtAdmin/);
       assert.equal(isAdminRole('ADMIN'), true);
+      assert.equal(isAdminRole('ROLE_ADMIN'), true);
+      assert.equal(isAdminRole('admin'), true);
       assert.equal(isAdminRole('USER'), false);
-    });
-
-    it('accurately decodes claims from valid base64url JWT', () => {
-      const payload = { sub: '42', email: 'admin@c2c.test', role: 'ADMIN' };
-      const token = createMockJwt(payload);
-      const decoded = decodeJwtPayload(token);
-
-      assert.equal(decoded?.sub, '42');
-      assert.equal(decoded?.email, 'admin@c2c.test');
-      assert.equal(decoded?.role, 'ADMIN');
-    });
-
-    it('identifies ADMIN role from payload.role', () => {
-      const adminToken = createMockJwt({ role: 'ADMIN' });
-      assert.equal(isJwtAdmin(adminToken), true);
-
-      const roleAdminToken = createMockJwt({ role: 'ROLE_ADMIN' });
-      assert.equal(isJwtAdmin(roleAdminToken), true);
-
-      const lowercaseAdminToken = createMockJwt({ role: 'admin' });
-      assert.equal(isJwtAdmin(lowercaseAdminToken), true);
-    });
-
-    it('identifies ADMIN role from payload.roles array or authorities array', () => {
-      const rolesArrayToken = createMockJwt({ roles: ['USER', 'ADMIN'] });
-      assert.equal(isJwtAdmin(rolesArrayToken), true);
-
-      const springAuthoritiesToken = createMockJwt({
-        authorities: [{ authority: 'ROLE_ADMIN' }],
-      });
-      assert.equal(isJwtAdmin(springAuthoritiesToken), true);
-    });
-
-    it('identifies uppercase Role claim from live backend JWTs', () => {
-      const liveRenderAdminToken = createMockJwt({
-        sub: 'admin@c2c.test',
-        Role: 'ADMIN',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      });
-      assert.equal(isJwtAdmin(liveRenderAdminToken), true);
-
-      const rolesUpperToken = createMockJwt({
-        Roles: ['ADMIN'],
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      });
-      assert.equal(isJwtAdmin(rolesUpperToken), true);
-    });
-
-    it('rejects regular USER tokens (prevents privilege escalation)', () => {
-      const userToken = createMockJwt({ role: 'USER', email: 'user@c2c.test' });
-      assert.equal(isJwtAdmin(userToken), false);
-    });
-
-    it('REGRESSION: strictly rejects partial/substring admin claims (e.g. NOT_ADMIN, SUBADMIN, ADMINISTRATOR)', () => {
-      // 1. Single role claims
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'NOT_ADMIN' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ Role: 'NOT_ADMIN' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMIN_READER' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'SUBADMIN' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMINISTRATOR' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'COMPANY_ADMIN' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'NOT_ROLE_ADMIN' })), false);
-
-      // 2. Roles array claims
-      assert.equal(isJwtAdmin(createMockJwt({ roles: ['USER', 'NOT_ADMIN'] })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ Roles: ['SUBADMIN', 'GUEST'] })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ roles: ['ADMIN_ASSISTANT'] })), false);
-
-      // 3. Authorities array claims
-      assert.equal(isJwtAdmin(createMockJwt({ authorities: ['NOT_ADMIN'] })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'NOT_ADMIN' }] })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'ROLE_NOT_ADMIN' }] })), false);
-
-      // 4. Scope claims
-      assert.equal(isJwtAdmin(createMockJwt({ scope: 'read write NOT_ADMIN' })), false);
-      assert.equal(isJwtAdmin(createMockJwt({ scope: 'ADMIN_READ' })), false);
-
-      // 5. Valid exact admin claims still succeed
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'ADMIN' })), true);
-      assert.equal(isJwtAdmin(createMockJwt({ role: 'ROLE_ADMIN' })), true);
-      assert.equal(isJwtAdmin(createMockJwt({ roles: ['USER', 'ADMIN'] })), true);
-      assert.equal(isJwtAdmin(createMockJwt({ authorities: [{ authority: 'ROLE_ADMIN' }] })), true);
-      assert.equal(isJwtAdmin(createMockJwt({ authorities: ['ROLE_ADMIN'] })), true);
-      assert.equal(isJwtAdmin(createMockJwt({ scope: 'read write ROLE_ADMIN' })), true);
-    });
-
-    it('rejects expired JWT tokens even if role is ADMIN', () => {
-      const pastTimestamp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
-      const expiredToken = createMockJwt({ role: 'ADMIN', exp: pastTimestamp });
-      assert.equal(isJwtAdmin(expiredToken), false);
-    });
-
-    it('treats expired JWTs as expired on localhost so proactive refresh is not bypassed', () => {
-      const previousWindow = globalThis.window;
-      globalThis.window = { location: { hostname: 'localhost' } };
-      try {
-        assert.equal(
-          isJwtExpired({ exp: Math.floor(Date.now() / 1000) - 60 }),
-          true
-        );
-      } finally {
-        if (previousWindow === undefined) delete globalThis.window;
-        else globalThis.window = previousWindow;
-      }
-    });
-
-    it('safely rejects malformed, empty, or non-JWT strings', () => {
-      assert.equal(isJwtAdmin(null), false);
-      assert.equal(isJwtAdmin(''), false);
-      assert.equal(isJwtAdmin('not.a.valid.jwt.token'), false);
-      assert.equal(isJwtAdmin('randomString'), false);
+      assert.equal(isAdminRole('NOT_ADMIN'), false);
+      assert.equal(isAdminRole('ADMINISTRATOR'), false);
+      const jwtSource = fs.readFileSync('src/core/security/jwt.ts', 'utf8');
+      assert.doesNotMatch(jwtSource, /decodeJwtPayload|isJwtAdmin|authorities|scope/);
     });
   });
 
@@ -211,12 +98,8 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.loading, false, 'Loading flag must be reset');
     });
 
-    it('PRESERVES active session state if access token is unexpired when refreshSessionThunk is rejected', () => {
-      const validToken = createMockJwt({
-        sub: 'user-42',
-        role: 'USER',
-        exp: Math.floor(Date.now() / 1000) + 3600,
-      });
+    it('PRESERVES an active session when refreshSessionThunk has a temporary failure', () => {
+      const validToken = 'active-access-token';
       const activeState = {
         user: { id: 'user-42', email: 'user@c2c.test' },
         token: validToken,
@@ -241,11 +124,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
     });
 
     it('CLEARS session only when refresh returns HTTP 401', () => {
-      const expiredToken = createMockJwt({
-        sub: 'user-42',
-        role: 'USER',
-        exp: Math.floor(Date.now() / 1000) - 3600,
-      });
+      const expiredToken = 'previous-access-token';
       const expiredState = {
         user: { id: 'user-42', email: 'user@c2c.test' },
         token: expiredToken,
@@ -269,10 +148,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
     });
 
     it('keeps startup loading until the unconditional cookie refresh settles', () => {
-      const expiredToken = createMockJwt({
-        sub: 'user-42',
-        exp: Math.floor(Date.now() / 1000) - 60,
-      });
+      const expiredToken = 'startup-access-token';
       const originalGetAccessToken = tokenStorage.getAccessToken;
       const originalGetUser = tokenStorage.getUser;
 
@@ -289,7 +165,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       tokenStorage.getUser = originalGetUser;
     });
 
-    it('preserves the existing user profile when refresh returns token fields without email', () => {
+    it('preserves optional profile fields when refresh returns the required identity fields', () => {
       const currentState = {
         user: { id: 63, email: 'user@c2c.test', firstName: 'Current', role: 'USER' },
         token: 'old-token',
@@ -303,7 +179,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       const nextState = authReducer(currentState, {
         type: refreshSessionThunk.fulfilled.type,
-        payload: { token: 'new-token', id: 63, role: 'USER' },
+        payload: { token: 'new-token', id: 63, role: 'USER', email: 'user@c2c.test' },
       });
 
       assert.equal(nextState.token, 'new-token');
@@ -418,7 +294,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') >= 0);
       assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') < logoutBody.indexOf('apiClient.post'));
       assert.match(apiClientSource, /getSessionEpoch\(\)[\s\S]*Authentication session changed while refresh was in progress/);
-      assert.match(apiClientSource, /reqUrl\.includes\('\/auth\/logout'\)/);
+      assert.match(apiClientSource, /PUBLIC_AUTH_PATHS[\s\S]*'\/auth\/logout'/);
       assert.match(logoutBody, /apiClient\.post\(API_ENDPOINTS\.AUTH\.LOGOUT, undefined/);
       assert.doesNotMatch(logoutBody, /refreshToken/);
     });
@@ -435,8 +311,9 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") >= 0);
       assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") < loginBody.indexOf('persistAuthSession'));
       assert.match(authSliceSource, /return await executeRefreshToken\(\)/);
-      assert.match(apiClientSource, /let refreshTokenPromise: Promise<RefreshSessionData> \| null = null/);
-      assert.match(apiClientSource, /refreshStatus === 401[\s\S]*tokenStorage\.clearTokens\(\)/);
+      assert.match(apiClientSource, /let refreshTokenPromise: Promise<AuthSessionData> \| null = null/);
+      assert.match(apiClientSource, /withCrossTabRefreshLock/);
+      assert.match(apiClientSource, /refreshStatus === 401[\s\S]*clearInvalidSession\(\)/);
     });
 
     it('claims auth ownership without clearing the active session', () => {
