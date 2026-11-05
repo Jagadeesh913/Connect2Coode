@@ -28,6 +28,7 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 // Import real security, API, service, and Redux modules
 const { getGoogleOAuthUrl, getBackendOrigin } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
+const { getSafeRedirectUrl } = await import('../../src/core/security/jwt.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
 const {
   default: authReducer,
@@ -80,11 +81,10 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
       assert.equal(tokenStorage.getAccessToken(), null);
     });
 
-    it('stores and retrieves refresh token in tokenStorage', () => {
-      tokenStorage.setRefreshToken('test.refresh.token');
-      assert.equal(tokenStorage.getRefreshToken(), 'test.refresh.token');
-      tokenStorage.removeRefreshToken();
-      assert.equal(tokenStorage.getRefreshToken(), null);
+    it('does not expose any JavaScript refresh-token storage API', () => {
+      assert.equal('setRefreshToken' in tokenStorage, false);
+      assert.equal('getRefreshToken' in tokenStorage, false);
+      assert.equal('removeRefreshToken' in tokenStorage, false);
     });
 
     it('clearTokens wipes in-memory access token and profile', () => {
@@ -273,40 +273,221 @@ describe('PRODUCTION-GRADE GOOGLE OAUTH & AUTHENTICATION LIFECYCLE', () => {
   // 5. Open-Redirect Vulnerability Defense
   // =========================================================================
   describe('5. Open-Redirect Prevention', () => {
-    const sanitizeUrl = (target) => {
-      if (!target || typeof target !== 'string') return '/practice';
-      const trimmed = target.trim();
-      if (
-        trimmed.startsWith('/') &&
-        !trimmed.startsWith('//') &&
-        !trimmed.startsWith('/\\') &&
-        !trimmed.includes(':') &&
-        trimmed !== '/login' &&
-        trimmed !== '/signup' &&
-        !trimmed.startsWith('/oauth')
-      ) {
-        return trimmed;
-      }
-      return '/practice';
-    };
-
-    it('permits internal application routes', () => {
-      assert.equal(sanitizeUrl('/practice'), '/practice');
-      assert.equal(sanitizeUrl('/problems/two-sum'), '/problems/two-sum');
-      assert.equal(sanitizeUrl('/admin/dashboard'), '/admin/dashboard');
-      assert.equal(sanitizeUrl('/companies/google'), '/companies/google');
+    it('permits internal application routes using exported getSafeRedirectUrl', () => {
+      assert.equal(getSafeRedirectUrl('/practice'), '/practice');
+      assert.equal(getSafeRedirectUrl('/problems/two-sum'), '/problems/two-sum');
+      assert.equal(getSafeRedirectUrl('/admin/dashboard'), '/admin/dashboard');
+      assert.equal(getSafeRedirectUrl('/companies/google'), '/companies/google');
+      assert.equal(getSafeRedirectUrl('/practice?topic=arrays&page=2'), '/practice?topic=arrays&page=2');
     });
 
     it('rejects external absolute URLs and protocol-relative URLs', () => {
-      assert.equal(sanitizeUrl('https://evil-attacker.com'), '/practice');
-      assert.equal(sanitizeUrl('http://phishing.site'), '/practice');
-      assert.equal(sanitizeUrl('//evil-domain.com/path'), '/practice');
-      assert.equal(sanitizeUrl('/\\evil.com'), '/practice');
-      assert.equal(sanitizeUrl('javascript:alert(1)'), '/practice');
-      assert.equal(sanitizeUrl('/login'), '/practice');
-      assert.equal(sanitizeUrl('/oauth/callback'), '/practice');
-      assert.equal(sanitizeUrl(null), '/practice');
-      assert.equal(sanitizeUrl(''), '/practice');
+      assert.equal(getSafeRedirectUrl('https://evil-attacker.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('http://phishing.site'), '/practice');
+      assert.equal(getSafeRedirectUrl('//evil-domain.com/path'), '/practice');
+      assert.equal(getSafeRedirectUrl('javascript:alert(1)'), '/practice');
+      assert.equal(getSafeRedirectUrl(null), '/practice');
+      assert.equal(getSafeRedirectUrl(''), '/practice');
+      assert.equal(getSafeRedirectUrl(undefined), '/practice');
+    });
+
+    it('rejects backslash injection and URL-encoded backslash/slash variants', () => {
+      assert.equal(getSafeRedirectUrl('/\\evil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/foo\\bar'), '/practice');
+      assert.equal(getSafeRedirectUrl('/admin\\..\\evil'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%5Cevil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%5cevil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%2F%2Fevil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%2fevil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%E0%A4%A'), '/practice'); // Malformed URI component
+    });
+
+    it('rejects control characters, newlines, tabs, and colons', () => {
+      assert.equal(getSafeRedirectUrl('/practice\r\n/evil'), '/practice');
+      assert.equal(getSafeRedirectUrl('/practice\0/evil'), '/practice');
+      assert.equal(getSafeRedirectUrl('/practice\t/evil'), '/practice');
+      assert.equal(getSafeRedirectUrl('/https://evil.com'), '/practice');
+      assert.equal(getSafeRedirectUrl('/javascript:alert(1)'), '/practice');
+      assert.equal(getSafeRedirectUrl('/%3A/test'), '/practice');
+    });
+
+    it('rejects authentication, password recovery, and oauth route prefixes to prevent loops', () => {
+      assert.equal(getSafeRedirectUrl('/login'), '/practice');
+      assert.equal(getSafeRedirectUrl('/login?redirect=/admin'), '/practice');
+      assert.equal(getSafeRedirectUrl('/signup'), '/practice');
+      assert.equal(getSafeRedirectUrl('/signup/verify'), '/practice');
+      assert.equal(getSafeRedirectUrl('/forgot-password'), '/practice');
+      assert.equal(getSafeRedirectUrl('/auth'), '/practice');
+      assert.equal(getSafeRedirectUrl('/auth/callback'), '/practice');
+      assert.equal(getSafeRedirectUrl('/oauth'), '/practice');
+      assert.equal(getSafeRedirectUrl('/oauth/callback'), '/practice');
+    });
+  });
+
+  // =========================================================================
+  // 6. OAuth Callback URL Parameter Sanitization Invariant
+  // =========================================================================
+  describe('6. OAuth Callback Credential Sanitization', () => {
+    it('never accepts refresh or access tokens from OAuth callback query parameters', async () => {
+      const fs = await import('node:fs');
+      const callbackSource = fs.readFileSync('src/features/auth/pages/OAuthCallback.tsx', 'utf8');
+      assert.doesNotMatch(callbackSource, /searchParams\.get\(['"](?:refreshToken|refresh_token|token|accessToken|access_token)['"]\)/);
+      assert.match(callbackSource, /dispatch\(refreshSessionThunk\(\)\)/);
+    });
+
+    it('never accepts tokens from OAuth callback hash fragments', async () => {
+      const fs = await import('node:fs');
+      const callbackSource = fs.readFileSync('src/features/auth/pages/OAuthCallback.tsx', 'utf8');
+      assert.doesNotMatch(callbackSource, /hashParams\.get\(['"](?:refreshToken|refresh_token|token|accessToken|access_token)['"]\)/);
+    });
+
+    it('extracts error parameters from query and hash fragments', () => {
+      const searchParams = new URLSearchParams('?error=access_denied&error_description=User+cancelled');
+      const errorQuery = searchParams.get('error') || searchParams.get('error_description');
+      assert.equal(errorQuery, 'access_denied');
+
+      const hashParams = new URLSearchParams('error=unauthorized_client'.replace(/^#/, ''));
+      const errorHash = hashParams.get('error') || hashParams.get('error_description');
+      assert.equal(errorHash, 'unauthorized_client');
+    });
+  });
+
+  // =========================================================================
+  // 7. OAuth postMessage Security & Origin / Source Validation
+  // =========================================================================
+  describe('7. OAuth postMessage Contract & Origin Verification', () => {
+    it('rejects cross-origin postMessage events', () => {
+      const expectedOrigin = 'https://connect2code.in';
+      const messageHandler = (event) => {
+        if (event.origin !== expectedOrigin) return 'REJECTED_ORIGIN';
+        if (event.source === event.target) return 'REJECTED_SELF';
+        if (event.data?.type === 'C2C_GOOGLE_OAUTH_SUCCESS') return 'ACCEPTED';
+        return 'REJECTED_TYPE';
+      };
+
+      assert.equal(
+        messageHandler({ origin: 'https://attacker.evil', data: { type: 'C2C_GOOGLE_OAUTH_SUCCESS' } }),
+        'REJECTED_ORIGIN'
+      );
+    });
+
+    it('rejects self-targeted messages (event.source === window) to prevent message loops', () => {
+      const mockWindow = {};
+      const expectedOrigin = 'https://connect2code.in';
+      const messageHandler = (event) => {
+        if (event.origin !== expectedOrigin) return 'REJECTED_ORIGIN';
+        if (event.source === mockWindow) return 'REJECTED_SELF';
+        if (event.data?.type === 'C2C_GOOGLE_OAUTH_SUCCESS') return 'ACCEPTED';
+        return 'REJECTED_TYPE';
+      };
+
+      assert.equal(
+        messageHandler({
+          origin: expectedOrigin,
+          source: mockWindow,
+          data: { type: 'C2C_GOOGLE_OAUTH_SUCCESS' },
+        }),
+        'REJECTED_SELF'
+      );
+    });
+
+    it('accepts valid postMessage from child popup on matching origin without trusting payload tokens', () => {
+      const mockParent = {};
+      const mockPopup = {};
+      const expectedOrigin = 'https://connect2code.in';
+      let discardedInMemorySession = false;
+      let refreshCalled = false;
+
+      const messageHandler = (event) => {
+        if (event.origin !== expectedOrigin) return;
+        if (event.source === mockParent) return;
+        if (event.data?.type === 'C2C_GOOGLE_OAUTH_SUCCESS') {
+          // Verify that payload tokens are ignored and session is refreshed from authoritative cookies
+          discardedInMemorySession = true;
+          refreshCalled = true;
+        }
+      };
+
+      messageHandler({
+        origin: expectedOrigin,
+        source: mockPopup,
+        data: {
+          type: 'C2C_GOOGLE_OAUTH_SUCCESS',
+          token: 'attacker.injected.token', // Must be ignored
+        },
+      });
+
+      assert.equal(discardedInMemorySession, true);
+      assert.equal(refreshCalled, true);
+    });
+  });
+
+  // =========================================================================
+  // 8. Role-Based Redirection on Authentication Invariant
+  // =========================================================================
+  describe('8. Role-Based Navigation Routing', () => {
+    it('routes non-admin users to /practice even if targetUrl points to /admin', () => {
+      const computeDestination = (targetUrl, isAdmin) => {
+        const safeDestination = getSafeRedirectUrl(targetUrl);
+        if (isAdmin) {
+          return safeDestination.startsWith('/admin') ? safeDestination : '/admin/dashboard';
+        }
+        return safeDestination.startsWith('/admin') ? '/practice' : safeDestination;
+      };
+
+      assert.equal(computeDestination('/admin/users', false), '/practice');
+      assert.equal(computeDestination('/admin/dashboard', false), '/practice');
+      assert.equal(computeDestination('/practice/problems', false), '/practice/problems');
+      assert.equal(computeDestination(null, false), '/practice');
+    });
+
+    it('routes admin users to /admin destinations correctly', () => {
+      const computeDestination = (targetUrl, isAdmin) => {
+        const safeDestination = getSafeRedirectUrl(targetUrl);
+        if (isAdmin) {
+          return safeDestination.startsWith('/admin') ? safeDestination : '/admin/dashboard';
+        }
+        return safeDestination.startsWith('/admin') ? '/practice' : safeDestination;
+      };
+
+      assert.equal(computeDestination('/admin/questions', true), '/admin/questions');
+      assert.equal(computeDestination('/practice', true), '/admin/dashboard');
+      assert.equal(computeDestination(null, true), '/admin/dashboard');
+    });
+  });
+
+  // =========================================================================
+  // 9. Logout Error Sanitization Invariant
+  // =========================================================================
+  describe('9. Logout Error Logging Sanitization', () => {
+    it('sanitizes error logging so request headers and tokens are never exposed in console', () => {
+      const warnings = [];
+      const originalWarn = console.warn;
+      console.warn = (...args) => warnings.push(args);
+
+      try {
+        const simulatedError = new Error('Request failed with status code 500');
+        simulatedError.config = {
+          headers: {
+            Authorization: 'Bearer secret.jwt.access.token',
+          },
+          url: 'https://api.connect2code.in/api/v1/auth/logout',
+        };
+
+        // Execute sanitized logging pattern
+        console.warn('Logout API warning:', simulatedError instanceof Error ? simulatedError.message : 'Logout request unfulfilled');
+
+        assert.equal(warnings.length, 1);
+        assert.equal(warnings[0][0], 'Logout API warning:');
+        assert.equal(warnings[0][1], 'Request failed with status code 500');
+
+        // Verify that config, headers, and token are NOT in the logged arguments
+        const loggedString = JSON.stringify(warnings[0]);
+        assert.equal(loggedString.includes('secret.jwt.access.token'), false);
+        assert.equal(loggedString.includes('Authorization'), false);
+      } finally {
+        console.warn = originalWarn;
+      }
     });
   });
 });

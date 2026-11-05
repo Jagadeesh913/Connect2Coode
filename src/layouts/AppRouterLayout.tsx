@@ -11,7 +11,7 @@ import {
 import { fetchBookmarks } from '../features/bookmarks/redux/bookmarkSlice';
 import { registerAuthListener, registerAuthFailureListener } from '../core/api/apiClient';
 import { tokenStorage } from '../core/security/tokenStorage';
-import { decodeJwtPayload, isJwtExpired } from '../core/security/jwt';
+import { isAdminRole } from '../core/security/jwt';
 import { subscribeToAuthSessionEvents } from '../core/security/authSessionSync';
 import { toast } from 'react-hot-toast';
 import { RouteMetadata } from '../core/metadata/RouteMetadata';
@@ -88,26 +88,22 @@ export const AppRouterLayout: React.FC = () => {
 
     tokenStorage.discardInMemorySession();
     dispatch(initializeAuth());
-    const token = tokenStorage.getAccessToken();
-    const hasValidToken = Boolean(token && !isJwtExpired(decodeJwtPayload(token)));
-    if (!hasValidToken && (tokenStorage.getRefreshToken() || tokenStorage.getUser())) {
-      dispatch(refreshSessionThunk());
-    }
+    dispatch(refreshSessionThunk());
   }), [dispatch]);
 
   // Intercept popup OAuth completion messages
   useEffect(() => {
     const handleOAuthMessage = async (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
+      if (event.source === window) return;
       if (event.data?.type === 'C2C_GOOGLE_OAUTH_SUCCESS') {
-        const token = event.data.refreshToken || event.data.token;
-        if (token) {
-          const res = await dispatch(refreshSessionThunk(token));
-          if (refreshSessionThunk.fulfilled.match(res)) {
-            dispatch(closeAuthModal());
-            toast.success('Signed in with Google!');
-            navigate('/practice', { replace: true });
-          }
+        tokenStorage.discardInMemorySession();
+        const res = await dispatch(refreshSessionThunk());
+        if (refreshSessionThunk.fulfilled.match(res)) {
+          dispatch(closeAuthModal());
+          toast.success('Signed in with Google!');
+          const refreshedUser = res.payload?.user || res.payload;
+          navigate(isAdminRole(refreshedUser?.role) ? '/admin/dashboard' : '/practice', { replace: true });
         }
       }
     };
@@ -123,12 +119,24 @@ export const AppRouterLayout: React.FC = () => {
     // Intercept OAuth parameters if redirected to root or any non-callback route
     if (!location.pathname.startsWith('/oauth')) {
       const searchParams = new URLSearchParams(location.search);
-      const hasOAuthParams =
+      let hasOAuthParams =
         searchParams.has('refreshToken') ||
         searchParams.has('refresh_token') ||
         searchParams.has('token') ||
         searchParams.has('accessToken') ||
         searchParams.has('access_token');
+
+      if (!hasOAuthParams && location.hash) {
+        try {
+          const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+          hasOAuthParams =
+            hashParams.has('refreshToken') ||
+            hashParams.has('refresh_token') ||
+            hashParams.has('token') ||
+            hashParams.has('accessToken') ||
+            hashParams.has('access_token');
+        } catch {}
+      }
 
       if (hasOAuthParams) {
         navigate(`/oauth/callback${location.search}${location.hash}`, { replace: true });
@@ -139,18 +147,10 @@ export const AppRouterLayout: React.FC = () => {
     if (hasInitializedRef.current) return;
     hasInitializedRef.current = true;
 
-    dispatch(initializeAuth());
-
     // /oauth/callback route coordinates its own refresh lifecycle
     if (!location.pathname.startsWith('/oauth')) {
-      const token = tokenStorage.getAccessToken();
-      const hasValidToken = Boolean(token && !isJwtExpired(decodeJwtPayload(token)));
-      const hasRefreshToken = Boolean(tokenStorage.getRefreshToken());
-      const hasUser = Boolean(tokenStorage.getUser());
-      // Refresh proactively if no active valid access token exists and a refresh token or user profile is stored
-      if (!hasValidToken && (hasRefreshToken || hasUser)) {
-        dispatch(refreshSessionThunk());
-      }
+      dispatch(initializeAuth());
+      dispatch(refreshSessionThunk());
     }
   }, [dispatch, location.pathname, location.search, location.hash, navigate]);
 

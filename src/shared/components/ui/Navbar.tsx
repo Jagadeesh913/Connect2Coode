@@ -3,8 +3,7 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { logoutUser, openAuthModal } from '../../../features/auth/redux/authSlice';
 import { useTheme } from '../../context/ThemeContext';
-import { tokenStorage } from '../../../core/security/tokenStorage';
-import { isJwtAdmin } from '../../../core/security/jwt';
+import { isAdminRole } from '../../../core/security/jwt';
 import { BrandLogo } from './BrandLogo';
 
 export interface NavbarProps {
@@ -32,8 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const userDisplayEmail = currentUser?.email || '';
   const userInitials = userDisplayName.slice(0, 2).toUpperCase();
 
-  const token = tokenStorage.getAccessToken();
-  const isAdmin = isLoggedIn && isJwtAdmin(token);
+  const isAdmin = isLoggedIn && isAdminRole(currentUser?.role);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -58,6 +56,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       onLogout();
     } else {
       dispatch(logoutUser());
+      navigate('/login', { replace: true });
     }
   };
 

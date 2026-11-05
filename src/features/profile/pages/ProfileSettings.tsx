@@ -15,7 +15,6 @@ import { EditAcademicModal } from '../components/modals/EditAcademicModal';
 import { toast } from 'react-hot-toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { decodeJwtPayload } from '../../../core/security/jwt';
 import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
@@ -83,14 +82,6 @@ export const UserProfilePage: React.FC = () => {
     const fromStored = parseNum(stored?.id) ?? parseNum((stored as any)?.userId);
     if (fromStored) return fromStored;
 
-    const token = tokenStorage.getAccessToken();
-    if (token) {
-      const decoded = decodeJwtPayload(token);
-      if (decoded) {
-        const fromJwt = parseNum((decoded as any).userId) ?? parseNum((decoded as any).id);
-        if (fromJwt) return fromJwt;
-      }
-    }
     return null;
   }, [authUser, profile]);
 
@@ -412,9 +403,8 @@ export const UserProfilePage: React.FC = () => {
   );
 
   const { isAuthenticated } = useAppSelector((state) => state.auth);
-  const token = tokenStorage.getAccessToken();
 
-  if (!isAuthenticated && !token) {
+  if (!isAuthenticated) {
     return (
       <div className="w-full flex flex-col items-center justify-center min-h-[65vh] font-sans bg-[#F8FAFC] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 px-4">
         <div className="text-center p-8 max-w-md w-full rounded-3xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-neutral-900 shadow-xl">

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { logoutUser } from '../../../features/auth/redux/authSlice';
 import { useTheme } from '../../../shared/context/ThemeContext';
@@ -20,6 +20,7 @@ interface AdminHeaderProps {
 
 export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar }) => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const reduxUser = useAppSelector((state) => state.auth.user);
   const user = reduxUser || tokenStorage.getUser();
   const { theme, toggleTheme } = useTheme();
@@ -39,6 +40,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
   const handleLogout = () => {
     setIsProfileOpen(false);
     dispatch(logoutUser());
+    navigate('/login', { replace: true });
   };
 
   const displayName =

@@ -2,31 +2,16 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch } from '../../../app/hooks';
 import { refreshSessionThunk, closeAuthModal } from '../redux/authSlice';
-import { isJwtAdmin } from '../../../core/security/jwt';
-import { tokenStorage } from '../../../core/security/tokenStorage';
+import { isAdminRole, getSafeRedirectUrl } from '../../../core/security/jwt';
 import { toast } from 'react-hot-toast';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 
-/**
- * Sanitizes redirect destination to prevent open-redirect vulnerabilities.
- * Only allows relative internal paths within the single page application.
- */
-function getSafeRedirectUrl(target: string | null | undefined): string {
-  if (!target || typeof target !== 'string') return '/practice';
-  const trimmed = target.trim();
-  if (
-    trimmed.startsWith('/') &&
-    !trimmed.startsWith('//') &&
-    !trimmed.startsWith('/\\') &&
-    !trimmed.includes(':') &&
-    trimmed !== '/login' &&
-    trimmed !== '/signup' &&
-    !trimmed.startsWith('/oauth')
-  ) {
-    return trimmed;
+const getOAuthErrorMessage = (errorCode: string): string => {
+  if (errorCode === 'email_not_verified') {
+    return 'Your Google email address is not verified. Verify it and try again.';
   }
-  return '/practice';
-}
+  return 'Google sign-in could not be completed. Please try again.';
+};
 
 export const OAuthCallback: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -40,21 +25,40 @@ export const OAuthCallback: React.FC = () => {
     if (executionRef.current) return;
     executionRef.current = true;
 
-    // Extract any error reported in query parameters
-    const errorParam = searchParams.get('error') || searchParams.get('error_description');
+    // Read only documented error codes. Credentials in the URL are never accepted.
+    let errorParam = searchParams.get('error') || searchParams.get('error_description');
+
+    if (typeof window !== 'undefined' && window.location.hash) {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+        if (!errorParam) {
+          errorParam = hashParams.get('error') || hashParams.get('error_description');
+        }
+      } catch {}
+    }
+
+    // Immediately sanitize sensitive credential tokens and parameters from browser URL and history state
+    // before any async processing or error exits, preventing leakage via history, screenshots, or Referer headers.
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      if (errorParam || window.location.search || window.location.hash) {
+        try {
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch {}
+      }
+    }
+
     if (errorParam) {
-      setError(errorParam);
+      setError(getOAuthErrorMessage(errorParam));
       return;
     }
 
-    // Safest flow: Establish authenticated session using the backend HttpOnly refreshToken cookie
+    // Establish the session only through the backend-managed HttpOnly cookie.
     const completeAuth = async () => {
       try {
         const result = await dispatch(refreshSessionThunk());
 
         if (refreshSessionThunk.fulfilled.match(result)) {
           dispatch(closeAuthModal());
-          const token = tokenStorage.getAccessToken();
           const userPayload = result.payload as any;
           const user = userPayload?.user || userPayload;
           const userName = user?.firstName || user?.fullName || 'User';
@@ -73,7 +77,7 @@ export const OAuthCallback: React.FC = () => {
               }, 150);
               return;
             } catch (e) {
-              console.warn('Popup postMessage warning:', e);
+              console.warn('Popup postMessage warning:', e instanceof Error ? e.message : 'Message dispatch failed');
             }
           }
 
@@ -87,14 +91,18 @@ export const OAuthCallback: React.FC = () => {
             }
           } catch {}
 
-          const isAdmin = isJwtAdmin(token);
-          if (destination === '/practice' && isAdmin) {
-            destination = '/admin/dashboard';
+          const isAdmin = isAdminRole(user?.role);
+          if (isAdmin) {
+            destination = destination.startsWith('/admin') ? destination : '/admin/dashboard';
+          } else if (destination.startsWith('/admin')) {
+            destination = '/practice';
           }
 
           navigate(destination, { replace: true });
         } else {
-          const rawError = (result.payload as string) || '';
+          const rawError = typeof result.payload === 'string'
+            ? result.payload
+            : result.payload?.message || '';
           const errMsg =
             rawError && !rawError.toLowerCase().includes('missing')
               ? rawError

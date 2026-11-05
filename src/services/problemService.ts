@@ -116,17 +116,17 @@ export const problemService = {
             timestamp: res.timestamp,
           };
         }
+        throw new Error(`Question #${numericId} returned an invalid detail response`);
       } catch (err) {
         if (isRequestCanceled(err)) {
           throw err;
         }
-        // Retain catalog fallback for backend deployments with a degraded
-        // details controller and for older response variants.
+        // A catalog row is not a complete detail DTO. Preserve the real error.
+        throw err;
       }
     }
 
-    // Catalog fallback resolves slugs because the backend details path accepts
-    // numeric IDs only.
+    // Catalog lookup is used only to resolve legacy title slugs to a numeric route.
     try {
       const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
 

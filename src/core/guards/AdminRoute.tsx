@@ -1,8 +1,7 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../app/hooks';
-import { tokenStorage } from '../security/tokenStorage';
-import { isJwtAdmin, isTokenValid } from '../security/jwt';
+import { isAdminRole } from '../security/jwt';
 import { PageLoading } from '../../shared/components/ui/PageLoading';
 
 const GuardLoader = PageLoading;
@@ -10,15 +9,14 @@ const GuardLoader = PageLoading;
 /**
  * AdminRoute Guard (F-036)
  * Restricts access to Admin Frontend routes (/admin/*).
- * Verifies that the user is authenticated AND possesses an ADMIN role
- * derived strictly from active JWT payload claims rather than mutable cached
- * profile metadata. The backend remains authoritative for real authorization.
+ * Verifies that the user is authenticated and that the latest backend auth
+ * response supplied an ADMIN role. The backend remains authoritative.
  */
 export const AdminRoute: React.FC = () => {
   const location = useLocation();
   const status = useAppSelector((state) => state.auth.status);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  const token = useAppSelector((state) => state.auth.token) || tokenStorage.getAccessToken();
+  const role = useAppSelector((state) => state.auth.user?.role);
 
   // 1. Prevent premature redirect during asynchronous startup session restoration
   if (status === 'LOADING') {
@@ -26,14 +24,12 @@ export const AdminRoute: React.FC = () => {
   }
 
   // 2. Check Authentication Status
-  const isAuthed = isAuthenticated && isTokenValid(token);
-  if (!isAuthed) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 3. Client-side admin routing is derived only from the active token claims.
-  // The cached user profile is browser-mutable metadata and must never grant access.
-  if (!isJwtAdmin(token)) {
+  // 3. Route presentation follows the role returned by login/refresh.
+  if (!isAdminRole(role)) {
     return <Navigate to="/practice" replace />;
   }
 

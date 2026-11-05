@@ -66,7 +66,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
       }
     });
 
-    it('recovers pageSize: 50 at offset 0 by stitching verified slices when backend 500s', async () => {
+    it('rejects an incomplete stitched page instead of reporting partial data as success', async () => {
       const originalPost = apiClient.post;
       try {
         apiClient.post = async (url, payload) => {
@@ -92,17 +92,13 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           throw new Error('Unexpected call');
         };
 
-        const res = await adminQuestionService.getQuestions({
+        await assert.rejects(() => adminQuestionService.getQuestions({
           level: null,
           companies: null,
           topic: null,
           searchText: null,
           pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 24);
-        assert.equal(res.data.totalElements, 50, 'Dynamic total elements must reflect actual live count');
+        }), /Questions Fetch Unsuccessful/);
       } finally {
         apiClient.post = originalPost;
       }
@@ -141,7 +137,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
   });
 
   describe('2. Offset 20 Backend 500 Recovery', () => {
-    it('recovers offset 20 (page 2 with pageSize 10) by fetching the safe slice at offset 20 without capping to 24', async () => {
+    it('rejects offset-20 recovery when only four of ten requested records are available', async () => {
       const originalPost = apiClient.post;
       try {
         let calls = [];
@@ -173,26 +169,19 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           throw new Error('Unexpected call');
         };
 
-        const res = await adminQuestionService.getQuestions({
+        await assert.rejects(() => adminQuestionService.getQuestions({
           level: null,
           companies: null,
           topic: null,
           searchText: null,
           pageRequest: { pageNumber: 2, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 4);
-        assert.equal(res.data.totalElements, 50, 'Must preserve dynamic totalElements 50 to allow forward navigation');
-        assert.equal(res.data.totalPages, 5, 'Must compute dynamic totalPages 5 for pageSize 10');
-        assert.equal(res.data.content[0].id, 22);
-        assert.equal(res.data.content[3].id, 30);
+        }), /Questions Fetch Unsuccessful/);
       } finally {
         apiClient.post = originalPost;
       }
     });
 
-    it('recovers offset 20 for problemService.getProblems with page 3 (1-indexed)', async () => {
+    it('propagates incomplete offset-20 recovery through problemService', async () => {
       const originalPost = apiClient.post;
       try {
         apiClient.post = async (url, payload) => {
@@ -222,18 +211,16 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           throw new Error('Unexpected call');
         };
 
-        const res = await problemService.getProblems({ page: 3, limit: 10 });
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.length, 4);
-        assert.equal(res.meta.page, 3);
-        assert.equal(res.meta.total, 50);
-        assert.equal(res.meta.totalPages, 5);
+        await assert.rejects(
+          () => problemService.getProblems({ page: 3, limit: 10 }),
+          /Questions Fetch Unsuccessful/
+        );
       } finally {
         apiClient.post = originalPost;
       }
     });
 
-    it('recovers newly created questions on the last page via micro-batching', async () => {
+    it('rejects micro-batching when failed probes leave a partial page', async () => {
       const originalPost = apiClient.post;
       try {
         apiClient.post = async (url, payload) => {
@@ -269,20 +256,13 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           throw new Error('Unexpected call: ' + JSON.stringify(payload));
         };
 
-        const res = await adminQuestionService.getQuestions({
+        await assert.rejects(() => adminQuestionService.getQuestions({
           level: null,
           companies: null,
           topic: null,
           searchText: null,
           pageRequest: { pageNumber: 4, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 2, 'Recovers both healthy newly created questions');
-        assert.equal(res.data.content[0].id, 55);
-        assert.equal(res.data.content[1].id, 56);
-        assert.equal(res.data.totalElements, 50);
-        assert.equal(res.data.totalPages, 5);
+        }), /Questions Fetch Unsuccessful/);
       } finally {
         apiClient.post = originalPost;
       }
@@ -290,7 +270,7 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
   });
 
   describe('3. Out-of-Bounds & Search Fallback Recovery', () => {
-    it('returns a clean empty page with 200 when requesting beyond verified reachable bounds', async () => {
+    it('propagates backend failure instead of fabricating an out-of-bounds empty page', async () => {
       const originalPost = apiClient.post;
       try {
         apiClient.post = async () => {
@@ -299,19 +279,13 @@ describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)',
           throw err;
         };
 
-        const res = await adminQuestionService.getQuestions({
+        await assert.rejects(() => adminQuestionService.getQuestions({
           level: null,
           companies: null,
           topic: null,
           searchText: null,
           pageRequest: { pageNumber: 6, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 0);
-        assert.equal(res.data.totalElements, 50);
-        assert.equal(res.data.totalPages, 5);
-        assert.equal(res.data.empty, true);
+        }), /Questions Fetch Unsuccessful/);
       } finally {
         apiClient.post = originalPost;
       }

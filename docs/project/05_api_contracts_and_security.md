@@ -25,21 +25,21 @@
 
 ## 2. Authentication Architecture & Token Lifecycle
 
-Connect2Code uses stateless **JWT Bearer access tokens** combined with **refresh tokens** managed via HTTP requests and client-side cookie storage.
+Connect2Code uses a short-lived **JWT Bearer access token** held only in per-tab memory. The backend exclusively owns the rotating refresh token in an HttpOnly cookie; frontend JavaScript never reads, creates, updates, or serializes it.
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as User / Client
     participant Client as apiClient (Axios)
-    participant Storage as tokenStorage (Cookies/Memory)
+    participant Storage as tokenStorage (Memory Only)
     participant API as Spring Boot API (/api/v1)
 
     Note over User,API: 1. Login Flow
     User->>Client: authService.login({ email, password })
     Client->>API: POST /auth/login
-    API-->>Client: 200 OK { statusCode: 200, data: { token, refreshToken, role, id, firstName, lastName, email, isDarkTheme } }
-    Client->>Storage: setAccessToken(token), setRefreshToken(refreshToken), setUser(user)
+    API-->>Client: Set-Cookie: refreshToken=...; HttpOnly + { data: { token, role, id, firstName, lastName, email, isDarkTheme } }
+    Client->>Storage: setAccessToken(token), setUser(profile)
 
     Note over User,API: 2. Authenticated Request with Auto-Attached Token
     User->>Client: problemService.getProblems(...)
@@ -48,29 +48,29 @@ sequenceDiagram
     Client->>API: POST /questions { business fields only }
     API-->>Client: 200 OK { statusCode: 200, data: { content: [...] } }
 
-    Note over User,API: 3. Automatic Token Refresh on 401 / Expired Token
+    Note over User,API: 3. Automatic Token Refresh on Protected HTTP 401
     User->>Client: Next API Call
     Client->>API: GET /userInfo/63 (Expired Token)
     API-->>Client: 401 Unauthorized / { statusCode: 401 }
     Client->>Client: Response Interceptor catches 401
-    Client->>API: POST /auth/refresh { refreshToken } (Single-Flight Lock)
-    API-->>Client: 200 OK { accessToken: "new_jwt", refreshToken: "new_uuid" }
-    Client->>Storage: Update tokens
+    Client->>API: POST /auth/refresh (no body; browser sends HttpOnly cookie)
+    API-->>Client: Set-Cookie rotates refresh token + { data: { token, role, user fields } }
+    Client->>Storage: Replace in-memory access token/profile
     Client->>API: Re-dispatch original request with new Bearer token
     API-->>Client: 200 OK
 ```
 
 ### Storage Security Architecture (`tokenStorage.ts`)
-- **Access Token**: Maintained in memory and fallback cookie (`accessToken`).
-- **Refresh Token**: Stored in cookie (`refreshToken`).
-- **Cookie Security Attributes**: Automatically appends `; Secure` on HTTPS origins and `SameSite=Lax`.
-- **No Web-Storage Credentials**: `tokenStorage` does not read or write access tokens, refresh tokens, or user profiles in `localStorage` or `sessionStorage`; it removes legacy copies when a session is written or cleared.
-- **Immediate Logout Hygiene**: Logout captures the refresh token, increments the local session epoch, clears memory/cookies/web-storage aliases, and broadcasts the cleared state before waiting for the backend. Cookie deletion uses both `Max-Age=0` and a past `Expires` date across canonical, legacy, current-route, API-route, host, and parent-domain scopes.
+- **Access Token**: Held only in module memory for the current tab. Obsolete JavaScript-readable access-token cookies and web-storage aliases are deleted but never read.
+- **Refresh Token**: Owned only by the backend in an HttpOnly cookie. `tokenStorage` exposes no refresh-token getter, setter, or remover.
+- **Profile Metadata**: Held in memory/Redux and restored from login or refresh response data.
+- **Immediate Logout Hygiene**: Logout increments the local session epoch, clears in-memory access/profile state and protected Redux caches immediately, broadcasts the cleared state, then calls the backend bodyless logout endpoint. The caller receives the real backend success or failure.
 - **Stale-Response Rejection**: Login and refresh responses capture the session epoch and cannot restore credentials after a logout that completed while their request was in flight.
-- **Expired-Access Startup**: An expired access token with a refresh token/profile keeps authentication in `LOADING` until the one bootstrap refresh completes, preventing a premature protected-route redirect.
-- **Environment parity**: JWT expiry uses the token's `exp` claim identically on localhost and deployed origins, so development requests proactively refresh instead of sending access tokens that are already expired.
-- **Single-Flight Refresh Lock**: `executeRefreshToken()` uses a shared promise variable `refreshTokenPromise`. If multiple concurrent requests receive a 401 simultaneously, only ONE refresh request is dispatched to the backend; all waiting callers resolve with the new access token.
-- **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free `session-updated` and `session-cleared` events through `BroadcastChannel`, with a transient storage-event fallback only where that browser API is unavailable. Receiving tabs discard their in-memory token cache, then restore from the shared cookies or immediately become unauthenticated. A logout, refresh failure, sign-in, or refresh therefore cannot leave another open tab with stale Redux authentication state.
+- **Unconditional Startup Restoration**: `AppRouterLayout` keeps auth status `LOADING` and calls `/auth/refresh` once on startup without inspecting cookies or persisted user state. Protected content stays gated until that request settles.
+- **401-Only Retry**: Requests are not proactively refreshed from decoded expiry. Only an HTTP 401 from a protected request enters the refresh flow; 403, other HTTP errors, successful envelopes containing an inner error code, and unexpected HTML never trigger refresh.
+- **Single-Flight Refresh Lock**: `executeRefreshToken()` owns the shared `refreshTokenPromise` used by startup, OAuth callback, and protected-request retries. Concurrent callers wait for the same rotation request.
+- **Failure Semantics**: A refresh HTTP 401 clears auth state and redirects through route guards. Network and 5xx failures do not prove the cookie invalid and therefore do not clear an otherwise active in-memory session.
+- **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free lifecycle events. A login event makes another tab perform its own cookie-backed refresh; logout and refresh-401 events clear per-tab state.
 
 ---
 
@@ -96,13 +96,13 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 | Endpoint | Method | Access | Request Body | Response Envelope |
 | :--- | :---: | :--- | :--- | :--- |
 | `/signUp` | `POST` | `PUBLIC` | `{ firstName, lastName, email, password, role: "USER", labelUserName, userName }` | `ApiResponse<AuthResponseData>` |
-| `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ token, refreshToken, role, id, firstName, lastName, email, isDarkTheme }>` (read-only production capture, 2026-10-23) |
-| `/auth/refresh` | `POST` | `SESSION_RENEWAL` (refresh token only; no access JWT) | `{ refreshToken }` | `ApiResponse<{ token, refreshToken }>`; `authService` normalizes `token` as the access token |
-| `/auth/logout` | `POST` | `PUBLIC` | `{ refreshToken }` | `ApiResponse<string>` |
+| `/auth/login` | `POST` | `PUBLIC` | `{ email, password }` | `ApiResponse<{ token, role, id, firstName, lastName, email, isDarkTheme }>` plus backend `Set-Cookie` for the HttpOnly refresh token |
+| `/auth/refresh` | `POST` | `SESSION_RENEWAL` | No body; browser sends HttpOnly cookie | `ApiResponse<{ token, role, id/user fields }>` plus rotated refresh cookie |
+| `/auth/logout` | `POST` | `PUBLIC` | No body; browser sends HttpOnly cookie | Real backend `ApiResponse<string>`; backend revokes and clears its cookie |
 | `/auth/generatePasswordResetOtp` | `POST` | `PUBLIC` | `{ email }` | `ApiResponse<unknown>` |
 | `/auth/verifyPasswordResetOtp` | `POST` | `PUBLIC` | `{ email, otp, password }` | `ApiResponse<unknown>` |
 
-`/auth/logout` remains a public-auth transport endpoint: the client clears its local session immediately, then sends the captured refresh token with credentials so the backend can invalidate the server session and expire any HttpOnly refresh cookie. Browser JavaScript cannot delete an HttpOnly cookie or revoke an already-issued stateless access JWT server-side; the backend owns those operations, while the client removes every readable credential and prevents stale responses from restoring it.
+`/auth/logout` remains a public-auth transport endpoint. The client clears local memory/caches immediately and sends a bodyless credentialed request. Backend revocation success is not fabricated: callers can distinguish a confirmed logout from local-only cleanup after a network/server failure.
 
 ### B. Problems & Questions ([`src/services/problemService.ts`](../../src/services/problemService.ts), [`src/services/questionService.ts`](../../src/services/questionService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -163,7 +163,7 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 
 The problem route is deliberately built from the nested `question.id`, never the outer association `id` and never the nullable response `sectionId`. The production OpenAPI document requires authentication and could not be read anonymously on 2026-11-01; therefore live update acceptance remains `PARTIALLY VERIFIED` until an authenticated edit is executed against the backend.
 
-All calls use `apiClient`. Protected business requests carry the access JWT only in the bearer header; access-token aliases are removed from request bodies and query parameters. The session-specific `/auth/refresh` and `/auth/logout` contracts intentionally retain `{ refreshToken }` in their request bodies.
+All calls use `apiClient`. Protected business requests carry the access JWT only in the bearer header; access- and refresh-token aliases are removed from request bodies and query parameters. `/auth/refresh` and `/auth/logout` are bodyless and rely exclusively on the backend-managed HttpOnly cookie.
 
 ### G. Live Read-Only DTO Fields (2026-10-23)
 
@@ -246,3 +246,11 @@ The backend is built with Java Spring Boot and Hibernate. When internal exceptio
 - [`src/core/validation/serverErrorMapper.ts`](../../src/core/validation/serverErrorMapper.ts) tests error text against `isInternalServerLeak()`.
 - If an internal leak is detected, it suppresses the technical trace and presents clean, actionable user feedback (e.g. *"Our servers encountered an issue while processing your request. Please try again shortly."*).
 - Prevents database column names, Java stack traces, and internal server topologies from being revealed to end users.
+
+### Open-Redirect, URL Credential Defense & Authentication Invariants (`jwt.ts`, `Login.tsx`, `OAuthCallback.tsx`, `AppRouterLayout.tsx`, `authService.ts`)
+- [`src/core/security/jwt.ts`](../../src/core/security/jwt.ts) exports `getSafeRedirectUrl(target: string | null | undefined): string` which strictly enforces that redirect targets begin with a single `/`, reject protocol-relative paths (`//`), any backslash (`\`), scheme delimiters (`:`), URL-encoded variants (`%5C`, `%2F%2F`), control characters (`\x00-\x1F`, `\x7F`), and auth route prefixes (`/login`, `/signup`, `/forgot-password`, `/auth`, `/oauth`), defaulting safely to `/practice`.
+- [`src/features/auth/pages/Login.tsx`](../../src/features/auth/pages/Login.tsx) passes all post-login destinations through `getSafeRedirectUrl` and strictly routes non-admin users to `/practice` even if an admin target URL was requested.
+- [`src/features/auth/pages/OAuthCallback.tsx`](../../src/features/auth/pages/OAuthCallback.tsx) extracts credentials from both query parameters and hash fragments, immediately purging them from the browser address bar and history via `window.history.replaceState({}, '', window.location.pathname)` before error exits or async completion to prevent leakage via browser history, logs, or Referer headers.
+- [`src/layouts/AppRouterLayout.tsx`](../../src/layouts/AppRouterLayout.tsx) listens for popup OAuth completion messages with strict same-origin checking (`event.origin === window.location.origin`), rejects self-messages (`event.source === window`), discards in-memory sessions, and triggers standard cookie session refresh without accepting caller-supplied tokens from `event.data.token`.
+- [`src/services/authService.ts`](../../src/services/authService.ts) sanitizes logout error logging to output only generic error messages, avoiding printing raw Axios error objects that expose request configurations, `Authorization: Bearer <token>` headers, and server tracebacks.
+- **Backend Boundary Notice**: Frontend route guards (`AdminRoute.tsx`, `ProtectedRoute.tsx`) and client-side token validation only control browser UI rendering. Assertions regarding backend endpoint authorization (`@PreAuthorize`), token revocation, and Judge0 sandboxing represent external backend dependencies that require independent verification on the Spring Boot and infrastructure layers.

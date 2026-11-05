@@ -51,7 +51,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
-| `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `RUNTIME-VERIFIED` | Combines auth, problems, companies, dsaSheet, progress, bookmarks, profile, references, languages. |
+| `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `RUNTIME-VERIFIED` | Combines all slices and clears protected cached data immediately on logout or forced unauthentication. |
 | `src/app/hooks.ts` | Typed Redux hooks | `RUNTIME-VERIFIED` | React Redux 9 `withTypes` hooks for dispatch, selector, and store. |
 
 ---
@@ -60,19 +60,19 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Bearer-only authentication is live-verified; body/query credential removal for objects, arrays, `FormData`, and `URLSearchParams`, bodyless DELETE handling, and base URL resolution are regression-tested. |
+| `src/core/api/apiClient.ts` | Central Axios client, interceptors, refresh lock | `RUNTIME-VERIFIED` | Attaches the in-memory bearer token; refresh is bodyless, credentialed, single-flight, and triggered only by protected-request HTTP 401. Refresh HTTP 401 clears the session while temporary failures preserve it. |
 | `src/core/api/endpoints.ts` | Centralized REST endpoint constants | `RUNTIME-VERIFIED` | Includes tested reference routes and semantic `SAVE` names for POST routes shared by create/update. |
-| `src/core/guards/AdminRoute.tsx` | Admin route gate checking JWT claims | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
-| `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Admin redirect selection uses signed JWT claims only; covered by auth regression tests. |
+| `src/core/guards/AdminRoute.tsx` | Admin route gate using response profile role | `RUNTIME-VERIFIED` | Uses the backend-supplied login/refresh role; it does not decode JWT claims for authorization. |
+| `src/core/guards/GuestRoute.tsx` | Guest route gate redirecting logged-in users | `RUNTIME-VERIFIED` | Redirect selection uses the backend-supplied response profile role. |
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/mappers/problemMapper.ts` | Question DTO to problem model mapper | `RUNTIME-VERIFIED` | Maps question catalog and detail payloads, preserving testCases, examples, constraints, hints, and ref metadata. |
 | `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families; authenticated API-backed and coming-soon routes default to noindex without guessed entity names. |
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
-| `src/core/security/jwt.ts` | JWT payload decoder, claim extractor, expiry | `RUNTIME-VERIFIED` | Expiry and role claims are tested in `authSession.test.mjs`, including localhost parity for proactive refresh. |
+| `src/core/security/jwt.ts` | Legacy JWT decoder plus response-role and redirect helpers | `RUNTIME-VERIFIED` | Source authorization callers use `isAdminRole` with backend response data; JWT claims are not used for routing or access decisions. |
 | `src/core/security/authSessionSync.ts` | Credential-free same-origin tab session event transport | `RUNTIME-VERIFIED` | BroadcastChannel with transient storage-event fallback; tested event validation. |
-| `src/core/security/tokenStorage.ts` | Cookie & memory token storage | `RUNTIME-VERIFIED` | Immediate logout expires canonical/legacy cookies across known scopes, clears both web-storage types and memory, advances the stale-response epoch, and broadcasts cross-tab cleanup. |
+| `src/core/security/tokenStorage.ts` | Memory-only access token and session profile storage | `RUNTIME-VERIFIED` | Exposes no refresh-token API, never reads or creates the backend HttpOnly cookie, purges legacy JavaScript-readable token aliases, and advances the stale-response epoch on clear. |
 | `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Tested in `taskRemediationVerification.test.mjs`. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Canonical institution filters, reference save unions, nullable profile responses, strict session-identity fields, and MCQ save payloads reflect the active contracts. |
@@ -89,18 +89,18 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Logout clears locally before backend invalidation; login advances session ownership before persistence; login/refresh reject superseded responses and notify tabs without disclosing credentials. Tested in `authSession.test.mjs`. |
+| `src/services/authService.ts` | Authentication REST service | `RUNTIME-VERIFIED` | Login stores only response token/profile in memory. Logout clears locally immediately, sends no token body, and returns the real backend outcome rather than fabricating success. |
 | `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
-| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `RUNTIME-VERIFIED` | Live company pages and metadata are verified; company-question requests use the verified `/questions` filter contract and preserve server pagination. A non-empty live exam/detail DTO remains unverified. |
+| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `RUNTIME-VERIFIED` | Company-question recovery preserves the requested numeric company filter and never substitutes an unscoped name search. A non-empty live exam/detail DTO remains unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Language caching, API-only reference-ID resolution, custom-input payloads, malformed response rejection, and non-zero success verdicts are covered by tests; live execution remains backend-dependent. |
 | `src/services/institutionService.ts` | Public institution search autocomplete | `RUNTIME-VERIFIED` | Tested in `apiIntegration.test.mjs`. |
 | `src/services/learningSheetService.ts` | DSA sheets, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, and ordering are tested. Live API access remains backend-dependent. |
 | `src/services/mcqService.ts` | User/admin MCQ reads and aptitude scoring | `RUNTIME-VERIFIED` | Contains no admin mutations; that boundary and option correctness are regression-tested. |
-| `src/services/problemService.ts` | Problem catalog and details service | `RUNTIME-VERIFIED` | Numeric detail responses must carry the requested ID; title-only or malformed degraded responses use the slug/catalog fallback. |
+| `src/services/problemService.ts` | Problem catalog and details service | `RUNTIME-VERIFIED` | Numeric detail failures propagate; catalog fallback is limited to slug resolution and cannot hide a failed detail request. |
 | `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Nullable reads, strict envelopes, and business-only save payloads are tested in `userInfoProfile.test.mjs`. |
-| `src/services/questionService.ts` | Problem CRUD and test case retrieval | `RUNTIME-VERIFIED` | Numeric direct lookup, cancellation, and test-case failure propagation covered by service tests. |
+| `src/services/questionService.ts` | Problem CRUD and test case retrieval | `RUNTIME-VERIFIED` | Numeric direct lookup, cancellation, failure propagation, and preservation of absent test-case classification as blank are covered. |
 | `src/services/referenceService.ts` | Taxonomy group codes and group records | `PARTIALLY VERIFIED` | Authenticated group-code listing returned 200; encoded group paths and strict DTO validation are tested, while the current per-group production read is blocked by the backend's missing `referenceCodesByGroup` cache. |
-| `src/services/userQuestionService.ts` | Solved/attempted IDs, bookmarks, submissions | `RUNTIME-VERIFIED` | Strict array extraction, cancellation signals, and backend typo endpoints are tested. |
+| `src/services/userQuestionService.ts` | Solved/attempted IDs, bookmarks, submissions | `RUNTIME-VERIFIED` | Missing required user/question identity rejects explicitly rather than returning a fabricated empty result. |
 | `src/services/admin/adminCompanyService.ts` | Admin company, role, section, exam authoring | `RUNTIME-VERIFIED` | Paginated reads delegate to the verified shared company service; business-only mutations and API-owned exam taxonomy IDs are regression-tested; live mutation remains backend-owned. |
 | `src/services/admin/adminInstitutionService.ts`| Admin institution CRUD & status toggle | `RUNTIME-VERIFIED` | Sends only canonical `type` and `activeOnly` filter names; tested in `institutionManagement.test.mjs`. |
 | `src/services/admin/adminLanguageService.ts` | Admin language compiler management | `RUNTIME-VERIFIED` | One save method matches the shared create/update POST; successful mutations invalidate execution-language cache. |
@@ -252,8 +252,8 @@ Every first-party source file has been inspected and assigned a verified status 
 ## 9. Verification Summary & Audit Totals
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 155
-- **Total Automated Test Suites in `scripts/tests/`**: 22
-- **Total Executed Automated Unit Tests**: 355 (355 Passed, 0 Failed; 100 reported suites across 22 files)
+- **Total Automated Test Files in `scripts/tests/`**: 23
+- **Total Executed Automated Unit Tests**: 371 (371 Passed, 0 Failed; 105 reported suites across 23 files)
 - **TypeScript Static Check (`npm run typecheck`)**: 0 errors
 - **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 177 files
 - **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.

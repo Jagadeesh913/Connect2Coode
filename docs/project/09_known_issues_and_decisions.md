@@ -39,24 +39,9 @@
   - [`src/core/api/endpoints.ts`](../../src/core/api/endpoints.ts) explicitly maps these exact strings to match the Spring Boot controller routes.
 
 ### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` & Paginated Slices (Corrupted Records 24..47)
-- **Observed Behavior**: In user catalog (`/problems`) and admin question bank (`/admin/questions`), navigating to subsequent pages, changing page size, or selecting page numbers caused `POST /api/v1/questions` to fail with HTTP 500 (`"Questions Fetch Unsuccessful"`).
-- **Empirical Root Cause (Verified via Postman MCP)**: Executing individual requests in the Postman MCP collection (`Questions API Pagination & Resilience Suite`) against `https://api.connect2code.in/api/v1/questions` confirmed:
-  - Requests for Page 0 (`pageNumber: 0, pageSize: 10`) and Page 1 (`pageNumber: 1, pageSize: 10`) return HTTP 200 with complete dynamic data (`totalElements: 49, totalPages: 5`).
-  - Requests intersecting indices 24..47 (e.g. Page 2 with `pageSize: 10`, Page 1 with `pageSize: 20`, or Page 0 with `pageSize: 50`) fail with HTTP 500 due to database corruption in records with IDs 31..54. Direct `GET /question/31` likewise throws HTTP 500 (`"Question Fetch Unsuccessfull"`), whereas `GET /question/30` returns HTTP 200.
-  - Search queries matching corrupted records (such as `"Reverse"`) also cause backend 500s.
-- **Frontend Real-Time Dynamic Mitigation & Micro-Batch Recovery**:
-  - Dynamically tracks live database total elements (`liveTotalQuestionsCount`, initialized to 50+ as empirically verified via Postman MCP) and dynamically updates whenever the backend returns a higher `totalElements` or when an admin publishes a new question.
-  - NEVER clamps `totalElements` to a static 24; all pagination controls dynamically adapt to the true live question count across user practice (`/practice`) and admin bank (`/admin/questions`).
-  - When a page request encounters backend 500 on corrupted slices (e.g. intersecting indices 24..47):
-    - Offset 0 with large page size (`pageSize: 50`): Stitches verified sub-slices `[0..20)`, `[20..24)`, and tail items `[48..)` to serve all readable records.
-    - Offset 20: Recovers boundary slice `{ pageNumber: 5, pageSize: 4 }` (items 20..23) preserving dynamic total count.
-    - Slices containing corrupted records: Executes fine-grained micro-batch probing (`pageSize: 1` in parallel) across slice offsets. Corrupted records (500) are safely bypassed while healthy records (such as newly created questions at offsets 48+) are successfully recovered and rendered on their genuine page.
-    - Out-of-bounds offsets (`offset >= liveTotalQuestionsCount`): Returns a clean empty page (`content: []`) with HTTP 200 and dynamic total elements, preserving active pagination controls so the user can easily navigate backward or jump to the last page.
-    - Admin question creation automatically transitions the admin to the last page where newly created DSA problems are immediately visible.
-    - Search queries and filtered queries (such as `level: [3]`, topic, companies, or platforms) failing on backend exceptions dynamically fall back to in-memory filtering over the verified readable catalog (`[0..20)` + `[20..24)`), returning status 200 with accurate totalElements and totalPages.
-    - Routed `companyService.getCompanyProblems` through `fetchResilientQuestionPage` so company question lists never crash when querying with large page sizes.
-    - In `/practice`, catalog loading fetches all verified problems once, allowing multi-axis filtering (difficulty, topic, company, platform, status: solved/bookmarked, search keyword, and difficulty sorting) to operate across the entire catalog rather than a pre-paginated single page slice. Filters support multi-select via comma-separated query params (e.g., `difficulty=Basic,Easy&platform=GFG,LEETCODE`), applying OR-logic within categories and AND-logic across categories, with individual active filter pill removal and automatic reset to page 1.
-    - In `/aptitude`, difficulty filtering supports multi-select toggles, seamlessly matching the multi-select behavior of Question Types and Companies while passing resolved numeric reference IDs to the backend API.
+- **Observed Behavior**: Historical frontend workarounds assumed certain `/questions` page slices failed and attempted to stitch smaller responses. Those observations are not treated as a backend contract because the backend source and complete DTO contract were unavailable for this audit.
+- **Decision**: A fallback may return success only when it proves the requested page/catalog is complete. Large-page stitching, offset recovery, and micro-batching now reject if any requested record is missing or any probe fails. The client no longer reports a 24-row subset with a synthetic `200` and a larger total, and it no longer fabricates an out-of-bounds empty page after a backend error.
+- **Filtered boundary**: Client-side fallback filtering is allowed only when the fallback response count equals the backend-reported complete catalog count. Otherwise the original backend failure is propagated.
 
 
 ### 6. Learning Sheet Section 4 Question Read Returns HTTP 500
@@ -106,14 +91,14 @@
 - **Context**: The database language table assigns IDs 1-4 (e.g. 1 = Java, 2 = C++, 3 = Python, 4 = C). However, the Judge0 execution engine expects Reference IDs 5-8 (5 = Java, 6 = C++, 7 = Python, 8 = C).
 - **Decision**: `executionService.resolveLanguageReferenceId` maps a table ID or already-resolved reference ID only when it is present in the dynamic `/language` catalog. Static ID ranges and positive-ID pass-through were removed because they could execute code with a wrong backend reference after registry changes.
 
-### Decision 6: Cookie-Only Session Persistence and Server-Owned Academic Records
+### Decision 6: Backend-Owned Refresh Cookie and Memory-Only Access Session
 - **Context**: The previous client mirrored credentials and profile objects into `localStorage` and `sessionStorage`, while the profile page retained an unscoped academic-record cache. This contradicted the documented storage policy and could leave sensitive data after a session.
-- **Decision**: Keep the established cookie/in-memory session contract for the backend that returns tokens in JSON, remove web-storage reads/writes for credentials and profile metadata, and fetch academic records solely through `/userInfo/{userId}`. Logout now clears memory and every known client-readable cookie/storage alias before its network request, expires cookies across legacy paths/domains with both `Max-Age=0` and a past `Expires`, and advances a session epoch so an in-flight login or refresh cannot recreate the cleared session. The captured refresh token is still sent to `/auth/logout` so the backend can invalidate the server session and its HttpOnly cookie.
-- **Guardrail**: An expired access token with a refresh session remains in `LOADING` until refresh succeeds or fails, so session restoration is not erased or redirected prematurely.
+- **Decision**: Access tokens and session identity remain only in memory/Redux. The frontend exposes no refresh-token storage API and sends no refresh token in refresh/logout bodies; the backend owns the HttpOnly cookie and its rotation/revocation. Startup refresh is unconditional, and all refresh callers share one lock. Logout clears memory and protected caches immediately, then returns the real backend outcome.
+- **Guardrail**: Only refresh HTTP 401 proves the cookie invalid and clears authentication. Network and 5xx failures preserve an already-active in-memory session.
 
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
 - **Context**: Admin question metadata and test cases were overridden or retained in browser storage, and two hard-coded fixtures included hidden evaluation cases. `ProblemDetails` also mirrored submitted source code and results even though the submission-history endpoint is available.
-- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible examples and sample test cases may still be parsed from problem descriptions or provided for standard catalog problems (e.g. Reverse an Array) to guide student inputs, but hidden evaluation fixtures are never bundled into the client.
+- **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible examples may be parsed for display, but missing test-case classification fields remain blank and must be selected from backend reference data; the client does not synthesize `SAMPLE`, `NECESSARY`, or display names as backend values.
 - **Boundary**: Problem bookmarks remain server-authoritative. COMPANY/APTITUDE bookmarks have no corresponding API endpoint and use only user-scoped browser persistence; the persistence middleware explicitly excludes server-owned problem bookmarks.
 
 ### Decision 8: Deterministic Redux State and Request Ownership
@@ -138,7 +123,7 @@
 
 ### Decision 12: Credential-Free Cross-Tab Session Synchronization
 - **Context**: Browser cookies are shared between tabs, but Redux state and the in-memory access-token cache are per tab. Logging out in one tab previously left another tab displaying an authenticated session until reload or a failed request.
-- **Decision**: Publish only `{ type, occurredAt }` session lifecycle events via `BroadcastChannel`, with a transient `storage` event fallback for unsupported browsers. Recipients clear per-tab memory and Redux state on logout, or discard memory and rehydrate from the cookie-backed session after sign-in/refresh. Tokens, refresh tokens, and user data are never placed in the signal.
+- **Decision**: Publish only `{ type, occurredAt }` lifecycle events. Recipients clear per-tab memory/Redux on logout or refresh-401, and perform a cookie-backed refresh after another tab signs in. Ordinary token rotation does not broadcast another refresh cascade. Tokens and user data are never placed in the signal.
 - **Boundary**: This synchronizes tabs in the same browser origin. Server-side token revocation remains authoritative for other devices, browsers, or sessions.
 
 ### Decision 13: API-Field Audit Uses Captured Backend Evidence
@@ -148,7 +133,7 @@
 
 ### Decision 14: Do Not Retry a Known-Unauthorized Test-Case Read
 - **Context**: A direct authenticated `GET /question/{id}/testCases` returned `401 Authentication required` on 2026-10-23, while `GET /question/{id}` returned the backend's separate `500 Question Fetch Unsuccessfull` error for a current catalog record.
-- **Decision**: Catalog fallback no longer issues the test-case GET after a failed detail request. It maps only cases returned in the catalog DTO and visible description content. The separate `POST /question/{id}/testCases` admin mutation is retained unchanged.
+- **Decision**: Numeric detail failures are propagated unchanged. A catalog row is never promoted to successful detail data, and no speculative test-case request follows the failure. The separate `POST /question/{id}/testCases` admin mutation is retained unchanged.
 - **Benefits**: Removes a predictable failed request from each affected question-detail fallback without replacing server-owned cases with mock or browser data.
 
 ### Decision 15: List DTOs Are Not Detail DTOs
@@ -189,14 +174,14 @@
 - **Decision**:
   - **Dynamic Starter Code**: Generated dynamically per selected problem title, ID, and runtime language (`java`, `python`, `cpp`, `javascript`). Verified working demo solutions (`SAMPLE_WORKING_SOLUTIONS`) can be loaded on-demand via a dedicated "Load Demo Solution" button.
   - **Scoped Code Drafts**: Preserves edited code drafts in local state indexed by `${questionId}_${languageId}`, preventing edits from being overwritten when toggling between problems or languages.
-  - **Resilient 5-Tier Question Loading**: Resolves question metadata and test cases gracefully: `adminQuestionService.getQuestionById` -> `problemService.getProblemById` (resilient catalog fallback) -> local question catalog cache -> `adminQuestionService.getTestCases` -> `extractTestCasesFromProblem`.
+  - **Authoritative Question Loading**: Numeric detail errors remain errors; catalog/cache rows are not substituted as full detail DTOs. Test-case classification values are preserved only when supplied by the API/reference selection.
   - **Authoritative Metrics & Difficulty Resolution**: Dynamically maps difficulty levels through `useReferenceGroup('DIFF')` instead of assuming sequential IDs. A metric request is omitted when its API reference is unavailable; no legacy fallback ID is sent. Integrates `learningSheetService.getSheets` to populate the 8th metric card (`DSA Sheets`) in a balanced 4x2 grid.
   - **Safe MCQ Pagination Contract**: Sanitizes `adminMcqService.getMcqs` payload to include full `pageRequest` and empty filter arrays, preventing Spring Boot 500 NPEs.
 
 ### Decision 21: CodeRabbit Frontend Review Remediation Boundaries
 
 - **Context**: The local CodeRabbit report grouped seven actionable frontend findings and used F-08 for two different UI concerns. Its F-09 claim treated the code-runner draft state as unused even though functional state updates read and preserve that cache.
-- **Decision**: Confirm findings against source and callers before editing. F-01 is resolved by keeping `ProfileSettings` limited to session identity, `/userInfo/{userId}` fields, and the API-backed password-reset action; unsupported email-notification, interface-language, and profile-level theme controls are removed instead of stored in the browser. Legacy academic and personal properties on the identity model are not used as fallbacks. URL-encoded authenticated bodies are cloned without losing repeated fields and retain the correct content type; dashboard metric requests are separated by dependency; profile `null` is a cacheable fetched result; expired JWTs receive no localhost grace; question-bank paging is user-driven and bounded; and the DSA carousel pauses explicitly for visibility, reduced motion, pointer, focus, and user controls. The aptitude option layout is top-aligned on narrow screens.
+- **Decision**: Confirm findings against source and callers before editing. `ProfileSettings` remains limited to session identity and `/userInfo/{userId}` fields. Authentication no longer decodes JWT expiry/roles for refresh or authorization routing: protected HTTP 401 drives refresh and backend response role drives UI routing. Question-bank recovery cannot publish partial pages as success.
 - **Not applicable**: F-09 requires no code change because `_codeDrafts` is the previous-state value used by functional `setCodeDrafts` updates. Removing it would discard existing per-question/per-language drafts.
 - **Boundary**: No Spring Boot implementation, endpoint, request field, or API contract was changed. The two F-08 descriptions are tracked independently: carousel background motion is covered with the carousel remediation, while mobile option alignment is covered in the aptitude UI.
 
@@ -207,11 +192,11 @@
 - **Runner concurrency (N-05/N-06)**: Catalog merges update a ref without retriggering question details. Reload, search, and load-more responses are generation-owned; superseding operations clear stale loading flags, empty searches preserve catalog pagination, and search filtering covers every service-matched list field. Per-question/per-language draft state remains required and regression-tested, so F-09 is still not applicable.
 - **Accessibility and iconography (N-07/N-08)**: Reduced-motion users receive a truthful disabled-control label. Inactive carousel slides are inert, hidden from assistive technology, and excluded from the tab order. Aptitude correctness marks use `lucide-react` `Check` and `X` components.
 
-### Decision 24: Complete Post-Remediation CodeRabbit Audit
+### Decision 24: Authentication Contract and Data-Recovery Remediation Boundary
 
-- **Context**: A fresh CodeRabbit review of the latest commit and every current working-tree scope found request-ownership races, unsafe partial filtered-question recovery, a degraded question-detail identity check, and state that could survive account, route, or section changes. Several other suggestions were rejected because they relied on the old body-token contract or reviewed one directory without its current cross-directory dependency.
-- **Decision**: Filtered `/questions` recovery is accepted only when the unfiltered fallback proves it contains the complete reported catalog; otherwise the original backend failure is propagated instead of publishing incomplete totals. Numeric problem details require the requested ID before mapping. Login advances the session epoch before installing a new account, empty refresh responses clean invalid credentials, and profile reads are user/request-owned. Reference-group lists, theme scopes, company-detail counts, and dashboard difficulty metrics now discard or clear superseded state. Exam sections require an explicit classification and cannot save while question taxonomy is disabled.
-- **Verification boundary**: Regression tests cover incomplete-catalog rejection, degraded detail fallback, stale profile/reference ownership, auth ordering, and the UI contracts. No production mutation was executed; admin mutation endpoints remain `PARTIALLY VERIFIED`.
+- **Context**: The supplied source audit identified authentication-contract violations, unsafe partial filtered-question recovery, a degraded question-detail fallback, unscoped company search recovery, synthesized classification metadata, and missing-identity paths that reported false empty data. Each claim was rechecked against active source and callers; project documentation and Postman artifacts were not treated as contract evidence.
+- **Decision**: Filtered and paginated `/questions` recovery is accepted only when completeness is proven; numeric detail failures are never hidden by catalog rows. Authentication follows the backend-owned HttpOnly refresh-cookie contract, uses a shared single-flight lock, and distinguishes refresh 401 from temporary failures. Missing required user IDs reject rather than returning fake empty data. Company-ID question requests never fall back to an unscoped text search.
+- **Verification boundary**: Source and unit/runtime regression tests cover these frontend behaviors. The Spring Boot source was not present in the public repository and no live integration or mutation was executed; unprovided backend DTOs remain `UNKNOWN` and admin mutation endpoints remain `PARTIALLY VERIFIED`.
 
 ---
 

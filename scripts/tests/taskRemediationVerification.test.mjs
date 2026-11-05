@@ -77,7 +77,7 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.ok(Array.isArray(mapped.testCases), 'testCases must be present for Question 3');
     assert.ok(mapped.testCases.length > 0, 'testCases must not be empty');
     assert.equal(mapped.testCases[0].isHidden, false, 'Sample test case must not be hidden');
-    assert.equal(mapped.testCases[0].typeRefCode, 'SAMPLE');
+    assert.equal(mapped.testCases[0].typeRefCode, '', 'Classification must not be invented when the API omits it');
     assert.match(mapped.testCases[0].input, /1 4 3 2 6 5|1 2 3 4 5/);
   });
 
@@ -114,15 +114,13 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(mapped.examPlatform, undefined);
   });
 
-  it('Task 5: tokenStorage keeps session tokens in the canonical cookie/memory contract', () => {
-    tokenStorage.setRefreshToken('token_abc_123');
-    assert.equal(tokenStorage.getRefreshToken(), 'token_abc_123');
-
+  it('Task 5: tokenStorage keeps only the access token and profile in memory', () => {
+    assert.equal('setRefreshToken' in tokenStorage, false);
+    assert.equal('getRefreshToken' in tokenStorage, false);
     tokenStorage.setAccessToken('access_token_xyz_789');
     assert.equal(tokenStorage.getAccessToken(), 'access_token_xyz_789');
 
     tokenStorage.clearTokens();
-    assert.equal(tokenStorage.getRefreshToken(), null);
     assert.equal(tokenStorage.getAccessToken(), null);
   });
 
@@ -312,7 +310,7 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.match(companyDetailsSource, /codingError \? \([\s\S]*?<td colSpan=\{6\}><RequestStatus error=\{codingError\}/);
 
     // Auth slice & OAuth callback check
-    assert.match(authSliceSource, /if \(!res\?\.data\) \{[\s\S]*return rejectWithValue/);
+    assert.match(authSliceSource, /return await executeRefreshToken\(\)/);
     assert.doesNotMatch(oauthCallbackSource, /setUnauthenticatedSession/);
 
     // PracticePage clamp and filter race condition checks

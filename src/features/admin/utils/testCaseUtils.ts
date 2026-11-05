@@ -95,7 +95,14 @@ export function parseTestCasesFromMarkdown(
     }
   }
 
-  return cases;
+  // Description-derived examples are frontend conveniences, not backend
+  // classification records. Never expose invented reference metadata.
+  return cases.map((testCase) => ({
+    ...testCase,
+    typeRefGroupCode: '',
+    typeRefCode: '',
+    typeRefName: '',
+  }));
 }
 
 /**
@@ -292,11 +299,9 @@ export function extractTestCasesFromProblem(
       return valid.map((tc, idx) => ({
         ...tc,
         displayOrder: tc.displayOrder || idx + 1,
-        typeRefGroupCode: 'TESTCASETYPE',
-        typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
-        typeRefName:
-          tc.typeRefName ||
-          (tc.isHidden ? 'Hidden Evaluation Test Case' : 'Visible Sample Test Case'),
+        typeRefGroupCode: tc.typeRefGroupCode || '',
+        typeRefCode: tc.typeRefCode || '',
+        typeRefName: tc.typeRefName || '',
       }));
     }
   }
@@ -314,9 +319,9 @@ export function extractTestCasesFromProblem(
       explanation: String(ex.explanation || '').trim(),
       isHidden: false,
       displayOrder: idx + 1,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: 'SAMPLE',
-      typeRefName: 'Visible Sample Test Case',
+      typeRefGroupCode: '',
+      typeRefCode: '',
+      typeRefName: '',
     }));
   }
 
@@ -325,14 +330,24 @@ export function extractTestCasesFromProblem(
   if (desc) {
     const parsed = parseTestCasesFromMarkdown(desc, numericId);
     if (parsed.length > 0) {
-      return parsed;
+      return parsed.map((testCase) => ({
+        ...testCase,
+        typeRefGroupCode: '',
+        typeRefCode: '',
+        typeRefName: '',
+      }));
     }
   }
 
   // 4. Standard foundational visible sample test cases fallback
   const standardCases = getStandardSampleCases(numericId, question.title);
   if (standardCases.length > 0) {
-    return standardCases;
+    return standardCases.map((testCase) => ({
+      ...testCase,
+      typeRefGroupCode: '',
+      typeRefCode: '',
+      typeRefName: '',
+    }));
   }
 
   return [];

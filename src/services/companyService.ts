@@ -322,7 +322,7 @@ export const companyService = {
       }
     }
 
-    if (problemsList.length === 0 && nameStr) {
+    if (numericCandidate === undefined && problemsList.length === 0 && nameStr) {
       try {
         const payload = {
           level: null,

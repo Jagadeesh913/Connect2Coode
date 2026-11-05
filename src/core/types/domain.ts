@@ -246,6 +246,7 @@ export interface UserProfile {
   email: string;
   role?: string;
   avatarUrl?: string;
+  isDarkTheme?: boolean;
 }
 
 export type User = UserProfile;

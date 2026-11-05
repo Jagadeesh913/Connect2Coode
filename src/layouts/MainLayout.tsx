@@ -18,8 +18,14 @@ export const MainLayout: React.FC = () => {
   const showModal = isAuthModalOpen || isAuthRoute;
 
   const handleLogout = async () => {
-    await dispatch(logoutUser());
-    toast.success('Logged out successfully');
+    const request = dispatch(logoutUser());
+    navigate('/login', { replace: true });
+    const result = await request;
+    if (logoutUser.fulfilled.match(result)) {
+      toast.success('Logged out successfully');
+    } else {
+      toast.error('Signed out locally, but server logout could not be confirmed.');
+    }
   };
 
   // Preserve user navigation context on modal close: return to Home if cancelled

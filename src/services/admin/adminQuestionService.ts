@@ -295,16 +295,23 @@ export async function fetchResilientQuestionPage(
 
           if (combined.length > 0) {
             const totalElements = Math.max(combined.length, liveTotalQuestionsCount);
+            const expectedPageItems = Math.min(pageSize, totalElements);
+            const uniqueContent = Array.from(
+              new Map(combined.map((question) => [String(question.id), question])).values()
+            );
+            if (uniqueContent.length < expectedPageItems) {
+              throw new Error('Question recovery returned an incomplete first page');
+            }
             return {
               statusCode: 200,
               message: 'Questions Fetched Successfully',
               data: {
-                content: combined,
+                content: uniqueContent,
                 totalElements,
                 totalPages: Math.max(1, Math.ceil(totalElements / pageSize)),
                 number: 0,
                 size: pageSize,
-                numberOfElements: combined.length,
+                numberOfElements: uniqueContent.length,
                 first: true,
                 last: true,
                 empty: false,
@@ -340,6 +347,10 @@ export async function fetchResilientQuestionPage(
             updateLiveTotalQuestionsCount(rawTotal);
             const totalElements = liveTotalQuestionsCount;
             const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+            const expectedPageItems = Math.min(pageSize, Math.max(0, totalElements - offset));
+            if (fbData.content.length < expectedPageItems) {
+              throw new Error('Question recovery returned an incomplete page');
+            }
             return {
               statusCode: 200,
               message: 'Questions Fetched Successfully',
@@ -361,28 +372,7 @@ export async function fetchResilientQuestionPage(
         }
       }
 
-      // 4. Out-of-bounds offset recovery
-      if (offset >= liveTotalQuestionsCount && !hasFilter) {
-        const totalElements = liveTotalQuestionsCount;
-        const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
-        return {
-          statusCode: 200,
-          message: 'Questions Fetched Successfully',
-          data: {
-            content: [],
-            totalElements,
-            totalPages,
-            number: pageNum,
-            size: pageSize,
-            numberOfElements: 0,
-            first: false,
-            last: true,
-            empty: true,
-          },
-        };
-      }
-
-      // 5. Slice Micro-Batching Recovery: for any page with corrupted records (e.g. 24..47),
+      // 4. Slice Micro-Batching Recovery: accept only a complete recovered page.
       // probe safe individual offsets in parallel to recover all healthy questions (e.g. newly created at 48+)
       if (!hasFilter && offset < liveTotalQuestionsCount) {
         try {
@@ -408,6 +398,9 @@ export async function fetchResilientQuestionPage(
           );
 
           const recoveredContent: QuestionListItem[] = [];
+          if (probeResults.some((result) => result.status === 'rejected')) {
+            throw new Error('Question recovery failed for one or more records');
+          }
           for (const result of probeResults) {
             if (result.status === 'fulfilled') {
               const d = (result.value as ApiResponse<PaginatedQuestionResponse>).data;
@@ -422,6 +415,9 @@ export async function fetchResilientQuestionPage(
 
           const totalElements = liveTotalQuestionsCount;
           const totalPages = Math.max(1, Math.ceil(totalElements / pageSize));
+          if (recoveredContent.length < sliceItemsCount) {
+            throw new Error('Question recovery returned an incomplete page');
+          }
 
           return {
             statusCode: 200,
@@ -512,11 +508,9 @@ export const adminQuestionService = {
         return (list as QuestionTestCase[]).map((tc, idx) => ({
           ...tc,
           displayOrder: tc.displayOrder || idx + 1,
-          typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',
-          typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
-          typeRefName:
-            tc.typeRefName ||
-            (tc.isHidden ? 'Hidden Evaluation Test Case' : 'Visible Sample Test Case'),
+          typeRefGroupCode: tc.typeRefGroupCode || '',
+          typeRefCode: tc.typeRefCode || '',
+          typeRefName: tc.typeRefName || '',
         }));
       }
     } catch {

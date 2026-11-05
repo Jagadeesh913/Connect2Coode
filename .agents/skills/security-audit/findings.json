@@ -1,0 +1,506 @@
+[
+  {
+    "verdict": "rejected",
+    "fingerprint": "c2c-fe-auth-client-jwt-signature-bypass",
+    "title": "Client-Side JWT Payload Decoding Without Cryptographic Signature Verification",
+    "description": "Client-side decoding in jwt.ts extracts claims from unsigned JWT payloads to gate navigation in AdminRoute.",
+    "claimed_root_cause": "The frontend decodes JWT claims using atob without verifying HMAC or RSA cryptographic signatures on the client.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/core/security/jwt.ts",
+        "line": 25,
+        "scope": "decodeJwtPayload",
+        "description": "Splits JWT into segments and decodes payload without cryptographic verification."
+      },
+      {
+        "kind": "sink",
+        "file": "src/core/guards/AdminRoute.tsx",
+        "line": 36,
+        "scope": "AdminRoute",
+        "description": "Gates client-side UI route rendering using isJwtAdmin(token)."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/core/security/jwt.ts",
+        "line": 4,
+        "description": "Architectural documentation explicitly specifies client decoding is for UI routing only; real access control is enforced by Spring Security @PreAuthorize."
+      },
+      {
+        "file": "src/core/guards/AdminRoute.tsx",
+        "line": 15,
+        "description": "AdminRoute documentation specifies that backend Spring Security remains authoritative for real authorization."
+      }
+    ],
+    "reason": "Not a vulnerability. In single-page web architecture, client-side signature verification is technically infeasible without shipping the backend secret key or public key in client bundles. The backend authoritatively enforces @PreAuthorize(\"hasRole('ADMIN')\") on all admin endpoints."
+  },
+  {
+    "verdict": "needs_validation",
+    "fingerprint": "c2c-fe-auth-httponly-cookie-boundary",
+    "title": "Client-Accessible Cookie Storage for Authentication Tokens",
+    "description": "Access and refresh tokens are stored in document.cookie without HttpOnly flags because the current backend returns tokens in JSON response bodies.",
+    "claimed_root_cause": "The frontend sets tokens into document.cookie with SameSite=Lax and Secure, but cannot set HttpOnly from client-side JavaScript.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/core/security/tokenStorage.ts",
+        "line": 44,
+        "scope": "setCookie",
+        "description": "Writes token to document.cookie with path=/; SameSite=Lax."
+      },
+      {
+        "kind": "sink",
+        "file": "src/core/security/tokenStorage.ts",
+        "line": 52,
+        "scope": "getCookie",
+        "description": "Reads token from document.cookie for API requests."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/core/security/tokenStorage.ts",
+        "line": 8,
+        "description": "Codebase comments record that backend should set HttpOnly cookies in Set-Cookie headers rather than JSON body."
+      }
+    ],
+    "blockers": [
+      "Requires Spring Boot backend modification to issue Set-Cookie: refreshToken=...; HttpOnly; Secure; SameSite=Strict headers on /api/v1/auth/login and /api/v1/auth/refresh."
+    ],
+    "validation_plan": {
+      "local": "Verify that document.cookie cannot set HttpOnly and requires backend Set-Cookie response header.",
+      "deployment": "Inspect production Set-Cookie headers on https://api.connect2code.in/api/v1/auth/login to confirm if HttpOnly cookies are issued."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "c2c-fe-auth-logout-error-logging",
+    "title": "Potential Credential Exposure in Logout Exception Logging",
+    "description": "The logout method logs the raw exception object to the browser console, potentially exposing the request configuration and token payload in console logs.",
+    "root_cause": "console.warn in authService.ts logs the raw Axios error object which may include error.config.data containing the refresh token.",
+    "intended_behavior": "Logout failure should log only a sanitized error string without dumping request payloads or headers.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/services/authService.ts",
+        "line": 115,
+        "scope": "authService.logout",
+        "description": "Passes refreshToken in payload to logout API endpoint."
+      },
+      {
+        "kind": "sink",
+        "file": "src/services/authService.ts",
+        "line": 121,
+        "scope": "authService.logout",
+        "description": "Logs raw exception e to console.warn upon network failure."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/services/authService.ts",
+        "line": 121,
+        "description": "console.warn('Logout API warning:', e) logs the entire error object."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "User clicks logout when network fails or server responds with an error."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "A user or attacker with access to browser console or extension inspection could inspect logged Axios error objects to retrieve tokens.",
+      "payloads": [
+        "Network failure during logout"
+      ],
+      "instructions": [
+        "Call authService.logout() when server is unreachable",
+        "Inspect console.warn output in DevTools"
+      ],
+      "observed_result": "Full error object including configuration data is output to console."
+    },
+    "remediation": {
+      "strategy": "Log only the error message or an innocuous string, omitting the raw error object.",
+      "code_changes": [
+        {
+          "file_name": "src/services/authService.ts",
+          "fixed_code": "console.warn('Logout API warning:', e instanceof Error ? e.message : 'Logout request unfulfilled');"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Requires console access or extension log extraction on the client machine."
+      },
+      "impact": {
+        "score": "low",
+        "reason": "Refreshed tokens are already invalidated on server-side logout in normal operations."
+      },
+      "overall_severity": "low"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Directly visible in authService.ts:121 source code."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "c2c-fe-auth-open-redirect-login",
+    "title": "Client-Side Open Redirect in Login Redirection Flow",
+    "description": "Login component redirects users to an unsanitized targetUrl taken from navigation state or sessionStorage without applying protocol or origin validation.",
+    "root_cause": "Login.tsx navigates directly to targetUrl without validating that the target is a relative internal path, allowing external protocol or domain redirection.",
+    "intended_behavior": "targetUrl must be validated and sanitized using getSafeRedirectUrl, restricting navigation to safe internal relative paths.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/features/auth/pages/Login.tsx",
+        "line": 180,
+        "scope": "Login.onLoginSubmit",
+        "description": "Extracts from destination from navLocationState or sessionStorage post_auth_redirect."
+      },
+      {
+        "kind": "propagation",
+        "file": "src/features/auth/pages/Login.tsx",
+        "line": 185,
+        "scope": "Login.onLoginSubmit",
+        "description": "Assigns targetUrl from untrusted from variable without URL sanitization."
+      },
+      {
+        "kind": "sink",
+        "file": "src/features/auth/pages/Login.tsx",
+        "line": 207,
+        "scope": "Login.onLoginSubmit",
+        "description": "Calls navigate(targetUrl, { replace: true }) where targetUrl could be external."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/features/auth/pages/Login.tsx",
+        "line": 207,
+        "description": "navigate(targetUrl, { replace: true }) called without getSafeRedirectUrl."
+      },
+      {
+        "file": "src/features/auth/pages/OAuthCallback.tsx",
+        "line": 14,
+        "description": "OAuthCallback implements getSafeRedirectUrl specifically to prevent open redirects, but the helper was not shared or used in Login.tsx."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "Victim follows a crafted link to /login with state or manipulated redirect state and logs in."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Attacker crafts a link or manipulates post_auth_redirect to an external phishing domain.",
+      "payloads": [
+        "https://phishing-site.attacker.com",
+        "//evil.com"
+      ],
+      "instructions": [
+        "Set sessionStorage.setItem('post_auth_redirect', 'https://phishing-site.attacker.com')",
+        "Perform successful login on /login",
+        "Observer that React Router navigates off-site"
+      ],
+      "observed_result": "User is redirected to the external URL upon login completion."
+    },
+    "remediation": {
+      "strategy": "Centralize getSafeRedirectUrl in a shared security utility and apply it to targetUrl in Login.tsx.",
+      "code_changes": [
+        {
+          "file_name": "src/features/auth/pages/Login.tsx",
+          "fixed_code": "const safeTarget = getSafeRedirectUrl(targetUrl); navigate(safeTarget, { replace: true });"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Attacker can influence redirect state or from location property via crafted navigation."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Enables phishing attacks by redirecting authenticated users to an attacker-controlled site."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Source code review directly proves lack of sanitization in Login.tsx."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "c2c-fe-auth-postmessage-token-injection",
+    "title": "Cross-Window Message Token Injection Risk & Broken Popup Flow",
+    "description": "AppRouterLayout handleOAuthMessage requires event.data.token to trigger session refresh, exposing a Login CSRF risk if untrusted tokens are accepted and breaking the standard popup flow which does not transmit tokens.",
+    "root_cause": "AppRouterLayout passes event.data token to refreshSessionThunk while OAuthCallback sends no token in postMessage.",
+    "intended_behavior": "Popup message should strictly trigger cookie-based session synchronization without accepting arbitrary tokens from event.data.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/layouts/AppRouterLayout.tsx",
+        "line": 100,
+        "scope": "handleOAuthMessage",
+        "description": "Listens for message events on window."
+      },
+      {
+        "kind": "sink",
+        "file": "src/layouts/AppRouterLayout.tsx",
+        "line": 105,
+        "scope": "handleOAuthMessage",
+        "description": "Calls dispatch(refreshSessionThunk(token)) with event.data token."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/layouts/AppRouterLayout.tsx",
+        "line": 103,
+        "description": "const token = event.data.refreshToken || event.data.token; if (token) { dispatch(refreshSessionThunk(token)); }"
+      },
+      {
+        "file": "src/features/auth/pages/OAuthCallback.tsx",
+        "line": 68,
+        "description": "window.opener.postMessage({ type: 'C2C_GOOGLE_OAUTH_SUCCESS' }, window.location.origin) sends no token."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "user_interaction",
+        "description": "Popup OAuth window completes authentication and sends success notification."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Attacker attempts to inject an arbitrary token into the parent window via postMessage.",
+      "payloads": [
+        "{ type: 'C2C_GOOGLE_OAUTH_SUCCESS', token: 'attacker_token' }"
+      ],
+      "instructions": [
+        "Post message with type C2C_GOOGLE_OAUTH_SUCCESS and an attacker token",
+        "Parent window attempts to establish session with attacker token"
+      ],
+      "observed_result": "Parent window executes refresh with untrusted token payload."
+    },
+    "remediation": {
+      "strategy": "Invalidate in-memory session and invoke refreshSessionThunk without arguments so the authenticated cookie is used.",
+      "code_changes": [
+        {
+          "file_name": "src/layouts/AppRouterLayout.tsx",
+          "fixed_code": "tokenStorage.discardInMemorySession(); const res = await dispatch(refreshSessionThunk());"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "low",
+        "reason": "Requires origin matching window.location.origin."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Prevents popup OAuth session completion and guards against token injection."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Discrepancy verified between OAuthCallback postMessage payload and AppRouterLayout message listener."
+    }
+  },
+  {
+    "verdict": "confirmed",
+    "fingerprint": "c2c-fe-auth-url-token-exposure",
+    "title": "Exposure of OAuth Credential Tokens in URL Parameters",
+    "description": "OAuthCallback does not strip authentication tokens from window.location upon mount or failure, leaving sensitive tokens in browser history, address bar, and Referer headers.",
+    "root_cause": "OAuthCallback does not sanitize window.location or history.replaceState to remove token parameters from query string.",
+    "intended_behavior": "Sensitive OAuth parameters (token, refreshToken, accessToken) should be immediately extracted into memory and stripped from the browser URL.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/layouts/AppRouterLayout.tsx",
+        "line": 134,
+        "scope": "AppRouterLayout",
+        "description": "Navigates to /oauth/callback preserving full location.search and location.hash."
+      },
+      {
+        "kind": "sink",
+        "file": "src/features/auth/pages/OAuthCallback.tsx",
+        "line": 34,
+        "scope": "OAuthCallback",
+        "description": "Mounts with sensitive query parameters retained in window.location."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/features/auth/pages/OAuthCallback.tsx",
+        "line": 112,
+        "description": "On authentication error, component renders error view while tokens remain visible in browser address bar."
+      }
+    ],
+    "conditions": [
+      {
+        "kind": "system_configuration",
+        "description": "OAuth provider or backend redirects with token in query parameters."
+      }
+    ],
+    "execution": {
+      "attacker_perspective": "Attacker views browser history, shoulder-surfs, or reads Referer header if user clicks a link.",
+      "payloads": [
+        "/oauth/callback?refreshToken=secret_token&token=secret_access_token"
+      ],
+      "instructions": [
+        "Navigate to /oauth/callback with token parameters",
+        "Check window.location.search after failure or delay"
+      ],
+      "observed_result": "Tokens remain persistent in browser address bar and history."
+    },
+    "remediation": {
+      "strategy": "Extract token parameters immediately into memory and replace browser history state with a sanitized URL.",
+      "code_changes": [
+        {
+          "file_name": "src/features/auth/pages/OAuthCallback.tsx",
+          "fixed_code": "window.history.replaceState({}, document.title, window.location.pathname);"
+        }
+      ]
+    },
+    "severity": {
+      "likelihood": {
+        "score": "medium",
+        "reason": "Occurs whenever OAuth callback URL contains credentials in query string."
+      },
+      "impact": {
+        "score": "medium",
+        "reason": "Token disclosure via browser history, shoulder surfing, and Referer headers."
+      },
+      "overall_severity": "medium"
+    },
+    "confidence": {
+      "score": "high",
+      "reason": "Confirmed by inspection of OAuthCallback.tsx and AppRouterLayout.tsx."
+    }
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "c2c-fe-coding-judge0-secret-exposure",
+    "title": "Direct Exposure of Judge0 API Keys or Endpoints to Frontend Clients",
+    "description": "Hypothesis that Judge0 compiler credentials or endpoints are accessible to the frontend client.",
+    "claimed_root_cause": "The frontend communicates directly with Judge0 API or bundles Judge0 keys.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/services/executionService.ts",
+        "line": 216,
+        "scope": "executionService.runCode",
+        "description": "Calls API_ENDPOINTS.EXECUTION.USER_RUN via apiClient."
+      },
+      {
+        "kind": "sink",
+        "file": "src/core/api/endpoints.ts",
+        "line": 40,
+        "scope": "API_ENDPOINTS.EXECUTION",
+        "description": "Resolves to Spring Boot backend /api/v1/runCode endpoint."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/services/executionService.ts",
+        "line": 219,
+        "description": "All execution calls target Spring Boot backend endpoints (/api/v1/runCode, /api/v1/submitCode); no direct Judge0 endpoint is ever called."
+      }
+    ],
+    "reason": "Refuted by source code. The frontend communicates strictly with the Spring Boot backend proxy. Judge0 server details, tokens, and keys are never present in frontend source or bundles."
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "c2c-fe-coding-judge0-untrusted-compiler-xss",
+    "title": "Cross-Site Scripting via Untrusted Compiler Output or Error Messages",
+    "description": "Hypothesis that Judge0 execution output, actualOutput, or compiler error messages are rendered unsafely via innerHTML or unescaped HTML.",
+    "claimed_root_cause": "Code execution results rendered into DOM without escaping.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/services/executionService.ts",
+        "line": 15,
+        "scope": "normalizeExecutionResult",
+        "description": "Receives actualOutput and errorMessage from backend."
+      },
+      {
+        "kind": "sink",
+        "file": "src/features/problems/pages/ProblemDetails.tsx",
+        "line": 1907,
+        "scope": "ProblemDetails",
+        "description": "Renders activeRunCase.actualOutput in JSX."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/features/problems/pages/ProblemDetails.tsx",
+        "line": 1907,
+        "description": "Output is rendered as JSX text node {activeRunCase.actualOutput}, which React automatically escapes."
+      }
+    ],
+    "reason": "Refuted by source code. React JSX syntax automatically escapes string expressions as DOM text nodes. No dangerouslySetInnerHTML or innerHTML is used anywhere in problem execution components."
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "c2c-fe-idor-client-profile-spoofing",
+    "title": "Client-Side User ID Manipulation for Profile and Registration Data Access",
+    "description": "Hypothesis that frontend profile page allows viewing or modifying other users' profiles by manipulating route parameters.",
+    "claimed_root_cause": "Frontend profile page accepts user-controlled ID parameter to fetch arbitrary user records.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/routes/AppRoutes.tsx",
+        "line": 130,
+        "scope": "appRoutes",
+        "description": "Profile route is mapped to static /profile without URL ID parameter."
+      },
+      {
+        "kind": "sink",
+        "file": "src/features/profile/pages/ProfileSettings.tsx",
+        "line": 69,
+        "scope": "UserProfilePage.effectiveUserId",
+        "description": "Resolves effectiveUserId strictly from authenticated session state."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/features/profile/pages/ProfileSettings.tsx",
+        "line": 77,
+        "description": "effectiveUserId is derived exclusively from authUser.id, profile.id, storedUser.id, or JWT claims."
+      }
+    ],
+    "reason": "Refuted by source code. The profile route (/profile) does not accept a user ID parameter. User ID is determined exclusively from the authenticated session."
+  },
+  {
+    "verdict": "rejected",
+    "fingerprint": "c2c-fe-react-dom-xss",
+    "title": "DOM-Based Cross-Site Scripting via dangerouslySetInnerHTML or eval",
+    "description": "Hypothesis that untrusted user content is injected into the DOM using raw HTML escape hatches.",
+    "claimed_root_cause": "Usage of dangerouslySetInnerHTML, innerHTML, or eval on user-controlled inputs.",
+    "trace": [
+      {
+        "kind": "entrypoint",
+        "file": "src/main.tsx",
+        "line": 1,
+        "scope": "Application Root",
+        "description": "Inspects entire frontend source tree for raw DOM injection APIs."
+      },
+      {
+        "kind": "sink",
+        "file": "src/main.tsx",
+        "line": 1,
+        "scope": "Application Root",
+        "description": "Evaluates presence of unsafe sinks."
+      }
+    ],
+    "evidence": [
+      {
+        "file": "src/features/problems/pages/ProblemDetails.tsx",
+        "line": 1,
+        "description": "All dynamic content rendered using standard React JSX curly brace expressions."
+      }
+    ],
+    "reason": "Refuted by exhaustive codebase search. There are 0 occurrences of dangerouslySetInnerHTML, innerHTML, outerHTML, document.write, eval(), or Function() anywhere in the src/ directory."
+  }
+]

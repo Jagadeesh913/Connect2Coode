@@ -206,7 +206,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       }
     });
 
-    it('does not rethrow a stale numeric-filter failure after the name fallback succeeds empty', async () => {
+    it('preserves numeric company filtering and propagates its failure without a global name fallback', async () => {
       const originalPost = apiClient.post;
       apiClient.post = async (_url, payload) => {
         if (Array.isArray(payload.companies) && payload.companies.length > 0) {
@@ -230,8 +230,14 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       };
 
       try {
-        const response = await companyService.getCompanyProblems(42, 'No Results Inc');
-        assert.deepEqual(response.data, []);
+        await assert.rejects(
+          () => companyService.getCompanyProblems(42, 'No Results Inc'),
+          (error) => {
+            assert.equal(error.statusCode, 500);
+            assert.equal(error.message, 'Numeric company filter failed');
+            return true;
+          }
+        );
       } finally {
         apiClient.post = originalPost;
       }

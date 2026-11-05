@@ -6,8 +6,7 @@ import type {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
-import { isTokenValid } from '../security/jwt';
-import { publishAuthSessionEvent } from '../security/authSessionSync';
+import type { User } from '../types/domain';
 
 /**
  * Resolves and normalizes the API base URL.
@@ -172,10 +171,23 @@ function notifyAuthFailure() {
   });
 }
 
-// Shared Promise Lock for Single-Flight Concurrent 401/403 Refresh Requests
-let refreshTokenPromise: Promise<string> | null = null;
+export interface RefreshSessionData {
+  token?: string;
+  accessToken?: string;
+  id?: number | string;
+  firstName?: string;
+  lastName?: string;
+  fullName?: string;
+  email?: string;
+  role?: string;
+  isDarkTheme?: boolean;
+  user?: User;
+}
 
-export const executeRefreshToken = async (): Promise<string> => {
+// One lock is shared by startup restoration, OAuth completion, and all 401 retries.
+let refreshTokenPromise: Promise<RefreshSessionData> | null = null;
+
+export const executeRefreshToken = async (): Promise<RefreshSessionData> => {
   if (refreshTokenPromise) {
     return refreshTokenPromise;
   }
@@ -183,13 +195,11 @@ export const executeRefreshToken = async (): Promise<string> => {
   refreshTokenPromise = (async () => {
     const sessionEpoch = tokenStorage.getSessionEpoch();
     try {
-      const storedRefreshToken = tokenStorage.getRefreshToken();
-      const payload = storedRefreshToken ? { refreshToken: storedRefreshToken } : {};
       const refreshUrl = `${BASE_URL}/auth/refresh`;
 
       const refreshRes: any = await axios.post(
         refreshUrl,
-        payload,
+        undefined,
         {
           timeout: 30_000,
           withCredentials: true,
@@ -201,26 +211,37 @@ export const executeRefreshToken = async (): Promise<string> => {
       );
 
       const responseData = refreshRes.data;
-      const tokenData = responseData?.data || responseData;
+      const tokenData: RefreshSessionData = responseData?.data || responseData;
       const newAccessToken = tokenData?.accessToken || tokenData?.token;
-      const newRefreshToken = tokenData?.refreshToken || storedRefreshToken;
 
       if (newAccessToken) {
         if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
           throw new Error('Authentication session changed while refresh was in progress');
         }
         tokenStorage.setAccessToken(newAccessToken);
-        if (newRefreshToken) {
-          tokenStorage.setRefreshToken(newRefreshToken);
+
+        const currentUser = tokenStorage.getUser();
+        const responseUser = tokenData.user || tokenData;
+        if (responseUser.email || responseUser.id !== undefined) {
+          tokenStorage.setUser({
+            ...currentUser,
+            id: responseUser.id ?? currentUser?.id,
+            email: responseUser.email || currentUser?.email || '',
+            firstName: responseUser.firstName ?? currentUser?.firstName,
+            lastName: responseUser.lastName ?? currentUser?.lastName,
+            fullName: responseUser.fullName ?? currentUser?.fullName,
+            role: responseUser.role ?? currentUser?.role,
+            isDarkTheme: responseUser.isDarkTheme ?? currentUser?.isDarkTheme,
+          });
         }
-        publishAuthSessionEvent('session-updated');
         notifyAuthListeners(newAccessToken, tokenData);
-        return newAccessToken;
+        return tokenData;
       } else {
         throw new Error('No access token returned from refresh endpoint');
       }
     } catch (refreshErr) {
-      if (tokenStorage.getSessionEpoch() === sessionEpoch) {
+      const refreshStatus = (refreshErr as { response?: { status?: number } })?.response?.status;
+      if (refreshStatus === 401 && tokenStorage.getSessionEpoch() === sessionEpoch) {
         tokenStorage.clearTokens();
         notifyAuthFailure();
       }
@@ -233,12 +254,26 @@ export const executeRefreshToken = async (): Promise<string> => {
   return refreshTokenPromise;
 };
 
-// Request Interceptor: Attach Access Token & Proactively Refresh if Expired
+// Request Interceptor: attach the current in-memory access token only.
 const isPlainObject = (value: unknown): value is Record<string, unknown> => {
   if (!value || typeof value !== 'object') return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
 };
+
+const CREDENTIAL_FIELD_NAMES = new Set([
+  'token',
+  'accesstoken',
+  'access_token',
+  'refreshtoken',
+  'refresh_token',
+  'refresh-token',
+  'jwttoken',
+  'jwt_token',
+]);
+
+const isCredentialField = (key: string): boolean =>
+  CREDENTIAL_FIELD_NAMES.has(key.toLowerCase());
 
 /** Recursively removes credentials from request bodies at every nesting level. */
 const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
@@ -246,8 +281,7 @@ const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
   if (value instanceof FormData) {
     const sanitized = new FormData();
     value.forEach((child, key) => {
-      const lowerKey = key.toLowerCase();
-      if (lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token') return;
+      if (isCredentialField(key)) return;
       sanitized.append(key, child);
     });
     return sanitized;
@@ -255,12 +289,7 @@ const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
   if (value instanceof URLSearchParams) {
     const sanitized = new URLSearchParams();
     value.forEach((child, key) => {
-      const lowerKey = key.toLowerCase();
-      if (
-        lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token'
-      ) {
-        return;
-      }
+      if (isCredentialField(key)) return;
       sanitized.append(key, child);
     });
     return sanitized;
@@ -270,10 +299,7 @@ const cloneWithoutDuplicateTokenFields = (value: unknown): unknown => {
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, child] of Object.entries(value)) {
-    const lowerKey = key.toLowerCase();
-    if (
-      lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token'
-    ) {
+    if (isCredentialField(key)) {
       continue;
     }
     sanitized[key] = cloneWithoutDuplicateTokenFields(child);
@@ -317,17 +343,7 @@ apiClient.interceptors.request.use(
       reqUrl.includes('/auth/generatePasswordResetOtp') ||
       reqUrl.includes('/auth/verifyPasswordResetOtp');
 
-    let token = tokenStorage.getAccessToken();
-    const storedRefreshToken = tokenStorage.getRefreshToken();
-    const storedUser = tokenStorage.getUser();
-
-    const hasValidToken = Boolean(token && isTokenValid(token));
-    // Proactively refresh if access token is missing or expired, but refresh token or user session exists
-    if (!hasValidToken && (storedRefreshToken || storedUser) && !isPublicAuthEndpoint) {
-      try {
-        token = await executeRefreshToken();
-      } catch {}
-    }
+    const token = tokenStorage.getAccessToken();
 
     if (token && !isPublicAuthEndpoint) {
       config.headers = config.headers || {};
@@ -341,8 +357,7 @@ apiClient.interceptors.request.use(
     // Parameter protection: Ensure token is NEVER sent in URL query parameters
     if (config.params && typeof config.params === 'object') {
       for (const key of Object.keys(config.params)) {
-        const lowerKey = key.toLowerCase();
-        if (lowerKey === 'token' || lowerKey === 'jwttoken' || lowerKey === 'jwt_token') {
+        if (isCredentialField(key)) {
           delete config.params[key];
         }
       }
@@ -374,36 +389,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   async (response: AxiosResponse) => {
     const resData = response.data;
-    const originalRequest = response.config as any;
-    const reqUrl = originalRequest?.url || '';
 
-    const isPublicAuthEndpoint =
-      reqUrl.includes('/auth/refresh') ||
-      reqUrl.includes('/auth/login') ||
-      reqUrl.includes('/auth/logout') ||
-      reqUrl.includes('/signUp') ||
-      reqUrl.includes('/auth/generatePasswordResetOtp') ||
-      reqUrl.includes('/auth/verifyPasswordResetOtp');
-
-    // Reject unexpected HTML responses from an API request when unauthenticated.
+    // Reject unexpected HTML responses. Refresh is driven only by an HTTP 401.
     if (typeof resData === 'string' && (resData.includes('<!doctype') || resData.includes('<html') || resData.includes('accounts.google.com'))) {
-      if (!originalRequest?._retry && !isPublicAuthEndpoint && (tokenStorage.getRefreshToken() || tokenStorage.getAccessToken() || tokenStorage.getUser())) {
-        originalRequest._retry = true;
-        try {
-          const newAccessToken = await executeRefreshToken();
-          originalRequest.headers = originalRequest.headers || {};
-          if (typeof (originalRequest.headers as any).set === 'function') {
-            (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
-          }
-          originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-          originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
-          return apiClient(originalRequest);
-        } catch {}
-      }
-
-      const errorMsg = 'Authentication required. Please log in.';
+      const errorMsg = 'Unexpected HTML response received from the API.';
       return Promise.reject({
-        statusCode: 401,
+        statusCode: 502,
         message: errorMsg,
         errors: [errorMsg],
         data: null,
@@ -413,29 +404,6 @@ apiClient.interceptors.response.use(
     // Accept all 2xx HTTP and inner backend status codes (200, 201 Created, 202 Accepted, 204 No Content)
     if (resData && typeof resData === 'object' && 'statusCode' in resData) {
       const code = Number(resData.statusCode);
-
-      // Handle 401 / 403 returned inside a 200 envelope
-      if ((code === 401 || code === 403) && !originalRequest?._retry && !isPublicAuthEndpoint) {
-        if (tokenStorage.getRefreshToken() || tokenStorage.getAccessToken() || tokenStorage.getUser()) {
-          originalRequest._retry = true;
-          try {
-            const newAccessToken = await executeRefreshToken();
-            originalRequest.headers = originalRequest.headers || {};
-            if (typeof (originalRequest.headers as any).set === 'function') {
-              (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
-            }
-            originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-            originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
-            return apiClient(originalRequest);
-          } catch (refreshErr: any) {
-            return Promise.reject({
-              statusCode: 401,
-              message: 'Your session has expired. Please login again.',
-              errors: refreshErr?.response?.data?.errors || ['Session expired or unauthorized'],
-            });
-          }
-        }
-      }
 
       if (code < 200 || code >= 300) {
         const errorMsg = resData.message || (resData.errors && resData.errors[0]) || 'Server processing error';
@@ -468,9 +436,9 @@ apiClient.interceptors.response.use(
     }
 
     const status = error.response?.status;
-    const isAuthFailure = status === 401 || status === 403;
+    const isAuthFailure = status === 401;
 
-    // Check for HTTP 401 / 403 Unauthorized
+    // Only an HTTP 401 from a protected request is eligible for refresh.
     if (isAuthFailure && !originalRequest._retry) {
       // Exclude public auth and refresh endpoints from the refresh loop to prevent recursion
       if (
@@ -495,21 +463,10 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
 
-      // Do not attempt token refresh if there are no tokens in storage or user session
-      const storedRefreshToken = tokenStorage.getRefreshToken();
-      const storedAccessToken = tokenStorage.getAccessToken();
-      const storedUser = tokenStorage.getUser();
-
-      if (!storedRefreshToken && !storedAccessToken && !storedUser) {
-        return Promise.reject({
-          statusCode: 401,
-          message: error.response?.data?.message || 'Authentication required. Please log in.',
-          errors: error.response?.data?.errors || ['Authentication required'],
-        });
-      }
-
       try {
-        const newAccessToken = await executeRefreshToken();
+        const refreshedSession = await executeRefreshToken();
+        const newAccessToken = refreshedSession.accessToken || refreshedSession.token;
+        if (!newAccessToken) throw new Error('No access token returned from refresh endpoint');
         originalRequest.headers = originalRequest.headers || {};
         if (typeof (originalRequest.headers as any).set === 'function') {
           (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
@@ -518,10 +475,21 @@ apiClient.interceptors.response.use(
         originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
         return apiClient(originalRequest);
       } catch (refreshErr: any) {
+        const refreshStatus = refreshErr?.response?.status || 0;
+        const refreshBody = refreshErr?.response?.data;
+        const fallbackMessage = refreshStatus === 401
+          ? 'Your session has expired. Please log in again.'
+          : refreshErr?.message || 'Session refresh failed. Please try again.';
+        if (refreshBody && typeof refreshBody === 'object' && !Array.isArray(refreshBody)) {
+          return Promise.reject({
+            ...refreshBody,
+            statusCode: refreshBody.statusCode || refreshStatus,
+          });
+        }
         return Promise.reject({
-          statusCode: 401,
-          message: 'Your session has expired. Please login again.',
-          errors: refreshErr?.response?.data?.errors || ['Session expired or unauthorized'],
+          statusCode: refreshStatus,
+          message: fallbackMessage,
+          errors: [fallbackMessage],
         });
       }
     }

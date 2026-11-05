@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk, isAnyOf, type PayloadAction } from '@red
 import { authService, type LoginPayload } from '../../../services/authService';
 import type { AuthResponseData } from '../../../services/authService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { decodeJwtPayload, isJwtExpired, isTokenValid } from '../../../core/security/jwt';
+import { executeRefreshToken } from '../../../core/api/apiClient';
 
 export type AuthStatus = 'LOADING' | 'AUTHENTICATED' | 'UNAUTHENTICATED';
 
@@ -14,6 +14,7 @@ export interface UserProfile {
   email: string;
   role?: string;
   avatarUrl?: string;
+  isDarkTheme?: boolean;
 }
 
 export interface AuthState {
@@ -25,6 +26,11 @@ export interface AuthState {
   error: string | null;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'signup' | 'forgot';
+}
+
+interface RefreshFailure {
+  message: string;
+  statusCode: number;
 }
 
 const initialState: AuthState = {
@@ -62,35 +68,27 @@ const buildUserProfile = (
       'User',
     email: String(email || ''),
     role: raw?.role ?? fallback?.role,
+    isDarkTheme: raw?.isDarkTheme ?? fallback?.isDarkTheme,
   };
 };
 
-// Canonical session refresh thunk: calls POST /api/v1/auth/refresh with HttpOnly cookie or explicit token
+// Canonical session refresh thunk. The browser supplies the HttpOnly cookie.
 export const refreshSessionThunk = createAsyncThunk<
   AuthResponseData,
-  string | undefined,
-  { rejectValue: string }
+  void,
+  { rejectValue: RefreshFailure }
 >(
   'auth/refreshSession',
-  async (explicitToken, { rejectWithValue }) => {
-    const refreshEpoch = tokenStorage.getSessionEpoch();
+  async (_, { rejectWithValue }) => {
     try {
-      const res = await authService.refreshToken(explicitToken);
-      if (!res?.data) {
-        const currentToken = tokenStorage.getAccessToken();
-        if (tokenStorage.getSessionEpoch() === refreshEpoch && (!currentToken || !isTokenValid(currentToken))) {
-          tokenStorage.clearTokens();
-        }
-        return rejectWithValue('Session refresh returned no data');
-      }
-      return res.data;
+      return await executeRefreshToken();
     } catch (err: any) {
-      const currentToken = tokenStorage.getAccessToken();
-      if (tokenStorage.getSessionEpoch() === refreshEpoch && (!currentToken || !isTokenValid(currentToken))) {
-        tokenStorage.clearTokens();
-      }
-      const errMsg = err?.message || (err?.errors && err?.errors[0]) || 'Session refresh failed';
-      return rejectWithValue(errMsg);
+      const responseData = err?.response?.data;
+      const errMsg = responseData?.message || err?.message || (err?.errors && err?.errors[0]) || 'Session refresh failed';
+      return rejectWithValue({
+        message: errMsg,
+        statusCode: Number(err?.response?.status || responseData?.statusCode || 0),
+      });
     }
   }
 );
@@ -151,45 +149,14 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    initializeAuth: {
-      prepare() {
-        const token = tokenStorage.getAccessToken();
-        const savedUser = tokenStorage.getUser();
-        return {
-          payload: {
-            token,
-            savedUser,
-            hasValidToken: isTokenValid(token),
-            canRefresh: Boolean(tokenStorage.getRefreshToken() || savedUser),
-          },
-        };
-      },
-      reducer(
-        state,
-        action: PayloadAction<{
-          token: string | null;
-          savedUser: UserProfile | null;
-          hasValidToken: boolean;
-          canRefresh: boolean;
-        }>
-      ) {
-        const { token, savedUser, hasValidToken, canRefresh } = action.payload;
-        if (hasValidToken && token) {
-          state.status = 'AUTHENTICATED';
-          state.isAuthenticated = true;
-          state.user = savedUser;
-          state.token = token;
-          state.loading = false;
-        } else {
-          // Keep the startup gate closed while AppRouterLayout attempts a refresh.
-          // Clearing here would erase the refresh cookie before that request runs.
-          state.status = canRefresh ? 'LOADING' : 'UNAUTHENTICATED';
-          state.isAuthenticated = false;
-          state.user = canRefresh ? savedUser : null;
-          state.token = null;
-          state.loading = canRefresh;
-        }
-      },
+    initializeAuth(state) {
+      // Keep route guards closed until the unconditional startup refresh settles.
+      state.status = 'LOADING';
+      state.isAuthenticated = false;
+      state.loading = true;
+      state.error = null;
+      state.token = tokenStorage.getAccessToken();
+      state.user = tokenStorage.getUser();
     },
     setAuthenticatedSession(state, action: PayloadAction<{ token: string; user?: any }>) {
       state.status = 'AUTHENTICATED';
@@ -237,14 +204,12 @@ const authSlice = createSlice({
         state.token = action.payload?.accessToken || action.payload?.token || state.token;
         state.user = buildUserProfile(action.payload, state.user);
       })
-      .addCase(refreshSessionThunk.rejected, (state) => {
+      .addCase(refreshSessionThunk.rejected, (state, action) => {
         state.loading = false;
-        const currentToken = state.token;
-        const isStillValid = Boolean(currentToken && !isJwtExpired(decodeJwtPayload(currentToken)));
-        if (isStillValid) {
-          // Preserve valid active access token session! Do NOT purge or log user out.
+        state.error = action.payload?.message || null;
+        if (action.payload?.statusCode !== 401 && state.isAuthenticated && state.token) {
+          // A transient refresh failure is not proof that the current session is invalid.
           state.status = 'AUTHENTICATED';
-          state.isAuthenticated = true;
         } else {
           state.user = null;
           state.token = null;
@@ -271,7 +236,7 @@ const authSlice = createSlice({
       })
       // Logout - Unconditional token and state cleanup (F-035)
       .addMatcher(
-        isAnyOf(logoutUser.fulfilled, logoutUser.rejected),
+        isAnyOf(logoutUser.pending, logoutUser.fulfilled, logoutUser.rejected),
         (state) => {
           state.user = null;
           state.token = null;

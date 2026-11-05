@@ -14,8 +14,14 @@ export const Landing: React.FC = () => {
   const { isAuthModalOpen, user } = useAppSelector((state) => state.auth);
 
   const handleLogout = async () => {
-    await dispatch(logoutUser());
-    toast.success('Logged out successfully');
+    const request = dispatch(logoutUser());
+    navigate('/login', { replace: true });
+    const result = await request;
+    if (logoutUser.fulfilled.match(result)) {
+      toast.success('Logged out successfully');
+    } else {
+      toast.error('Signed out locally, but server logout could not be confirmed.');
+    }
   };
 
   // Interactive FAQ State (first item open by default matching reference)

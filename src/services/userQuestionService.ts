@@ -96,7 +96,7 @@ export const userQuestionService = {
     signal?: AbortSignal
   ): Promise<UserBookmarkQuestionResponse[]> {
     if (!userId) {
-      return [];
+      throw new Error('userId is required to retrieve bookmarks');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId), { signal });
     return extractArrayResponse<UserBookmarkQuestionResponse>(res, 'bookmarks');
@@ -111,7 +111,7 @@ export const userQuestionService = {
     signal?: AbortSignal
   ): Promise<UserSubmittedQuestionItem[]> {
     if (!userId) {
-      return [];
+      throw new Error('userId is required to retrieve solved questions');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
     return extractArrayResponse<UserSubmittedQuestionItem>(res, 'solved questions');
@@ -136,7 +136,7 @@ export const userQuestionService = {
     signal?: AbortSignal
   ): Promise<UserAttemptedQuestionItem[]> {
     if (!userId) {
-      return [];
+      throw new Error('userId is required to retrieve attempted questions');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
     return extractArrayResponse<UserAttemptedQuestionItem>(res, 'attempted questions');
@@ -152,7 +152,7 @@ export const userQuestionService = {
     signal?: AbortSignal
   ): Promise<UserQuestionSubmissionItem[]> {
     if (!userId || !questionId) {
-      return [];
+      throw new Error('Both userId and questionId are required to retrieve submissions');
     }
     const res: ApiResponse<unknown> = await apiClient.get(
       API_ENDPOINTS.USER.QUESTION_SUBMISSIONS(userId, questionId),

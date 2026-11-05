@@ -213,23 +213,18 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       );
     });
 
-    it('safely returns empty list if userId is missing for getBookmarkedQuestions', async () => {
-      const res = await userQuestionService.getBookmarkedQuestions(null);
-      assert.deepEqual(res, []);
+    it('rejects missing userId for getBookmarkedQuestions instead of fabricating an empty result', async () => {
+      await assert.rejects(() => userQuestionService.getBookmarkedQuestions(null), /userId is required/);
     });
 
-    it('safely returns empty list if userId is missing for progress endpoints', async () => {
-      const solved = await userQuestionService.getSolvedQuestions(undefined);
-      assert.deepEqual(solved, []);
-      const attempted = await userQuestionService.getAttemptedQuestions('');
-      assert.deepEqual(attempted, []);
+    it('rejects missing userId for progress endpoints', async () => {
+      await assert.rejects(() => userQuestionService.getSolvedQuestions(undefined), /userId is required/);
+      await assert.rejects(() => userQuestionService.getAttemptedQuestions(''), /userId is required/);
     });
 
-    it('safely returns empty list if userId or questionId is missing for getQuestionSubmissions', async () => {
-      const emptyUser = await userQuestionService.getQuestionSubmissions(null, 1);
-      assert.deepEqual(emptyUser, []);
-      const emptyQ = await userQuestionService.getQuestionSubmissions(63, null);
-      assert.deepEqual(emptyQ, []);
+    it('rejects missing userId or questionId for getQuestionSubmissions', async () => {
+      await assert.rejects(() => userQuestionService.getQuestionSubmissions(null, 1), /Both userId and questionId are required/);
+      await assert.rejects(() => userQuestionService.getQuestionSubmissions(63, null), /Both userId and questionId are required/);
     });
 
     it('rejects malformed successful list responses instead of reporting false empty states', async () => {
@@ -284,7 +279,11 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
           assert.equal(error.message, 'Question Fetch Unsuccessfull');
           return true;
         });
-        await problemService.getProblemById(3);
+        await assert.rejects(() => problemService.getProblemById(3), (error) => {
+          assert.equal(error.statusCode, 500);
+          assert.equal(error.message, 'Question Fetch Unsuccessfull');
+          return true;
+        });
         assert.deepEqual(getUrls, [
           API_ENDPOINTS.QUESTION.DETAILS(3),
           API_ENDPOINTS.QUESTION.DETAILS(3),
@@ -300,7 +299,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
-    it('rejects a title-only degraded detail payload and resolves the requested ID from the catalog', async () => {
+    it('rejects a title-only degraded detail payload without promoting a catalog row to detail data', async () => {
       const originalGet = apiClient.get;
       const originalPost = apiClient.post;
       let catalogCalls = 0;
@@ -331,9 +330,11 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       };
 
       try {
-        const result = await problemService.getProblemById(3);
-        assert.equal(Number(result.data?.id), 3);
-        assert.equal(catalogCalls, 1);
+        await assert.rejects(
+          () => problemService.getProblemById(3),
+          /Question #3 returned an invalid detail response/
+        );
+        assert.equal(catalogCalls, 0);
       } finally {
         apiClient.get = originalGet;
         apiClient.post = originalPost;

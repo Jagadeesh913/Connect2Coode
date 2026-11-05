@@ -26,7 +26,7 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 // Import real production security modules, types, and reducers
-const { decodeJwtPayload, isJwtAdmin, isJwtExpired } = await import('../../src/core/security/jwt.ts');
+const { decodeJwtPayload, isJwtAdmin, isJwtExpired, isAdminRole } = await import('../../src/core/security/jwt.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 const { isAuthSessionEvent } = await import('../../src/core/security/authSessionSync.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
@@ -43,18 +43,20 @@ function createMockJwt(payload) {
 describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
   // =========================================================================
-  // F-036: AdminRoute Role Check Relies on Signed JWT Claims (Not LocalStorage)
+  // F-036: Admin UI follows the role supplied by login/refresh responses
   // =========================================================================
   describe('F-036: Signed JWT Claims & Admin Authorization', () => {
-    it('admin gating, guest redirects, and navigation do not trust mutable cached role metadata', async () => {
+    it('admin gating, guest redirects, and navigation use response roles rather than decoded JWT claims', async () => {
       const fs = await import('node:fs');
       const adminRouteSource = fs.readFileSync('src/core/guards/AdminRoute.tsx', 'utf8');
       const guestRouteSource = fs.readFileSync('src/core/guards/GuestRoute.tsx', 'utf8');
       const navbarSource = fs.readFileSync('src/shared/components/ui/Navbar.tsx', 'utf8');
-      assert.match(adminRouteSource, /if \(!isJwtAdmin\(token\)\)/);
-      assert.match(guestRouteSource, /if \(isJwtAdmin\(token\)\)/);
-      assert.match(navbarSource, /isAdmin = isLoggedIn && isJwtAdmin\(token\)/);
-      assert.doesNotMatch(`${adminRouteSource}\n${guestRouteSource}\n${navbarSource}`, /isUserRoleAdmin|userRole\.includes\('ADMIN'\)|role\.includes\('ADMIN'\)/);
+      assert.match(adminRouteSource, /if \(!isAdminRole\(role\)\)/);
+      assert.match(guestRouteSource, /if \(isAdminRole\(role\)\)/);
+      assert.match(navbarSource, /isAdmin = isLoggedIn && isAdminRole\(currentUser\?\.role\)/);
+      assert.doesNotMatch(`${adminRouteSource}\n${guestRouteSource}\n${navbarSource}`, /isJwtAdmin/);
+      assert.equal(isAdminRole('ADMIN'), true);
+      assert.equal(isAdminRole('USER'), false);
     });
 
     it('accurately decodes claims from valid base64url JWT', () => {
@@ -228,6 +230,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       const nextState = authReducer(activeState, {
         type: refreshSessionThunk.rejected.type,
+        payload: { statusCode: 500, message: 'Temporary refresh failure' },
         error: { message: 'Refresh token invalid or expired' },
       });
 
@@ -237,7 +240,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.user?.id, 'user-42', 'User must not be cleared');
     });
 
-    it('CLEARS session if access token is expired when refreshSessionThunk is rejected', () => {
+    it('CLEARS session only when refresh returns HTTP 401', () => {
       const expiredToken = createMockJwt({
         sub: 'user-42',
         role: 'USER',
@@ -256,6 +259,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       const nextState = authReducer(expiredState, {
         type: refreshSessionThunk.rejected.type,
+        payload: { statusCode: 401, message: 'Refresh token invalid or expired' },
         error: { message: 'Refresh token invalid or expired' },
       });
 
@@ -264,17 +268,15 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.user, null, 'User must be cleared');
     });
 
-    it('keeps startup loading while an expired access token still has a refresh session', () => {
+    it('keeps startup loading until the unconditional cookie refresh settles', () => {
       const expiredToken = createMockJwt({
         sub: 'user-42',
         exp: Math.floor(Date.now() / 1000) - 60,
       });
       const originalGetAccessToken = tokenStorage.getAccessToken;
-      const originalGetRefreshToken = tokenStorage.getRefreshToken;
       const originalGetUser = tokenStorage.getUser;
 
       tokenStorage.getAccessToken = () => expiredToken;
-      tokenStorage.getRefreshToken = () => 'refresh-token';
       tokenStorage.getUser = () => ({ id: 'user-42', email: 'user@c2c.test' });
 
       const nextState = authReducer(undefined, initializeAuth());
@@ -284,7 +286,6 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.isAuthenticated, false);
 
       tokenStorage.getAccessToken = originalGetAccessToken;
-      tokenStorage.getRefreshToken = originalGetRefreshToken;
       tokenStorage.getUser = originalGetUser;
     });
 
@@ -302,7 +303,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
       const nextState = authReducer(currentState, {
         type: refreshSessionThunk.fulfilled.type,
-        payload: { token: 'new-token', refreshToken: 'new-refresh', id: 63, role: 'USER' },
+        payload: { token: 'new-token', id: 63, role: 'USER' },
       });
 
       assert.equal(nextState.token, 'new-token');
@@ -328,7 +329,7 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(isAuthSessionEvent({ type: 'logout' }), false);
     });
 
-    it('stores the typed User profile in the session cookie without mirroring it into web storage', () => {
+    it('stores access/profile state only in memory and never manages the refresh cookie', () => {
       // Mock browser persistence for the Node.js test environment.
       const memoryStore = new Map();
       const sessionMemoryStore = new Map();
@@ -386,16 +387,15 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       document.cookie = 'refreshToken=active-refresh; path=/';
       document.cookie = 'jwt=legacy-access; path=/';
       document.cookie = 'authToken=legacy-auth; path=/';
-      document.cookie = 'refresh_token=legacy-refresh; path=/';
       localStorage.setItem('c2c_jwt', 'legacy-access');
-      sessionStorage.setItem('refresh_token', 'legacy-refresh');
 
       const epochBeforeLogout = tokenStorage.getSessionEpoch();
       tokenStorage.clearTokens();
       assert.equal(tokenStorage.getUser(), null);
       assert.equal(tokenStorage.getAccessToken(), null);
-      assert.equal(tokenStorage.getRefreshToken(), null);
-      assert.equal(cookieStore.size, 0, 'Every current and legacy session cookie must be expired');
+      assert.equal(cookieStore.get('refreshToken'), 'active-refresh', 'Frontend must not mutate the backend-owned refresh cookie');
+      assert.equal(cookieStore.has('accessToken'), false, 'Legacy access cookies must be expired');
+      assert.equal(cookieStore.has('jwt'), false, 'Legacy access aliases must be expired');
       assert.equal(memoryStore.size, 0, 'Legacy localStorage credentials must be removed');
       assert.equal(sessionMemoryStore.size, 0, 'Legacy sessionStorage credentials must be removed');
       assert.equal(tokenStorage.getSessionEpoch(), epochBeforeLogout + 1);
@@ -413,29 +413,30 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       const fs = await import('node:fs');
       const authServiceSource = fs.readFileSync('src/services/authService.ts', 'utf8');
       const apiClientSource = fs.readFileSync('src/core/api/apiClient.ts', 'utf8');
-      const logoutBody = authServiceSource.match(/async logout\(\)[\s\S]*?return \{/u)?.[0] || '';
+      const logoutBody = authServiceSource.match(/async logout\(\)[\s\S]*?\n  \},/u)?.[0] || '';
 
       assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') >= 0);
       assert.ok(logoutBody.indexOf('tokenStorage.clearTokens()') < logoutBody.indexOf('apiClient.post'));
-      assert.match(authServiceSource, /getSessionEpoch\(\)[\s\S]*Authentication session changed while refresh was in progress/);
       assert.match(apiClientSource, /getSessionEpoch\(\)[\s\S]*Authentication session changed while refresh was in progress/);
       assert.match(apiClientSource, /reqUrl\.includes\('\/auth\/logout'\)/);
+      assert.match(logoutBody, /apiClient\.post\(API_ENDPOINTS\.AUTH\.LOGOUT, undefined/);
+      assert.doesNotMatch(logoutBody, /refreshToken/);
     });
 
-    it('invalidates older auth work before persisting a successful login and cleans empty refreshes', async () => {
+    it('invalidates older login work and routes every refresh through the shared lock', async () => {
       const fs = await import('node:fs');
       const authServiceSource = fs.readFileSync('src/services/authService.ts', 'utf8');
       const authSliceSource = fs.readFileSync('src/features/auth/redux/authSlice.ts', 'utf8');
+      const apiClientSource = fs.readFileSync('src/core/api/apiClient.ts', 'utf8');
       const loginBody = authServiceSource.match(/async login\(payload: LoginPayload\)[\s\S]*?return response;/u)?.[0] || '';
 
       assert.ok(loginBody.indexOf('tokenStorage.claimSessionOwnership()') >= 0);
       assert.ok(loginBody.indexOf('tokenStorage.claimSessionOwnership()') < loginBody.indexOf('apiClient.post'));
       assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") >= 0);
       assert.ok(loginBody.indexOf("tokenStorage.clearTokens({ broadcast: false })") < loginBody.indexOf('persistAuthSession'));
-      assert.match(
-        authSliceSource,
-        /const refreshEpoch = tokenStorage\.getSessionEpoch\(\)[\s\S]*?if \(!res\?\.data\) \{[\s\S]*?getSessionEpoch\(\) === refreshEpoch[\s\S]*?tokenStorage\.clearTokens\(\)[\s\S]*?catch[\s\S]*?getSessionEpoch\(\) === refreshEpoch[\s\S]*?tokenStorage\.clearTokens\(\)/
-      );
+      assert.match(authSliceSource, /return await executeRefreshToken\(\)/);
+      assert.match(apiClientSource, /let refreshTokenPromise: Promise<RefreshSessionData> \| null = null/);
+      assert.match(apiClientSource, /refreshStatus === 401[\s\S]*tokenStorage\.clearTokens\(\)/);
     });
 
     it('claims auth ownership without clearing the active session', () => {

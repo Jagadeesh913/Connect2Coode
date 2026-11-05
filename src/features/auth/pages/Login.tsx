@@ -13,8 +13,7 @@ import { authService } from '../../../services/authService';
 import { toast } from 'react-hot-toast';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
-import { tokenStorage } from '../../../core/security/tokenStorage';
-import { isJwtAdmin } from '../../../core/security/jwt';
+import { isAdminRole, getSafeRedirectUrl } from '../../../core/security/jwt';
 
 import {
   loginSchema,
@@ -169,8 +168,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         const userName = userObj?.firstName || userObj?.fullName || 'User';
         toast.success(`Welcome ${userName}`);
 
-        const token = userObj?.accessToken || userObj?.token || tokenStorage.getAccessToken();
-        const isAdmin = isJwtAdmin(token);
+        const isAdmin = isAdminRole(userObj?.user?.role || userObj?.role);
 
         if (onCloseModal) {
           onCloseModal();
@@ -201,12 +199,12 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
           sessionStorage.removeItem('post_auth_redirect');
         } catch {}
 
+        const safeDestination = getSafeRedirectUrl(targetUrl);
+
         if (isAdmin) {
-          navigate(targetUrl?.startsWith('/admin') ? targetUrl : '/admin/dashboard', { replace: true });
-        } else if (targetUrl && targetUrl !== '/login' && targetUrl !== '/signup') {
-          navigate(targetUrl, { replace: true });
+          navigate(safeDestination.startsWith('/admin') ? safeDestination : '/admin/dashboard', { replace: true });
         } else {
-          navigate('/practice', { replace: true });
+          navigate(safeDestination.startsWith('/admin') ? '/practice' : safeDestination, { replace: true });
         }
       } else {
         toast.error(getActionableErrorMessage(result.payload, 'Invalid email or password. Please verify and try again.'));

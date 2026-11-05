@@ -54,11 +54,9 @@ export const questionService = {
         return valid.map((tc, idx) => ({
           ...tc,
           displayOrder: tc.displayOrder || idx + 1,
-          typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',
-          typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
-          typeRefName:
-            tc.typeRefName ||
-            (tc.isHidden ? 'Hidden Evaluation Test Case' : 'Visible Sample Test Case'),
+          typeRefGroupCode: tc.typeRefGroupCode || '',
+          typeRefCode: tc.typeRefCode || '',
+          typeRefName: tc.typeRefName || '',
         }));
       }
     }

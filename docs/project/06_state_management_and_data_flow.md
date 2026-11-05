@@ -35,9 +35,10 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Key Thunks**:
   - `loginUser`: Authenticates credentials with `POST /auth/login`, syncs `tokenStorage`.
   - `refreshSessionThunk`: Proactively refreshes token with single-flight locking.
-  - `logoutUser`: Clears server session and unsets all cookies/storage.
+  - `logoutUser`: Clears access/profile memory and every protected Redux cache on `pending`, redirects to login, and reports the real bodyless backend logout result.
 - **Bootstrap behavior**: If the access token is expired but refresh-session evidence exists, `initializeAuth` leaves the state at `LOADING` for `AppRouterLayout`'s refresh attempt instead of deleting the refresh session before it runs.
-- **Refresh response shape**: `/auth/refresh` may return only token/role/ID fields. The service and reducer merge this response with the current profile so email/name are not erased. Refresh-token storage is owned by `tokenStorage`, not duplicated in Redux.
+- **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same single-flight coordinator. The response token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
+- **Authorization presentation**: Admin routing/navigation uses only the role supplied by login/refresh response data. JWT payload claims are not decoded for authorization decisions.
 - **Reducer purity**: Cookie reads occur in the `initializeAuth` action prepare callback and token writes occur in `authService`; reducers only apply action payloads.
 
 ### 2. `problemSlice` ([`src/features/problems/redux/problemSlice.ts`](../../src/features/problems/redux/problemSlice.ts))
@@ -121,10 +122,8 @@ graph LR
         ReduxMem[Redux Slices]
     end
 
-    subgraph CookieJar [Browser Cookies]
-        CookieAccess[accessToken: maxAge 900s]
-        CookieRefresh[refreshToken: maxAge 7d]
-        CookieUser[user: maxAge 7d]
+    subgraph BackendCookie [Backend-Owned Cookie]
+        CookieRefresh[refreshToken: HttpOnly; unreadable by JS]
     end
 
     subgraph ScopedStorage [userScopedStorage]
@@ -133,7 +132,7 @@ graph LR
     end
 ```
 
-Credentials and user-profile metadata are intentionally excluded from `localStorage` and `sessionStorage`. `tokenStorage` uses in-memory values plus the existing cookie contract; legacy web-storage copies are deleted during session writes and logout. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained user-scoped storage is limited to manual/offline progress, COMPANY/APTITUDE bookmark fallbacks, and the active identity's theme preference. `ProtectedRoute` stores `post_auth_redirect` separately in `sessionStorage` for the current tab. Unsupported profile notification and interface-language preferences are not persisted.
+Access credentials and session profile metadata are held only in per-tab memory/Redux. `tokenStorage` never reads or writes the HttpOnly refresh cookie; it only removes obsolete JavaScript-readable access/profile aliases left by older builds. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained user-scoped storage is limited to manual/offline progress, COMPANY/APTITUDE bookmark fallbacks, and the active identity's theme preference. `ProtectedRoute` stores `post_auth_redirect` separately in `sessionStorage` for the current tab.
 
 ### `userScopedStorage` Architecture
 Browser storage is shared across users on the same machine. To eliminate privacy leaks when a user logs out and another logs in:

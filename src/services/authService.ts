@@ -11,9 +11,9 @@ export interface AuthResponseData {
   fullName?: string;
   email?: string;
   role?: string;
+  isDarkTheme?: boolean;
   token?: string;
   accessToken?: string;
-  refreshToken?: string;
   user?: {
     id?: number | string;
     firstName?: string;
@@ -21,6 +21,7 @@ export interface AuthResponseData {
     fullName?: string;
     email?: string;
     role?: string;
+    isDarkTheme?: boolean;
   };
 }
 
@@ -46,7 +47,6 @@ export interface VerifyOtpPayload {
 const persistAuthSession = (data: AuthResponseData): void => {
   const accessToken = data.accessToken || data.token;
   if (accessToken) tokenStorage.setAccessToken(accessToken);
-  if (data.refreshToken) tokenStorage.setRefreshToken(data.refreshToken);
 
   const currentUser = tokenStorage.getUser();
   const responseUser = data.user || data;
@@ -64,6 +64,7 @@ const persistAuthSession = (data: AuthResponseData): void => {
       lastName: responseUser.lastName ?? currentUser?.lastName,
       fullName: responseUser.fullName ?? currentUser?.fullName,
       role: responseUser.role ?? currentUser?.role,
+      isDarkTheme: responseUser.isDarkTheme ?? currentUser?.isDarkTheme,
     });
   }
 };
@@ -107,51 +108,13 @@ export const authService = {
   // Logout: POST /api/v1/auth/logout with credentials
   // Backend invalidates session and clears HttpOnly refresh cookie via Set-Cookie
   async logout(): Promise<ApiResponse<string>> {
-    const token = tokenStorage.getRefreshToken();
     // Local logout must be immediate and must invalidate any in-flight login or
     // refresh response before waiting on the network.
     tokenStorage.clearTokens();
-    try {
-      const payload = token ? { refreshToken: token } : {};
-      await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, payload, {
-        withCredentials: true,
-        timeout: 30_000,
-      });
-    } catch (e) {
-      console.warn('Logout API warning:', e);
-    }
-    return {
-      statusCode: 200,
-      message: 'Logout Successful',
-      data: 'User Logged Out Successfully',
-      errors: null,
-      timestamp: new Date().toISOString(),
-    };
-  },
-
-  // Refresh Token: POST /api/v1/auth/refresh with credentials
-  // Browser automatically transmits HttpOnly refreshToken cookie to backend origin
-  async refreshToken(explicitRefreshToken?: string): Promise<ApiResponse<AuthResponseData>> {
-    const sessionEpoch = tokenStorage.getSessionEpoch();
-    const token = explicitRefreshToken || tokenStorage.getRefreshToken();
-    const payload = token ? { refreshToken: token } : {};
-
-    const response: ApiResponse<AuthResponseData> = await apiClient.post(
-      API_ENDPOINTS.AUTH.REFRESH,
-      payload,
-      { withCredentials: true, timeout: 60000 }
-    );
-    if (response?.data) {
-      if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
-        throw new Error('Authentication session changed while refresh was in progress');
-      }
-      persistAuthSession({
-        ...response.data,
-        refreshToken: response.data.refreshToken || token || undefined,
-      });
-      publishAuthSessionEvent('session-updated');
-    }
-    return response;
+    return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, undefined, {
+      withCredentials: true,
+      timeout: 30_000,
+    });
   },
 
   // Generate Password Reset OTP: POST /api/v1/auth/generatePasswordResetOtp

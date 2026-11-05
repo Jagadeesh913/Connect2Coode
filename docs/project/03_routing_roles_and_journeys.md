@@ -96,8 +96,8 @@ The application distinguishes between two primary user roles:
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
 | **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Checks `isAuthenticated && isTokenValid(token)`. If loading, renders `<PageLoading />`. Saves attempted destination in `sessionStorage.getItem('post_auth_redirect')`. | Redirects to `/login` |
-| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Verifies user is unauthenticated. If already logged in, signed JWT claims alone select `/admin/dashboard`; all other users go to `/practice`. | Redirects to `/practice` or `/admin/dashboard` |
-| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Evaluates `isAuthed`. If true, requires `isJwtAdmin(token)` from signed token claims (`role`, `Role`, `roles`, `authorities`, `scope`). Cached user/profile role strings never authorize an admin route. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
+| **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Waits for startup refresh, then uses the backend response `role` to select `/admin/dashboard` or `/practice`. JWT claims are not decoded for routing. | Redirects to `/practice` or `/admin/dashboard` |
+| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Requires authenticated Redux state and an exact `ADMIN`/`ROLE_ADMIN` value supplied by the latest login/refresh response. Backend authorization remains authoritative. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
 
 ---
 
@@ -138,7 +138,7 @@ The application distinguishes between two primary user roles:
 4. **Instant Feedback**: User checks explanation or submits mock test to calculate percentile and review incorrect choices.
 
 ### Journey 5: Administrator Resource Authoring
-1. **Admin Authentication**: Admin logs in at `/login`. `AdminRoute` verifies `ADMIN` role from JWT claims and renders `AdminLayout`.
+1. **Admin Authentication**: Admin logs in at `/login`. `AdminRoute` verifies the backend response role and renders `AdminLayout`; it never derives the role from decoded JWT claims.
 2. **Question CRUD**: At `/admin/questions`, admin clicks "Add Question". Enters problem title, description, constraints, and test cases (input, expected output, hidden flag). Dispatches `POST /api/v1/question` and `POST /api/v1/question/{id}/testCases`.
 3. **MCQ CRUD**: At `/admin/mcqs`, admin creates MCQ. Marks correct option explicitly. Dispatches `POST /api/v1/admin/mcq`.
 4. **Institution Governance**: At `/admin/institutions`, admin reviews colleges, edits AISHE codes, and toggles active status via `PATCH /api/v1/admin/institutions/{id}/status`.
