@@ -101,7 +101,10 @@ export const renderPrerenderedHtml = (template, route) => {
   html = replaceHeadTag(html, 'name="twitter:description"', `<meta name="twitter:description" content="${escapeHtml(route.description)}" data-c2c-managed="true" />`);
   html = replaceHeadTag(html, 'name="twitter:image"', `<meta name="twitter:image" content="${SOCIAL_IMAGE_URL}" data-c2c-managed="true" />`);
   html = html.replace(/<link[^>]+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${escapeHtml(canonical)}" data-c2c-managed="true" />`);
-  html = html.replace('<div id="root"></div>', `<div id="root">${renderPrerenderedContent(route)}\n    </div>`);
+  html = html.replace(
+    '<div id="root"></div>',
+    `<div id="root"></div>\n    <noscript data-c2c-prerender="true">${renderPrerenderedContent(route)}</noscript>`
+  );
   if (!html.includes('data-c2c-prerender="true"')) throw new Error('Built HTML is missing the empty React root expected by the prerenderer.');
   return html;
 };
@@ -122,9 +125,10 @@ const renderNonIndexableShell = (template, { title, heading, description }) => {
   html = replaceHeadTag(html, 'name="twitter:description"', `<meta name="twitter:description" content="${escapeHtml(description)}" data-c2c-managed="true" />`);
   html = html.replace(/\s*<link[^>]+rel="canonical"[^>]*>/i, '');
   html = html.replace(/\s*<meta[^>]+property="og:url"[^>]*>/i, '');
-  html = html.replace('<div id="root"></div>', `<div id="root">
-      <main data-c2c-prerender="true"><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(description)}</p></main>
-    </div>`);
+  html = html.replace(
+    '<div id="root"></div>',
+    `<div id="root"></div>\n    <noscript data-c2c-prerender="true"><main><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(description)}</p></main></noscript>`
+  );
   return html;
 };
 

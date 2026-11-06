@@ -114,7 +114,6 @@ describe('shared UX interaction contracts', () => {
   it('problem list URL transitions dispatch before paint to prevent one-frame stale rows', async () => {
     for (const path of [
       'src/features/problems/pages/PracticePage.tsx',
-      'src/features/problems/pages/ProblemList.tsx',
     ]) {
       const source = await readSource(path);
       assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*?dispatch\([\s\S]*?fetchProblems\(/);
@@ -296,6 +295,10 @@ describe('shared UX interaction contracts', () => {
   it('ships deployment-level browser hardening headers', async () => {
     const deploymentConfig = await readSource('vercel.json');
     assert.match(deploymentConfig, /Content-Security-Policy/);
+    assert.match(deploymentConfig, /default-src 'self'/);
+    assert.match(deploymentConfig, /script-src 'self'/);
+    assert.match(deploymentConfig, /connect-src 'self' https:\/\/api\.connect2code\.in/);
+    assert.match(deploymentConfig, /worker-src 'self' blob:/);
     assert.match(deploymentConfig, /frame-ancestors 'none'/);
     assert.match(deploymentConfig, /display-capture=\(\)/);
     assert.match(deploymentConfig, /X-Frame-Options/);
@@ -310,6 +313,32 @@ describe('shared UX interaction contracts', () => {
     assert.match(dsaSheetSource, /actionText="Sign In"/);
     assert.match(dsaSheetSource, /onAction=\{\(\) => dispatch\(openAuthModal\(\{ mode: 'login' \}\)\)\}/);
     assert.match(dsaSheetSource, /icon=\{<Lock className="w-12 h-12 text-blue-500" \/>\}/);
+  });
+
+  it('gates feature routes before their API-owning page components mount', async () => {
+    const routes = await readSource('src/routes/appRoutes.tsx');
+    const gate = await readSource('src/features/auth/components/AuthenticatedFeatureGate.tsx');
+
+    for (const path of ['/practice', '/problems/:slug', '/dsa-sheet', '/companies', '/aptitude']) {
+      const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      assert.match(routes, new RegExp(`path: '${escapedPath}', element: requireFeatureSession`));
+    }
+    assert.match(gate, /status === 'LOADING'/);
+    assert.match(gate, /status === 'RECOVERY_REQUIRED'/);
+    assert.match(gate, /if \(!isAuthenticated\)/);
+    assert.match(gate, /<EmptyState/);
+    assert.match(gate, /actionText="Sign In"/);
+    assert.match(gate, /openAuthModal\(\{ mode: 'login' \}\)/);
+    assert.match(gate, /return <>\{children\}<\/>/);
+  });
+
+  it('positions global toast notifications below the responsive sticky navbar', async () => {
+    const app = await readSource('src/App.tsx');
+    const styles = await readSource('src/index.css');
+    assert.match(app, /top: 'calc\(var\(--c2c-navbar-height\) \+ 0\.75rem \+ env\(safe-area-inset-top, 0px\)\)'/);
+    assert.match(app, /zIndex: 60/);
+    assert.match(styles, /--c2c-navbar-height: 4rem/);
+    assert.match(styles, /@media \(min-width: 640px\)[\s\S]*?--c2c-navbar-height: 5rem/);
   });
 });
 

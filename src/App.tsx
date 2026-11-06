@@ -33,6 +33,10 @@ export const App: React.FC = () => {
         <Toaster
           position="top-right"
           gutter={10}
+          containerStyle={{
+            top: 'calc(var(--c2c-navbar-height) + 0.75rem + env(safe-area-inset-top, 0px))',
+            zIndex: 60,
+          }}
           toastOptions={{
             duration: 4000,
             className: 'c2c-toast',

@@ -3,10 +3,7 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Problem, ProblemFilter, QuestionListItem, QuestionListRequest } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
-import {
-  fetchResilientQuestionPage,
-  VERIFIED_READABLE_QUESTION_COUNT,
-} from './admin/adminQuestionService';
+import { fetchQuestionPage } from './admin/adminQuestionService';
 
 
 export type ProblemItem = Problem;
@@ -62,7 +59,7 @@ export const problemService = {
     }
 
     try {
-      const res = await fetchResilientQuestionPage(payload, signal);
+      const res = await fetchQuestionPage(payload, signal);
       const page = res.data;
       if (!page || !Array.isArray(page.content)) {
         throw new Error('Unexpected problems response format');
@@ -128,51 +125,28 @@ export const problemService = {
 
     // Catalog lookup is used only to resolve legacy title slugs to a numeric route.
     try {
-      const pageNumber = isNumericId ? Math.max(0, Math.floor((numericId - 1) / 50)) : 0;
-
-      const payload: QuestionListRequest = {
-        level: [],
-        companies: [],
-        topic: [],
-        searchText: null,
-        pageRequest: {
-          pageNumber,
-          pageSize: VERIFIED_READABLE_QUESTION_COUNT,
-          sortBy: 'id',
-          sortDirection: 'ASC' as const,
-        },
-      };
-
-      const resList = await fetchResilientQuestionPage(payload, signal);
-      const items = resList.data.content;
-
       const targetStr = String(id).trim().toLowerCase();
-      let matched = items.find((item: QuestionListItem) => {
-        const itemId = String(item.id ?? '').trim().toLowerCase();
-        const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-        return itemId === targetStr || itemTitle === targetStr;
-      });
+      const pageSize = 50;
+      let pageNumber = 0;
+      let totalPages = 1;
+      let matched: QuestionListItem | undefined;
 
-      if (!matched && pageNumber !== 0) {
-        const res0 = await fetchResilientQuestionPage(
-          {
-            level: null,
-            companies: null,
-            topic: null,
-            searchText: null,
-            pageRequest: { pageNumber: 0, pageSize: VERIFIED_READABLE_QUESTION_COUNT, sortBy: 'id', sortDirection: 'ASC' as const },
-          },
-          signal
-        );
-
-        const items0 = res0.data.content;
-
-        matched = items0.find((item: QuestionListItem) => {
+      do {
+        const response = await fetchQuestionPage({
+          level: null,
+          companies: null,
+          topic: null,
+          searchText: null,
+          pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' as const },
+        }, signal);
+        totalPages = Math.max(1, Number(response.data.totalPages) || 1);
+        matched = response.data.content.find((item: QuestionListItem) => {
           const itemId = String(item.id ?? '').trim().toLowerCase();
           const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
           return itemId === targetStr || itemTitle === targetStr;
         });
-      }
+        pageNumber += 1;
+      } while (!matched && pageNumber < totalPages);
 
       if (matched) {
         // GET /question/{id}/testCases is currently rejected with 401 by the

@@ -6,7 +6,11 @@ import type {
   InternalAxiosRequestConfig,
 } from 'axios';
 import { tokenStorage } from '../security/tokenStorage';
-import { requireAuthSessionData, type AuthSessionData } from '../security/authContract';
+import {
+  getUserFromAuthSession,
+  requireAuthSessionData,
+  type AuthSessionData,
+} from '../security/authContract';
 import { withCrossTabRefreshLock } from '../security/refreshCoordinator';
 import { userScopedStorage } from '../storage/userScopedStorage';
 
@@ -142,7 +146,7 @@ export const apiClient = axios.create({
   },
 }) as UnwrappedApiClient;
 
-type AuthListener = (token: string, data: any) => void;
+type AuthListener = (token: string, data: AuthSessionData) => void;
 type AuthFailureListener = () => void;
 
 const authListeners: AuthListener[] = [];
@@ -164,7 +168,7 @@ export const registerAuthFailureListener = (listener: AuthFailureListener) => {
   };
 };
 
-function notifyAuthListeners(token: string, data: any) {
+function notifyAuthListeners(token: string, data: AuthSessionData) {
   authListeners.forEach((fn) => {
     try { fn(token, data); } catch {}
   });
@@ -184,14 +188,16 @@ function clearInvalidSession(): void {
 
 // One promise deduplicates this tab; the coordinator serializes rotation across tabs.
 let refreshTokenPromise: Promise<AuthSessionData> | null = null;
+let refreshTokenPromiseEpoch: number | null = null;
 
 export const executeRefreshToken = async (): Promise<AuthSessionData> => {
-  if (refreshTokenPromise) {
+  const requestedEpoch = tokenStorage.getSessionEpoch();
+  if (refreshTokenPromise && refreshTokenPromiseEpoch === requestedEpoch) {
     return refreshTokenPromise;
   }
 
-  refreshTokenPromise = withCrossTabRefreshLock(async () => {
-    const sessionEpoch = tokenStorage.getSessionEpoch();
+  const nextPromise = withCrossTabRefreshLock(async () => {
+    const sessionEpoch = requestedEpoch;
     try {
       const refreshUrl = `${BASE_URL}/auth/refresh`;
 
@@ -215,7 +221,7 @@ export const executeRefreshToken = async (): Promise<AuthSessionData> => {
         throw new Error('Authentication session changed while refresh was in progress');
       }
       tokenStorage.setAccessToken(tokenData.token);
-      tokenStorage.setUser(tokenData.user || tokenData);
+      tokenStorage.setUser(getUserFromAuthSession(tokenData));
       notifyAuthListeners(tokenData.token, tokenData);
       return tokenData;
     } catch (refreshErr) {
@@ -225,11 +231,17 @@ export const executeRefreshToken = async (): Promise<AuthSessionData> => {
       }
       throw refreshErr;
     }
-  }).finally(() => {
-    refreshTokenPromise = null;
   });
+  refreshTokenPromise = nextPromise;
+  refreshTokenPromiseEpoch = requestedEpoch;
+  void nextPromise.finally(() => {
+    if (refreshTokenPromise === nextPromise) {
+      refreshTokenPromise = null;
+      refreshTokenPromiseEpoch = null;
+    }
+  }).catch(() => {});
 
-  return refreshTokenPromise;
+  return nextPromise;
 };
 
 const PUBLIC_AUTH_PATHS = [

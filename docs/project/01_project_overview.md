@@ -31,7 +31,7 @@ The application combines:
 | **Form Resolver** | `@hookform/resolvers` | `^5.5.7` | Connects Zod schemas to React Hook Form on auth, profile, language, institution, company, and question forms. |
 | **Animation** | Framer Motion | `^12.43.0` | Scoped to the shared admin modal and honors reduced-motion preference. |
 | **Icons** | Lucide React | `^1.28.0` | Tree-shakeable icons for shared, admin, profile, and modernized feature UI. Legacy Font Awesome classes remain where replacing them would be a design rewrite. |
-| **Notifications** | React Hot Toast | `^2.6.0` | One application-level toaster and mutation/error feedback. |
+| **Notifications** | React Hot Toast | `^2.6.0` | One application-level toaster with a responsive navbar/safe-area offset and mutation/error feedback. |
 | **Linting** | Oxlint | `^1.75.0` | High-performance Rust-based linter executing 92 rules in < 50ms. |
 | **Testing** | Node.js Test Runner| Built-in | Fast ESM-native tests (`node:test`, `node:assert/strict`) in `scripts/tests/`. |
 
@@ -84,6 +84,7 @@ graph TB
 ### Fully Verified Core Capabilities
 - **Authentication Lifecycle**: Email/password login, student signup, password reset with OTP, Google OAuth2 popup/callback, startup restoration, HTTP-401-driven refresh, same-tab deduplication, and Web-Locks-based cross-tab serialization. Browsers without Web Locks fail refresh safely instead of issuing an uncoordinated rotating-cookie request; live deployed multi-tab verification remains pending.
 - **API Transport Hardening**: Explicit public/protected request policy, bearer-header authentication, strict login/refresh identity validation, recursive elimination of legacy body token fields, and query-parameter token leak prevention.
+- **Authenticated Learning Gate**: Problems, problem workspaces, DSA sheets, Company Prep, and Aptitude retain stable navigable URLs but do not mount their API-owning page trees until startup session restoration succeeds. Signed-out visitors receive one shared sign-in state; only the required cookie-backed auth refresh may run before that decision.
 - **Problem Catalog & Filters**: Multi-faceted filtering by difficulty, topic, recruiter company, platform (LeetCode, GFG, HackerRank), search query, and pagination.
 - **API-Driven DSA Sheets**: `/dsa-sheet` lists active learning sheets, ordered top-level sections, and lazily loaded linked questions with search and solved-state indicators. `/admin/dsa-sheets` creates sheets/sections and manages question associations through the supplied learning-sheet endpoints.
 - **Monaco Code Runner**: Code execution uses the `/language` API's table-ID-to-reference-ID mapping, automatic Java class sanitization (`Main`), and sample test case execution. The client does not guess compiler IDs when the catalog is unavailable.

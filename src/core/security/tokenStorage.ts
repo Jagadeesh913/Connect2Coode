@@ -162,6 +162,7 @@ export const tokenStorage = {
 
   /** Discards this tab's volatile session before cookie-backed restoration. */
   discardInMemorySession(): void {
+    sessionEpoch += 1;
     inMemoryAccessToken = null;
     inMemoryUser = null;
   },

@@ -20,7 +20,7 @@ export const AppSettings: React.FC = () => {
             Platform & API Integration Settings
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-            Inspect your architecture status, API transportation layer, and backend readiness.
+            Inspect the configured API transport and authentication architecture.
           </p>
         </div>
 
@@ -33,12 +33,12 @@ export const AppSettings: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">Data Source Mode</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Connected to Java Spring Boot REST APIs
+                  Configured for the Java Spring Boot REST API
                 </p>
               </div>
             </div>
             <span className="text-xs font-mono font-bold px-3 py-1 bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 rounded-full">
-              Live Spring Boot REST API
+              Configured endpoint
             </span>
           </div>
 
@@ -62,8 +62,8 @@ export const AppSettings: React.FC = () => {
           <div className="p-4 bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/40 rounded-2xl text-xs text-slate-700 dark:text-slate-300 flex items-start gap-3">
             <i className="fa-solid fa-shield-halved text-blue-600 dark:text-blue-400 text-lg shrink-0 mt-0.5"></i>
             <div>
-              <span className="font-bold text-slate-900 dark:text-white block mb-0.5">Live API Connection Active</span>
-              All data requests are communicated directly with the live Java Spring Boot backend server.
+              <span className="font-bold text-slate-900 dark:text-white block mb-0.5">API transport configured</span>
+              This page shows configuration only. Availability is reported by each real request and is not inferred from the URL.
             </div>
           </div>
         </div>

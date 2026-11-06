@@ -113,10 +113,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
     try {
       const res = await adminCompanyService.getCompanyProblems(company.id);
       if (epoch !== readEpoch.current) return;
-      const list = res?.data || (Array.isArray(res) ? res : []);
-      if (Array.isArray(list)) {
-        setProblems(list);
-      }
+      setProblems(res.data);
     } catch {
       if (epoch === readEpoch.current) setProblemsError('Unable to load tagged questions.');
     } finally {
@@ -127,16 +124,33 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   // Load recruitment exams
   const fetchExams = useCallback(async () => {
     if (!company?.id) return;
+    const companyId = company.id;
     const epoch = readEpoch.current;
     setExamsLoading(true);
     setExamsError(null);
     try {
-      const res = await companyService.getCompanyExamsList(company.id, {
+      const firstPage = await companyService.getCompanyExamsList(companyId, {
         pageSize: 50,
         pageNumber: 0,
       });
+      const remainingPages = Array.from(
+        { length: Math.max(0, firstPage.data.totalPages - 1) },
+        (_, index) => index + 1
+      );
+      const additionalPages = await Promise.all(
+        remainingPages.map((pageNumber) =>
+          companyService.getCompanyExamsList(companyId, { pageSize: 50, pageNumber })
+        )
+      );
       if (epoch !== readEpoch.current) return;
-      const content = res?.data?.content || (Array.isArray(res?.data) ? res.data : []);
+      const seen = new Set<number>();
+      const content = [firstPage, ...additionalPages]
+        .flatMap((page) => page.data.content)
+        .filter((exam) => {
+          if (seen.has(exam.id)) return false;
+          seen.add(exam.id);
+          return true;
+        });
       setExams(content);
     } catch {
       if (epoch === readEpoch.current) setExamsError('Unable to load company exams.');

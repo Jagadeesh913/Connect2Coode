@@ -172,6 +172,10 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
                 setValue('college', val, { shouldValidate: true, shouldDirty: true });
                 if (opt?.id) {
                   setValue('collegeId', String(opt.id), { shouldDirty: true });
+                } else {
+                  // Free-text edits invalidate the previously selected institution;
+                  // the backend receives the typed name without a mismatched ID.
+                  setValue('collegeId', '', { shouldValidate: true, shouldDirty: true });
                 }
               }}
               onSelectOption={(opt) => {

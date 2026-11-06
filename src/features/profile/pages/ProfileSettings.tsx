@@ -18,6 +18,8 @@ import { tokenStorage } from '../../../core/security/tokenStorage';
 import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
+import type { AcademicDetailsFormData, PersonalInfoFormData } from '../../../core/validation';
+import { normalizeCollegeId } from '../utils/academicProfile';
 
 // Lucide Icons
 import {
@@ -56,6 +58,11 @@ export const UserProfilePage: React.FC = () => {
 
   // Institution display enrichment remains page-local; academic data lives in Redux.
   const [institution, setInstitution] = useState<Institution | null>(null);
+
+  useEffect(() => {
+    // Page-local enrichment must never survive an account switch.
+    setInstitution(null);
+  }, [authUser?.id, authUser?.email]);
 
   const {
     solvedItems,
@@ -159,7 +166,11 @@ export const UserProfilePage: React.FC = () => {
   // Auto-enrich institution metadata from real API if college is present
   useEffect(() => {
     const collegeName = userInfo?.college || userInfo?.collegeName;
-    if (!collegeName || (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase())) return;
+    if (!collegeName) {
+      setInstitution(null);
+      return;
+    }
+    if (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase()) return;
 
     const controller = new AbortController();
     institutionService.searchInstitutions(collegeName, controller.signal).then((res) => {
@@ -169,8 +180,8 @@ export const UserProfilePage: React.FC = () => {
         const cleanedQuery = collegeName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const match = list.find((item) => {
           const itemClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return itemClean.includes(cleanedQuery) || cleanedQuery.includes(itemClean);
-        }) || list[0];
+          return itemClean === cleanedQuery;
+        });
 
         if (match) {
           setInstitution({
@@ -182,9 +193,14 @@ export const UserProfilePage: React.FC = () => {
             isActive: true,
             aisheCode: '',
           });
+        } else {
+          // A fuzzy search result is not proof of an institution association.
+          setInstitution(null);
         }
       }
-    }).catch(() => {});
+    }).catch(() => {
+      if (!controller.signal.aborted) setInstitution(null);
+    });
 
     return () => {
       controller.abort();
@@ -192,7 +208,7 @@ export const UserProfilePage: React.FC = () => {
   }, [userInfo?.college, userInfo?.collegeName, institution?.name]);
 
   // Handle Personal Info Submit
-  const handleSavePersonalInfo = async (data: any) => {
+  const handleSavePersonalInfo = async (data: PersonalInfoFormData) => {
     if (!effectiveUserId) {
       toast.error('Please log in to save personal information.');
       dispatch(openAuthModal({ mode: 'login' }));
@@ -252,7 +268,7 @@ export const UserProfilePage: React.FC = () => {
   };
 
   // Handle Academic Info Submit -> POST /api/v1/userInfo/{userId}
-  const handleSaveAcademic = async (data: any) => {
+  const handleSaveAcademic = async (data: AcademicDetailsFormData) => {
     if (!effectiveUserId) {
       toast.error('Please log in to save academic details.');
       dispatch(openAuthModal({ mode: 'login' }));
@@ -263,12 +279,9 @@ export const UserProfilePage: React.FC = () => {
     mutationPendingRef.current = true;
     setSubmitting(true);
     try {
-      const resolvedCollegeId =
-        data.collegeId !== undefined && data.collegeId !== null && data.collegeId !== ''
-          ? String(data.collegeId)
-          : userInfo?.collegeId !== undefined && userInfo?.collegeId !== null
-          ? String(userInfo.collegeId)
-          : null;
+      // The submitted form is authoritative. A free-text college edit clears
+      // collegeId in the modal and must not resurrect the previous institution.
+      const resolvedCollegeId = normalizeCollegeId(data.collegeId);
 
       const payload: SaveUserInfoPayload = {
         id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
@@ -292,15 +305,15 @@ export const UserProfilePage: React.FC = () => {
       ).unwrap();
 
       if (payload.college) {
-        setInstitution((prev) => ({
-          id: prev?.id ?? (resolvedCollegeId ? Number(resolvedCollegeId) : 0),
+        setInstitution({
+          id: resolvedCollegeId ? Number(resolvedCollegeId) : 0,
           name: payload.college,
-          institutionType: prev?.institutionType ?? 'COLLEGE',
-          state: prev?.state ?? '',
-          district: prev?.district ?? '',
+          institutionType: 'COLLEGE',
+          state: '',
+          district: '',
           isActive: true,
-          aisheCode: prev?.aisheCode ?? '',
-        } as Institution));
+          aisheCode: '',
+        } as Institution);
       }
 
       toast.success('Academic details saved successfully.');

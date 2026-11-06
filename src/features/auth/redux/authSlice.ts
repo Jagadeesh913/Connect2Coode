@@ -4,6 +4,7 @@ import type { AuthResponseData } from '../../../services/authService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { executeRefreshToken } from '../../../core/api/apiClient';
 import type { AuthSessionData } from '../../../core/security/authContract';
+import type { User } from '../../../core/types/domain';
 
 export type AuthStatus = 'LOADING' | 'AUTHENTICATED' | 'RECOVERY_REQUIRED' | 'UNAUTHENTICATED';
 
@@ -27,6 +28,7 @@ export interface AuthState {
   error: string | null;
   isAuthModalOpen: boolean;
   authModalMode: 'login' | 'signup' | 'forgot';
+  refreshRequestId: string | null;
 }
 
 interface RefreshFailure {
@@ -43,6 +45,7 @@ const initialState: AuthState = {
   error: null,
   isAuthModalOpen: false,
   authModalMode: 'login',
+  refreshRequestId: null,
 };
 
 const buildUserProfile = (
@@ -158,7 +161,7 @@ const authSlice = createSlice({
       state.token = tokenStorage.getAccessToken();
       state.user = tokenStorage.getUser();
     },
-    setAuthenticatedSession(state, action: PayloadAction<{ token: string; user?: any }>) {
+    setAuthenticatedSession(state, action: PayloadAction<{ token: string; user?: User | null }>) {
       state.status = 'AUTHENTICATED';
       state.isAuthenticated = true;
       state.loading = false;
@@ -173,6 +176,7 @@ const authSlice = createSlice({
       state.loading = false;
       state.token = null;
       state.user = null;
+      state.refreshRequestId = null;
     },
     clearAuthError(state) {
       state.error = null;
@@ -193,12 +197,15 @@ const authSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Canonical startup/OAuth/HTTP-401 session refresh lifecycle.
-      .addCase(refreshSessionThunk.pending, (state) => {
+      .addCase(refreshSessionThunk.pending, (state, action) => {
+        state.refreshRequestId = action.meta?.requestId ?? null;
         if (!state.isAuthenticated) state.status = 'LOADING';
         state.loading = true;
         state.error = null;
       })
       .addCase(refreshSessionThunk.fulfilled, (state, action) => {
+        if (state.refreshRequestId && action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
+        state.refreshRequestId = null;
         state.loading = false;
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
@@ -207,6 +214,8 @@ const authSlice = createSlice({
         state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(refreshSessionThunk.rejected, (state, action) => {
+        if (state.refreshRequestId && action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
+        state.refreshRequestId = null;
         state.loading = false;
         state.error = action.payload?.message || null;
         if (action.payload?.statusCode !== 401 && state.isAuthenticated && state.token) {
@@ -244,6 +253,7 @@ const authSlice = createSlice({
       .addMatcher(
         isAnyOf(logoutUser.pending, logoutUser.fulfilled, logoutUser.rejected),
         (state) => {
+          state.refreshRequestId = null;
           state.user = null;
           state.token = null;
           state.status = 'UNAUTHENTICATED';

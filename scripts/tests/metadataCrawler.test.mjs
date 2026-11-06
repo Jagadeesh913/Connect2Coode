@@ -46,6 +46,8 @@ test('all indexable routes render meaningful, route-specific HTML without JavaSc
     assert.ok(html.includes(`content="${canonical}"`));
     assert.ok(html.includes('content="index, follow"'));
     assert.ok(html.includes('https://connect2code.in/social-card.png'));
+    assert.match(html, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
+    assert.doesNotMatch(html, /<div id="root">\s*<main/);
     assert.equal(count(html, 'rel="canonical"'), 1);
     assert.equal(count(html, 'property="og:title"'), 1);
     assert.equal(count(html, 'name="twitter:title"'), 1);
@@ -76,7 +78,9 @@ test('build generator emits public pages, a noindex app shell, a noindex 404, an
     const sitemap = await readFile(join(directory, 'sitemap.xml'), 'utf8');
 
     assert.match(practice, /Coding Practice for Placement Interviews/);
+    assert.match(practice, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
     [appShell, notFound].forEach((html) => {
+      assert.match(html, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
       assert.match(html, /name="robots" content="noindex, nofollow"/);
       assert.doesNotMatch(html, /rel="canonical"/);
       assert.doesNotMatch(html, /property="og:url"/);

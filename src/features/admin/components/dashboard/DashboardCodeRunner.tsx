@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
-import { adminQuestionService, getLiveTotalQuestionsCount } from '../../../../services/admin/adminQuestionService';
+import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { problemService } from '../../../../services/problemService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
@@ -208,7 +208,11 @@ public class Main {
 `;
 };
 
-export const DashboardCodeRunner: React.FC = () => {
+interface DashboardCodeRunnerProps {
+  onQuestionTotalChange?: (total: number) => void;
+}
+
+export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQuestionTotalChange }) => {
   const dispatch = useAppDispatch();
   const { theme } = useTheme();
 
@@ -244,6 +248,8 @@ export const DashboardCodeRunner: React.FC = () => {
   const [selectedQuestionDetails, setSelectedQuestionDetails] = useState<Question | null>(null);
   const [selectedQuestionTestCases, setSelectedQuestionTestCases] = useState<QuestionTestCase[]>([]);
   const [loadingQuestionDetails, setLoadingQuestionDetails] = useState<boolean>(false);
+  const [questionDetailsError, setQuestionDetailsError] = useState<string | null>(null);
+  const [_questionDetailsRetry, setQuestionDetailsRetry] = useState(0);
   const [isStatementOpen, setIsStatementOpen] = useState<boolean>(true);
   const [testCaseTab, setTestCaseTab] = useState<'sample' | 'all'>('sample');
 
@@ -291,21 +297,18 @@ export const DashboardCodeRunner: React.FC = () => {
         signal
       );
       if (generation !== pageGenerationRef.current) return;
-      const raw: any = initialRes?.data || initialRes;
-      const allItems: any[] = Array.isArray(raw?.content)
-        ? raw.content
-        : Array.isArray(raw)
-        ? raw
-        : [];
+      const raw = initialRes.data;
+      const allItems = raw.content;
 
       const totalElements =
-        typeof raw?.totalElements === 'number'
+        typeof raw.totalElements === 'number'
           ? raw.totalElements
-          : getLiveTotalQuestionsCount();
+          : allItems.length;
       setTotalKnownQuestions(totalElements);
+      onQuestionTotalChange?.(totalElements);
       setQuestionPage(0);
       setQuestionTotalPages(
-        typeof raw?.totalPages === 'number'
+        typeof raw.totalPages === 'number'
           ? raw.totalPages
           : Math.max(1, Math.ceil(totalElements / 10))
       );
@@ -333,7 +336,7 @@ export const DashboardCodeRunner: React.FC = () => {
         setResourcesLoading(false);
       }
     }
-  }, [selectQuestionId]);
+  }, [onQuestionTotalChange, selectQuestionId]);
 
   const loadNextQuestionPage = async () => {
     if (isLoadingMoreQuestions || questionPage + 1 >= questionTotalPages) return;
@@ -382,121 +385,75 @@ export const DashboardCodeRunner: React.FC = () => {
     );
   }, [languages]);
 
-  // 2. Fetch selected problem statement & test cases dynamically with multi-tier fallback
+  // 2. Fetch one authoritative detail response for the selected question.
   useEffect(() => {
     if (!selectedQuestionId) {
       setSelectedQuestionDetails(null);
       setSelectedQuestionTestCases([]);
+      setQuestionDetailsError(null);
       return;
     }
 
-    let active = true;
+    const controller = new AbortController();
     setLoadingQuestionDetails(true);
+    setQuestionDetailsError(null);
+    setSelectedQuestionDetails(null);
+    setSelectedQuestionTestCases([]);
 
     const loadDetailsAndTestCases = async () => {
-      let details: Question | null = null;
-      let cases: QuestionTestCase[] = [];
-
-      // Tier 1: Dedicated adminQuestionService.getQuestionById
       try {
-        const detailRes = await adminQuestionService.getQuestionById(selectedQuestionId);
-        const raw: any = detailRes?.data || detailRes;
-        if (raw && typeof raw === 'object' && raw.id) {
-          details = raw;
-          if (Array.isArray(raw.testCases) && raw.testCases.length > 0) {
-            cases = raw.testCases;
-          }
-        }
-      } catch {
-        // Direct admin detail fetch might fail (e.g. backend 500 on certain IDs like #6)
-      }
-
-      // Tier 2: Resilient problemService.getProblemById with catalog fallback
-      if (!details) {
-        try {
-          const probRes = await problemService.getProblemById(selectedQuestionId);
-          if (probRes?.data) {
-            const p = probRes.data;
-            details = {
-              id: Number(p.id || p.questionId || selectedQuestionId),
-              title: p.title,
-              description: p.description || '',
-              constraints: p.constraints || '',
-              difficultyRefGroupCode: 'DIFF',
-              difficultyRefCode: p.difficultyRefCode || '',
-              difficultyRefName: p.difficultyRefName || p.difficulty || '',
-              topicRefGroupCode: 'TOPIC',
-              topicRefCode: p.topicRefCode || '',
-              topicRefName: p.topicRefName || p.topic || '',
-              qpfRefGroupCode: 'QPF',
-              qpfRefCode: p.qpfRefCode || '',
-              qpfRefName: p.qpfRefName || '',
-              questionHints: [],
-              testCases: p.testCases || [],
-            };
-            if (Array.isArray(p.testCases) && p.testCases.length > 0) {
-              cases = p.testCases;
-            }
-          }
-        } catch {
-          // Fall through to question cache
-        }
-      }
-
-      // Tier 3: Lookup in already-loaded questions list
-      if (!details) {
-        const cached = questionsRef.current.find((q) => q.id === selectedQuestionId);
-        if (cached) {
-          details = {
-            id: cached.id,
-            title: cached.title,
-            description: cached.description || '',
-            constraints: cached.constraints || '',
+        const detailRes = await adminQuestionService.getQuestionById(
+          selectedQuestionId,
+          controller.signal
+        );
+        if (controller.signal.aborted) return;
+        const details = detailRes.data;
+        const cases = Array.isArray(details.testCases) && details.testCases.length > 0
+          ? details.testCases
+          : extractTestCasesFromProblem(details);
+        setSelectedQuestionDetails(details);
+        setSelectedQuestionTestCases(cases);
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        const fallbackCached = questionsRef.current.find((q) => q.id === selectedQuestionId);
+        if (fallbackCached) {
+          setSelectedQuestionDetails({
+            id: fallbackCached.id,
+            title: fallbackCached.title,
+            description: fallbackCached.description || '',
+            constraints: fallbackCached.constraints || '',
             difficultyRefGroupCode: 'DIFF',
             difficultyRefCode: '',
-            difficultyRefName: cached.difficultyRefName || cached.difficulty || '',
+            difficultyRefName: fallbackCached.difficultyRefName || fallbackCached.difficulty || '',
             topicRefGroupCode: 'TOPIC',
             topicRefCode: '',
-            topicRefName: cached.topicRefName || '',
+            topicRefName: fallbackCached.topicRefName || '',
             qpfRefGroupCode: 'QPF',
             qpfRefCode: '',
             qpfRefName: '',
             questionHints: [],
-            testCases: cached.testCases || [],
-          };
-          if (Array.isArray(cached.testCases) && cached.testCases.length > 0) {
-            cases = cached.testCases;
-          }
+            testCases: fallbackCached.testCases || [],
+          });
+          setSelectedQuestionTestCases(
+            Array.isArray(fallbackCached.testCases) && fallbackCached.testCases.length > 0
+              ? fallbackCached.testCases
+              : extractTestCasesFromProblem(fallbackCached)
+          );
+        } else {
+          const message = error && typeof error === 'object' && 'message' in error
+            ? String(error.message)
+            : 'Unable to load the selected question details.';
+          setQuestionDetailsError(message);
         }
+      } finally {
+        if (!controller.signal.aborted) setLoadingQuestionDetails(false);
       }
-
-      // Tier 4: Try fetching test cases if still empty
-      if (cases.length === 0) {
-        try {
-          const tcRes = await adminQuestionService.getTestCases(selectedQuestionId);
-          if (Array.isArray(tcRes) && tcRes.length > 0) {
-            cases = tcRes;
-          }
-        } catch {
-          // Ignore
-        }
-      }
-
-      // Tier 5: Extract test cases from problem description markdown or standard cases
-      if (cases.length === 0 && details) {
-        cases = extractTestCasesFromProblem(details);
-      }
-
-      if (!active) return;
-      setSelectedQuestionDetails(details);
-      setSelectedQuestionTestCases(cases);
-      setLoadingQuestionDetails(false);
     };
 
     void loadDetailsAndTestCases();
 
     return () => {
-      active = false;
+      controller.abort();
     };
   }, [selectedQuestionId]);
 
@@ -1095,6 +1052,12 @@ export const DashboardCodeRunner: React.FC = () => {
                   <Skeleton className="h-4 w-4/5" />
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><Skeleton className="h-20 w-full rounded-xl" /><Skeleton className="h-20 w-full rounded-xl" /></div>
                 </div>
+              ) : questionDetailsError ? (
+                <RequestStatus
+                  pending={false}
+                  error={questionDetailsError}
+                  onRetry={() => setQuestionDetailsRetry((value) => value + 1)}
+                />
               ) : selectedQuestionDetails ? (
                 <>
                   {/* Problem Description */}
@@ -1303,9 +1266,9 @@ export const DashboardCodeRunner: React.FC = () => {
                 {result.failedTestCases > 0 && (
                   <AdminBadge variant="danger">Failed: {result.failedTestCases}</AdminBadge>
                 )}
-                {result.runtimeMs && (
+                {result.executionTime !== undefined && result.executionTime !== null && (
                   <AdminBadge variant="neutral" size="sm">
-                    {result.runtimeMs} ms
+                    {result.executionTime}{result.executionTimeUnit ? ` ${result.executionTimeUnit}` : ''}
                   </AdminBadge>
                 )}
               </div>

@@ -34,139 +34,42 @@ const { getProblemEditorial } = await import('../../src/features/problems/utils/
 
 describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience', () => {
 
-  describe('F-012: Company 500 Error Propagation & 404 Fallback Isolation', () => {
-    it('propagates HTTP 500 server errors instead of swallowing into getCompanies fallback', async () => {
+  describe('F-012: Numeric Company Details & Text Slug Resolution', () => {
+    it('sends numeric company identifiers directly to the detail endpoint', async () => {
       const originalGet = apiClient.get;
-      let fallbackCalled = false;
-
+      let requestedUrl = null;
       apiClient.get = async (url) => {
-        if (url === '/company/error-company' || url.endsWith('/error-company')) {
-          const err = new Error('Internal Server Error');
-          err.statusCode = 500;
-          throw err;
-        }
-        if (url === '/company' || url.startsWith('/company?')) {
-          fallbackCalled = true;
-          return { data: [] };
-        }
-        return { data: {} };
+        requestedUrl = url;
+        return { statusCode: 200, message: 'OK', data: { id: 42, name: 'Numeric Corp' } };
       };
 
       try {
-        await assert.rejects(
-          async () => {
-            await companyService.getCompanyBySlug('error-company');
-          },
-          (err) => {
-            assert.equal(err.statusCode, 500);
-            return true;
-          },
-          'Must re-throw 500 server error'
-        );
-        assert.equal(fallbackCalled, false, 'Fallback getCompanies must NOT be called on 500');
+        const response = await companyService.getCompanyBySlug('42');
+        assert.equal(requestedUrl, '/company/42');
+        assert.equal(response.data.id, 42);
       } finally {
         apiClient.get = originalGet;
       }
     });
 
-    it('propagates network connection errors without status instead of swallowing into fallback', async () => {
-      const originalGet = apiClient.get;
-      let fallbackCalled = false;
-
-      apiClient.get = async (url) => {
-        if (url === '/company/net-error' || url.endsWith('/net-error')) {
-          const netErr = new Error('Network Error: Connection Refused');
-          // Network errors have no HTTP response status
-          throw netErr;
-        }
-        if (url === '/company' || url.startsWith('/company?')) {
-          fallbackCalled = true;
-          return { data: [] };
-        }
-        return { data: {} };
-      };
-
-      try {
-        await assert.rejects(
-          async () => {
-            await companyService.getCompanyBySlug('net-error');
-          },
-          (err) => {
-            assert.match(err.message, /Network Error/);
-            return true;
-          },
-          'Must re-throw network error without swallowing'
-        );
-        assert.equal(fallbackCalled, false, 'Fallback getCompanies must NOT be called on network errors');
-      } finally {
-        apiClient.get = originalGet;
-      }
-    });
-
-    it('propagates HTTP 400 Bad Request errors without triggering catalog fallback', async () => {
-      const originalGet = apiClient.get;
-      let fallbackCalled = false;
-
-      apiClient.get = async (url) => {
-        if (url === '/company/bad-req' || url.endsWith('/bad-req')) {
-          const err = new Error('Bad Request: Invalid identifier syntax');
-          err.statusCode = 400;
-          throw err;
-        }
-        if (url === '/company' || url.startsWith('/company?')) {
-          fallbackCalled = true;
-          return { data: [] };
-        }
-        return { data: {} };
-      };
-
-      try {
-        await assert.rejects(
-          async () => {
-            await companyService.getCompanyBySlug('bad-req');
-          },
-          (err) => {
-            assert.equal(err.statusCode, 400);
-            return true;
-          },
-          'Must re-throw 400 bad request error'
-        );
-        assert.equal(fallbackCalled, false, 'Fallback getCompanies must NOT be called on 400');
-      } finally {
-        apiClient.get = originalGet;
-      }
-    });
-
-    it('falls back to getCompanies directory search ONLY when slug returns genuine 404 Not Found', async () => {
+    it('resolves text slugs from the catalog without issuing an invalid detail request', async () => {
       const originalGet = apiClient.get;
       const originalPost = apiClient.post;
-      let fallbackInvoked = false;
-
-      apiClient.get = async (url) => {
-        if (url === '/company/target-corp' || url.endsWith('/target-corp')) {
-          const err = new Error('Not Found');
-          err.statusCode = 404;
-          throw err;
-        }
-        if (url === '/company' || url.startsWith('/company?')) {
-          fallbackInvoked = true;
-          return {
-            data: [
-              { id: 99, name: 'Target Corp', slug: 'target-corp' }
-            ]
-          };
-        }
-        return { data: {} };
+      let detailCalled = false;
+      apiClient.get = async () => {
+        detailCalled = true;
+        throw new Error('Text slugs must not call GET /company/{id}');
       };
-
       apiClient.post = async (url) => {
         if (url.includes('/company/list') || url.includes('/company')) {
-          fallbackInvoked = true;
           return {
+            statusCode: 200,
+            timestamp: '2026-11-06T00:00:00Z',
             data: {
-              content: [
-                { id: 99, name: 'Target Corp', slug: 'target-corp' }
-              ]
+              content: [{ id: 99, name: 'Target Corp', slug: 'target-corp' }],
+              totalPages: 1,
+              pageNumber: 0,
+              pageSize: 100,
             }
           };
         }
@@ -175,34 +78,13 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
 
       try {
         const res = await companyService.getCompanyBySlug('target-corp');
-        assert.equal(fallbackInvoked, true, 'Fallback getCompanies should be called on genuine 404');
+        assert.equal(detailCalled, false);
         assert.equal(res.data.name, 'Target Corp');
         assert.equal(res.data.id, 99);
+        assert.equal(res.timestamp, '2026-11-06T00:00:00Z');
       } finally {
         apiClient.get = originalGet;
         apiClient.post = originalPost;
-      }
-    });
-
-    it('propagates cancellation signal errors immediately', async () => {
-      const originalGet = apiClient.get;
-      apiClient.get = async () => {
-        const err = new Error('canceled');
-        err.name = 'CanceledError';
-        throw err;
-      };
-
-      try {
-        await assert.rejects(
-          async () => {
-            await companyService.getCompanyBySlug('canceled-slug');
-          },
-          (err) => {
-            return err.name === 'CanceledError' || err.message === 'canceled';
-          }
-        );
-      } finally {
-        apiClient.get = originalGet;
       }
     });
 
@@ -238,6 +120,34 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
             return true;
           }
         );
+      } finally {
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('loads every reported company-question page without a fixed 50-row cap', async () => {
+      const originalPost = apiClient.post;
+      const requestedPages = [];
+      apiClient.post = async (_url, payload) => {
+        requestedPages.push(payload.pageRequest.pageNumber);
+        const pageNumber = payload.pageRequest.pageNumber;
+        return {
+          statusCode: 200,
+          message: 'OK',
+          data: {
+            content: [{ id: pageNumber + 1, title: `Problem ${pageNumber + 1}` }],
+            totalElements: 3,
+            totalPages: 3,
+            pageNumber,
+            pageSize: 50,
+          },
+        };
+      };
+
+      try {
+        const response = await companyService.getCompanyProblems(42);
+        assert.deepEqual(requestedPages, [0, 1, 2]);
+        assert.deepEqual(response.data.map((problem) => String(problem.id)), ['1', '2', '3']);
       } finally {
         apiClient.post = originalPost;
       }
@@ -402,7 +312,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
           err.statusCode = 404;
           throw err;
         }
-        return originalApiClientGet(url);
+        return typeof originalApiClientGet === 'function' ? originalApiClientGet(url) : { data: {} };
       };
 
       questionService.getById = async (id) => {
@@ -450,7 +360,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
             ],
           };
         }
-        return originalApiClientGet(url);
+        return typeof originalApiClientGet === 'function' ? originalApiClientGet(url) : { data: {} };
       };
 
       try {

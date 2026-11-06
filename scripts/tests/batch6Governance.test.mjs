@@ -38,7 +38,7 @@ globalThis.localStorage = {
 
 // Import production bookmarkReducer and thunks
 const bookmarkModule = await import('../../src/features/bookmarks/redux/bookmarkSlice.ts');
-const { default: bookmarkReducer, fetchBookmarks, toggleBookmarkItem, clearBookmarks, isBookmarkItem } = bookmarkModule;
+const { default: bookmarkReducer, fetchBookmarks, toggleBookmarkItem, clearBookmarks, isBookmarkItem, mapServerBookmark } = bookmarkModule;
 const progressModule = await import('../../src/features/progress/redux/progressSlice.ts');
 const { default: progressReducer, hydrateProgress } = progressModule;
 const profileModule = await import('../../src/features/profile/redux/profileSlice.ts');
@@ -52,6 +52,18 @@ const { userQuestionService } = await import('../../src/services/userQuestionSer
 const { profileService } = await import('../../src/services/profileService.ts');
 
 describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & Automation', () => {
+
+  it('does not fabricate savedAt for server bookmark DTOs without timestamps', () => {
+    const mapped = mapServerBookmark({ questionId: 7, title: 'Two Sum', difficulty: 'Easy' });
+    assert.deepEqual(mapped, {
+      id: 'bm-q-7',
+      itemId: '7',
+      type: 'PROBLEM',
+      title: 'Two Sum',
+      difficulty: 'Easy',
+    });
+    assert.equal('savedAt' in mapped, false);
+  });
 
   describe('F-038: Full Root TypeScript Configuration & Scope Coverage', () => {
     it('verifies root tsconfig.json covers all files in src/ without exclusion', () => {
@@ -124,6 +136,35 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       );
       assert.match(middlewareCode, /type === 'APTITUDE' \|\| type === 'COMPANY'/);
       assert.match(middlewareCode, /\.filter\(isLocalOnlyBookmark\)/);
+    });
+
+    it('preserves fresh bookmarks when the same user session is refreshed', () => {
+      const user = { id: 'user-A', email: 'userA@c2c.test' };
+      let state = bookmarkReducer(undefined, {
+        type: 'auth/login/fulfilled',
+        payload: user,
+      });
+      state = bookmarkReducer(state, {
+        type: fetchBookmarks.pending.type,
+        meta: { requestId: 'req-A' },
+      });
+      const bookmarks = [
+        { id: 'bm-1', itemId: '101', type: 'PROBLEM', title: 'Problem 101' },
+      ];
+      state = bookmarkReducer(state, {
+        type: fetchBookmarks.fulfilled.type,
+        payload: { userId: user.id, bookmarks, fetchedAt: 12345 },
+        meta: { requestId: 'req-A' },
+      });
+
+      state = bookmarkReducer(state, {
+        type: 'auth/refreshSession/fulfilled',
+        payload: { user },
+      });
+
+      assert.deepEqual(state.bookmarks, bookmarks);
+      assert.equal(state.lastFetchedAt, 12345);
+      assert.equal(state.activeUserId, user.id);
     });
 
     // =========================================================================
@@ -471,6 +512,48 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.deepEqual(state.solvedItems, []);
       assert.deepEqual(state.attemptedItems, []);
       assert.equal(state.lastFetchedUserId, 'B');
+    });
+
+    it('treats a successful empty server progress response as authoritative', () => {
+      let state = progressReducer(undefined, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-A-1', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.fulfilled.type,
+        payload: {
+          solved: { 42: true },
+          attempted: { 43: true },
+          solvedItems: [{ questionId: 42 }],
+          attemptedItems: [{ questionId: 43 }],
+          userId: 'A',
+          fetchedAt: 10,
+          warning: null,
+        },
+        meta: { requestId: 'progress-A-1', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.pending.type,
+        meta: { requestId: 'progress-A-2', arg: { userId: 'A' } },
+      });
+      state = progressReducer(state, {
+        type: hydrateProgress.fulfilled.type,
+        payload: {
+          solved: {},
+          attempted: {},
+          solvedItems: [],
+          attemptedItems: [],
+          userId: 'A',
+          fetchedAt: 20,
+          warning: null,
+        },
+        meta: { requestId: 'progress-A-2', arg: { userId: 'A' } },
+      });
+
+      assert.deepEqual(state.solvedByProblemId, {});
+      assert.deepEqual(state.attemptedByProblemId, {});
+      assert.deepEqual(state.solvedItems, []);
+      assert.deepEqual(state.attemptedItems, []);
     });
 
     it('keeps user-scoped local progress visible when both server progress requests fail', async () => {

@@ -100,7 +100,7 @@ export const hydrateProgress = createAsyncThunk<
 >(
   'progress/hydrate',
   async (arg, { getState, signal }) => {
-    const canonical = loadInitialProgress();
+    const localFallback = loadInitialProgress();
     const state = getState() as RootState;
     const requestedUserId = typeof arg === 'object' && arg ? arg.userId : undefined;
     const userId = requestedUserId !== undefined ? requestedUserId : state.auth?.user?.id ?? null;
@@ -122,7 +122,7 @@ export const hydrateProgress = createAsyncThunk<
 
       if (solvedRes.status === 'rejected' && attemptedRes.status === 'rejected') {
         return {
-          solved: canonical,
+          solved: localFallback,
           attempted: attemptedMap,
           solvedItems,
           attemptedItems,
@@ -134,14 +134,13 @@ export const hydrateProgress = createAsyncThunk<
 
       if (solvedRes.status === 'fulfilled' && Array.isArray(solvedRes.value)) {
         solvedItems = solvedRes.value;
-        if (solvedRes.value.length > 0) {
-          solvedRes.value.forEach((item: any) => {
-            const qId = String(item?.questionId ?? item?.id ?? item);
-            if (qId && qId !== '[object Object]') {
-              canonical[qId] = true;
-            }
-          });
-        }
+        // A successful server response is authoritative, including an empty
+        // array. Local solved progress is used only when that remote read fails.
+        Object.keys(localFallback).forEach((key) => delete localFallback[key]);
+        solvedRes.value.forEach((item: UserSubmittedQuestionItem) => {
+          const qId = String(item.questionId);
+          if (qId) localFallback[qId] = true;
+        });
       } else {
         warning = 'Solved-problem progress could not be refreshed.';
       }
@@ -164,7 +163,7 @@ export const hydrateProgress = createAsyncThunk<
     }
 
     return {
-      solved: canonical,
+      solved: localFallback,
       attempted: attemptedMap,
       solvedItems,
       attemptedItems,

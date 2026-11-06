@@ -11,4 +11,20 @@ export const mcqService = {
   async getMcqById(id: string | number, signal?: AbortSignal): Promise<ApiResponse<McqQuestion>> {
     return apiClient.get(API_ENDPOINTS.MCQ.DETAILS(id), { signal });
   },
+
+  /**
+   * List rows are allowed to omit options. Fetch the authoritative detail only
+   * when an answerable question is opened; never synthesize choices locally.
+   */
+  async getMcqForAnswering(question: McqQuestion, signal?: AbortSignal): Promise<McqQuestion> {
+    if (Array.isArray(question.options) && question.options.length > 0) {
+      return question;
+    }
+
+    const response = await this.getMcqById(question.id, signal);
+    if (!response.data || typeof response.data !== 'object' || Array.isArray(response.data)) {
+      throw new Error('Unexpected MCQ detail response format');
+    }
+    return response.data;
+  },
 };

@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Company, Problem, QuestionListRequest } from '../core/types/domain';
 import { mapProblemDto } from '../core/mappers/problemMapper';
-import { fetchResilientQuestionPage } from './admin/adminQuestionService';
+import { fetchQuestionPage } from './admin/adminQuestionService';
 import type {
   CompanyExamItem,
   CompanyExamDetailsData,
@@ -39,26 +39,43 @@ const mapCompanyItem = (value: unknown): CompanyItem => {
 
 const normalizePage = <T>(
   data: unknown,
-  fallbackPageNumber: number,
-  fallbackPageSize: number,
   mapItem: (item: unknown) => T,
   label: string
 ): PaginatedData<T> => {
   const page = isRecord(data) ? data : null;
-  const rawContent = Array.isArray(data) ? data : page && Array.isArray(page.content) ? page.content : null;
+  const rawContent =
+    page && Array.isArray(page.content)
+      ? page.content
+      : Array.isArray(data)
+      ? data
+      : null;
   if (!rawContent) throw new Error(`Unexpected ${label} response format`);
   const content = rawContent.map(mapItem);
-  const numberValue = (value: unknown, fallback: number) =>
-    typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  const optionalNumber = (primary: unknown, alias: unknown, fallback: number): number => {
+    const value = typeof primary === 'number' ? primary : alias;
+    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  };
+  const pageNumber = optionalNumber(page?.pageNumber, page?.number, 0);
+  const pageSize = optionalNumber(page?.pageSize, page?.size, rawContent.length || 10);
+  const totalElements =
+    typeof page?.totalElements === 'number' && Number.isFinite(page.totalElements)
+      ? page.totalElements
+      : typeof page?.total === 'number' && Number.isFinite(page.total)
+      ? page.total
+      : rawContent.length;
+  const totalPages =
+    typeof page?.totalPages === 'number' && Number.isFinite(page.totalPages)
+      ? page.totalPages
+      : Math.max(1, Math.ceil(totalElements / (pageSize || 1)));
 
   return {
     content,
-    pageNumber: numberValue(page?.pageNumber, fallbackPageNumber),
-    pageSize: numberValue(page?.pageSize, fallbackPageSize),
-    totalElements: numberValue(page?.totalElements, content.length),
-    totalPages: numberValue(page?.totalPages, 1),
-    first: typeof page?.first === 'boolean' ? page.first : fallbackPageNumber === 0,
-    last: typeof page?.last === 'boolean' ? page.last : true,
+    pageNumber,
+    pageSize,
+    totalElements,
+    totalPages,
+    first: typeof page?.first === 'boolean' ? page.first : pageNumber === 0,
+    last: typeof page?.last === 'boolean' ? page.last : pageNumber + 1 >= totalPages,
   };
 };
 
@@ -81,7 +98,7 @@ export const companyService = {
     const res: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.COMPANY.LIST, payload, { signal });
     return {
       ...res,
-      data: normalizePage(res.data, payload.pageNumber, payload.pageSize, mapCompanyItem, 'companies'),
+      data: normalizePage(res.data, mapCompanyItem, 'companies'),
     };
   },
 
@@ -89,29 +106,14 @@ export const companyService = {
    * Fetches full list of companies for selector dropdowns / filters
    */
   async getCompanies(search?: string, signal?: AbortSignal): Promise<ApiResponse<Company[]>> {
-    try {
-      const res = await this.getCompaniesPaginated(
-        { pageNumber: 0, pageSize: 100, sortBy: 'name', sortDirection: 'ASC' },
-        signal
-      );
-      let content = res.data.content;
-      if (search && search.trim()) {
-        const q = search.toLowerCase().trim();
-        content = content.filter((c) => c.name?.toLowerCase().includes(q));
-      }
-      return {
-        statusCode: 200,
-        message: 'Companies Fetched Successfully',
-        data: content,
-        errors: null,
-        timestamp: res.timestamp,
-      };
-    } catch (err) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      throw err;
-    }
+    const response = await this.getAllCompanies(signal);
+    if (!search?.trim()) return response;
+
+    const query = search.toLowerCase().trim();
+    return {
+      ...response,
+      data: response.data.filter((company) => company.name.toLowerCase().includes(query)),
+    };
   },
 
   /**
@@ -177,8 +179,6 @@ export const companyService = {
       ...res,
       data: normalizePage(
         res.data,
-        payload.pageNumber,
-        payload.pageSize,
         (item) => {
           if (!isRecord(item) || typeof item.id !== 'number' || typeof item.examName !== 'string') {
             throw new Error('Unexpected company exam record format');
@@ -219,29 +219,21 @@ export const companyService = {
   },
 
   async getCompanyBySlug(slug: string, signal?: AbortSignal): Promise<ApiResponse<Company>> {
-    try {
-      const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.COMPANY.DETAILS(slug), { signal });
+    const normalizedIdentifier = slug.trim();
+    const numericId = Number(normalizedIdentifier);
+    if (Number.isSafeInteger(numericId) && numericId > 0) {
+      const res: ApiResponse<unknown> = await apiClient.get(
+        API_ENDPOINTS.COMPANY.DETAILS(numericId),
+        { signal }
+      );
       return { ...res, data: mapCompanyItem(res.data) };
-
-    } catch (err: unknown) {
-      if (isRequestCanceled(err)) {
-        throw err;
-      }
-      // F-012: Only genuine HTTP 404 responses trigger catalog search fallback.
-      // Propagate HTTP 500, network failures, auth errors, and any non-404 failures.
-      const error = err && typeof err === 'object' ? err as {
-        statusCode?: number;
-        status?: number;
-        response?: { status?: number };
-      } : null;
-      const status = error?.statusCode || error?.response?.status || error?.status;
-      if (status !== 404) {
-        throw err;
-      }
     }
 
-    const allCompRes = await this.getCompanies(undefined, signal);
-    const normalizedSlug = slug.toLowerCase();
+    // The backend detail route accepts a numeric Long path variable. Sending a
+    // text slug reaches its security/error catch-all instead of a slug lookup,
+    // so resolve text routes through the real paginated catalog directly.
+    const allCompRes = await this.getAllCompanies(signal);
+    const normalizedSlug = normalizedIdentifier.toLowerCase();
     const matched = allCompRes.data.find(
       (company) =>
         String(company.id) === String(slug) ||
@@ -259,7 +251,7 @@ export const companyService = {
       message: 'Company Fetched Successfully',
       data: matched,
       errors: null,
-      timestamp: new Date().toISOString(),
+      timestamp: allCompRes.timestamp,
     };
   },
 
@@ -282,36 +274,44 @@ export const companyService = {
         : undefined);
 
     const problemsList: Problem[] = [];
-    const seenTitles = new Set<string>();
+    const seenProblemIds = new Set<string>();
     let lastBackendError: unknown = null;
     let lastAttemptFailed = false;
 
-    if (numericCandidate !== undefined) {
-      try {
-        const payload = {
+    const loadAllMatchingPages = async (
+      companies: number[] | null,
+      searchText: string | null
+    ): Promise<void> => {
+      const pageSize = 50;
+      let pageNumber = 0;
+      let totalPages = 1;
+
+      do {
+        signal?.throwIfAborted();
+        const response = await fetchQuestionPage({
           level: null,
-          companies: [numericCandidate],
+          companies,
           topic: null,
-          searchText: null,
-          pageRequest: {
-            pageNumber: 0,
-            pageSize: 50,
-            sortBy: 'id',
-            sortDirection: 'ASC' as const,
-          },
-        };
-
-        const res = await fetchResilientQuestionPage(payload, signal);
-        const list = res.data.content;
-
-        for (const item of list) {
+          searchText,
+          pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' },
+        }, signal);
+        const page = response.data;
+        totalPages = Math.max(1, Number(page.totalPages) || 1);
+        page.content.forEach((item) => {
           const problem = mapProblemDto(item);
-          const normalizedTitle = problem.title.toLowerCase().trim();
-          if (!seenTitles.has(normalizedTitle)) {
-            seenTitles.add(normalizedTitle);
+          const key = String(problem.id);
+          if (!seenProblemIds.has(key)) {
+            seenProblemIds.add(key);
             problemsList.push(problem);
           }
-        }
+        });
+        pageNumber += 1;
+      } while (pageNumber < totalPages);
+    };
+
+    if (numericCandidate !== undefined) {
+      try {
+        await loadAllMatchingPages([numericCandidate], null);
         lastAttemptFailed = false;
       } catch (err) {
         if (isRequestCanceled(err)) {
@@ -324,30 +324,7 @@ export const companyService = {
 
     if (numericCandidate === undefined && problemsList.length === 0 && nameStr) {
       try {
-        const payload = {
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: nameStr,
-          pageRequest: {
-            pageNumber: 0,
-            pageSize: 50,
-            sortBy: 'id',
-            sortDirection: 'ASC' as const,
-          },
-        };
-
-        const res = await fetchResilientQuestionPage(payload, signal);
-        const list = res.data.content;
-
-        for (const item of list) {
-          const problem = mapProblemDto(item);
-          const normalizedTitle = problem.title.toLowerCase().trim();
-          if (!seenTitles.has(normalizedTitle)) {
-            seenTitles.add(normalizedTitle);
-            problemsList.push(problem);
-          }
-        }
+        await loadAllMatchingPages(null, nameStr);
         lastAttemptFailed = false;
       } catch (err) {
         if (isRequestCanceled(err)) {
@@ -395,14 +372,22 @@ export const companyService = {
         sortDirection: 'ASC',
       },
     };
-    const response = await fetchResilientQuestionPage(payload, signal);
+    const response = await fetchQuestionPage(payload, signal);
     const page = response.data;
     return {
       ...response,
       data: {
         content: page.content.map(mapProblemDto),
-        pageNumber: typeof page.number === 'number' ? page.number : pageNumber,
-        pageSize: typeof page.size === 'number' ? page.size : pageSize,
+        pageNumber: typeof page.pageNumber === 'number'
+          ? page.pageNumber
+          : typeof page.number === 'number'
+            ? page.number
+            : pageNumber,
+        pageSize: typeof page.pageSize === 'number'
+          ? page.pageSize
+          : typeof page.size === 'number'
+            ? page.size
+            : pageSize,
         totalElements: typeof page.totalElements === 'number' ? page.totalElements : page.content.length,
         totalPages: Math.max(1, typeof page.totalPages === 'number' ? page.totalPages : 1),
         first: typeof page.first === 'boolean' ? page.first : pageNumber === 0,

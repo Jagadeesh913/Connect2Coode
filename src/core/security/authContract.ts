@@ -13,6 +13,21 @@ export interface AuthSessionData {
   user?: User;
 }
 
+/** Projects only identity/profile fields; credentials never enter user state. */
+export function getUserFromAuthSession(data: AuthSessionData): User {
+  const source = data.user || data;
+  return {
+    id: source.id,
+    role: source.role,
+    email: source.email,
+    firstName: source.firstName,
+    lastName: source.lastName,
+    fullName: source.fullName,
+    avatarUrl: source.avatarUrl,
+    isDarkTheme: source.isDarkTheme,
+  };
+}
+
 const hasIdentity = (value: unknown): value is number | string =>
   (typeof value === 'number' && Number.isFinite(value)) ||
   (typeof value === 'string' && value.trim().length > 0);

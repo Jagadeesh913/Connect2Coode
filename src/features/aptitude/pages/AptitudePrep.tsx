@@ -97,8 +97,46 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
   const [showExplanation, setShowExplanation] = useState<boolean>(false);
+  const [answerQuestion, setAnswerQuestion] = useState<McqQuestion>(question);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailRetry, setDetailRetry] = useState(0);
+  const [detailRequested, setDetailRequested] = useState(false);
 
-  const options = useMemo(() => synthesizeMcqOptions(question), [question]);
+  useEffect(() => {
+    setAnswerQuestion(question);
+    setSelectedAnswer(null);
+    setIsSubmitted(false);
+    setShowExplanation(false);
+    setDetailError(null);
+    setDetailLoading(false);
+    setDetailRequested(false);
+  }, [question]);
+
+  useEffect(() => {
+    if ((Array.isArray(question.options) && question.options.length > 0) || !detailRequested) {
+      return;
+    }
+
+    const controller = new AbortController();
+    setDetailLoading(true);
+    mcqService.getMcqForAnswering(question, controller.signal)
+      .then((detail) => {
+        if (!controller.signal.aborted) setAnswerQuestion(detail);
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setDetailError(error instanceof Error ? error.message : 'Unable to load answer options.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailLoading(false);
+      });
+
+    return () => controller.abort();
+  }, [question, detailRequested, detailRetry]);
+
+  const options = useMemo(() => synthesizeMcqOptions(answerQuestion), [answerQuestion]);
   const correctOption = useMemo(() => options.find((o) => o.isCorrect === true), [options]);
 
   const difficultyLabel = String(
@@ -179,7 +217,25 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
 
       {/* Options Grid */}
       <div className="flex flex-col gap-2 pt-1">
-        {options.length > 0 ? (
+        {!detailRequested && options.length === 0 ? (
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-xs text-slate-500 dark:text-slate-400">
+            <span>Open this question to load its answer options.</span>
+            <button type="button" onClick={() => setDetailRequested(true)} className="font-bold text-blue-600 dark:text-sky-400 cursor-pointer">
+              Load options
+            </button>
+          </div>
+        ) : detailLoading ? (
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 text-slate-500 dark:text-slate-400 text-xs">
+            Loading answer options…
+          </div>
+        ) : detailError ? (
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/20 text-xs text-rose-700 dark:text-rose-300">
+            <span>{detailError}</span>
+            <button type="button" onClick={() => setDetailRetry((value) => value + 1)} className="font-bold underline cursor-pointer">
+              Retry
+            </button>
+          </div>
+        ) : options.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {options.map((opt) => {
               const isSelected = selectedAnswer === opt.optionText;
@@ -311,10 +367,10 @@ const AptitudeQuestionCard: React.FC<AptitudeQuestionCardProps> = ({ question, i
               {correctOption ? `Option ${correctOption.optionLabel}: ${correctOption.optionText}` : 'N/A'}
             </span>
           </div>
-          {question.explanation ? (
+          {answerQuestion.explanation ? (
             <p className="mt-1 text-slate-600 dark:text-slate-300">
               <span className="font-semibold text-slate-700 dark:text-slate-200">Explanation: </span>
-              {question.explanation}
+              {answerQuestion.explanation}
             </p>
           ) : (
             <p className="mt-1 text-slate-600 dark:text-slate-400 italic">

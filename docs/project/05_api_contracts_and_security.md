@@ -71,7 +71,7 @@ sequenceDiagram
 - **Single-Flight Refresh Lock**: `executeRefreshToken()` owns the same-tab promise while `refreshCoordinator.ts` serializes refresh-token rotation across tabs with the browser's atomic Web Locks API. `localStorage` is not used as a mutex because it has no atomic compare-and-set operation. If Web Locks are unavailable, refresh fails safely before the request is issued rather than bypassing serialization.
 - **Failure Semantics**: A refresh HTTP 401 clears auth state and redirects through route guards. Network, malformed success, and 5xx failures do not prove the cookie invalid: active sessions remain active, while startup enters `RECOVERY_REQUIRED` and shows a retry gate instead of rendering protected content or redirecting to login.
 - **Cross-Tab Session Reconciliation**: [`src/core/security/authSessionSync.ts`](../../src/core/security/authSessionSync.ts) sends credential-free lifecycle events. A login event makes another tab perform its own serialized cookie-backed refresh; logout and refresh-401 events clear per-tab state.
-- **Explicit Request Policy**: Every request is resolved to `public` or `protected`. Only protected requests receive the bearer header and only their first HTTP 401 may refresh/retry. Public institution and authentication calls are explicitly marked `public`; 400, 403, 404, 429, 500, and an already-retried 401 never refresh.
+- **Explicit Request Policy**: Every request is resolved to `public` or `protected`. Only protected requests receive the bearer header and only their first HTTP 401 may refresh/retry. Authentication transport calls are explicitly marked `public`; authenticated profile institution search is explicitly `protected`. A 400, 403, 404, 429, 500, or already-retried 401 never refreshes.
 - **Legacy Refresh-Cookie Migration**: Frontend JavaScript does not read or expire `refreshToken`, including a legacy readable cookie. The backend deployment must replace/expire legacy variants with `Set-Cookie` for every formerly used Path/Domain and issue only the canonical `HttpOnly; Secure; SameSite` cookie. This cannot be completed safely by frontend code.
 - **Runtime Verification Boundary**: Automated tests exercise one active Web Lock at a time and prove the no-lock/storage-denied path never invokes the refresh callback. They do not prove behavior in two real browser tabs or validate deployed refresh-cookie rotation. The deployed `/auth/refresh` payload and `Set-Cookie` attributes also remain unverified from this frontend-only checkout.
 
@@ -125,7 +125,7 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 
 `ProblemDetails` invalidates and refetches submission history after a completed user submission. It does not synthesize a local history row or store submitted source code/results in browser storage.
 
-`executionService` normalizes only the execution response fields returned by the API (`totalTestCases`, pass/fail counts, optional runtime/memory, and `testCases`). A successful HTTP response must still contain a recognizable verdict, and solved/success UI requires at least one executed and passed test with zero failures; zero-test or malformed responses are rejected instead of being reported as accepted.
+`executionService` normalizes the execution verdict plus observed `time`, `memory`, `errors`, `stderr`, `stdout`, `compileOutput`, `message`, and `status` fields. `time` and `memory` remain opaque display values because their units are not verified; only explicitly named legacy `runtimeMs` and `memoryMb` fields receive `ms` and `MB` labels. Nullable diagnostics are ignored safely. Hidden test-case input, expected output, actual output, and case-level diagnostic text are removed at this shared boundary before components receive the result. This is defense in depth only: the backend must not expose hidden-case contents to ordinary users. A successful HTTP response must still contain a recognizable verdict, and solved/success UI requires at least one executed and passed test with zero failures; zero-test or malformed responses are rejected instead of being reported as accepted.
 
 ### D. Recruiter Companies & Exams ([`src/services/companyService.ts`](../../src/services/companyService.ts), [`src/services/admin/adminCompanyService.ts`](../../src/services/admin/adminCompanyService.ts))
 | Endpoint | Method | Access | Description / Payload |
@@ -143,7 +143,7 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/mcq` | `POST` | `USER_OR_ADMIN` | Query MCQs by `subject`, `difficulty`, `topic`, `companies`, and `searchText`, with `pageRequest`. Reference filters send numeric IDs loaded from the reference library. Live 2026-11-03 probes returned 86 total rows and different totals for search queries. |
-| `/mcq/{id}` | `GET` | `USER_OR_ADMIN` | Single MCQ question details and options. |
+| `/mcq/{id}` | `GET` | `USER_OR_ADMIN` | Single MCQ question details and options. When a list row omits options, Aptitude fetches this detail only after the user requests that card's options, and Company Preparation fetches it when the solve modal opens. |
 | `/admin/mcq` | `POST` | `ADMIN_ONLY` | Admin create/update MCQ. The request contains `id` for an update, taxonomy codes and names (`subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topicGroupCode`, `topicRefCode`, `topicRefName`, `difficultyGroupCode`, `difficultyRefCode`, `difficultyRefName`), optional `companyId` and `companyName`, `question`, optional `explanation`, `isActive`, and `options`. Each option contains only its persisted `id` when present, `optionLabel`, `optionText`, and explicit `isCorrect: true/false`. Exactly one option must be correct. Legacy question-level answer fields and option aliases are not sent or used to determine correctness. |
 | `/admin/mcq/{id}` | `DELETE` | `ADMIN_ONLY` | Deletes an MCQ question. |
 
@@ -189,7 +189,7 @@ The following fields were captured from the configured production API using supp
 | `GET /institutions/search` | `id`, `name`, `institutionType`, `state`, `district` |
 | `GET /admin/institutions`, `GET /admin/institutions/{id}` | `id`, `aisheCode`, `name`, `institutionType`, `state`, `district`, `website`, `yearOfEstablishment`, `location`, `collegeType`, `management`, `universityId`, `universityName`, `universityType`, `isActive`, audit timestamps/IDs |
 
-Live MCQ verification on 2026-10-23 found that this is a record-level data boundary: a ten-record `POST /mcq` response had option counts `4, 4, 4, 0, 0, 0, 0, 0, 0, 0`, and an affected record's `GET /mcq/4` returned the same empty `options` array. The aptitude renderer intentionally shows no selectable answers for those records; it must not manufacture option text or correctness from question-level aliases.
+Live MCQ verification on 2026-10-23 found that this is also a record-level data boundary: a ten-record `POST /mcq` response had option counts `4, 4, 4, 0, 0, 0, 0, 0, 0`, and an affected record's `GET /mcq/4` returned the same empty `options` array. A missing list `options` field now triggers the verified detail route at the user-interaction boundary; if detail still returns no options, the renderer remains unanswerable and does not manufacture option text or correctness from question-level aliases.
 
 ### G. Endpoint Coverage Boundary
 
@@ -213,14 +213,14 @@ Live MCQ verification on 2026-10-23 found that this is a record-level data bound
 
 Academic records are server-owned: `ProfileSettings` reads and writes them through `/userInfo/{userId}` and does not retain an offline `localStorage` copy. A legacy `c2c_user_academic_<userId>` value is removed when that profile is opened.
 
-Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, `title`, and `difficulty` from `GET /users/{userId}/questions/bookmarks`; a failed refresh preserves the active user's last known server list and exposes an error instead of replacing it with a false empty success. COMPANY/APTITUDE bookmarks have no observed API contract and are therefore retained only in `userScopedStorage`; server-owned problem bookmarks are excluded from browser persistence.
+Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, `title`, and `difficulty` from `GET /users/{userId}/questions/bookmarks`; it leaves `savedAt` absent because the DTO has no creation timestamp and fetch time is not save time. A failed refresh preserves the active user's last known server list and exposes an error instead of replacing it with a false empty success. COMPANY/APTITUDE bookmarks have no observed API contract and are therefore retained only in `userScopedStorage`; server-owned problem bookmarks are excluded from browser persistence.
 
 `GET` and `PUT /user/profile` are not used: archived direct probes returned 401 for every available credential and identified the route as unmapped. The client therefore does not fabricate successful identity or avatar mutations in browser storage. Name/email remain session-owned and read-only; avatar editing is disabled. Personal fields supported by `userInfo` are saved only when the required academic fields already exist, so the client never invents registration, college, or year values to satisfy the POST contract.
 
 ### G. Institution Directory ([`src/services/institutionService.ts`](../../src/services/institutionService.ts), [`src/services/admin/adminInstitutionService.ts`](../../src/services/admin/adminInstitutionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/institutions/search` | `GET` | `PUBLIC` | Query param `?query=...` (min 3 chars). Autocomplete for college selection. |
+| `/institutions/search` | `GET` | `USER_OR_ADMIN` | Query param `?query=...` (min 3 chars). Authenticated profile autocomplete; anonymous requests returned 401 and Bearer-authenticated requests returned 200 in the supplied Postman audit. |
 | `/institutions/{id}` | `GET` | `PUBLIC` | Public institution details. |
 | `/admin/institutions` | `GET` | `ADMIN_ONLY` | Paginated admin list with query, type, state, district, activeOnly filters. |
 | `/admin/institutions/{id}` | `GET` | `ADMIN_ONLY` | Institution details including affiliated university. |

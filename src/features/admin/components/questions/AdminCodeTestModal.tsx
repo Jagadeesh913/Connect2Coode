@@ -117,8 +117,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       if (!active) return;
       const failures: string[] = [];
       if (questionResult.status === 'fulfilled') {
-        const raw: any = questionResult.value?.data || questionResult.value;
-        setQuestionDetails(raw);
+        setQuestionDetails(questionResult.value?.data || null);
       } else failures.push('Unable to load the problem statement.');
       setResourcesError(failures.join(' ') || null);
       setResourcesLoading(false);

@@ -24,530 +24,90 @@ export async function resolve(specifier, context, nextResolve) {
 
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
-const { adminQuestionService, VERIFIED_READABLE_QUESTION_COUNT } = await import('../../src/services/admin/adminQuestionService.ts');
+const { adminQuestionService } = await import('../../src/services/admin/adminQuestionService.ts');
 const { problemService } = await import('../../src/services/problemService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 
-describe('Questions API Pagination & Resilience Suite (POST /api/v1/questions)', () => {
+const request = {
+  level: null,
+  companies: null,
+  topic: null,
+  searchText: null,
+  pageRequest: { pageNumber: 2, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
+};
 
-  it('VERIFIED_READABLE_QUESTION_COUNT is 24', () => {
-    assert.equal(VERIFIED_READABLE_QUESTION_COUNT, 24);
+describe('Questions API pagination contract', () => {
+  it('preserves pagination metadata returned by the API', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'Questions Fetched Successfully',
+        data: {
+          content: Array.from({ length: 10 }, (_, index) => ({ id: index + 21 })),
+          totalElements: 49,
+          totalPages: 5,
+          number: 2,
+          size: 10,
+        },
+      });
+
+      const response = await adminQuestionService.getQuestions(request);
+      assert.equal(response.data.totalElements, 49);
+      assert.equal(response.data.totalPages, 5);
+      assert.equal(response.data.number, 2);
+      assert.equal(response.data.content.length, 10);
+    } finally {
+      apiClient.post = originalPost;
+    }
   });
 
-  describe('1. Unfiltered Catalog Page Normalization', () => {
-    it('preserves real dynamic API totalElements and totalPages directly from API response on success', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async () => ({
-          statusCode: 200,
-          message: 'Questions Fetched Successfully',
-          data: {
-            content: Array.from({ length: 10 }, (_, i) => ({ id: i + 1, title: `Problem ${i + 1}` })),
-            totalElements: 49,
-            totalPages: 5,
-            number: 0,
-            size: 10,
-          },
-        });
+  it('makes exactly one API call and propagates backend failures', async () => {
+    const originalPost = apiClient.post;
+    let calls = 0;
+    try {
+      apiClient.post = async () => {
+        calls += 1;
+        const error = new Error('Questions Fetch Unsuccessful');
+        error.statusCode = 500;
+        throw error;
+      };
 
-        const res = await adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.data.totalElements, 49, 'Valid API queries must dynamically preserve backend totalElements');
-        assert.equal(res.data.totalPages, 5, 'Valid API queries must dynamically preserve backend totalPages');
-        assert.equal(res.data.content.length, 10);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('rejects an incomplete stitched page instead of reporting partial data as success', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (payload.pageRequest?.pageSize === 50) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 20 && payload.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'OK',
-              data: { content: Array.from({ length: 20 }, (_, i) => ({ id: i + 1 })) },
-            };
-          }
-          if (payload.pageRequest?.pageSize === 4 && payload.pageRequest?.pageNumber === 5) {
-            return {
-              statusCode: 200,
-              message: 'OK',
-              data: { content: Array.from({ length: 4 }, (_, i) => ({ id: 21 + i })) },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        await assert.rejects(() => adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
-        }), /Questions Fetch Unsuccessful/);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('does not cap totalElements when active filters are provided', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async () => ({
-          statusCode: 200,
-          message: 'Questions Fetched Successfully',
-          data: {
-            content: Array.from({ length: 7 }, (_, i) => ({ id: i + 1, title: `Basic Problem ${i + 1}` })),
-            totalElements: 7,
-            totalPages: 1,
-            number: 0,
-            size: 10,
-          },
-        });
-
-        const res = await adminQuestionService.getQuestions({
-          level: [1],
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.data.totalElements, 7, 'Filtered query retains its actual totalElements');
-        assert.equal(res.data.totalPages, 1);
-        assert.equal(res.data.content.length, 7);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
+      await assert.rejects(
+        () => adminQuestionService.getQuestions(request),
+        /Questions Fetch Unsuccessful/
+      );
+      assert.equal(calls, 1, 'one failed page must not fan out into record-by-record probes');
+    } finally {
+      apiClient.post = originalPost;
+    }
   });
 
-  describe('2. Offset 20 Backend 500 Recovery', () => {
-    it('rejects offset-20 recovery when only four of ten requested records are available', async () => {
-      const originalPost = apiClient.post;
-      try {
-        let calls = [];
-        apiClient.post = async (url, payload) => {
-          calls.push(payload);
-          if (payload.pageRequest?.pageSize === 10 && payload.pageRequest?.pageNumber === 2) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 4 && payload.pageRequest?.pageNumber === 5) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 22, title: 'addition of 2 number' },
-                  { id: 26, title: 'Audit Verify Problem' },
-                  { id: 28, title: 'Automated Audit Verification' },
-                  { id: 30, title: 'Testing on 22-10-2026' },
-                ],
-                totalElements: 50,
-                totalPages: 5,
-                number: 5,
-                size: 4,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        await assert.rejects(() => adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 2, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        }), /Questions Fetch Unsuccessful/);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('propagates incomplete offset-20 recovery through problemService', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (payload.pageRequest?.pageSize === 10 && payload.pageRequest?.pageNumber === 2) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 4 && payload.pageRequest?.pageNumber === 5) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 22, title: 'addition of 2 number' },
-                  { id: 26, title: 'Audit Verify Problem' },
-                  { id: 28, title: 'Automated Audit Verification' },
-                  { id: 30, title: 'Testing on 22-10-2026' },
-                ],
-                totalElements: 50,
-                totalPages: 5,
-                number: 5,
-                size: 4,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        await assert.rejects(
-          () => problemService.getProblems({ page: 3, limit: 10 }),
-          /Questions Fetch Unsuccessful/
-        );
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('rejects micro-batching when failed probes leave a partial page', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          // Standard page 4 (offset 40..49) fails because 40..47 are corrupt
-          if (payload.pageRequest?.pageSize === 10 && payload.pageRequest?.pageNumber === 4) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          // Micro-batching probes individual items with pageSize 1
-          if (payload.pageRequest?.pageSize === 1) {
-            const offset = payload.pageRequest.pageNumber;
-            if (offset >= 40 && offset <= 47) {
-              const err = new Error('Questions Fetch Unsuccessful');
-              err.statusCode = 500;
-              throw err;
-            }
-            if (offset === 48) {
-              return {
-                statusCode: 200,
-                message: 'OK',
-                data: { content: [{ id: 55, title: 'Longest Subarray With Sum K' }], totalElements: 50 },
-              };
-            }
-            if (offset === 49) {
-              return {
-                statusCode: 200,
-                message: 'OK',
-                data: { content: [{ id: 56, title: 'First Repeated Digit' }], totalElements: 50 },
-              };
-            }
-          }
-          throw new Error('Unexpected call: ' + JSON.stringify(payload));
-        };
-
-        await assert.rejects(() => adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 4, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        }), /Questions Fetch Unsuccessful/);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
+  it('rejects malformed successful responses', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({ statusCode: 200, message: 'OK', data: { content: null } });
+      await assert.rejects(
+        () => adminQuestionService.getQuestions(request),
+        /Unexpected questions response format/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
   });
 
-  describe('3. Out-of-Bounds & Search Fallback Recovery', () => {
-    it('propagates backend failure instead of fabricating an out-of-bounds empty page', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async () => {
-          const err = new Error('Questions Fetch Unsuccessful');
-          err.statusCode = 500;
-          throw err;
-        };
-
-        await assert.rejects(() => adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 6, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        }), /Questions Fetch Unsuccessful/);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('falls back to client-side filtering across base catalog when search returns 500', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (payload.searchText === 'Array') {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          // Base catalog call
-          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 1, title: 'Find the Largest Element from the Array', topicName: 'Array' },
-                  { id: 3, title: 'Reverse an Array', topicName: 'Array' },
-                  { id: 9, title: 'Check Palindrome String', topicName: 'String' },
-                  { id: 11, title: 'Reverse a String', topicName: 'String' },
-                ],
-                totalElements: 4,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        const res = await adminQuestionService.getQuestions({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: 'Array',
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 2);
-        assert.equal(res.data.content[0].id, 1);
-        assert.equal(res.data.content[1].id, 3);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('propagates a filtered failure when the fallback catalog is incomplete', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (_url, payload) => {
-          if (payload.searchText === 'Tail Match') {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Partial fallback',
-              data: {
-                content: [{ id: 1, title: 'First question' }],
-                totalElements: 50,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        await assert.rejects(
-          () => adminQuestionService.getQuestions({
-            level: null,
-            companies: [7],
-            topic: null,
-            searchText: 'Tail Match',
-            pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-          }),
-          /Questions Fetch Unsuccessful/
-        );
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('recovers when level filter (e.g. Medium) throws 500 on backend corrupted records', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (Array.isArray(payload.level) && payload.level.includes(3)) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium' },
-                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy' },
-                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', questionPlatform: 'GeeksforGeeks' },
-                ],
-                totalElements: 3,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        const res = await adminQuestionService.getQuestions({
-          level: [3],
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 2);
-        assert.equal(res.data.content[0].id, 1);
-        assert.equal(res.data.content[1].id, 3);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('recovers when both level (Medium) and platform (GeeksforGeeks) are filtered and backend 500s', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (Array.isArray(payload.level) && payload.level.includes(3)) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload.pageRequest?.pageSize === 24 && payload.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 1, title: 'Two Sum', difficultyId: 3, difficultyName: 'Medium', qpfId: 24, questionPlatform: 'LeetCode' },
-                  { id: 2, title: 'Reverse String', difficultyId: 2, difficultyName: 'Easy', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
-                  { id: 3, title: 'Next Greater Element', difficultyId: 3, difficultyName: 'Medium', qpfId: 25, questionPlatform: 'GeeksforGeeks' },
-                ],
-                totalElements: 3,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        const res = await adminQuestionService.getQuestions({
-          level: [3],
-          platform: [25],
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 1);
-        assert.equal(res.data.content[0].id, 3);
-        assert.equal(res.data.content[0].title, 'Next Greater Element');
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-  });
-
-  describe('5. Multi-Select Filter Execution & OR-Logic within Categories', () => {
-    it('filters across multiple difficulty levels (Basic or Easy) via resilient fallback', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (Array.isArray(payload?.level)) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload?.pageRequest?.pageSize === 24 && payload?.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 1, title: 'Basic Sum', difficultyId: 1, difficultyName: 'Basic' },
-                  { id: 2, title: 'Easy Array', difficultyId: 2, difficultyName: 'Easy' },
-                  { id: 3, title: 'Medium DP', difficultyId: 3, difficultyName: 'Medium' },
-                  { id: 4, title: 'Hard Graph', difficultyId: 4, difficultyName: 'Hard' },
-                ],
-                totalElements: 4,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        const res = await adminQuestionService.getQuestions({
-          level: [1, 2],
-          platform: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 2);
-        assert.deepEqual(res.data.content.map((q) => q.id), [1, 2]);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
-
-    it('filters across multiple platforms simultaneously via resilient fallback', async () => {
-      const originalPost = apiClient.post;
-      try {
-        apiClient.post = async (url, payload) => {
-          if (Array.isArray(payload?.platform)) {
-            const err = new Error('Questions Fetch Unsuccessful');
-            err.statusCode = 500;
-            throw err;
-          }
-          if (payload?.pageRequest?.pageSize === 24 && payload?.pageRequest?.pageNumber === 0) {
-            return {
-              statusCode: 200,
-              message: 'Questions Fetched Successfully',
-              data: {
-                content: [
-                  { id: 10, title: 'GFG Problem', qpfRefCode: 'GFG', questionPlatform: 'GeeksforGeeks' },
-                  { id: 20, title: 'LeetCode Problem', qpfRefCode: 'LEETCODE', questionPlatform: 'LeetCode' },
-                  { id: 30, title: 'HackerRank Problem', qpfRefCode: 'HACKERRANK', questionPlatform: 'HackerRank' },
-                ],
-                totalElements: 3,
-              },
-            };
-          }
-          throw new Error('Unexpected call');
-        };
-
-        const res = await adminQuestionService.getQuestions({
-          level: null,
-          platform: ['GFG', 'LEETCODE'],
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
-        });
-
-        assert.equal(res.statusCode, 200);
-        assert.equal(res.data.content.length, 2);
-        assert.deepEqual(res.data.content.map((q) => q.id), [10, 20]);
-      } finally {
-        apiClient.post = originalPost;
-      }
-    });
+  it('propagates question-list failures through problemService', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => {
+        throw new Error('Questions Fetch Unsuccessful');
+      };
+      await assert.rejects(
+        () => problemService.getProblems({ page: 3, limit: 10 }),
+        /Questions Fetch Unsuccessful/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
   });
 });
-

@@ -66,6 +66,7 @@ export const AdminQuestions: React.FC = () => {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const mutationPendingRef = useRef(false);
   const detailRequestId = useRef(0);
+  const detailAbortRef = useRef<AbortController | null>(null);
 
   // Search Debouncing
   const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -188,18 +189,22 @@ export const AdminQuestions: React.FC = () => {
     fetchQuestions();
     return () => {
       searchAbortRef.current?.abort();
+      detailAbortRef.current?.abort();
     };
   }, [fetchQuestions]);
 
   const handleInspect = async (questionOrId: QuestionPayload | string | number) => {
     const qId = typeof questionOrId === 'object' ? questionOrId.id : questionOrId;
     if (!qId) return;
+    detailAbortRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
     const requestId = ++detailRequestId.current;
     setSelectedQuestion(null);
     setDetailsLoading(true);
     setIsDetailsOpen(true);
     try {
-      const res = await adminQuestionService.getQuestionById(qId);
+      const res = await adminQuestionService.getQuestionById(qId, controller.signal);
       if (requestId !== detailRequestId.current) return;
       const detailedData = res.data;
       const cases = (detailedData.testCases && detailedData.testCases.length > 0)
@@ -221,9 +226,14 @@ export const AdminQuestions: React.FC = () => {
 
   const handleEditClick = async (question: QuestionPayload) => {
     if (!question.id) return;
+    detailAbortRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
+    const requestId = ++detailRequestId.current;
     setEditingQuestionId(question.id);
     try {
       const response = await adminQuestionService.getQuestionById(question.id);
+      if (requestId !== detailRequestId.current) return;
       const detail = response.data;
       const cases = (detail.testCases && detail.testCases.length > 0)
         ? detail.testCases
@@ -235,31 +245,27 @@ export const AdminQuestions: React.FC = () => {
       });
       setIsFormOpen(true);
     } catch (err: any) {
+      if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete question data for editing.'));
     } finally {
-      setEditingQuestionId(null);
+      if (requestId === detailRequestId.current) setEditingQuestionId(null);
     }
   };
 
   const handleManageTestCases = async (question: QuestionPayload) => {
     if (!question.id) return;
+    detailAbortRef.current?.abort();
+    const controller = new AbortController();
+    detailAbortRef.current = controller;
+    const requestId = ++detailRequestId.current;
     setLoadingTestCasesId(question.id);
     try {
       const response = await adminQuestionService.getQuestionById(question.id);
+      if (requestId !== detailRequestId.current) return;
       const detail = response.data;
       let cases = (detail.testCases && detail.testCases.length > 0)
         ? detail.testCases
         : [];
-      if (cases.length === 0) {
-        try {
-          const fetchedCases = await adminQuestionService.getTestCases(question.id);
-          if (fetchedCases && fetchedCases.length > 0) {
-            cases = fetchedCases;
-          }
-        } catch {
-          // ignore fallback
-        }
-      }
       if (cases.length === 0) {
         cases = extractTestCasesFromProblem(detail);
       }
@@ -270,9 +276,10 @@ export const AdminQuestions: React.FC = () => {
       });
       setIsTestCaseOpen(true);
     } catch (err: any) {
+      if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load test cases for this problem.'));
     } finally {
-      setLoadingTestCasesId(null);
+      if (requestId === detailRequestId.current) setLoadingTestCasesId(null);
     }
   };
 
@@ -339,6 +346,23 @@ export const AdminQuestions: React.FC = () => {
           }
         });
 
+        const selectedIds = new Set(
+          resolvedCompanies
+            .map((company) => company.id)
+            .filter((id): id is number => typeof id === 'number' && id > 0)
+        );
+        const selectedNames = new Set(
+          resolvedCompanies.map((company) => company.name.toLowerCase().trim())
+        );
+        const removesExistingAssociation =
+          [...existingIds].some((id) => !selectedIds.has(id)) ||
+          [...existingNames].some((name) => !selectedNames.has(name));
+
+        if (removesExistingAssociation) {
+          toast.error('Removing a company is not supported by the current API. Keep existing companies or ask the backend team to add association removal.');
+          return;
+        }
+
         const newOnly = resolvedCompanies.filter(
           (c) =>
             typeof c.id === 'number' &&
@@ -373,7 +397,6 @@ export const AdminQuestions: React.FC = () => {
         askedDate: formData.askedDate && formData.askedDate.trim() !== '' ? formData.askedDate.trim() : null,
         questionHints: formData.questionHints || [],
         ...(companiesToSubmit !== undefined ? { companies: companiesToSubmit } : {}),
-        testCases: formData.testCases || [],
       };
 
       const res = await adminQuestionService.saveOrUpdateQuestion(questionPayload);
@@ -435,12 +458,6 @@ export const AdminQuestions: React.FC = () => {
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
         } catch (tcErr: any) {
-          setSelectedQuestion({
-            ...questionPayload,
-            ...(savedQuestion && typeof savedQuestion === 'object' ? savedQuestion : {}),
-            id: targetQuestionId,
-            testCases: formData.testCases,
-          });
           await fetchQuestions();
           toast.error(
             getActionableErrorMessage(

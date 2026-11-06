@@ -28,11 +28,27 @@ export const rootReducer = (
   state: AppState | undefined,
   action: { type: string; payload?: unknown }
 ): AppState => {
+  const payload = action.payload && typeof action.payload === 'object'
+    ? action.payload as Record<string, unknown>
+    : null;
+  const nestedUser = payload?.user && typeof payload.user === 'object'
+    ? payload.user as Record<string, unknown>
+    : null;
+  const incomingUserId = nestedUser?.id ?? payload?.id ?? null;
+  const isAuthenticatedIdentityAction =
+    action.type === 'auth/login/fulfilled' ||
+    action.type === 'auth/refreshSession/fulfilled' ||
+    action.type === 'auth/setAuthenticatedSession';
+  const isIdentityChange =
+    isAuthenticatedIdentityAction &&
+    incomingUserId !== null &&
+    String(state?.auth.user?.id ?? '') !== String(incomingUserId);
   const shouldClearProtectedState =
     action.type === 'auth/logout/pending' ||
     action.type === 'auth/logout/fulfilled' ||
     action.type === 'auth/logout/rejected' ||
-    action.type === 'auth/setUnauthenticatedSession';
+    action.type === 'auth/setUnauthenticatedSession' ||
+    isIdentityChange;
 
   if (shouldClearProtectedState) {
     const resetState = appReducer(undefined, { type: '@@c2c/RESET_PROTECTED_STATE' });

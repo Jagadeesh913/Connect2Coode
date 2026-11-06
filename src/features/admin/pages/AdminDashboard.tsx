@@ -6,7 +6,7 @@ import { DashboardMetricsGrid, DashboardStats } from '../components/dashboard/Da
 import { DashboardSystemInfo } from '../components/dashboard/DashboardSystemInfo';
 import { DashboardQuickActions } from '../components/dashboard/DashboardQuickActions';
 import { DashboardCodeRunner } from '../components/dashboard/DashboardCodeRunner';
-import { adminQuestionService, getLiveTotalQuestionsCount } from '../../../services/admin/adminQuestionService';
+import { adminQuestionService } from '../../../services/admin/adminQuestionService';
 import { adminCompanyService } from '../../../services/admin/adminCompanyService';
 import { adminInstitutionService } from '../../../services/admin/adminInstitutionService';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
@@ -48,23 +48,11 @@ export const AdminDashboard: React.FC = () => {
 
     try {
       // 1. Fetch primary dashboard resources in parallel
-      const [probRes, compRes, instRes, mcqRes, sheetsRes] = await Promise.allSettled([
-        adminQuestionService.getQuestions(
-          {
-            level: null,
-            companies: null,
-            topic: null,
-            searchText: null,
-            pageRequest: {
-              pageNumber: 0,
-              pageSize: 10,
-              sortBy: 'id',
-              sortDirection: 'ASC',
-            },
-          },
+      const [compRes, instRes, mcqRes, sheetsRes] = await Promise.allSettled([
+        adminCompanyService.getCompaniesPaginated(
+          { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
           controller.signal
         ),
-        adminCompanyService.getCompanies(controller.signal),
         adminInstitutionService.getInstitutions({ page: 0, size: 1 }, controller.signal),
         adminMcqService.getMcqs(
           {
@@ -86,23 +74,14 @@ export const AdminDashboard: React.FC = () => {
 
       if (controller.signal.aborted) return;
 
-      let totalProblems = 0;
       let totalCompanies = 0;
       let totalInstitutions = 0;
       let totalMcqs = 0;
       let totalSheets = 0;
 
-      // 1. Total Problems
-      if (probRes.status === 'fulfilled' && probRes.value) {
-        const pageData = probRes.value.data;
-        const questionsList = Array.isArray(pageData?.content) ? pageData.content : [];
-        totalProblems = pageData?.totalElements ?? getLiveTotalQuestionsCount() ?? questionsList.length;
-      }
-
-      // 2. Companies
+      // 1. Companies
       if (compRes.status === 'fulfilled' && compRes.value) {
-        const companies = compRes.value.data;
-        totalCompanies = Array.isArray(companies) ? companies.length : 0;
+        totalCompanies = compRes.value.data.totalElements;
       }
 
       // 3. Institutions
@@ -124,10 +103,10 @@ export const AdminDashboard: React.FC = () => {
         totalSheets = sheetsRes.value.length;
       }
 
-      const criticalFailures = [probRes, compRes, instRes, mcqRes]
+      const criticalFailures = [compRes, instRes, mcqRes]
         .map((result, index) =>
           result.status === 'rejected'
-            ? ['problem catalog', 'companies', 'institutions', 'MCQs'][index]
+            ? ['companies', 'institutions', 'MCQs'][index]
             : null
         )
         .filter(Boolean);
@@ -139,7 +118,6 @@ export const AdminDashboard: React.FC = () => {
       setHasData(true);
       setStats((previous) => ({
         ...previous,
-        totalProblems: probRes.status === 'fulfilled' ? totalProblems : previous.totalProblems,
         totalCompanies: compRes.status === 'fulfilled' ? totalCompanies : previous.totalCompanies,
         totalInstitutions: instRes.status === 'fulfilled' ? totalInstitutions : previous.totalInstitutions,
         totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
@@ -154,6 +132,11 @@ export const AdminDashboard: React.FC = () => {
         setLoading(false);
       }
     }
+  }, []);
+
+  const handleQuestionTotalChange = useCallback((total: number) => {
+    setStats((previous) => ({ ...previous, totalProblems: total }));
+    setHasData(true);
   }, []);
 
   const fetchDifficultyCounts = useCallback(async () => {
@@ -317,7 +300,7 @@ export const AdminDashboard: React.FC = () => {
 
       {/* 3. Interactive Problem Code Runner & Test Suite */}
       <div id="dashboard-code-runner">
-        <DashboardCodeRunner />
+        <DashboardCodeRunner onQuestionTotalChange={handleQuestionTotalChange} />
       </div>
 
       {/* 4. System Configuration & Security Overview */}

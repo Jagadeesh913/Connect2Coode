@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { register } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -30,7 +31,10 @@ const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const {
   executionService,
   normalizeExecutionResult,
+  normalizeExecutionTestCaseResult,
   isExecutionResultSuccessful,
+  MAX_SOURCE_CODE_LENGTH,
+  MAX_CUSTOM_INPUT_LENGTH,
 } = await import('../../src/services/executionService.ts');
 const { adminLanguageService } = await import('../../src/services/admin/adminLanguageService.ts');
 const { userQuestionService } = await import('../../src/services/userQuestionService.ts');
@@ -42,6 +46,13 @@ const { getDsaQuestionProblemPath } = await import('../../src/features/dsaSheet/
 
 describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
   describe('1. Endpoint URL Formatting & Route Definitions', () => {
+    it('does not present configured admin auth state as a live validation result', () => {
+      const source = fs.readFileSync('src/features/admin/components/dashboard/DashboardSystemInfo.tsx', 'utf8');
+      assert.doesNotMatch(source, /Validated Token|RBAC Protected/);
+      assert.match(source, /JWT authentication configured/);
+      assert.match(source, /Current role:/);
+    });
+
     it('defines user-facing code execution endpoints', () => {
       assert.equal(API_ENDPOINTS.EXECUTION.USER_RUN, '/runCode');
       assert.equal(API_ENDPOINTS.EXECUTION.USER_SUBMIT, '/submitCode');
@@ -487,8 +498,14 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         totalTestCases: 1,
         passedTestCases: 1,
         failedTestCases: 0,
-        runtimeMs: undefined,
-        memoryMb: undefined,
+        executionTime: undefined,
+        executionTimeUnit: undefined,
+        memoryUsage: undefined,
+        memoryUnit: undefined,
+        status: undefined,
+        message: undefined,
+        stdout: undefined,
+        diagnostics: [],
         testCases: [{
           testCaseId: 1,
           testCaseType: 'Test Case',
@@ -500,6 +517,64 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
           errorMessage: undefined,
         }],
       });
+    });
+
+    it('normalizes observed execution fields without inventing runtime or memory units', () => {
+      const normalized = normalizeExecutionResult({
+        totalTestCases: 1,
+        passedTestCases: 0,
+        failedTestCases: 1,
+        time: '0.014',
+        memory: 12352,
+        errors: ['Execution failed'],
+        stderr: 'runtime diagnostic',
+        stdout: 'program output',
+        compileOutput: 'compiler diagnostic',
+        message: 'Code execution completed',
+        status: 'Failed',
+        testCases: [{
+          testCaseId: 11,
+          status: 'Failed',
+          stderr: 'case runtime diagnostic',
+          stdout: 'visible output',
+          isHidden: false,
+        }],
+      });
+
+      assert.equal(normalized.executionTime, '0.014');
+      assert.equal(normalized.executionTimeUnit, undefined);
+      assert.equal(normalized.memoryUsage, 12352);
+      assert.equal(normalized.memoryUnit, undefined);
+      assert.equal(normalized.status, 'Failed');
+      assert.equal(normalized.message, 'Code execution completed');
+      assert.equal(normalized.stdout, 'program output');
+      assert.deepEqual(normalized.diagnostics, [
+        'Execution failed',
+        'runtime diagnostic',
+        'compiler diagnostic',
+      ]);
+      assert.equal(normalized.testCases[0].actualOutput, 'visible output');
+      assert.equal(normalized.testCases[0].errorMessage, 'case runtime diagnostic');
+    });
+
+    it('retains units only for explicitly unit-named legacy execution fields', () => {
+      const normalized = normalizeExecutionResult({
+        totalTestCases: 1,
+        passedTestCases: 1,
+        failedTestCases: 0,
+        runtimeMs: 18,
+        memoryMb: '12.5',
+        errors: null,
+        stderr: null,
+        compileOutput: null,
+        testCases: [],
+      });
+
+      assert.equal(normalized.executionTime, 18);
+      assert.equal(normalized.executionTimeUnit, 'ms');
+      assert.equal(normalized.memoryUsage, '12.5');
+      assert.equal(normalized.memoryUnit, 'MB');
+      assert.deepEqual(normalized.diagnostics, []);
     });
 
     it('rejects missing verdicts and accepts only a complete passing result', () => {
@@ -574,8 +649,28 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
-    it('handles nullable and hidden test case fields without throwing errors', () => {
-      const mockResult = {
+    it('rejects oversized execution payloads before any language or execution request', async () => {
+      await assert.rejects(
+        () => executionService.prepareExecutionPayload({
+          questionId: 7,
+          languageId: 1,
+          sourceCode: 'x'.repeat(MAX_SOURCE_CODE_LENGTH + 1),
+        }),
+        /Source code exceeds/
+      );
+      await assert.rejects(
+        () => executionService.prepareExecutionPayload({
+          questionId: 7,
+          languageId: 1,
+          sourceCode: 'print(1)',
+          customInput: 'x'.repeat(MAX_CUSTOM_INPUT_LENGTH + 1),
+        }),
+        /Custom input exceeds/
+      );
+    });
+
+    it('masks hidden test case input and all outputs in the shared normalizer', () => {
+      const normalized = normalizeExecutionResult({
         totalTestCases: 3,
         passedTestCases: 2,
         failedTestCases: 1,
@@ -608,32 +703,32 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
             actualOutput: 'wrong_output',
           },
         ],
-      };
+      });
 
-      assert.equal(mockResult.testCases.length, 3);
-      // Hidden test case contract: isHidden === true must mask input and expected output in client UI
-      const hiddenFailCase = mockResult.testCases[2];
+      assert.equal(normalized.testCases.length, 3);
+      const visibleCase = normalized.testCases[0];
+      assert.equal(visibleCase.input, '1 2');
+      assert.equal(visibleCase.expectedOutput, '3');
+      assert.equal(visibleCase.actualOutput, '3');
+
+      const hiddenFailCase = normalized.testCases[2];
       assert.equal(hiddenFailCase.isHidden, true);
       assert.equal(hiddenFailCase.status, 'Failed');
+      assert.equal(hiddenFailCase.input, undefined);
+      assert.equal(hiddenFailCase.expectedOutput, undefined);
+      assert.equal(hiddenFailCase.actualOutput, undefined);
+      assert.equal(hiddenFailCase.errorMessage, undefined);
 
-      // Function simulating the ProblemDetails.tsx masking logic
-      const getDisplayedTestCase = (tc) => {
-        if (tc.isHidden) {
-          return {
-            status: tc.status,
-            isHidden: true,
-            input: null,
-            expectedOutput: null,
-            actualOutput: tc.actualOutput,
-          };
-        }
-        return tc;
-      };
-
-      const masked = getDisplayedTestCase(hiddenFailCase);
-      assert.equal(masked.input, null);
-      assert.equal(masked.expectedOutput, null);
-      assert.equal(masked.status, 'Failed');
+      const directlyNormalized = normalizeExecutionTestCaseResult({
+        isHidden: true,
+        status: 'Failed',
+        input: 'secret',
+        expectedOutput: 'secret expected',
+        stdout: 'secret actual',
+      });
+      assert.equal(directlyNormalized.input, undefined);
+      assert.equal(directlyNormalized.expectedOutput, undefined);
+      assert.equal(directlyNormalized.actualOutput, undefined);
     });
   });
 });

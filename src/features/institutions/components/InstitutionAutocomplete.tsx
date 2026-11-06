@@ -84,8 +84,7 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
         controller.signal
       );
       if (controller.signal.aborted) return;
-      const data = res?.data || (Array.isArray(res) ? res : []);
-      const results = Array.isArray(data) ? data.slice(0, 15) : [];
+      const results = res.data.slice(0, 15);
       setOptions(results);
       setActiveIndex(-1);
 

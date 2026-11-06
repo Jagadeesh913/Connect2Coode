@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchCompanyBySlug } from '../redux/companySlice';
@@ -132,6 +132,9 @@ export const CompanyDetails: React.FC = () => {
   const [activeMcqOptions, setActiveMcqOptions] = useState<SynthesizedOption[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [activeMcqLoading, setActiveMcqLoading] = useState(false);
+  const [activeMcqError, setActiveMcqError] = useState<string | null>(null);
+  const activeMcqControllerRef = useRef<AbortController | null>(null);
 
   // Tab State: Recruitment Exams (Default) vs Practice Questions
   const [activeTab, setActiveTab] = useState<'exams' | 'practice'>('exams');
@@ -382,13 +385,46 @@ export const CompanyDetails: React.FC = () => {
       .catch((err: unknown) => toast.error(typeof err === 'string' ? err : 'Failed to update bookmark'));
   };
 
-  const handleOpenSolveModal = (mcq: McqQuestion) => {
+  const handleOpenSolveModal = async (mcq: McqQuestion) => {
+    activeMcqControllerRef.current?.abort();
     const opts = synthesizeMcqOptions(mcq);
     setActiveSolveMcq(mcq);
     setActiveMcqOptions(opts);
     setSelectedAnswer(null);
     setIsSubmitted(false);
+    setActiveMcqError(null);
+
+    if (opts.length > 0) {
+      setActiveMcqLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    activeMcqControllerRef.current = controller;
+    setActiveMcqLoading(true);
+    try {
+      const detail = await mcqService.getMcqForAnswering(mcq, controller.signal);
+      if (controller.signal.aborted) return;
+      setActiveSolveMcq(detail);
+      setActiveMcqOptions(synthesizeMcqOptions(detail));
+    } catch (error: unknown) {
+      if (!controller.signal.aborted) {
+        setActiveMcqError(error instanceof Error ? error.message : 'Unable to load answer options.');
+      }
+    } finally {
+      if (!controller.signal.aborted) setActiveMcqLoading(false);
+    }
   };
+
+  const handleCloseSolveModal = () => {
+    activeMcqControllerRef.current?.abort();
+    activeMcqControllerRef.current = null;
+    setActiveSolveMcq(null);
+    setActiveMcqLoading(false);
+    setActiveMcqError(null);
+  };
+
+  useEffect(() => () => activeMcqControllerRef.current?.abort(), []);
 
   const activeCorrectOption = useMemo(() => {
     return activeMcqOptions.find((o) => o.isCorrect === true);
@@ -1135,7 +1171,7 @@ export const CompanyDetails: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveSolveMcq(null)}
+                  onClick={handleCloseSolveModal}
                   className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
                 >
                   <i className="fa-solid fa-xmark text-sm"></i>
@@ -1164,6 +1200,20 @@ export const CompanyDetails: React.FC = () => {
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Select your answer:
                 </span>
+                {activeMcqLoading ? (
+                  <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#111A2E] text-xs text-slate-500 dark:text-slate-400">
+                    Loading answer options…
+                  </div>
+                ) : activeMcqError ? (
+                  <div className="flex items-center justify-between gap-3 p-4 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/70 dark:bg-rose-950/20 text-xs text-rose-700 dark:text-rose-300">
+                    <span>{activeMcqError}</span>
+                    <button type="button" onClick={() => void handleOpenSolveModal(activeSolveMcq)} className="font-bold underline cursor-pointer">Retry</button>
+                  </div>
+                ) : activeMcqOptions.length === 0 ? (
+                  <div className="p-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#111A2E] text-xs italic text-slate-500 dark:text-slate-400">
+                    Multiple-choice options have not yet been configured for this question.
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {activeMcqOptions.map((opt) => {
                     const isSelected = selectedAnswer === opt.optionText;
@@ -1204,6 +1254,7 @@ export const CompanyDetails: React.FC = () => {
                     );
                   })}
                 </div>
+                )}
               </div>
 
               {/* Explanation & Feedback (When submitted) */}
@@ -1244,7 +1295,7 @@ export const CompanyDetails: React.FC = () => {
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => setActiveSolveMcq(null)}
+                onClick={handleCloseSolveModal}
                 className="px-5 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Close
@@ -1254,7 +1305,7 @@ export const CompanyDetails: React.FC = () => {
                 {!isSubmitted ? (
                   <button
                     type="button"
-                    disabled={!selectedAnswer}
+                    disabled={!selectedAnswer || activeMcqLoading || Boolean(activeMcqError) || activeMcqOptions.length === 0}
                     onClick={() => {
                       if (!selectedAnswer) return;
                       setIsSubmitted(true);
@@ -1276,7 +1327,7 @@ export const CompanyDetails: React.FC = () => {
                       if (currentIndex !== -1 && currentIndex + 1 < filteredMcqs.length) {
                         handleOpenSolveModal(filteredMcqs[currentIndex + 1]);
                       } else {
-                        setActiveSolveMcq(null);
+                        handleCloseSolveModal();
                       }
                     }}
                     className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-xs cursor-pointer flex items-center gap-1.5"

@@ -92,6 +92,25 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
       assert.equal(state1.loadingSheets, false);
       assert.equal(state1.sheetError, 'Network connection lost.');
     });
+
+    it('ignores a stale sheets response after a newer request takes ownership', () => {
+      let state = dsaSheetReducer(getInitialState(), {
+        type: fetchDsaSheets.pending.type,
+        meta: { requestId: 'older', arg: undefined },
+      });
+      state = dsaSheetReducer(state, {
+        type: fetchDsaSheets.pending.type,
+        meta: { requestId: 'newer', arg: { force: true } },
+      });
+      state = dsaSheetReducer(state, {
+        type: fetchDsaSheets.fulfilled.type,
+        meta: { requestId: 'older', arg: undefined },
+        payload: [{ id: 1, sheetName: 'Stale', sheetCode: 'STALE', isActive: true }],
+      });
+
+      assert.deepEqual(state.sheets, []);
+      assert.equal(state.sheetsRequestId, 'newer');
+    });
   });
 
   describe('selectSheet and toggleSection actions', () => {

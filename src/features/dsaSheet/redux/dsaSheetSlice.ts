@@ -19,6 +19,9 @@ export interface DsaSheetState {
   loadingSheets: boolean;
   loadingSections: boolean;
   loadingQuestionSectionId: number | null;
+  sheetsRequestId: string | null;
+  sectionRequestIds: Record<number, string>;
+  questionRequestIds: Record<number, string>;
 
   // Error messages
   sheetError: string | null;
@@ -42,6 +45,9 @@ const initialState: DsaSheetState = {
   loadingSheets: true,
   loadingSections: false,
   loadingQuestionSectionId: null,
+  sheetsRequestId: null,
+  sectionRequestIds: {},
+  questionRequestIds: {},
 
   sheetError: null,
   sectionsError: null,
@@ -74,6 +80,8 @@ export const fetchDsaSheets = createAsyncThunk<
     if (isRequestCanceled(error)) throw error;
     return rejectWithValue(getActionableErrorMessage(error, 'Unable to load DSA sheets.'));
   }
+}, {
+  condition: (arg, { getState }) => Boolean(arg?.force || !getState().dsaSheet.sheetsRequestId),
 });
 
 export const fetchDsaSections = createAsyncThunk<
@@ -96,6 +104,9 @@ export const fetchDsaSections = createAsyncThunk<
     if (isRequestCanceled(error)) throw error;
     return rejectWithValue(getActionableErrorMessage(error, 'Unable to load DSA sheet sections.'));
   }
+}, {
+  condition: ({ sheetId, force }, { getState }) =>
+    Boolean(force || !getState().dsaSheet.sectionRequestIds[sheetId]),
 });
 
 export const fetchSectionQuestions = createAsyncThunk<
@@ -121,6 +132,9 @@ export const fetchSectionQuestions = createAsyncThunk<
       message: getActionableErrorMessage(error, 'Unable to load section questions.'),
     });
   }
+}, {
+  condition: ({ sectionId, force }, { getState }) =>
+    Boolean(force || !getState().dsaSheet.questionRequestIds[sectionId]),
 });
 
 export const dsaSheetSlice = createSlice({
@@ -163,12 +177,15 @@ export const dsaSheetSlice = createSlice({
   },
   extraReducers: (builder) => {
     // 1. Sheets List
-    builder.addCase(fetchDsaSheets.pending, (state) => {
+    builder.addCase(fetchDsaSheets.pending, (state, action) => {
       state.loadingSheets = state.sheets.length === 0;
+      state.sheetsRequestId = action.meta?.requestId ?? null;
       state.sheetError = null;
     });
     builder.addCase(fetchDsaSheets.fulfilled, (state, action) => {
+      if (state.sheetsRequestId && action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
       state.loadingSheets = false;
+      state.sheetsRequestId = null;
       state.sheets = action.payload;
       state.sheetsFetchedAt = Date.now();
       state.sheetError = null;
@@ -195,19 +212,31 @@ export const dsaSheetSlice = createSlice({
       }
     });
     builder.addCase(fetchDsaSheets.rejected, (state, action) => {
+      if (state.sheetsRequestId && action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
       state.loadingSheets = false;
+      state.sheetsRequestId = null;
+      if (action.meta?.aborted || action.meta?.condition) return;
       state.sheetError = (action.payload as string) || 'Unable to load DSA sheets.';
     });
 
     // 2. Sections List
     builder.addCase(fetchDsaSections.pending, (state, action) => {
-      const sheetId = action.meta.arg.sheetId;
-      if (!state.sectionsBySheetId[sheetId] || action.meta.arg.force) {
+      const sheetId = action.meta?.arg?.sheetId;
+      if (sheetId !== undefined && action.meta?.requestId) {
+        state.sectionRequestIds[sheetId] = action.meta.requestId;
+      }
+      if (!sheetId || !state.sectionsBySheetId[sheetId] || action.meta?.arg?.force) {
         state.loadingSections = true;
       }
       state.sectionsError = null;
     });
     builder.addCase(fetchDsaSections.fulfilled, (state, action) => {
+      const sheetId = action.payload?.sheetId;
+      const ownedRequestId = sheetId !== undefined ? state.sectionRequestIds[sheetId] : undefined;
+      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (sheetId !== undefined) {
+        delete state.sectionRequestIds[sheetId];
+      }
       state.loadingSections = false;
       state.sectionsBySheetId[action.payload.sheetId] = action.payload.sections;
       state.sectionsFetchedAt[action.payload.sheetId] = Date.now();
@@ -225,22 +254,39 @@ export const dsaSheetSlice = createSlice({
       }
     });
     builder.addCase(fetchDsaSections.rejected, (state, action) => {
+      const sheetId = action.meta?.arg?.sheetId;
+      const ownedRequestId = sheetId !== undefined ? state.sectionRequestIds[sheetId] : undefined;
+      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (sheetId !== undefined) {
+        delete state.sectionRequestIds[sheetId];
+      }
       state.loadingSections = false;
       state.loadingQuestionSectionId = null;
+      if (action.meta?.aborted || action.meta?.condition) return;
       state.sectionsError = (action.payload as string) || 'Unable to load DSA sheet sections.';
-      if (!state.sectionsBySheetId[action.meta.arg.sheetId]) {
+      if (action.meta?.arg?.sheetId && !state.sectionsBySheetId[action.meta.arg.sheetId]) {
         state.sections = [];
       }
     });
 
     // 3. Section Questions
     builder.addCase(fetchSectionQuestions.pending, (state, action) => {
-      const sectionId = action.meta.arg.sectionId;
-      state.loadingQuestionSectionId = sectionId;
-      delete state.questionErrors[sectionId];
+      const sectionId = action.meta?.arg?.sectionId;
+      if (sectionId !== undefined && action.meta?.requestId) {
+        state.questionRequestIds[sectionId] = action.meta.requestId;
+      }
+      state.loadingQuestionSectionId = sectionId ?? null;
+      if (sectionId !== undefined) {
+        delete state.questionErrors[sectionId];
+      }
     });
     builder.addCase(fetchSectionQuestions.fulfilled, (state, action) => {
       const { sectionId, questions } = action.payload;
+      const ownedRequestId = sectionId !== undefined ? state.questionRequestIds[sectionId] : undefined;
+      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (sectionId !== undefined) {
+        delete state.questionRequestIds[sectionId];
+      }
       if (state.loadingQuestionSectionId === sectionId) {
         state.loadingQuestionSectionId = null;
       }
@@ -249,13 +295,21 @@ export const dsaSheetSlice = createSlice({
       delete state.questionErrors[sectionId];
     });
     builder.addCase(fetchSectionQuestions.rejected, (state, action) => {
-      const sectionId = action.meta.arg.sectionId;
+      const sectionId = action.meta?.arg?.sectionId;
+      const ownedRequestId = sectionId !== undefined ? state.questionRequestIds[sectionId] : undefined;
+      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (sectionId !== undefined) {
+        delete state.questionRequestIds[sectionId];
+      }
       if (state.loadingQuestionSectionId === sectionId) {
         state.loadingQuestionSectionId = null;
       }
+      if (action.meta?.aborted || action.meta?.condition) return;
       const payload = action.payload as { sectionId: number; message: string } | undefined;
       const message = payload?.message || 'Unable to load section questions.';
-      state.questionErrors[sectionId] = message;
+      if (sectionId !== undefined) {
+        state.questionErrors[sectionId] = message;
+      }
     });
     builder.addMatcher(
       (action) =>

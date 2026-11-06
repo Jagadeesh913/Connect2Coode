@@ -26,6 +26,8 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 const { synthesizeMcqOptions, parseAptitudeSubjectCode } = await import('../../src/features/aptitude/utils/mcqUtils.ts');
+const { apiClient } = await import('../../src/core/api/apiClient.ts');
+const { mcqService } = await import('../../src/services/mcqService.ts');
 const {
   normalizeApiMcqOptions,
   serializeMcqOptions,
@@ -140,5 +142,56 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
     });
 
     assert.deepEqual(options, []);
+  });
+
+  it('fetches MCQ detail when a list row omits answer options', async () => {
+    const originalGet = apiClient.get;
+    const calls = [];
+    apiClient.get = async (url, config) => {
+      calls.push([url, config]);
+      return {
+        statusCode: 200,
+        data: {
+          id: 4,
+          question: 'Detail question',
+          options: [
+            { id: 1, optionLabel: 'A', optionText: 'First', isCorrect: false },
+            { id: 2, optionLabel: 'B', optionText: 'Second', isCorrect: true },
+          ],
+        },
+      };
+    };
+
+    try {
+      const controller = new AbortController();
+      const detail = await mcqService.getMcqForAnswering(
+        { id: 4, question: 'List question' },
+        controller.signal
+      );
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0][0], '/mcq/4');
+      assert.equal(calls[0][1].signal, controller.signal);
+      assert.equal(synthesizeMcqOptions(detail).find((option) => option.isCorrect)?.optionLabel, 'B');
+    } finally {
+      apiClient.get = originalGet;
+    }
+  });
+
+  it('does not refetch a list row that already contains authoritative options', async () => {
+    const originalGet = apiClient.get;
+    apiClient.get = async () => {
+      throw new Error('Detail request should not run');
+    };
+    const listQuestion = {
+      id: 5,
+      question: 'Complete list question',
+      options: [{ id: 1, optionLabel: 'A', optionText: 'Answer', isCorrect: true }],
+    };
+
+    try {
+      assert.equal(await mcqService.getMcqForAnswering(listQuestion), listQuestion);
+    } finally {
+      apiClient.get = originalGet;
+    }
   });
 });

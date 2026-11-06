@@ -76,8 +76,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
           existingCases = question.testCases;
         }
 
-        // 2. Fetch authoritative test cases directly from the API when not already attached
-        if (existingCases.length === 0 && questionId) {
+        // 2. Only fetch when the caller did not supply an authoritative detail.
+        if (!question && questionId) {
           try {
             const fetched = await adminQuestionService.getTestCases(questionId);
             if (fetched && fetched.length > 0) {

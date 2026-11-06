@@ -23,7 +23,7 @@
 - **Verified Behavior**: The archived direct HTTP inventory records `GET /question/1` as `PASS`/`VERIFIED` and returning full question details. The earlier claim that every numeric details request returned 500 was stale.
 - **Specific Record Defects**: Certain questions (such as `GET /question/6`) fail on the remote Spring Boot backend with HTTP 500 (`"statusCode": 500, "message": "Question Fetch Unsuccessfull"`), likely due to internal null relationship references in the question entity.
 - **Remaining Constraint**: `GET /question/{slug}` fails because the Spring controller expects a numeric `Long` path variable.
-- **Frontend Mitigation**: Numeric IDs try `GET /question/{id}` first. If it fails with 500 or if a text slug is used, `problemService.getProblemById` and `questionService.getById` transparently fall back to the paginated `/questions` catalog and extract visible examples from the returned description. They do not add a speculative `GET /question/{id}/testCases` request because that route returned `401` for the authenticated temporary account. Abort errors are rethrown and never converted into a generic not-found result.
+- **Frontend Mitigation**: Numeric IDs require a valid `GET /question/{id}` detail response and preserve any backend failure. Only legacy text slugs scan the paginated `/questions` catalog to resolve a numeric identity. A catalog row is never presented as a complete numeric detail DTO.
 
 ### 3. Backend `@PathVariable Long id` vs String Slugs
 - **Observed Behavior**: Calling `GET /company/tcs` or `GET /question/two-sum` returns HTTP 401/404 because the Spring Boot controller declares `@PathVariable Long id`.
@@ -40,8 +40,18 @@
 
 ### 5. `POST /api/v1/questions` HTTP 500 on Oversized `pageSize` & Paginated Slices (Corrupted Records 24..47)
 - **Observed Behavior**: Historical frontend workarounds assumed certain `/questions` page slices failed and attempted to stitch smaller responses. Those observations are not treated as a backend contract because the backend source and complete DTO contract were unavailable for this audit.
-- **Decision**: A fallback may return success only when it proves the requested page/catalog is complete. Large-page stitching, offset recovery, and micro-batching now reject if any requested record is missing or any probe fails. The client no longer reports a 24-row subset with a synthetic `200` and a larger total, and it no longer fabricates an out-of-bounds empty page after a backend error.
-- **Filtered boundary**: Client-side fallback filtering is allowed only when the fallback response count equals the backend-reported complete catalog count. Otherwise the original backend failure is propagated.
+- **Decision**: The hard-coded 24/50 record counts, slice stitching, tail probes, per-record micro-batching, and client-side filtered recovery were removed. One requested page now produces one API request, successful metadata is preserved as returned, and malformed or failed responses remain failures.
+- **Release boundary**: This prevents a frontend request storm and false success, but it does not repair corrupt backend data. Every page and filter must work through the normal contract before question discovery is production-ready.
+
+### 8. Admin authorization returns HTTP 500 for an ordinary user
+- **Observed Behavior**: Historical Postman evidence shows the admin institution read succeeds for an ADMIN account, while a separate USER request returns HTTP 500. It does **not** establish that the USER obtained admin data.
+- **Required Backend Repair**: Enforce authorization before handler/database work and return 403 for an authenticated non-admin (401 only when unauthenticated). Repeat the matrix across every admin endpoint with confirmed USER and ADMIN identities.
+- **Frontend Boundary**: Route guards are presentation controls, not authorization. The frontend preserves the backend error and cannot prove or implement server-side RBAC.
+
+### 9. Postman workspace contract and credential hygiene
+- **Status**: `NOT WORKING`
+- **Observed State**: The workspace collection labelled as the complete API contains only a small subset, diagnostic collections retain legacy hosts and body-token patterns, some assertions pass unconditionally, and an access credential was embedded in collection data.
+- **Required Operations**: Revoke/rotate the exposed credential, remove all secrets, consolidate one canonical environment and collection against `https://api.connect2code.in/api/v1`, replace unconditional tests with contract assertions, and version the result. The current workspace is historical evidence, not a complete authoritative specification.
 
 
 ### 6. Learning Sheet Section 4 Question Read Returns HTTP 500
@@ -202,7 +212,7 @@
 
 ## 3. Unresolved Questions & Future Work
 
-0. **MCQ Option Data Is Missing for Existing Records**: `POST /mcq` on 2026-10-23 returned 10 records with option counts `4, 4, 4, 0, 0, 0, 0, 0, 0, 0`. `GET /mcq/4` likewise returned `options: []`. The aptitude UI is correctly rendering the API's empty collection and must not fabricate answer choices or correctness. Repair requires populating those MCQ option rows through the admin authoring API or backend data migration, then verifying `GET /mcq/{id}` returns the documented `options[].id`, `optionLabel`, `optionText`, and `isCorrect` fields.
+0. **MCQ Option Data Is Missing for Existing Records**: `POST /mcq` on 2026-10-23 returned 10 records with option counts `4, 4, 4, 0, 0, 0, 0, 0, 0, 0`. `GET /mcq/4` likewise returned `options: []`. The frontend now checks detail when an affected question is opened, but a detail response with no options correctly remains unanswerable. Repair still requires populating those option rows through the admin authoring API or backend data migration, then verifying `GET /mcq/{id}` returns documented `options[].id`, `optionLabel`, `optionText`, and `isCorrect` fields.
 
 1. **Backend Submission Patch**: Coordinate with backend engineering to add null safety checks to `TestCase.getType()` in Spring Boot code submission service to enable full submission execution.
 2. **Real-Time Notification Websocket**: Currently notifications and progress updates are pulled via HTTP; evaluate Stomp/Websocket integration if live multi-user contests are introduced.
@@ -222,3 +232,12 @@
 - Admin company autofill uses the complete paginated company catalog rather than only the currently visible admin table page.
 - Sanitized `FormData` requests clear the inherited JSON content type so Axios/browser multipart handling supplies the required boundary.
 - The legacy theme key is migration-only; all new guest/account preferences remain in `userScopedStorage`, and auth-status transitions reload the correct scope after startup refresh success or failure.
+
+### Decision 26: Phase 1 frontend contract remediation boundary (2026-11-05)
+
+- **Authentication**: `/institutions/search` is protected because the supplied Postman audit observed anonymous 401 and Bearer-authenticated 200. The detail endpoint remains unchanged because its authentication requirement was not separately re-verified.
+- **MCQ list/detail split**: List rows without options remain valid catalog rows. Aptitude fetches `/mcq/{id}` only after the user asks to load that card's options; Company Preparation fetches detail when the solve modal opens. Detail errors remain visible and retryable, and an empty detail `options` array remains unanswerable.
+- **Execution normalization and secrecy**: Observed `time`, `memory`, `errors`, `stderr`, `stdout`, `compileOutput`, `message`, and `status` fields are retained without assigning unverified units. Hidden-case input, expected output, actual output, and case diagnostic text are stripped in the shared normalizer. A normal-USER live `/submitCode` response was not available in this checkout, so actual backend hidden-value exposure remains `UNKNOWN`; frontend masking is not a substitute for backend access control.
+- **Bookmark and dashboard truthfulness**: Server bookmarks omit `savedAt` when the backend omits it. Admin system information now reports configured authentication and the session-supplied role without claiming live token validation or RBAC health.
+- **Question pagination boundary (M-03)**: Offset recovery, hard-coded historical counts, tail probes, micro-batching, and client-side filter recovery were removed because they amplified failures and fabricated success. Backend repair and complete authenticated pagination verification remain release requirements.
+- **Evidence boundary**: The connected Postman workspace was inspected, but its fragmented legacy collections and embedded credential prevent treating it as a canonical executable contract. No production mutation or complete live acceptance run was performed during this remediation.

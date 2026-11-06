@@ -31,8 +31,16 @@ const { companyService } = await import('../../src/services/companyService.ts');
 const { adminCompanyService } = await import('../../src/services/admin/adminCompanyService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
+const { normalizeCollegeId } = await import('../../src/features/profile/utils/academicProfile.ts');
 
 describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userId})', () => {
+  it('does not restore a stale institution ID after a free-text college edit', () => {
+    assert.equal(normalizeCollegeId('2250'), '2250');
+    assert.equal(normalizeCollegeId(''), null);
+    assert.equal(normalizeCollegeId('   '), null);
+    assert.equal(normalizeCollegeId(undefined), null);
+  });
+
   it('API_ENDPOINTS: accurately defines USER_INFO parameterized endpoint', () => {
     assert.equal(API_ENDPOINTS.USER.USER_INFO(68), '/userInfo/68');
     assert.equal(API_ENDPOINTS.USER.USER_INFO('101'), '/userInfo/101');

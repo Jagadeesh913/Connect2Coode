@@ -38,7 +38,6 @@ export interface SignUpPayload {
   lastName: string;
   email: string;
   password: string;
-  role?: string;
 }
 
 export interface VerifyOtpPayload {
@@ -79,10 +78,10 @@ export const authService = {
     const sanitizedLabel = rawLabel.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || `user${Date.now()}`;
 
     const requestPayload = {
-      role: 'USER',
+      ...payload,
+      role: 'USER' as const,
       labelUserName: payload.labelUserName || sanitizedLabel,
       userName: payload.userName || sanitizedLabel,
-      ...payload,
     };
     return apiClient.post(API_ENDPOINTS.AUTH.SIGNUP, requestPayload, {
       timeout: 120000,

@@ -40,10 +40,10 @@ export const DashboardSystemInfo: React.FC = () => {
             </span>
           </div>
           <span className="text-slate-800 dark:text-slate-200 font-semibold truncate text-xs">
-            Cryptographic Bearer JWT
+            Bearer JWT
           </span>
-          <AdminBadge variant="success" dot className="w-fit mt-1">
-            Validated Token
+          <AdminBadge variant="info" className="w-fit mt-1">
+            JWT authentication configured
           </AdminBadge>
         </div>
 
@@ -55,10 +55,10 @@ export const DashboardSystemInfo: React.FC = () => {
             </span>
           </div>
           <span className="text-slate-800 dark:text-slate-200 font-bold truncate text-xs">
-            {roleName} Active
+            Current role: {roleName}
           </span>
           <AdminBadge variant="warning" className="w-fit mt-1">
-            RBAC Protected
+            Role supplied by session
           </AdminBadge>
         </div>
       </div>

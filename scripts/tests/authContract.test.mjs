@@ -54,9 +54,10 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 const axiosModule = await import('axios');
-const { executeRefreshToken } = await import('../../src/core/api/apiClient.ts');
+const { apiClient, executeRefreshToken } = await import('../../src/core/api/apiClient.ts');
+const { authService } = await import('../../src/services/authService.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
-const { requireAuthSessionData } = await import('../../src/core/security/authContract.ts');
+const { getUserFromAuthSession, requireAuthSessionData } = await import('../../src/core/security/authContract.ts');
 const { withCrossTabRefreshLock } = await import('../../src/core/security/refreshCoordinator.ts');
 const { userScopedStorage } = await import('../../src/core/storage/userScopedStorage.ts');
 
@@ -68,6 +69,27 @@ setNavigator({
   locks: {
     request: (_name, _options, callback) => callback(),
   },
+});
+
+it('forces public signup to USER even when an untyped caller supplies another role', async () => {
+  const originalPost = apiClient.post;
+  let capturedPayload;
+  try {
+    apiClient.post = async (_url, payload) => {
+      capturedPayload = payload;
+      return { statusCode: 200, message: 'Created', data: {} };
+    };
+    await authService.signUp({
+      firstName: 'A',
+      lastName: 'User',
+      email: 'a.user@example.test',
+      password: 'example-password',
+      role: 'ADMIN',
+    });
+    assert.equal(capturedPayload.role, 'USER');
+  } finally {
+    apiClient.post = originalPost;
+  }
 });
 
 const installMemoryStorage = () => {
@@ -192,26 +214,79 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.equal('refreshToken' in nested.user, false);
   });
 
-  it('uses explicit request auth policy and never refreshes public HTTP 401 responses', async () => {
+  it('projects flat session payloads into credential-free user state', () => {
+    const session = requireAuthSessionData({
+      token: 'sensitive-access-token',
+      refreshToken: 'sensitive-refresh-token',
+      id: 42,
+      role: 'USER',
+      email: 'user@c2c.test',
+      firstName: 'Test',
+    });
+    const user = getUserFromAuthSession(session);
+    assert.deepEqual(user, {
+      id: 42,
+      role: 'USER',
+      email: 'user@c2c.test',
+      firstName: 'Test',
+      lastName: undefined,
+      fullName: undefined,
+      avatarUrl: undefined,
+      isDarkTheme: undefined,
+    });
+    assert.equal('token' in user, false);
+    assert.equal('refreshToken' in user, false);
+  });
+
+  it('attaches Bearer auth to institution search and applies protected 401 refresh policy', async () => {
+    const fs = await import('node:fs');
+    const institutionServiceSource = fs.readFileSync('src/services/institutionService.ts', 'utf8');
+    assert.match(
+      institutionServiceSource,
+      /INSTITUTION\.PUBLIC\.SEARCH[\s\S]*authPolicy:\s*'protected'/,
+      'Institution search must explicitly use protected authentication'
+    );
+
     tokenStorage.setAccessToken('in-memory-token');
     const requestHandler = axiosModule.requestHandlers[0];
     const publicConfig = await requestHandler({
-      url: '/institutions/search',
+      url: '/auth/login',
       authPolicy: 'public',
       headers: {},
     });
-    const protectedConfig = await requestHandler({
-      url: '/questions',
+    const institutionConfig = await requestHandler({
+      url: '/institutions/search',
       authPolicy: 'protected',
       headers: {},
     });
     assert.equal(publicConfig.headers.Authorization, undefined);
-    assert.equal(protectedConfig.headers.Authorization, 'Bearer in-memory-token');
+    assert.equal(institutionConfig.headers.Authorization, 'Bearer in-memory-token');
 
     axiosModule.resetPostCalls();
     const responseErrorHandler = axiosModule.responseErrorHandlers[0];
+    axiosModule.setPostImpl(async () => ({
+      data: {
+        statusCode: 200,
+        data: { token: 'refreshed-token', id: 42, email: 'user@c2c.test', role: 'USER' },
+      },
+    }));
+    const failedInstitutionRequest = {
+      url: '/institutions/search',
+      authPolicy: 'protected',
+      headers: {},
+    };
+    await responseErrorHandler({
+      config: failedInstitutionRequest,
+      response: { status: 401, data: { message: 'Expired access token' } },
+      message: 'Unauthorized',
+    });
+    assert.equal(axiosModule.postCalls.length, 1, 'Protected institution 401 must attempt one refresh');
+    assert.equal(axiosModule.postCalls[0][0], 'https://api.connect2code.in/api/v1/auth/refresh');
+    assert.equal(failedInstitutionRequest.headers.Authorization, 'Bearer refreshed-token');
+
+    axiosModule.resetPostCalls();
     await assert.rejects(() => responseErrorHandler({
-      config: { url: '/institutions/search', authPolicy: 'public' },
+      config: { url: '/auth/login', authPolicy: 'public' },
       response: { status: 401, data: { message: 'Public request denied' } },
       message: 'Unauthorized',
     }));

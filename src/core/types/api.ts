@@ -39,6 +39,8 @@ export interface ApiPage<T> {
   totalElements: number;
   size: number;
   number: number;
+  pageSize?: number;
+  pageNumber?: number;
   sort?: unknown;
   numberOfElements: number;
   first: boolean;

@@ -13,7 +13,7 @@ export interface BookmarkItem {
   title: string;
   difficulty?: string;
   category?: string;
-  savedAt: string;
+  savedAt?: string | null;
 }
 
 export interface BookmarkState {
@@ -98,6 +98,16 @@ export const isBookmarkItem = (
   type: BookmarkType
 ): boolean => item.type === type && String(item.itemId) === String(itemId);
 
+export const mapServerBookmark = (item: UserBookmarkQuestionResponse): BookmarkItem => ({
+  id: `bm-q-${item.questionId}`,
+  itemId: String(item.questionId),
+  type: 'PROBLEM',
+  // The server DTO does not expose the original bookmark timestamp. Omitting
+  // savedAt avoids presenting fetch time as creation time.
+  title: item.title,
+  difficulty: item.difficulty,
+});
+
 export const fetchBookmarks = createAsyncThunk<
   { userId: string | number | null; bookmarks: BookmarkItem[]; fetchedAt: number },
   { force?: boolean } | boolean | void,
@@ -114,16 +124,7 @@ export const fetchBookmarks = createAsyncThunk<
       try {
         const serverBookmarks = await userQuestionService.getBookmarkedQuestions(userId, signal);
         if (Array.isArray(serverBookmarks)) {
-          const mappedServer: BookmarkItem[] = serverBookmarks.map((item: UserBookmarkQuestionResponse) => ({
-            id: `bm-q-${item.questionId}`,
-            itemId: String(item.questionId),
-            type: 'PROBLEM' as const,
-            // GET /users/{userId}/questions/bookmarks exposes title and
-            // difficulty. Do not synthesize unobserved aliases.
-            title: item.title,
-            difficulty: item.difficulty,
-            savedAt: new Date().toISOString(),
-          }));
+          const mappedServer = serverBookmarks.map(mapServerBookmark);
           return {
             userId,
             bookmarks: mergeBookmarks(mappedServer, localBookmarks),
@@ -349,9 +350,14 @@ const bookmarkSlice = createSlice({
           action.type === 'auth/setAuthenticatedSession',
         (state, action: any) => {
           state.currentRequestId = null;
-          state.activeUserId =
-            action.payload?.user?.id ?? action.payload?.id ?? state.activeUserId;
-          state.bookmarks = [];
+          const nextUserId = action.payload?.user?.id ?? action.payload?.id ?? null;
+          const isSameScope =
+            String(state.activeUserId ?? '') === String(nextUserId ?? '');
+          state.activeUserId = nextUserId;
+          if (!isSameScope) {
+            state.bookmarks = [];
+            state.lastFetchedAt = null;
+          }
           state.pendingToggleKeys = {};
           state.loading = false;
           state.error = null;

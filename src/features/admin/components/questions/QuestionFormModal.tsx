@@ -7,7 +7,6 @@ import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
 import { adminCompanyService, CompanyItem } from '../../../../services/admin/adminCompanyService';
-import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from 'react-hot-toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
@@ -257,18 +256,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       }
 
       const resolvedTestCases = extractTestCasesFromProblem(initialData);
-      if (resolvedTestCases.length > 0) {
-        setTestCases(resolvedTestCases);
-      } else if (initialData.id) {
-        adminQuestionService
-          .getTestCases(initialData.id)
-          .then((cases) => {
-            if (cases && cases.length > 0) {
-              setTestCases(cases);
-            }
-          })
-          .catch(() => {});
-      }
+      setTestCases(resolvedTestCases);
     } else {
       const defaultDiff = difficulties[0];
       const defaultTopic = topics[0];

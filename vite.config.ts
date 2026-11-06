@@ -20,7 +20,6 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         changeOrigin: true,
-        secure: false,
         headers: {
           Origin: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         },
@@ -33,7 +32,6 @@ export default defineConfig({
       '/oauth2': {
         target: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         changeOrigin: true,
-        secure: false,
         headers: {
           Origin: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         },
@@ -51,7 +49,6 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         changeOrigin: true,
-        secure: false,
         headers: {
           Origin: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         },
@@ -64,7 +61,6 @@ export default defineConfig({
       '/oauth2': {
         target: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         changeOrigin: true,
-        secure: false,
         headers: {
           Origin: process.env.VITE_PROXY_TARGET || 'https://api.connect2code.in',
         },

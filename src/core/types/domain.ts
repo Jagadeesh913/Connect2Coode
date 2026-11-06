@@ -273,8 +273,14 @@ export interface ExecutionResult {
   totalTestCases: number;
   passedTestCases: number;
   failedTestCases: number;
-  runtimeMs?: number | string;
-  memoryMb?: number | string;
+  executionTime?: number | string;
+  executionTimeUnit?: 'ms';
+  memoryUsage?: number | string;
+  memoryUnit?: 'MB';
+  status?: number | string;
+  message?: string;
+  stdout?: string;
+  diagnostics: string[];
   testCases: ExecutionTestCaseResult[];
 }
 

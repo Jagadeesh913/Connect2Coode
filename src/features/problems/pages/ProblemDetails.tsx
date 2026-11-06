@@ -1976,11 +1976,11 @@ export const ProblemDetails: React.FC = () => {
                           <dl className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-1">
                             <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
                               <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Runtime</dt>
-                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.runtimeMs !== undefined && executionResult.runtimeMs !== null ? `${executionResult.runtimeMs} ms` : 'Not reported'}</dd>
+                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.executionTime !== undefined && executionResult.executionTime !== null ? `${executionResult.executionTime}${executionResult.executionTimeUnit ? ` ${executionResult.executionTimeUnit}` : ''}` : 'Not reported'}</dd>
                             </div>
                             <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
                               <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Memory</dt>
-                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.memoryMb !== undefined && executionResult.memoryMb !== null ? `${executionResult.memoryMb} MB` : 'Not reported'}</dd>
+                              <dd className="font-mono font-bold text-slate-900 dark:text-white">{executionResult.memoryUsage !== undefined && executionResult.memoryUsage !== null ? `${executionResult.memoryUsage}${executionResult.memoryUnit ? ` ${executionResult.memoryUnit}` : ''}` : 'Not reported'}</dd>
                             </div>
                             <div className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5 dark:border-slate-800">
                               <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Language</dt>

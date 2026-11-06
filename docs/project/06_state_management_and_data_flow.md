@@ -41,6 +41,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Authorization presentation**: Admin routing/navigation uses only the role supplied by login/refresh response data. JWT payload claims are not decoded for authorization decisions.
 - **Session response boundary**: Login and refresh establish authentication only after validating `token`, `id`, `role`, and `email`.
 - **Startup recovery state**: `RECOVERY_REQUIRED` distinguishes network/5xx/contract failures from refresh HTTP 401. Route guards render a retry gate without exposing protected content; only HTTP 401 becomes `UNAUTHENTICATED`.
+- **Feature mount boundary**: `AuthenticatedFeatureGate` keeps Problems, Problem Details, DSA Sheet, Company Prep, and Aptitude page trees unmounted until the session is authenticated. Their catalog/reference/detail effects therefore cannot issue API calls for signed-out visitors. The bodyless cookie-backed `/auth/refresh` still runs because it is the only contract-safe way to discover an existing HttpOnly-cookie session.
 - **Reducer purity**: Cookie reads occur in the `initializeAuth` action prepare callback and token writes occur in `authService`; reducers only apply action payloads.
 
 ### 2. `problemSlice` ([`src/features/problems/redux/problemSlice.ts`](../../src/features/problems/redux/problemSlice.ts))
@@ -65,7 +66,8 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - On app startup or user login, `hydrateProgress` queries the backend:
     - `GET /{userId}/getSubmiteedQuestionIds`
     - `GET /{userId}/getAPttemptedQuestionIds`
-    - Merges remote cloud states with local scoped storage.
+    - Treats each successful remote resource as authoritative, including an empty result.
+    - Uses the matching local scoped resource only when that remote request fails.
 - **Request ownership**: `currentRequestId` plus `loadingUserId` allow a newly authenticated user to supersede an in-flight request for the previous user; late fulfilled/rejected actions are ignored.
 - **Failure handling**: A new user scope clears the previous account's data as soon as hydration starts. One successful endpoint is retained with a warning; if both endpoints fail, the reducer uses that user's scoped local progress and exposes a warning instead of leaking the prior account or presenting an unexplained blank state.
 
@@ -76,6 +78,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Mutation concurrency**: `pendingToggleKeys` deduplicates only an identical in-flight mutation. Fulfilled mutations update the current array item-by-item instead of replacing it with a stale thunk snapshot, so concurrent toggles for different items cannot overwrite each other.
 - **Server boundary**: Authenticated problem bookmarks use the API. COMPANY/APTITUDE bookmarks remain an explicitly scoped browser-only fallback because no matching backend contract was found.
 - **Failure handling**: A failed server refresh remains rejected, preserves the active user's last known problem bookmarks, restores only scoped COMPANY/APTITUDE items, and exposes the error. Browser persistence filters out server-owned problem bookmarks.
+- **Timestamp boundary**: Server bookmark DTOs expose no original save timestamp, so hydrated problem bookmarks omit `savedAt`. Only records created locally receive a client creation timestamp.
 
 ### 6. `profileSlice` ([`src/features/profile/redux/profileSlice.ts`](../../src/features/profile/redux/profileSlice.ts))
 - **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` academic/personal fields. Activity metrics belong to `progressSlice`.

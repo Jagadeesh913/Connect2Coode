@@ -4,7 +4,7 @@ import type { ApiResponse } from '../core/types/api';
 import type { Institution, InstitutionOptionDTO } from '../core/types/domain';
 
 /**
- * Public Institution Service Layer (Student Registration & Autocomplete)
+ * Institution Service Layer (Authenticated Profile Autocomplete)
  * Base URL: /api/v1/institutions
  */
 export const institutionService = {
@@ -30,7 +30,7 @@ export const institutionService = {
       const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.INSTITUTION.PUBLIC.SEARCH, {
         params: { query: trimmed },
         signal,
-        authPolicy: 'public',
+        authPolicy: 'protected',
       });
       if (!Array.isArray(res.data)) {
         throw new Error('Unexpected institution search response format');

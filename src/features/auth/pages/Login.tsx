@@ -230,7 +230,6 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         lastName: data.lastName.trim(),
         email: data.email.trim(),
         password: data.password,
-        role: 'USER',
       });
 
       setSignupLoading(false);

@@ -36,13 +36,55 @@ export interface UserQuestionSubmissionItem {
 
 export type UserQuestionProgressResponse = UserSubmittedQuestionItem;
 
-const extractArrayResponse = <T>(response: unknown, label: string): T[] => {
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const isBookmarkQuestion = (value: unknown): value is UserBookmarkQuestionResponse =>
+  isRecord(value) &&
+  isFiniteNumber(value.questionId) &&
+  typeof value.title === 'string' &&
+  typeof value.difficulty === 'string';
+
+const isSubmittedQuestion = (value: unknown): value is UserSubmittedQuestionItem =>
+  isRecord(value) &&
+  isFiniteNumber(value.questionId) &&
+  typeof value.questionName === 'string' &&
+  typeof value.difficultyLevel === 'string' &&
+  typeof value.submittedDate === 'string';
+
+const isAttemptedQuestion = (value: unknown): value is UserAttemptedQuestionItem =>
+  isRecord(value) &&
+  isFiniteNumber(value.questionId) &&
+  typeof value.title === 'string' &&
+  typeof value.difficulty === 'string' &&
+  typeof value.submittedDate === 'string';
+
+const isQuestionSubmission = (value: unknown): value is UserQuestionSubmissionItem =>
+  isRecord(value) &&
+  isFiniteNumber(value.id) &&
+  isFiniteNumber(value.userId) &&
+  isFiniteNumber(value.questionId) &&
+  isFiniteNumber(value.languageId) &&
+  typeof value.sourceCode === 'string' &&
+  isFiniteNumber(value.totalTestCases) &&
+  isFiniteNumber(value.passedTestCases) &&
+  (value.status === null || typeof value.status === 'string') &&
+  typeof value.submittedAt === 'string';
+
+const extractArrayResponse = <T>(
+  response: unknown,
+  label: string,
+  guard: (value: unknown) => value is T
+): T[] => {
   const envelope = response && typeof response === 'object'
     ? response as Record<string, unknown>
     : null;
   const data = envelope?.data;
 
-  if (Array.isArray(data)) return data as T[];
+  if (Array.isArray(data) && data.every(guard)) return data;
 
   throw new Error(`Unexpected ${label} response format`);
 };
@@ -99,7 +141,7 @@ export const userQuestionService = {
       throw new Error('userId is required to retrieve bookmarks');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.BOOKMARKS(userId), { signal });
-    return extractArrayResponse<UserBookmarkQuestionResponse>(res, 'bookmarks');
+    return extractArrayResponse(res, 'bookmarks', isBookmarkQuestion);
   },
 
   /**
@@ -114,7 +156,7 @@ export const userQuestionService = {
       throw new Error('userId is required to retrieve solved questions');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.SUBMITTED_QUESTIONS(userId), { signal });
-    return extractArrayResponse<UserSubmittedQuestionItem>(res, 'solved questions');
+    return extractArrayResponse(res, 'solved questions', isSubmittedQuestion);
   },
 
   /**
@@ -139,7 +181,7 @@ export const userQuestionService = {
       throw new Error('userId is required to retrieve attempted questions');
     }
     const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.USER.ATTEMPTED_QUESTIONS(userId), { signal });
-    return extractArrayResponse<UserAttemptedQuestionItem>(res, 'attempted questions');
+    return extractArrayResponse(res, 'attempted questions', isAttemptedQuestion);
   },
 
   /**
@@ -158,6 +200,6 @@ export const userQuestionService = {
       API_ENDPOINTS.USER.QUESTION_SUBMISSIONS(userId, questionId),
       { signal }
     );
-    return extractArrayResponse<UserQuestionSubmissionItem>(res, 'question submissions');
+    return extractArrayResponse(res, 'question submissions', isQuestionSubmission);
   },
 };

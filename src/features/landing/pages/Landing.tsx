@@ -30,8 +30,6 @@ export const Landing: React.FC = () => {
   // Interactive Mini Code Runner Demo State
   const [demoSelectedLang, setDemoSelectedLang] = useState('Java');
   const [demoActiveTab, setDemoActiveTab] = useState<'custom' | 'testcases'>('testcases');
-  const [demoRunning, setDemoRunning] = useState(false);
-  const [demoOutput, setDemoOutput] = useState<string | null>(null);
 
   // Company Marquee Horizontal Scroll Ref for manual arrows
   const companiesScrollRef = useRef<HTMLDivElement>(null);
@@ -46,6 +44,8 @@ export const Landing: React.FC = () => {
   // Automated Feedback Carousel State (Auto-advances from Right to Left)
   const [activeFeedbackSlide, setActiveFeedbackSlide] = useState(0);
   const [isFeedbackHovered, setIsFeedbackHovered] = useState(false);
+  const [isFeedbackFocused, setIsFeedbackFocused] = useState(false);
+  const [isFeedbackPaused, setIsFeedbackPaused] = useState(false);
 
   const feedbackSlides = [
     // Slide 1 (Matching reference image)
@@ -124,12 +124,13 @@ export const Landing: React.FC = () => {
 
   // Automatic right-to-left slide transition every 3.5 seconds
   useEffect(() => {
-    if (isFeedbackHovered) return;
+    if (isFeedbackHovered || isFeedbackFocused || isFeedbackPaused) return;
     const timer = setInterval(() => {
+      if (document.hidden || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       setActiveFeedbackSlide((prev) => (prev + 1) % feedbackSlides.length);
     }, 3500);
     return () => clearInterval(timer);
-  }, [isFeedbackHovered, feedbackSlides.length]);
+  }, [isFeedbackFocused, isFeedbackHovered, isFeedbackPaused, feedbackSlides.length]);
 
   const handleNextFeedback = () => {
     setActiveFeedbackSlide((prev) => (prev + 1) % feedbackSlides.length);
@@ -137,16 +138,6 @@ export const Landing: React.FC = () => {
 
   const handlePrevFeedback = () => {
     setActiveFeedbackSlide((prev) => (prev === 0 ? feedbackSlides.length - 1 : prev - 1));
-  };
-
-  const handleRunDemoCode = () => {
-    setDemoRunning(true);
-    setDemoOutput(null);
-    setTimeout(() => {
-      setDemoRunning(false);
-      setDemoOutput('[0, 1] — All 3 Test Cases Passed! (Runtime: 1ms)');
-      toast.success('Sample Code Executed Successfully!');
-    }, 800);
   };
 
   const faqs = [
@@ -886,30 +877,14 @@ export const Landing: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleRunDemoCode}
-                    disabled={demoRunning}
-                    className="px-4 py-1.5 rounded-full bg-[#0B0F19] dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-all shadow-2xs active:translate-y-0.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {demoRunning ? 'Running...' : 'Run Code'}
-                  </button>
                   <Link
-                    to="/practice/two-sum"
+                    to="/practice"
                     className="px-5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-all shadow-xs active:translate-y-0.5 cursor-pointer no-underline"
                   >
-                    Submit
+                    Open Problem Bank
                   </Link>
                 </div>
               </div>
-
-              {/* Live output preview */}
-              {demoOutput && (
-                <div className="mt-3.5 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs font-mono text-emerald-800 dark:text-emerald-300 animate-fade-in flex items-center gap-2">
-                  <i className="fa-solid fa-circle-check text-emerald-600"></i>
-                  <span>{demoOutput}</span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -941,6 +916,12 @@ export const Landing: React.FC = () => {
           className="relative flex items-center justify-center gap-3 sm:gap-4 max-w-6xl mx-auto"
           onMouseEnter={() => setIsFeedbackHovered(true)}
           onMouseLeave={() => setIsFeedbackHovered(false)}
+          onFocusCapture={() => setIsFeedbackFocused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setIsFeedbackFocused(false);
+            }
+          }}
         >
           {/* Left Arrow Button */}
           <button
@@ -1021,6 +1002,14 @@ export const Landing: React.FC = () => {
               aria-label={`Go to slide ${idx + 1}`}
             />
           ))}
+          <button
+            type="button"
+            onClick={() => setIsFeedbackPaused((paused) => !paused)}
+            className="ml-2 rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold text-slate-600 hover:border-blue-500 hover:text-blue-600 dark:border-slate-700 dark:text-slate-300"
+            aria-pressed={isFeedbackPaused}
+          >
+            {isFeedbackPaused ? 'Play' : 'Pause'}
+          </button>
         </div>
       </section>
 
@@ -1077,7 +1066,10 @@ export const Landing: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                    className="w-full px-5 py-4 flex items-center justify-between text-left gap-4 cursor-pointer focus:outline-none"
+                    aria-expanded={isOpen}
+                    aria-controls={`landing-faq-answer-${index}`}
+                    id={`landing-faq-question-${index}`}
+                    className="w-full px-5 py-4 flex items-center justify-between text-left gap-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500"
                   >
                     <div className="flex items-center gap-3">
                       {isOpen && (
@@ -1097,7 +1089,12 @@ export const Landing: React.FC = () => {
                   </button>
 
                   {isOpen && (
-                    <div className="px-5 pb-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-3 animate-fade-in pl-14">
+                    <div
+                      id={`landing-faq-answer-${index}`}
+                      role="region"
+                      aria-labelledby={`landing-faq-question-${index}`}
+                      className="px-5 pb-4 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-slate-800/80 pt-3 animate-fade-in pl-14"
+                    >
                       {faq.a}
                     </div>
                   )}

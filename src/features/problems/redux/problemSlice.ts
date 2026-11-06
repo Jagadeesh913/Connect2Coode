@@ -334,6 +334,7 @@ const problemSlice = createSlice({
       })
       .addCase(fetchProblems.fulfilled, (state, action) => {
         const { key, problems, pagination, fetchedAt } = action.payload;
+
         state.listCache = trimCache(
           {
             ...state.listCache,
@@ -341,10 +342,6 @@ const problemSlice = createSlice({
           },
           MAX_LIST_CACHE_ENTRIES
         );
-
-        // A superseded response may warm the cache, but must never replace the
-        // visible query or release the newer request's loading ownership.
-        if (state.listRequestId !== action.meta.requestId) return;
 
         const isCurrent = state.listRequestId === action.meta.requestId;
         if (isCurrent) {
@@ -404,6 +401,7 @@ const problemSlice = createSlice({
       })
       .addCase(fetchProblemById.fulfilled, (state, action) => {
         const { key, problem, fetchedAt } = action.payload;
+
         state.detailCache = trimCache(
           {
             ...state.detailCache,
@@ -411,8 +409,6 @@ const problemSlice = createSlice({
           },
           MAX_DETAIL_CACHE_ENTRIES
         );
-
-        if (state.detailRequestId !== action.meta.requestId) return;
 
         const isCurrent = state.detailRequestId === action.meta.requestId;
         if (isCurrent) {

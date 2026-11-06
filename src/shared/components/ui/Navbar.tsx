@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { logoutUser, openAuthModal } from '../../../features/auth/redux/authSlice';
+import { logoutUser, openAuthModal, type UserProfile } from '../../../features/auth/redux/authSlice';
 import { useTheme } from '../../context/ThemeContext';
 import { isAdminRole } from '../../../core/security/jwt';
 import { BrandLogo } from './BrandLogo';
 
 export interface NavbarProps {
-  user?: any;
+  user?: UserProfile | null;
   onLogout?: () => void;
 }
 
@@ -27,7 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const isLoggedIn = user !== undefined ? user !== null : (isAuthenticated && reduxUser !== null);
   const currentUser = user || reduxUser || null;
-  const userDisplayName = currentUser?.fullName || currentUser?.firstName || currentUser?.name || currentUser?.email?.split('@')[0] || 'User';
+  const userDisplayName = currentUser?.fullName || currentUser?.firstName || currentUser?.email?.split('@')[0] || 'User';
   const userDisplayEmail = currentUser?.email || '';
   const userInitials = userDisplayName.slice(0, 2).toUpperCase();
 
@@ -41,6 +41,16 @@ export const Navbar: React.FC<NavbarProps> = ({
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setIsProfileDropdownOpen(false);
+      setIsMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
   // Close mobile menu whenever route changes
@@ -147,12 +157,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isLoggedIn ? (
               <div className="relative" ref={dropdownRef}>
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsProfileDropdownOpen((prev) => !prev);
                   }}
                   className="flex items-center gap-1.5 sm:gap-2 p-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                   aria-label="User menu"
+                  aria-expanded={isProfileDropdownOpen}
+                  aria-controls="c2c-profile-menu"
                 >
                   <div className="relative">
                     {currentUser?.avatarUrl ? (
@@ -173,7 +186,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
                 {/* Profile Dropdown */}
                 {isProfileDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2.5 w-56 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 flex flex-col p-2 gap-1 font-sans">
+                  <div id="c2c-profile-menu" className="absolute right-0 top-full mt-2.5 w-56 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 flex flex-col p-2 gap-1 font-sans">
                     <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50 rounded-xl flex items-center gap-2.5">
                       {currentUser?.avatarUrl ? (
                         <img
@@ -269,6 +282,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={() => setIsMobileMenuOpen((prev) => !prev)}
               className="md:hidden p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               aria-label="Toggle navigation menu"
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="c2c-mobile-navigation"
             >
               <i className={`fa-solid ${isMobileMenuOpen ? 'fa-xmark' : 'fa-bars'} text-sm`}></i>
             </button>
@@ -279,7 +294,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* MOBILE NAVIGATION DRAWER */}
       {isMobileMenuOpen && (
-        <div className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-[#0B0F19]/98 backdrop-blur-xl px-4 py-3 shadow-xl animate-fade-in font-sans">
+        <div id="c2c-mobile-navigation" className="md:hidden border-t border-slate-200 dark:border-slate-800 bg-white/98 dark:bg-[#0B0F19]/98 backdrop-blur-xl px-4 py-3 shadow-xl animate-fade-in font-sans">
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => {
               const isActive = item.exact 

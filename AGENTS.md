@@ -33,7 +33,8 @@ The authoritative project documentation lives in [`docs/project/`](docs/project/
 | [**07_testing_and_verification_guide.md**](docs/project/07_testing_and_verification_guide.md) | Test runner (`node:test`), verification commands, mocking strategies, and regression coverage. |
 | [**08_dev_environment_and_operations.md**](docs/project/08_dev_environment_and_operations.md) | Local setup, proxying, `.env` conventions, Vercel SPA rewrites, and GitHub Actions CI. |
 | [**09_known_issues_and_decisions.md**](docs/project/09_known_issues_and_decisions.md) | Known backend defects, architectural trade-offs, and unresolved investigation areas. |
-| [**10_file_coverage_and_verification_status.md**](docs/project/10_file_coverage_and_verification_status.md) | Exhaustive file-level coverage matrix across all 136 source files and scripts. |
+| [**10_file_coverage_and_verification_status.md**](docs/project/10_file_coverage_and_verification_status.md) | File-level coverage matrix across the 159 TypeScript/TSX source files and supporting scripts. |
+| [**11_phase1_production_audit.md**](docs/project/11_phase1_production_audit.md) | Consolidated Phase 1 original/deep checklist, remediation status, external blockers, and release gate. |
 
 ---
 

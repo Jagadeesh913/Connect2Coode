@@ -118,7 +118,7 @@ export const AdminCompanies: React.FC = () => {
     try {
       const res = await adminCompanyService.getCompanyById(id);
       if (requestId !== inspectionId.current) return;
-      const companyData = res?.data || ((res as any)?.id ? (res as any) : null);
+      const companyData = res.data;
       if (companyData) {
         setSelectedCompany(companyData);
       } else {
@@ -142,7 +142,7 @@ export const AdminCompanies: React.FC = () => {
     try {
       const res = await adminCompanyService.getCompanyById(item.id);
       if (requestId !== inspectionId.current) return;
-      const companyData = res?.data || ((res as any)?.id ? (res as any) : null);
+      const companyData = res.data;
       if (companyData) {
         setSelectedCompany(companyData);
         setIsFormOpen(true);

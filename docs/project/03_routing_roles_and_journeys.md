@@ -13,7 +13,7 @@ graph TD
         AuthL["/login, /signup, /forgot-password"]
     end
     
-    subgraph PublicPracticeBranch [Public & Student (MainLayout)]
+    subgraph PublicPracticeBranch [Stable URLs, Authenticated Content (MainLayout)]
         Practice["/practice, /dsa-sheet, /problems/:slug"]
         Companies["/companies, /companies/:slug, /companies/exams/:examId"]
         Aptitude["/aptitude, /roadmaps/:slug, /interviews"]
@@ -42,16 +42,16 @@ graph TD
 | `/login` | `Login` | Guest Only | `AuthLayout` | `GuestRoute` (redirects to `/practice` if authed) |
 | `/signup` | `Signup` | Guest Only | `AuthLayout` | `GuestRoute` |
 | `/forgot-password` | `ForgotPassword` | Guest Only | `AuthLayout` | `GuestRoute` |
-| `/practice` | `PracticePage` | Public (with tracking) | `MainLayout` | None |
-| `/dsa-sheet` | `DsaSheetPage` | Public (API auth is attached when available) | `MainLayout` | None |
-| `/problems/:slug` | `ProblemDetails` | Public (with tracking) | `MainLayout` | Monaco editor coding workspace |
+| `/practice` | `PracticePage` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; signed-out users see the shared sign-in state |
+| `/dsa-sheet` | `DsaSheetPage` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; signed-out users see the shared sign-in state |
+| `/problems/:slug` | `ProblemDetails` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; Monaco workspace is not mounted while signed out |
 | `/problems` | Redirect -> `/practice` | Public | N/A | Instant Navigate replace |
-| `/companies` | `CompanyList` | Public | `MainLayout` | None |
-| `/companies/:slug` | `CompanyDetails` | Public | `MainLayout` | Company syllabus & questions |
-| `/companies/:companyId/exams/:examId` | `CompanyExamDetails` | Public | `MainLayout` | Detailed exam blueprint |
-| `/companies/exams/:examId` | `CompanyExamDetails` | Public | `MainLayout` | Direct exam blueprint route |
+| `/companies` | `CompanyList` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate` |
+| `/companies/:slug` | `CompanyDetails` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; company content is not mounted while signed out |
+| `/companies/:companyId/exams/:examId` | `CompanyExamDetails` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate` |
+| `/companies/exams/:examId` | `CompanyExamDetails` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate` |
 | `/company-patterns` | Redirect -> `/companies` | Public | N/A | Instant Navigate replace |
-| `/aptitude` | `AptitudePrep` | Public | `MainLayout` | Quantitative, Reasoning, Verbal, Pseudocode |
+| `/aptitude` | `AptitudePrep` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; signed-out users see the shared sign-in state |
 | `/logical` | Redirect -> `/aptitude?category=reasoning` | Public | N/A | Query string redirect |
 | `/verbal` | Redirect -> `/aptitude?category=verbal` | Public | N/A | Query string redirect |
 | `/pseudocode` | Redirect -> `/aptitude?category=pseudocode` | Public | N/A | Query string redirect |
@@ -81,7 +81,7 @@ graph TD
 
 Every route resolves a title, description, canonical path, robots directive, Open Graph set, and Twitter/X card set through [`src/core/metadata/pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts). Titles use `Page Name | Connect2Code`. The stable public hubs (`/`, `/practice`, `/dsa-sheet`, `/companies`, and `/aptitude`) are indexable. Login/signup/reset pages are `noindex, follow`; OAuth, authenticated, admin, error, unknown, coming-soon, and authenticated API-backed detail routes are `noindex, nofollow`. Redirect aliases canonicalize and permanently redirect at the edge to their destination (`/problems` to `/practice`, `/company-patterns` to `/companies`, and aptitude aliases to `/aptitude`). Dynamic problem, company, and exam titles are applied in the browser only after the current route's API response succeeds; the route remains non-indexable because those API contracts require authentication.
 
-The metadata owner is mounted above all route branches in `AppRouterLayout`, so client navigation, back/forward navigation, deep-link hydration, guard redirects, errors, and unknown routes cannot retain tags from the previous page. The production build also runs [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs), producing route-specific, meaningful HTML and social metadata for each indexable public hub without User-Agent detection. Vercel serves a separate noindex app shell for authenticated/dynamic routes, sends matching `X-Robots-Tag` headers, and serves the generated `404.html` with a genuine 404 for paths outside the explicit route allowlist.
+The metadata owner is mounted above all route branches in `AppRouterLayout`, so client navigation, back/forward navigation, deep-link hydration, guard redirects, errors, and unknown routes cannot retain tags from the previous page. The production build also runs [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs), producing route-specific metadata and no-JavaScript fallback content for each indexable hub without User-Agent detection. That fallback lives in `<noscript>` beside an empty React root, so JavaScript browsers do not briefly render crawler text before React mounts. Vercel serves a separate noindex app shell for authenticated/dynamic routes, sends matching `X-Robots-Tag` headers, and serves the generated `404.html` with a genuine 404 for paths outside the explicit route allowlist.
 
 ---
 
@@ -96,10 +96,11 @@ The application distinguishes between two primary user roles:
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
 | **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Waits for startup restoration, then trusts validated Redux authentication state. Saves the attempted destination in `sessionStorage.getItem('post_auth_redirect')`. JWT contents are never decoded. | Redirects to `/login` only after confirmed unauthentication |
+| **`AuthenticatedFeatureGate`** | [`src/features/auth/components/AuthenticatedFeatureGate.tsx`](../../src/features/auth/components/AuthenticatedFeatureGate.tsx) | Waits for startup restoration and keeps the API-owning learning page unmounted until authentication succeeds. Signed-out visitors receive the shared `EmptyState` sign-in UI; temporary failures receive `SessionRecoveryState`. | Inline sign-in prompt; no redirect and no feature API effects while signed out |
 | **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Waits for startup refresh, then uses the backend response `role` to select `/admin/dashboard` or `/practice`. JWT claims are not decoded for routing. | Redirects to `/practice` or `/admin/dashboard` |
 | **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Requires authenticated Redux state and an exact `ADMIN`/`ROLE_ADMIN` value supplied by the latest login/refresh response. Backend authorization remains authoritative. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
 
-All three guard types keep protected/guest decisions closed during `LOADING`. A temporary startup refresh failure enters `RECOVERY_REQUIRED` and renders a safe retry screen; it does not redirect to login, infer that the cookie is invalid, or reveal protected route content. Refresh HTTP 401 alone transitions to `UNAUTHENTICATED`.
+All guard types keep protected/guest decisions closed during `LOADING`. A temporary startup refresh failure enters `RECOVERY_REQUIRED` and renders a safe retry screen; it does not redirect to login, infer that the cookie is invalid, or reveal protected route content. Refresh HTTP 401 alone transitions to `UNAUTHENTICATED`. The cookie-backed `/auth/refresh` remains the required startup session check; the feature gate prevents catalog, reference, company, sheet, aptitude, and problem-detail requests until a session is authenticated.
 
 ---
 
@@ -114,7 +115,7 @@ All three guard types keep protected/guest decisions closed during `LOADING`. A 
 6. **Save Profile**: User saves academic details (passing year, graduation year, registration number). Dispatches `POST /api/v1/userInfo/{userId}` with bearer authentication and business fields only.
 
 ### Journey 2: DSA Problem Solving & Live Code Compilation
-1. **Catalog Navigation**: Student navigates to `/practice` for the general catalog or `/dsa-sheet` for an ordered learning path.
+1. **Catalog Navigation**: An authenticated student navigates to `/practice` for the general catalog or `/dsa-sheet` for an ordered learning path. A signed-out visitor sees the shared sign-in state without mounting either API-owning page.
 2. **Sheet Navigation**: The DSA page fetches active sheets, top-level sections ordered by `displayOrder`, and loads linked questions when a section is opened.
 3. **Filtering**: On `/practice`, the student selects topics, difficulty, and company. On `/dsa-sheet`, search is applied to the loaded question metadata without inventing unreturned questions.
 4. **Problem Details**: User clicks a linked problem, navigating to `/problems/{questionId}`.
@@ -128,7 +129,7 @@ All three guard types keep protected/guest decisions closed during `LOADING`. A 
 8. **Submission**: User clicks "Submit". Dispatches `POST /api/v1/submitCode`. On success, progress slice updates solved status and marks problem solved in `userScopedStorage`.
 
 ### Journey 3: Company Recruitment Exam Preparation
-1. **Directory Browse**: User visits `/companies`. `CompanyBrandLogo` resolves the 121 bundled recruiter assets first, then uses the documented dynamic provider cascade for companies outside the local registry.
+1. **Directory Browse**: An authenticated user visits `/companies`. A signed-out visitor sees the shared sign-in state without starting company catalog requests. After authentication, `CompanyBrandLogo` resolves the 121 bundled recruiter assets first, then uses the documented dynamic provider cascade for companies outside the local registry.
 2. **Company Blueprint**: User selects TCS (`/companies/tcs`). Page queries `GET /api/v1/company/1` and `POST /api/v1/company/1/exams/list`.
 3. **Exam Selection**: User clicks "TCS NQT 2026" (`/companies/1/exams/10`).
 4. **Section Breakdown**: Displays exam rounds, durations, marks, and associated technical interview/coding questions.

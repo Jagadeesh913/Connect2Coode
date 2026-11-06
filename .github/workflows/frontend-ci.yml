@@ -47,7 +47,7 @@ jobs:
         run: npm test
 
       - name: Typecheck
-        run: npx --yes -p typescript@5.9.3 tsc -p tsconfig.json --noEmit
+        run: npm run typecheck
 
       - name: Build
         run: npm run build
