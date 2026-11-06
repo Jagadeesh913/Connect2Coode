@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { UserInfoData, UserProfile } from '../../../../core/types/domain';
@@ -6,6 +6,7 @@ import { personalInfoSchema, PersonalInfoFormData } from '../../../../core/valid
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { User, Mail, FileText, X, Loader2, CheckCircle2, Calendar, Lock } from 'lucide-react';
 import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
+import { useAccessibleDialog } from '../../../../shared/hooks/useAccessibleDialog';
 
 interface EditPersonalInfoModalProps {
   isOpen: boolean;
@@ -25,6 +26,8 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
   initialData,
   submitting = false,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useAccessibleDialog(isOpen, onClose, dialogRef);
   const { items: genderReferences, loading: gendersLoading, error: gendersError, retry: retryGenders } =
     useReferenceGroup('GENDER', isOpen);
   const genderOptions = genderReferences.filter((item) => item.isActive !== false);
@@ -100,7 +103,7 @@ export const EditPersonalInfoModal: React.FC<EditPersonalInfoModalProps> = ({
       aria-labelledby="edit-personal-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in font-sans"
     >
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
+      <div ref={dialogRef} className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">

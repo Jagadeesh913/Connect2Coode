@@ -55,27 +55,17 @@ export const Footer: React.FC = () => {
             <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <li>
                 <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <Link to="/roadmaps" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Study Plans
+                  DSA Learning Sheets
                 </Link>
               </li>
               <li>
                 <Link to="/companies" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Interview Guides
-                </Link>
-              </li>
-              <li>
-                <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  DSA Sheets
+                  Company Preparation
                 </Link>
               </li>
               <li>
                 <Link to="/aptitude" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Aptitude Notes
+                  Aptitude Practice
                 </Link>
               </li>
             </ul>

@@ -660,10 +660,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           <div className="space-y-4">
             {/* Title */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="question-title" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Problem Title <span className="text-rose-500">*</span>
               </label>
               <input
+                id="question-title"
                 type="text"
                 {...register('title')}
                 placeholder="e.g. Two Sum, Reverse Linked List"
@@ -679,10 +680,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             {/* Classification: Difficulty, Topic, Platform */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="question-difficulty" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Difficulty <span className="text-rose-500">*</span>
                 </label>
                 <select
+                  id="question-difficulty"
                   value={watch('difficultyRefCode') || ''}
                   onChange={handleDifficultySelect}
                   className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -698,10 +700,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="question-topic" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Category / Topic <span className="text-rose-500">*</span>
                 </label>
                 <select
+                  id="question-topic"
                   value={watch('topicRefCode') || ''}
                   onChange={handleTopicSelect}
                   className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -717,10 +720,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               </div>
 
               <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="question-platform" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Platform Origin <span className="text-rose-500">*</span>
                 </label>
                 <select
+                  id="question-platform"
                   value={watch('qpfRefCode') || ''}
                   onChange={handleQpfSelect}
                   className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -738,10 +742,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
             {/* Description */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="question-description" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Problem Description <span className="text-rose-500">*</span>
               </label>
               <textarea
+                id="question-description"
                 rows={5}
                 {...register('description')}
                 placeholder="Full problem statement with input/output format, examples..."
@@ -756,10 +761,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
             {/* Constraints */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="question-constraints" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Constraints (e.g. 1 &lt;= N &lt;= 10^5)
               </label>
               <textarea
+                id="question-constraints"
                 rows={2}
                 {...register('constraints')}
                 placeholder="1 <= nums.length <= 10^4&#10;-10^9 <= nums[i] <= 10^9"
@@ -770,10 +776,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             {/* Company Tagging */}
             <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <label htmlFor="question-company" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Target Hiring Companies
                 </label>
                 <select
+                  id="question-company"
                   onChange={handleSelectCompanyFromDropdown}
                   defaultValue=""
                   className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -802,6 +809,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                       <span>{c.name}</span>
                       <button
                         type="button"
+                        aria-label={`Remove ${c.name} company association`}
                         onClick={() => handleRemoveCompany(c.name)}
                         className="text-purple-400 hover:text-purple-700 dark:hover:text-purple-100 ml-1 cursor-pointer"
                       >
@@ -816,9 +824,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             {/* Hints Section */}
             <div className="space-y-2 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
               <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                <div className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Problem Hints ({hints.length})
-                </label>
+                </div>
                 <button
                   type="button"
                   onClick={handleAddHint}
@@ -831,10 +839,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
               {hints.map((hint, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="text-xs font-mono font-bold text-slate-400 w-12 shrink-0">
+                  <label htmlFor={`question-hint-${idx}`} className="text-xs font-mono font-bold text-slate-400 w-12 shrink-0">
                     #{idx + 1}
-                  </span>
+                  </label>
                   <input
+                    id={`question-hint-${idx}`}
                     type="text"
                     value={hint.hintText}
                     onChange={(e) => handleHintChange(idx, e.target.value)}
@@ -843,6 +852,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                   />
                   <button
                     type="button"
+                    aria-label={`Remove hint ${idx + 1}`}
                     onClick={() => handleRemoveHint(idx)}
                     className="p-2 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                   >
@@ -873,7 +883,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               </label>
 
               <div>
+                <label htmlFor="question-asked-date" className="sr-only">Asked date</label>
                 <input
+                  id="question-asked-date"
                   type="date"
                   {...register('askedDate')}
                   className="w-full px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
@@ -976,10 +988,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                      <label htmlFor={`question-test-input-${idx}`} className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
                         Input Raw String <span className="text-rose-500">*</span>
                       </label>
                       <textarea
+                        id={`question-test-input-${idx}`}
                         rows={3}
                         value={tc.input}
                         onChange={(e) => handleTestCaseChange(idx, 'input', e.target.value)}
@@ -994,10 +1007,11 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                     </div>
 
                     <div className="space-y-1">
-                      <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                      <label htmlFor={`question-test-output-${idx}`} className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
                         Expected Output <span className="text-rose-500">*</span>
                       </label>
                       <textarea
+                        id={`question-test-output-${idx}`}
                         rows={3}
                         value={tc.expectedOutput}
                         onChange={(e) => handleTestCaseChange(idx, 'expectedOutput', e.target.value)}

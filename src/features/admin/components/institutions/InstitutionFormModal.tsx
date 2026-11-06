@@ -154,11 +154,12 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
         {/* AISHE Code & Type Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-aishe-code" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               AISHE Code <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <input
+                id="institution-aishe-code"
                 type="text"
                 {...register('aisheCode')}
                 placeholder="e.g. C-12345 or U-0123"
@@ -173,10 +174,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Institution Type <span className="text-rose-500">*</span>
             </label>
             <select
+              id="institution-type"
               {...register('institutionType')}
               className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
             >
@@ -189,10 +191,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
 
         {/* Institution Name */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="institution-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Institution Official Name <span className="text-rose-500">*</span>
           </label>
           <input
+            id="institution-name"
             type="text"
             {...register('name')}
             placeholder="e.g. National Institute of Technology"
@@ -208,10 +211,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
         {/* Affiliated University (Only if College) */}
         {selectedType === 'COLLEGE' && (
           <div className="space-y-1.5 p-3.5 bg-slate-50 dark:bg-slate-900/40 rounded-2xl border border-slate-200/80 dark:border-slate-800/80">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-university-id" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Affiliated Parent University (Optional)
             </label>
             <select
+              id="institution-university-id"
               {...register('universityId', {
                 setValueAs: (v) => (v === '' || v === null || isNaN(Number(v)) ? null : Number(v)),
               })}
@@ -231,10 +235,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
         {/* Location: State & District */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-state" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               State <span className="text-rose-500">*</span>
             </label>
             <input
+              id="institution-state"
               type="text"
               {...register('state')}
               placeholder="e.g. Karnataka, Maharashtra"
@@ -248,10 +253,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-district" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               District <span className="text-rose-500">*</span>
             </label>
             <input
+              id="institution-district"
               type="text"
               {...register('district')}
               placeholder="e.g. Bengaluru Urban, Pune"
@@ -268,10 +274,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
         {/* Website & Year of Establishment */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-website" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Official Website
             </label>
             <input
+              id="institution-website"
               type="url"
               {...register('website')}
               placeholder="https://institution.edu.in"
@@ -285,10 +292,11 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="institution-year-of-establishment" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Year of Establishment
             </label>
             <input
+              id="institution-year-of-establishment"
               type="number"
               {...register('yearOfEstablishment', {
                 setValueAs: (v) => (v === '' || isNaN(Number(v)) ? null : Number(v)),

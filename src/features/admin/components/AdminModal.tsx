@@ -28,6 +28,9 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
@@ -59,6 +62,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         window.clearTimeout(focusTimer);
         document.body.style.overflow = previousOverflow;
         window.removeEventListener('keydown', handleKeyDown);
+        previousFocus?.focus();
       };
     }
     return undefined;

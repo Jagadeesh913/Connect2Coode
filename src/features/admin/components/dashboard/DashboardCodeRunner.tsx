@@ -6,7 +6,6 @@ import Editor from '@monaco-editor/react';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { problemService } from '../../../../services/problemService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
 import { toast } from 'react-hot-toast';
@@ -62,79 +61,6 @@ const mergeQuestionOptions = (
   const merged = new Map(current.map((item) => [item.id, item]));
   incoming.forEach((item) => merged.set(item.id, item));
   return Array.from(merged.values()).sort((a, b) => a.id - b.id);
-};
-
-/**
- * Verified working demo solutions for quick runtime verification testing.
- */
-const SAMPLE_WORKING_SOLUTIONS: Record<number, Record<string, string>> = {
-  1: {
-    java: `import java.util.*;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        if (sc.hasNextInt()) {
-            int n = sc.nextInt();
-            int max = Integer.MIN_VALUE;
-            for (int i = 0; i < n; i++) {
-                if (sc.hasNextInt()) {
-                    max = Math.max(max, sc.nextInt());
-                }
-            }
-            System.out.println(max);
-        }
-    }
-}`,
-    python: `import sys
-
-def main():
-    lines = sys.stdin.read().split()
-    if not lines:
-        return
-    n = int(lines[0])
-    nums = [int(x) for x in lines[1:n+1]]
-    if nums:
-        print(max(nums))
-
-if __name__ == '__main__':
-    main()
-`,
-    cpp: `#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <climits>
-using namespace std;
-
-int main() {
-    int n;
-    if (cin >> n) {
-        int maxVal = INT_MIN;
-        for (int i = 0; i < n; i++) {
-            int val;
-            cin >> val;
-            maxVal = max(maxVal, val);
-        }
-        cout << maxVal << endl;
-    }
-    return 0;
-}
-`,
-    javascript: `const fs = require('fs');
-
-function solve() {
-    const input = fs.readFileSync(0, 'utf-8').trim().split(/\\s+/);
-    if (!input || input.length === 0 || input[0] === '') return;
-    const n = parseInt(input[0], 10);
-    const nums = input.slice(1, n + 1).map(Number);
-    if (nums.length > 0) {
-        console.log(Math.max(...nums));
-    }
-}
-
-solve();
-`,
-  },
 };
 
 /**
@@ -218,7 +144,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
 
   // Question options & dynamic search
   const [questions, setQuestions] = useState<QuestionOption[]>([]);
-  const questionsRef = useRef<QuestionOption[]>([]);
   const pageGenerationRef = useRef(0);
   const [totalKnownQuestions, setTotalKnownQuestions] = useState<number>(0);
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null);
@@ -239,10 +164,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     selectedQuestionIdRef.current = questionId;
     setSelectedQuestionId(questionId);
   }, []);
-
-  useEffect(() => {
-    questionsRef.current = questions;
-  }, [questions]);
 
   // Selected question statement & test cases
   const [selectedQuestionDetails, setSelectedQuestionDetails] = useState<Question | null>(null);
@@ -415,36 +336,10 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         setSelectedQuestionTestCases(cases);
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
-        const fallbackCached = questionsRef.current.find((q) => q.id === selectedQuestionId);
-        if (fallbackCached) {
-          setSelectedQuestionDetails({
-            id: fallbackCached.id,
-            title: fallbackCached.title,
-            description: fallbackCached.description || '',
-            constraints: fallbackCached.constraints || '',
-            difficultyRefGroupCode: 'DIFF',
-            difficultyRefCode: '',
-            difficultyRefName: fallbackCached.difficultyRefName || fallbackCached.difficulty || '',
-            topicRefGroupCode: 'TOPIC',
-            topicRefCode: '',
-            topicRefName: fallbackCached.topicRefName || '',
-            qpfRefGroupCode: 'QPF',
-            qpfRefCode: '',
-            qpfRefName: '',
-            questionHints: [],
-            testCases: fallbackCached.testCases || [],
-          });
-          setSelectedQuestionTestCases(
-            Array.isArray(fallbackCached.testCases) && fallbackCached.testCases.length > 0
-              ? fallbackCached.testCases
-              : extractTestCasesFromProblem(fallbackCached)
-          );
-        } else {
-          const message = error && typeof error === 'object' && 'message' in error
-            ? String(error.message)
-            : 'Unable to load the selected question details.';
-          setQuestionDetailsError(message);
-        }
+        const message = error && typeof error === 'object' && 'message' in error
+          ? String(error.message)
+          : 'Unable to load the selected question details.';
+        setQuestionDetailsError(message);
       } finally {
         if (!controller.signal.aborted) setLoadingQuestionDetails(false);
       }
@@ -463,22 +358,17 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     const key = `${selectedQuestionId}_${selectedLanguageId}`;
     const langObj = languages.find((l) => l.id === selectedLanguageId);
     const langName = langObj?.name || 'Java';
-    const normLang = langName.toLowerCase().includes('python')
-      ? 'python'
-      : langName.toLowerCase().includes('c++')
-      ? 'cpp'
-      : langName.toLowerCase().includes('javascript')
-      ? 'javascript'
-      : 'java';
 
     setCodeDrafts((prev) => {
       if (prev[key] !== undefined) {
         setSourceCode(prev[key]);
         return prev;
       }
-      const starter =
-        SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang] ||
-        getDynamicStarterCode(langName, selectedQuestionDetails?.title, selectedQuestionId);
+      const starter = getDynamicStarterCode(
+        langName,
+        selectedQuestionDetails?.title,
+        selectedQuestionId
+      );
       setSourceCode(starter);
       return { ...prev, [key]: starter };
     });
@@ -601,23 +491,18 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     const exists = questions.some((q) => q.id === num);
     if (!exists) {
       try {
-        let qData: any = null;
-        try {
-          const res = await adminQuestionService.getQuestionById(num);
-          qData = res.data;
-        } catch {
-          const res2 = await problemService.getProblemById(num);
-          qData = res2?.data;
-        }
+        const response = await adminQuestionService.getQuestionById(num);
+        const qData = response.data;
 
         if (qData && (qData.id || qData.title)) {
+          const qAny = qData as any;
           const newOpt: QuestionOption = {
             id: Number(qData.id || num),
             title: qData.title,
             description: qData.description,
             constraints: qData.constraints,
-            difficulty: qData.difficultyRefName || qData.difficulty,
-            difficultyRefName: qData.difficultyRefName || qData.difficulty,
+            difficulty: qData.difficultyRefName || qAny.difficulty,
+            difficultyRefName: qData.difficultyRefName || qAny.difficulty,
             topicRefName: qData.topicRefName,
             testCases: qData.testCases,
           };
@@ -645,36 +530,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     setCodeDrafts((prev) => ({ ...prev, [key]: starter }));
     toast.success('Code editor reset to boilerplate template.');
   };
-
-  const handleLoadWorkingSolution = () => {
-    if (!selectedLangObj || !selectedQuestionId) return;
-    const normLang = selectedLangObj.name.toLowerCase().includes('python')
-      ? 'python'
-      : selectedLangObj.name.toLowerCase().includes('c++')
-      ? 'cpp'
-      : selectedLangObj.name.toLowerCase().includes('javascript')
-      ? 'javascript'
-      : 'java';
-    const sample = SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang];
-    if (sample) {
-      const key = `${selectedQuestionId}_${selectedLanguageId}`;
-      setSourceCode(sample);
-      setCodeDrafts((prev) => ({ ...prev, [key]: sample }));
-      toast.success(`Loaded demo solution for #${selectedQuestionId} (${selectedLangObj.name})`);
-    }
-  };
-
-  const hasSampleSolution = useMemo(() => {
-    if (!selectedQuestionId || !selectedLangObj) return false;
-    const normLang = selectedLangObj.name.toLowerCase().includes('python')
-      ? 'python'
-      : selectedLangObj.name.toLowerCase().includes('c++')
-      ? 'cpp'
-      : selectedLangObj.name.toLowerCase().includes('javascript')
-      ? 'javascript'
-      : 'java';
-    return Boolean(SAMPLE_WORKING_SOLUTIONS[selectedQuestionId]?.[normLang]);
-  }, [selectedQuestionId, selectedLangObj]);
 
   const executionRequest = useExecutionRequest('dashboard');
   useEffect(() => {
@@ -834,12 +689,13 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
             {/* Search Input */}
             <div className="md:col-span-4 space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <label htmlFor="dashboard-question-search" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Filter / Search Questions
               </label>
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="dashboard-question-search"
                   type="text"
                   value={searchFilter}
                   onChange={(e) => setSearchFilter(e.target.value)}
@@ -853,6 +709,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
                 {searchFilter && (
                   <button
                     type="button"
+                    aria-label="Clear question search"
                     onClick={() => setSearchFilter('')}
                     className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-bold"
                   >
@@ -865,7 +722,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
             {/* Dynamic Question Selector */}
             <div className="md:col-span-4 space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <label htmlFor="dashboard-question-select" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                   Select Problem ({filteredQuestions.length} of {totalKnownQuestions || questions.length})
                 </label>
                 <button
@@ -879,6 +736,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
                 </button>
               </div>
               <select
+                id="dashboard-question-select"
                 value={selectedQuestionId ?? ''}
                 onChange={handleQuestionSelectChange}
                 disabled={isBusy || combinedResourcesLoading || filteredQuestions.length === 0}
@@ -913,10 +771,11 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
 
             {/* Manual ID Input */}
             <div className="md:col-span-2 space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <label htmlFor="dashboard-question-id" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Problem ID
               </label>
               <input
+                id="dashboard-question-id"
                 type="number"
                 value={manualQuestionId}
                 onChange={handleManualQuestionIdChange}
@@ -932,10 +791,11 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
 
             {/* Compiler Runtime Selector */}
             <div className="md:col-span-2 space-y-1.5">
-              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              <label htmlFor="dashboard-runtime" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Runtime
               </label>
               <select
+                id="dashboard-runtime"
                 value={selectedLanguageId ?? ''}
                 onChange={handleLanguageChange}
                 disabled={isBusy || combinedResourcesLoading || !languages.length}
@@ -1182,17 +1042,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
               </span>
             </div>
             <div className="flex items-center gap-3">
-              {hasSampleSolution && (
-                <button
-                  type="button"
-                  onClick={handleLoadWorkingSolution}
-                  className="flex items-center gap-1.5 text-[11px] text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-semibold transition-colors cursor-pointer"
-                  title="Load verified sample solution for this problem"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  <span>Load Demo Solution</span>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={handleResetTemplate}

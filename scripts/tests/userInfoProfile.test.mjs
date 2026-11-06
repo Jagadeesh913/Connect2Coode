@@ -238,7 +238,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
-        return { statusCode: 200, message: 'Success', data: [] };
+        return { statusCode: 200, message: 'Success', data: { content: [], pageNumber: 0, pageSize: 10, totalElements: 0, totalPages: 0 } };
       };
       tokenStorage.setAccessToken(TEST_TOKEN);
 
@@ -252,7 +252,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
-        return { statusCode: 200, message: 'Success', data: [] };
+        return { statusCode: 200, message: 'Success', data: { content: [], pageNumber: 0, pageSize: 20, totalElements: 0, totalPages: 0 } };
       };
       tokenStorage.setAccessToken(TEST_TOKEN);
 
@@ -266,7 +266,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
         capturedPayload = payload;
-        return { statusCode: 200, message: 'Success', data: [] };
+        return { statusCode: 200, message: 'Success', data: { content: [], pageNumber: 0, pageSize: 100, totalElements: 0, totalPages: 0 } };
       };
       tokenStorage.setAccessToken(TEST_TOKEN);
 

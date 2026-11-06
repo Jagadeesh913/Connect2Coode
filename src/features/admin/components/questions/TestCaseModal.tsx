@@ -320,9 +320,14 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                     </label>
 
                     {/* Test Case Type */}
+                    <label htmlFor={`test-case-type-${idx}`} className="sr-only">
+                      Test case {idx + 1} type
+                    </label>
                     <select
+                      id={`test-case-type-${idx}`}
                       value={tc.typeRefCode || ''}
                       onChange={(e) => handleChange(idx, 'typeRefCode', e.target.value)}
+                      disabled={testCaseTypes.length === 0}
                       className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     >
                       {testCaseTypes.map((t) => (
@@ -331,10 +336,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                         </option>
                       ))}
                       {testCaseTypes.length === 0 && (
-                        <>
-                          <option value="SAMPLE">Sample Test Case</option>
-                          <option value="NECESSARY">Mandatory Test Case</option>
-                        </>
+                        <option value="">No API test case types available</option>
                       )}
                     </select>
 
@@ -355,10 +357,11 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                 {/* Raw Input and Expected Output Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label htmlFor={`test-case-input-${idx}`} className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                       Raw Input String <span className="text-rose-500">*</span>
                     </label>
                     <textarea
+                      id={`test-case-input-${idx}`}
                       rows={3}
                       value={tc.input}
                       onChange={(e) => handleChange(idx, 'input', e.target.value)}
@@ -373,10 +376,11 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    <label htmlFor={`test-case-output-${idx}`} className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                       Expected Output String <span className="text-rose-500">*</span>
                     </label>
                     <textarea
+                      id={`test-case-output-${idx}`}
                       rows={3}
                       value={tc.expectedOutput}
                       onChange={(e) => handleChange(idx, 'expectedOutput', e.target.value)}
@@ -393,10 +397,11 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
                 {/* Explanation */}
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  <label htmlFor={`test-case-explanation-${idx}`} className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                     Test Case Explanation (Optional)
                   </label>
                   <input
+                    id={`test-case-explanation-${idx}`}
                     type="text"
                     value={tc.explanation || ''}
                     onChange={(e) => handleChange(idx, 'explanation', e.target.value)}

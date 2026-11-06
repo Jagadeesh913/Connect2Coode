@@ -44,18 +44,6 @@ export const questionService = {
    * server-owned and are never synthesized in the browser.
    */
   async getTestCases(id: string | number, signal?: AbortSignal): Promise<QuestionTestCase[]> {
-    try {
-      const direct = await apiClient.get<ApiResponse<QuestionTestCase[]>>(
-        API_ENDPOINTS.QUESTION.TEST_CASES(id),
-        { signal }
-      );
-      if (Array.isArray(direct?.data) && direct.data.length > 0) {
-        return direct.data;
-      }
-    } catch {
-      // Fall through to question detail fallback if direct testCases endpoint is unavailable
-    }
-
     const response = await this.getById(id, signal);
     const detail = response.data;
     if (Array.isArray(detail?.testCases) && detail.testCases.length > 0) {

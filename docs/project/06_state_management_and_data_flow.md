@@ -52,11 +52,11 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - LRU Trimming: `trimCache` evicts oldest cache entries when capacity is reached.
 - **Visible-query invariant**: When a page/filter request changes the list cache key, the reducer immediately swaps to a fresh matching cache entry or clears the visible rows and initializes pagination for the requested page. It never presents rows from the previous query under new controls. Same-query refreshes may retain their current rows while the refresh status is shown.
 - **Server-owned list controls**: Practice sends URL-backed difficulty, topic, company, platform, search, page, and page-size values through `fetchProblems` to `POST /questions`; it does not load a large catalog and slice it in the browser. Company directories request the selected `/company/list` page directly. Company-detail coding and MCQ tabs debounce search, resolve difficulty/subject IDs from reference groups, and request each page from `/questions` or `/mcq`. Controls without an observed backend field are not rendered as catalog filters.
-- **Request ownership**: Only the latest list request may replace visible rows or release its loading state; superseded responses may warm their own cache entry but cannot overwrite the active query.
+- **Request ownership**: Only the exact owning list/detail request may write a cache entry, replace visible rows, or release its loading state. A response arriving after logout, account switch, reset, or supersession is ignored before any protected cache write.
 
 ### 3. `companySlice` ([`src/features/companies/redux/companySlice.ts`](../../src/features/companies/redux/companySlice.ts))
-- **Responsibilities**: Recruiter directory list, selected company metadata, company-associated problems, exams list, and active exam blueprints.
-- **Loading invariant**: The aggregate `loading` flag includes company-problem requests and is recomputed when each independent request settles.
+- **Responsibilities**: Recruiter directory list, selected company metadata, list/detail request ownership, and bounded list/detail caches. Company-associated questions and exams are loaded by their owning page services rather than duplicated in this slice.
+- **Loading invariant**: The aggregate `loading` flag is recomputed from the independent company-list and company-detail requests.
 
 ### 4. `progressSlice` ([`src/features/progress/redux/progressSlice.ts`](../../src/features/progress/redux/progressSlice.ts))
 - **Responsibilities**: Maps of solved/attempted problems plus the raw API records used by profile metrics. This prevents the profile route from repeating the two progress requests already made at application hydration.
@@ -79,6 +79,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Server boundary**: Authenticated problem bookmarks use the API. COMPANY/APTITUDE bookmarks remain an explicitly scoped browser-only fallback because no matching backend contract was found.
 - **Failure handling**: A failed server refresh remains rejected, preserves the active user's last known problem bookmarks, restores only scoped COMPANY/APTITUDE items, and exposes the error. Browser persistence filters out server-owned problem bookmarks.
 - **Timestamp boundary**: Server bookmark DTOs expose no original save timestamp, so hydrated problem bookmarks omit `savedAt`. Only records created locally receive a client creation timestamp.
+- **Auth transitions**: A same-user refresh preserves the current bookmark state and freshness timestamp. An identity-changing login, refresh, or authenticated-session replacement clears protected state before the new account can render it.
 
 ### 6. `profileSlice` ([`src/features/profile/redux/profileSlice.ts`](../../src/features/profile/redux/profileSlice.ts))
 - **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` academic/personal fields. Activity metrics belong to `progressSlice`.

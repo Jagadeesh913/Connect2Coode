@@ -43,30 +43,22 @@ const normalizePage = <T>(
   label: string
 ): PaginatedData<T> => {
   const page = isRecord(data) ? data : null;
-  const rawContent =
-    page && Array.isArray(page.content)
-      ? page.content
-      : Array.isArray(data)
-      ? data
-      : null;
-  if (!rawContent) throw new Error(`Unexpected ${label} response format`);
+  if (!page || !Array.isArray(page.content)) {
+    throw new Error(`Unexpected ${label} response format`);
+  }
+  const rawContent = page.content;
   const content = rawContent.map(mapItem);
-  const optionalNumber = (primary: unknown, alias: unknown, fallback: number): number => {
+  const requiredNumber = (primary: unknown, alias: unknown, field: string): number => {
     const value = typeof primary === 'number' ? primary : alias;
-    return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      throw new Error(`Unexpected ${label} ${field} metadata`);
+    }
+    return value;
   };
-  const pageNumber = optionalNumber(page?.pageNumber, page?.number, 0);
-  const pageSize = optionalNumber(page?.pageSize, page?.size, rawContent.length || 10);
-  const totalElements =
-    typeof page?.totalElements === 'number' && Number.isFinite(page.totalElements)
-      ? page.totalElements
-      : typeof page?.total === 'number' && Number.isFinite(page.total)
-      ? page.total
-      : rawContent.length;
-  const totalPages =
-    typeof page?.totalPages === 'number' && Number.isFinite(page.totalPages)
-      ? page.totalPages
-      : Math.max(1, Math.ceil(totalElements / (pageSize || 1)));
+  const pageNumber = requiredNumber(page.pageNumber, page.number, 'page number');
+  const pageSize = requiredNumber(page.pageSize, page.size, 'page size');
+  const totalElements = requiredNumber(page.totalElements, page.total, 'total elements');
+  const totalPages = requiredNumber(page.totalPages, undefined, 'total pages');
 
   return {
     content,
@@ -246,13 +238,7 @@ export const companyService = {
       throw new Error(`Company not found for slug: ${slug}`);
     }
 
-    return {
-      statusCode: 200,
-      message: 'Company Fetched Successfully',
-      data: matched,
-      errors: null,
-      timestamp: allCompRes.timestamp,
-    };
+    return this.getCompanyBySlug(String(matched.id), signal);
   },
 
   async getCompanyProblems(

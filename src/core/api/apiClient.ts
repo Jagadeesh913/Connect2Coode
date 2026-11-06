@@ -215,7 +215,7 @@ export const executeRefreshToken = async (): Promise<AuthSessionData> => {
       );
 
       const responseData = refreshRes.data;
-      const tokenData = requireAuthSessionData(responseData?.data || responseData);
+      const tokenData = requireAuthSessionData(responseData?.data);
 
       if (tokenStorage.getSessionEpoch() !== sessionEpoch) {
         throw new Error('Authentication session changed while refresh was in progress');

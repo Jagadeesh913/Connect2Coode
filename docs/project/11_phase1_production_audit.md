@@ -19,7 +19,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | M-03 | Remove hard-coded question totals, offset stitching, tail probes, and per-record fan-out after addressing the backend defect | Frontend workaround was removed. One requested page now produces one API request and real failures remain failures. The backend pagination/data defect is still an external release blocker. | `PARTIALLY VERIFIED` |
 | M-04 | Do not fabricate server bookmark timestamps | Server records omit timestamps the API did not return. | `PARTIALLY VERIFIED` |
 | L-01 | Do not label configured auth/RBAC as live-validated system health | Misleading labels and invented fallback role were removed. | `PARTIALLY VERIFIED` |
-| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | Full verification suite passes: 371 tests, 0 typecheck errors, 0 lint warnings/errors across 187 files, clean build, docs and architecture verified. | `RUNTIME-VERIFIED` |
+| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | The current source statically declares 369 tests, but the modified final tree has not been executed in an OS-level sandbox. Historical green results cannot certify these changes. | `UNKNOWN` |
 | Gate | No existing behavior is broken and final remediation report exists | Requires runtime journeys and external acceptance checks below. | `UNKNOWN` |
 
 ## 3. Deep-audit remediation checklist
@@ -30,6 +30,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | :--- | :--- | :--- | :---: |
 | P1-01 | Public signup cannot choose an authorization role | `role` was removed from `SignUpPayload`; request construction writes `USER` after spreading caller data. Backend must independently ignore/reject caller role fields. | `PARTIALLY VERIFIED` |
 | P1-07 | Refresh behavior on browsers without Web Locks is intentional and tested | Current policy fails closed when safe rotating-cookie coordination is unavailable. Product browser-support approval and cross-tab runtime tests remain required. | `PARTIALLY VERIFIED` |
+| P1-08 | Logout/account switch cannot be undone by stale auth or protected-cache responses | Refresh is epoch/request-owned, identity changes reset protected slices, and problem/DSA cache writes require exact ownership. Final reducer/browser tests remain pending. | `PARTIALLY VERIFIED` |
 | SEC-01 | Ordinary users receive 401/403—not 500—from admin endpoints | Prior Postman evidence shows a USER request to admin institutions returned 500. This is a backend authorization/error-handling defect; a bypass was **not** proven. | `NOT WORKING` |
 | SEC-02 | Hidden test inputs/outputs never enter an ordinary user response | Frontend masking is defense-in-depth only. Verify the network response for successful submit and question detail using a USER account. | `UNKNOWN` |
 | SEC-03 | User-ID path endpoints enforce ownership server-side | Client passes authenticated user IDs but cannot establish object-level authorization. Test same-user and cross-user IDs for progress, bookmarks, profile, and submissions. | `UNKNOWN` |
@@ -47,6 +48,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | DATA-01 | Editing institution text cannot retain a different institution ID | Free-text changes clear `collegeId`; only an actual selection supplies it. | `PARTIALLY VERIFIED` |
 | DATA-02 | Removing a company from an existing question persists | Current backend save behavior inserts associations and rejects duplicates; no verified removal contract exists. The UI must not claim this mutation is supported until backend replace/remove semantics are supplied. | `NOT WORKING` |
 | DATA-03 | Question list/detail and nullable fields have separate boundary handling | Numeric details require a valid detail DTO; legacy text slugs scan real pages; nullable hints/test cases are handled without fabricated values. | `PARTIALLY VERIFIED` |
+| DATA-04 | Company pages and slugs use verified metadata/identity | Page envelopes require complete metadata; numeric IDs are direct and text slugs resolve through the real paginated catalog. | `PARTIALLY VERIFIED` |
 
 ### Requests, caching, performance, and reliability
 
@@ -58,6 +60,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | PERF-04 | Company admin selector and visible page do not download overlapping catalogs unnecessarily | The two datasets serve different UI needs, but selector loading should be demand-driven or server-search-backed when the backend supports it. | `INFERRED` |
 | PERF-05 | Code execution payloads are bounded before transport | Positive integer IDs, non-empty code, 200,000-character source limit, and 64,000-character custom-input limit are enforced client-side. Backend limits remain required. | `PARTIALLY VERIFIED` |
 | PERF-06 | Large pages/components do not cause unacceptable render or bundle cost | Several feature pages remain very large. Bundle analysis, React profiling, list-scale tests, and route-level lazy-loading evidence are still required. | `UNKNOWN` |
+| PERF-07 | Duplicate question/test-case reads and dead business stacks are removed | Dashboard detail uses one authoritative request, test cases reuse detail, the unused company-problems thunk/cache and legacy ProblemList were removed, and shared dialog behavior replaces repeated focus logic. | `PARTIALLY VERIFIED` |
 
 ### Admin, profile, company, DSA, and execution journeys
 
@@ -71,16 +74,18 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | J-06 | Admin questions and test cases | Create/edit, visible/hidden cases, company add/remove, and mutation refresh. | `UNKNOWN` |
 | J-07 | Admin companies/exams/roles/sections | CRUD and relationship updates with USER/ADMIN authorization checks. | `UNKNOWN` |
 | J-08 | DSA sheet admin and learner accordion | CRUD/linking, empty sections, section 4 failure repair, race/cancel behavior. | `NOT WORKING` |
-| J-09 | Responsive and accessibility pass | Keyboard, screen reader, focus, reduced motion, mobile/tablet/desktop layouts. | `UNKNOWN` |
+| J-09 | Responsive and accessibility pass | Dialog focus/Escape/scroll behavior, reduced-motion controls, and admin label/group associations are implemented. Keyboard, screen-reader, and responsive browser acceptance remains pending. | `PARTIALLY VERIFIED` |
+| J-10 | Public UI claims and navigation are truthful | Fake newsletter success, mismatched footer resources, simulated execution, unmeasured totals, and unverified testimonial claims were removed/reworded. Approved legal pages/content are still absent. | `PARTIALLY VERIFIED` |
 
 ### Supply chain, deployment, and external API evidence
 
 | ID | Check | Resolution / evidence required | Status |
 | :--- | :--- | :--- | :---: |
-| OPS-01 | CI uses the lockfile toolchain | Typecheck now uses the installed package script rather than `npx --yes -p ...`. GitHub Actions are still referenced by moving major tags and should be SHA-pinned under an agreed update policy. | `PARTIALLY VERIFIED` |
+| OPS-01 | CI uses the lockfile toolchain | Typecheck uses the installed package script; checkout and setup-node are pinned to reviewed immutable v7 SHAs. A CI run and dependency-update policy remain required. | `PARTIALLY VERIFIED` |
 | OPS-02 | Runtime version is reproducible | `package.json` now declares Node `>=22.12.0 <23`; deployment and CI must use that range. | `PARTIALLY VERIFIED` |
 | OPS-03 | Postman workspace is an authoritative, secret-free contract source | The workspace is fragmented: the collection labelled “All 32 APIs” contains only a small subset, legacy hosts/body tokens remain in diagnostic collections, assertions sometimes pass unconditionally, and a credential was embedded in a collection. Revoke/rotate it and sanitize/version the workspace. | `NOT WORKING` |
 | OPS-04 | Dependency/build/security checks run on the final tree | Run clean install/lockfile validation, dependency audit, tests, typecheck, lint, architecture/docs checks, build, preview smoke, and deployment header checks. | `UNKNOWN` |
+| OPS-05 | Development proxy verifies upstream TLS | All proxy targets use default TLS certificate verification; final dev proxy smoke is pending. | `PARTIALLY VERIFIED` |
 
 ## 4. Release-blocking external work
 
@@ -91,6 +96,8 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 5. Repair the learning-sheet section-question 500 and the submit-code null test-case failure.
 6. Rotate the credential exposed in Postman, remove secrets and legacy token fields, and publish one canonical environment/collection with meaningful assertions.
 7. Execute the final verification matrix and supported-browser production journeys.
+8. Supply reviewed privacy/terms/legal content and add routes only after approval; complete the assistive-technology/browser audit.
+9. Define the update policy for the now-immutable GitHub Action pins and verify the workflow on the final tree.
 
 ## 5. Current Phase 1 verdict
 

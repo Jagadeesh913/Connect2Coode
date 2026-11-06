@@ -67,7 +67,31 @@ export const AdminInstitutions: React.FC = () => {
   const [editingInstitutionId, setEditingInstitutionId] = useState<string | number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const mutationPendingRef = useRef(false);
+  const detailControllerRef = useRef<AbortController | null>(null);
+  const detailGenerationRef = useRef(0);
   const [formServerError, setFormServerError] = useState<{ field?: string; message: string } | null>(null);
+
+  const beginDetailRequest = useCallback(() => {
+    detailControllerRef.current?.abort();
+    setEditingInstitutionId(null);
+    setDetailsLoading(false);
+    const controller = new AbortController();
+    detailControllerRef.current = controller;
+    return { controller, generation: ++detailGenerationRef.current };
+  }, []);
+
+  const cancelDetailRequest = useCallback(() => {
+    detailGenerationRef.current += 1;
+    detailControllerRef.current?.abort();
+    detailControllerRef.current = null;
+    setEditingInstitutionId(null);
+    setDetailsLoading(false);
+  }, []);
+
+  useEffect(() => () => {
+    detailGenerationRef.current += 1;
+    detailControllerRef.current?.abort();
+  }, []);
 
   /**
    * Fetches institutions with active filters and pagination
@@ -149,50 +173,61 @@ export const AdminInstitutions: React.FC = () => {
     return () => controller.abort();
   }, []);
 
-  const inspectionId = useRef(0);
-  useEffect(() => () => { inspectionId.current++; }, []);
   const handleInspect = async (id: number | string) => {
-    const requestId = ++inspectionId.current;
+    const { controller, generation } = beginDetailRequest();
+    setIsFormOpen(false);
+    setIsStatusModalOpen(false);
     setSelectedInstitution(null);
     setDetailsLoading(true);
     setIsDetailsOpen(true);
     try {
-      const res = await adminInstitutionService.getInstitutionById(id);
-      if (requestId !== inspectionId.current) return;
+      const res = await adminInstitutionService.getInstitutionById(id, controller.signal);
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       setSelectedInstitution(res.data);
     } catch (err: any) {
-      if (requestId !== inspectionId.current) return;
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       setIsDetailsOpen(false);
       toast.error(getActionableErrorMessage(err, 'Could not retrieve full institution details.'));
     } finally {
-      if (requestId === inspectionId.current) setDetailsLoading(false);
+      if (generation === detailGenerationRef.current) setDetailsLoading(false);
     }
   };
 
   const handleOpenCreate = () => {
+    cancelDetailRequest();
+    setIsDetailsOpen(false);
+    setIsStatusModalOpen(false);
     setSelectedInstitution(null);
     setFormServerError(null);
     setIsFormOpen(true);
   };
 
   const handleOpenEdit = async (inst: InstitutionItem) => {
+    const { controller, generation } = beginDetailRequest();
+    setIsDetailsOpen(false);
+    setIsStatusModalOpen(false);
     setFormServerError(null);
     setEditingInstitutionId(inst.id);
     try {
-      const response = await adminInstitutionService.getInstitutionById(inst.id);
+      const response = await adminInstitutionService.getInstitutionById(inst.id, controller.signal);
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       if (!response.data?.id) {
         throw new Error(`Institution #${inst.id} returned an invalid detail response`);
       }
       setSelectedInstitution(response.data);
       setIsFormOpen(true);
     } catch (err: any) {
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete institution data for editing.'));
     } finally {
-      setEditingInstitutionId(null);
+      if (generation === detailGenerationRef.current) setEditingInstitutionId(null);
     }
   };
 
   const handleOpenStatusModal = (inst: InstitutionItem) => {
+    cancelDetailRequest();
+    setIsDetailsOpen(false);
+    setIsFormOpen(false);
     setSelectedInstitution(inst);
     setIsStatusModalOpen(true);
   };
@@ -518,7 +553,10 @@ export const AdminInstitutions: React.FC = () => {
       {/* Institution Form Modal (Create / Edit) */}
       <InstitutionFormModal
         isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
+        onClose={() => {
+          cancelDetailRequest();
+          setIsFormOpen(false);
+        }}
         onSubmit={handleFormSubmit}
         initialData={selectedInstitution}
         universities={availableUniversities}
@@ -529,7 +567,10 @@ export const AdminInstitutions: React.FC = () => {
       {/* Institution Details Modal */}
       <InstitutionDetailsModal
         isOpen={isDetailsOpen}
-        onClose={() => setIsDetailsOpen(false)}
+        onClose={() => {
+          cancelDetailRequest();
+          setIsDetailsOpen(false);
+        }}
         institution={selectedInstitution}
         loading={detailsLoading}
       />
@@ -537,7 +578,10 @@ export const AdminInstitutions: React.FC = () => {
       {/* Status Toggle Modal */}
       <InstitutionStatusModal
         isOpen={isStatusModalOpen}
-        onClose={() => setIsStatusModalOpen(false)}
+        onClose={() => {
+          cancelDetailRequest();
+          setIsStatusModalOpen(false);
+        }}
         onConfirm={handleStatusToggleConfirm}
         institution={selectedInstitution}
         submitting={submitting}

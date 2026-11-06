@@ -81,6 +81,22 @@ export const AdminMcqs: React.FC = () => {
   const [editingLoadingId, setEditingLoadingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const mutationPendingRef = useRef(false);
+  const detailControllerRef = useRef<AbortController | null>(null);
+  const detailGenerationRef = useRef(0);
+
+  const beginDetailRequest = useCallback(() => {
+    detailControllerRef.current?.abort();
+    setEditingLoadingId(null);
+    setViewLoadingId(null);
+    const controller = new AbortController();
+    detailControllerRef.current = controller;
+    return { controller, generation: ++detailGenerationRef.current };
+  }, []);
+
+  useEffect(() => () => {
+    detailGenerationRef.current += 1;
+    detailControllerRef.current?.abort();
+  }, []);
 
   // Form State
   const [formSubjectRefCode, setFormSubjectRefCode] = useState<string>('');
@@ -268,6 +284,9 @@ export const AdminMcqs: React.FC = () => {
 
   // Open Create Modal
   const handleOpenCreateModal = () => {
+    detailGenerationRef.current += 1;
+    detailControllerRef.current?.abort();
+    setIsViewModalOpen(false);
     setEditingMcq(null);
     const initialSubject = subjects[0]?.refCode || '';
     setFormSubjectRefCode(initialSubject);
@@ -287,10 +306,13 @@ export const AdminMcqs: React.FC = () => {
 
   // Open Edit Modal - fetches authoritative question details BEFORE opening modal to prevent race conditions
   const handleOpenEditModal = async (mcq: McqQuestion) => {
+    const { controller, generation } = beginDetailRequest();
+    setIsViewModalOpen(false);
     setEditingLoadingId(mcq.id);
     try {
       try {
         const detailRes = await adminMcqService.getMcqById(mcq.id);
+        if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
         const detailData = detailRes.data;
         if (!detailData || typeof detailData !== 'object' || !detailData.id) {
           throw new Error(`MCQ #${mcq.id} returned an invalid detail response`);
@@ -319,17 +341,22 @@ export const AdminMcqs: React.FC = () => {
         setFormOptions(mapped);
         setIsCreateModalOpen(true);
       } catch (err: any) {
+        if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
         toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ data for editing.'));
       }
     } finally {
-      setEditingLoadingId(null);
+      if (generation === detailGenerationRef.current) setEditingLoadingId(null);
     }
   };
 
   const handleOpenViewModal = async (mcq: McqQuestion) => {
+    const { controller, generation } = beginDetailRequest();
+    setIsCreateModalOpen(false);
+    setEditingMcq(null);
     setViewLoadingId(mcq.id);
     try {
       const detailRes = await adminMcqService.getMcqById(mcq.id);
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       const detailData = detailRes.data;
       if (!detailData || typeof detailData !== 'object' || !detailData.id) {
         throw new Error(`MCQ #${mcq.id} returned an invalid detail response`);
@@ -337,9 +364,10 @@ export const AdminMcqs: React.FC = () => {
       setSelectedMcq({ ...mcq, ...detailData });
       setIsViewModalOpen(true);
     } catch (err: any) {
+      if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ details.'));
     } finally {
-      setViewLoadingId(null);
+      if (generation === detailGenerationRef.current) setViewLoadingId(null);
     }
   };
 
@@ -653,6 +681,7 @@ export const AdminMcqs: React.FC = () => {
             </button>
             <button
               onClick={fetchMcqs}
+              aria-label="Refresh MCQs"
               disabled={loading}
               className="p-2 bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer disabled:opacity-50 shadow-xs"
               title="Refresh"
@@ -669,6 +698,8 @@ export const AdminMcqs: React.FC = () => {
         <div className="relative w-full md:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
+            id="admin-mcq-search"
+            aria-label="Search MCQs"
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -681,6 +712,8 @@ export const AdminMcqs: React.FC = () => {
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
           {/* Subject Filter */}
           <select
+            id="admin-mcq-subject-filter"
+            aria-label="Filter MCQs by subject"
             value={selectedSubject}
             onChange={(e) => {
               setSelectedSubject(e.target.value);
@@ -698,6 +731,8 @@ export const AdminMcqs: React.FC = () => {
 
           {/* Difficulty Filter */}
           <select
+            id="admin-mcq-difficulty-filter"
+            aria-label="Filter MCQs by difficulty"
             value={selectedDifficulty}
             onChange={(e) => {
               setSelectedDifficulty(e.target.value);
@@ -715,6 +750,8 @@ export const AdminMcqs: React.FC = () => {
 
           {/* Page Size */}
           <select
+            id="admin-mcq-page-size"
+            aria-label="MCQ rows per page"
             value={pageSize}
             onChange={(e) => {
               setPageSize(Number(e.target.value));
@@ -740,10 +777,7 @@ export const AdminMcqs: React.FC = () => {
             data={mcqs}
             loading={loading}
             keyExtractor={(row) => row.id}
-            onRowClick={(row) => {
-              setSelectedMcq(row);
-              setIsViewModalOpen(true);
-            }}
+            onRowClick={(row) => void handleOpenViewModal(row)}
             emptyTitle="No MCQs Found"
             emptyDescription="There are currently no multiple choice questions matching your active filters."
             emptyAction={
@@ -950,10 +984,11 @@ export const AdminMcqs: React.FC = () => {
           {/* Classification Row */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="admin-mcq-subject" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Subject <span className="text-rose-500">*</span>
               </label>
               <select
+                id="admin-mcq-subject"
                 value={formSubjectRefCode}
                 onChange={(e) => setFormSubjectRefCode(e.target.value)}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -967,10 +1002,11 @@ export const AdminMcqs: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="admin-mcq-topic" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Topic <span className="text-rose-500">*</span>
               </label>
               <select
+                id="admin-mcq-topic"
                 value={formTopicRefCode}
                 onChange={(e) => setFormTopicRefCode(e.target.value)}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -984,10 +1020,11 @@ export const AdminMcqs: React.FC = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              <label htmlFor="admin-mcq-difficulty" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Difficulty <span className="text-rose-500">*</span>
               </label>
               <select
+                id="admin-mcq-difficulty"
                 value={formDifficultyRefCode}
                 onChange={(e) => setFormDifficultyRefCode(e.target.value)}
                 className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -1003,10 +1040,11 @@ export const AdminMcqs: React.FC = () => {
 
           {/* Company Tag */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-mcq-company" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Associate Hiring Company (Optional)
             </label>
             <select
+              id="admin-mcq-company"
               value={formCompanyId}
               onChange={(e) => setFormCompanyId(e.target.value)}
               className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -1022,10 +1060,11 @@ export const AdminMcqs: React.FC = () => {
 
           {/* Question Text */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-mcq-question" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Question Statement <span className="text-rose-500">*</span>
             </label>
             <textarea
+              id="admin-mcq-question"
               value={formQuestion}
               onChange={(e) => setFormQuestion(e.target.value)}
               rows={3}
@@ -1036,15 +1075,17 @@ export const AdminMcqs: React.FC = () => {
 
           {/* Options A, B, C, D */}
           <div className="space-y-2.5 pt-2">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <div id="admin-mcq-options-label" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Options &amp; Correct Answer Selection
-            </label>
+            </div>
+            <div role="group" aria-labelledby="admin-mcq-options-label" className="space-y-2.5">
             {formOptions.map((opt, index) => (
               <div key={opt.optionLabel} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 text-slate-700 dark:text-slate-300">
+                <label htmlFor={`admin-mcq-option-${opt.optionLabel}`} className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-xs shrink-0 text-slate-700 dark:text-slate-300">
                   {opt.optionLabel}
-                </div>
+                </label>
                 <input
+                  id={`admin-mcq-option-${opt.optionLabel}`}
                   type="text"
                   value={opt.optionText}
                   onChange={(e) => {
@@ -1057,6 +1098,8 @@ export const AdminMcqs: React.FC = () => {
                 />
                 <button
                   type="button"
+                  aria-pressed={opt.isCorrect}
+                  aria-label={`Set option ${opt.optionLabel} as correct`}
                   onClick={() => {
                     const newOpts = formOptions.map((o, idx) => ({
                       ...o,
@@ -1081,14 +1124,16 @@ export const AdminMcqs: React.FC = () => {
                 </button>
               </div>
             ))}
+            </div>
           </div>
 
           {/* Explanation */}
           <div className="space-y-1.5 pt-2">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-mcq-explanation" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Explanation (Optional)
             </label>
             <textarea
+              id="admin-mcq-explanation"
               value={formExplanation}
               onChange={(e) => setFormExplanation(e.target.value)}
               rows={2}

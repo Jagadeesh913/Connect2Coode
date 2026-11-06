@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { authService } from '../../../services/authService';
 import { toast } from 'react-hot-toast';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
+import { useAccessibleDialog } from '../../../shared/hooks/useAccessibleDialog';
 import { isAdminRole, getSafeRedirectUrl } from '../../../core/security/jwt';
 
 import {
@@ -46,6 +47,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const isModal = Boolean(onCloseModal);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   const { loading, error, authModalMode } = useAppSelector((state) => state.auth);
 
@@ -97,7 +100,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
 
   // Forgot Password OTP Countdown Timer
   useEffect(() => {
-    let interval: any = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (forgotOtpTimer > 0) {
       interval = setInterval(() => {
         setForgotOtpTimer((prev) => prev - 1);
@@ -144,13 +147,15 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   });
 
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     if (onCloseModal) {
       onCloseModal();
     } else {
       navigate('/');
     }
-  };
+  }, [navigate, onCloseModal]);
+
+  useAccessibleDialog(isModal, handleClose, dialogRef);
 
   const { initiateGoogleLogin } = useGoogleOAuthLogin();
 
@@ -386,8 +391,6 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       authActionPendingRef.current = false;
     }
   };
-
-  const isModal = Boolean(onCloseModal);
 
   const cardElement = (
     <div className={`relative w-full max-w-md bg-neutral-900 border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white ${isModal ? 'my-auto max-h-[90vh] overflow-y-auto' : ''} animate-scale-up`}>
@@ -921,7 +924,13 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Reset password'} dialog`}
+        className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans"
+      >
         {cardElement}
       </div>
     );

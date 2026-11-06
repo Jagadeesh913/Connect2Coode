@@ -123,10 +123,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
         {/* Preset Company Selector */}
         {!isEditing && availableCompanies.length > 0 && (
           <div className="space-y-1.5 p-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
-            <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <label htmlFor="company-preset" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Autofill from Indexed Companies
             </label>
             <select
+              id="company-preset"
               onChange={(e) => {
                 const found = availableCompanies.find((c) => String(c.id) === e.target.value);
                 if (found) handleSelectPreset(found);
@@ -146,11 +147,12 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Company Name */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Company Name <span className="text-rose-500">*</span>
           </label>
           <div className="relative">
             <input
+              id="company-name"
               type="text"
               {...register('name')}
               placeholder="e.g. Google, Amazon, Microsoft"
@@ -166,12 +168,13 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Website URL */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-website" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Website URL
           </label>
           <div className="relative flex items-center">
             <Globe className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
             <input
+              id="company-website"
               type="url"
               {...register('website')}
               placeholder="https://careers.google.com"
@@ -187,7 +190,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Logo URL with Live Preview */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-logo" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Brand Logo URL
           </label>
           <div className="flex items-center gap-3">
@@ -205,6 +208,7 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             </div>
             <div className="flex-1">
               <input
+                id="company-logo"
                 type="url"
                 {...register('logo')}
                 placeholder="https://example.com/logo.png"
@@ -221,10 +225,11 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
 
         {/* Description / Hiring Notes */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-description" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Description & Hiring Notes
           </label>
           <textarea
+            id="company-description"
             {...register('description')}
             rows={3}
             placeholder="Key patterns, interview rounds, DSA focus areas..."

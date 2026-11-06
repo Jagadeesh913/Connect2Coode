@@ -1,5 +1,6 @@
-import React, { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useAccessibleDialog } from '../../../shared/hooks/useAccessibleDialog';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchCompanyBySlug } from '../redux/companySlice';
 import { CompanyDetailsSkeleton, TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
@@ -129,6 +130,7 @@ export const CompanyDetails: React.FC = () => {
 
   // Solve Modal State for MCQs
   const [activeSolveMcq, setActiveSolveMcq] = useState<McqQuestion | null>(null);
+  const solveDialogRef = useRef<HTMLDivElement>(null);
   const [activeMcqOptions, setActiveMcqOptions] = useState<SynthesizedOption[]>([]);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
@@ -416,15 +418,17 @@ export const CompanyDetails: React.FC = () => {
     }
   };
 
-  const handleCloseSolveModal = () => {
+  const handleCloseSolveModal = useCallback(() => {
     activeMcqControllerRef.current?.abort();
     activeMcqControllerRef.current = null;
     setActiveSolveMcq(null);
     setActiveMcqLoading(false);
     setActiveMcqError(null);
-  };
+  }, []);
 
   useEffect(() => () => activeMcqControllerRef.current?.abort(), []);
+
+  useAccessibleDialog(Boolean(activeSolveMcq), handleCloseSolveModal, solveDialogRef);
 
   const activeCorrectOption = useMemo(() => {
     return activeMcqOptions.find((o) => o.isCorrect === true);
@@ -1126,7 +1130,13 @@ export const CompanyDetails: React.FC = () => {
 
       {/* 5. INTERACTIVE SOLVE MODAL FOR MCQS */}
       {activeSolveMcq && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans">
+        <div
+          ref={solveDialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Solve question ${activeSolveMcq.id}`}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in font-sans"
+        >
           <div className="relative w-full max-w-2xl bg-white dark:bg-[#0D1322] border border-slate-200 dark:border-slate-800 rounded-3xl p-4 sm:p-7 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
@@ -1160,6 +1170,7 @@ export const CompanyDetails: React.FC = () => {
                   onClick={(e) => handleMcqBookmarkToggle(activeSolveMcq, e)}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors cursor-pointer"
                   title="Bookmark"
+                  aria-label="Toggle question bookmark"
                 >
                   <i
                     className={`text-sm ${
@@ -1172,6 +1183,7 @@ export const CompanyDetails: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleCloseSolveModal}
+                  aria-label="Close question dialog"
                   className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white cursor-pointer"
                 >
                   <i className="fa-solid fa-xmark text-sm"></i>

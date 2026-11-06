@@ -124,45 +124,31 @@ export const problemService = {
     }
 
     // Catalog lookup is used only to resolve legacy title slugs to a numeric route.
-    try {
-      const targetStr = String(id).trim().toLowerCase();
-      const pageSize = 50;
-      let pageNumber = 0;
-      let totalPages = 1;
-      let matched: QuestionListItem | undefined;
+    const targetStr = String(id).trim().toLowerCase();
+    const pageSize = 50;
+    let pageNumber = 0;
+    let totalPages = 1;
+    let matched: QuestionListItem | undefined;
 
-      do {
-        const response = await fetchQuestionPage({
-          level: null,
-          companies: null,
-          topic: null,
-          searchText: null,
-          pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' as const },
-        }, signal);
-        totalPages = Math.max(1, Number(response.data.totalPages) || 1);
-        matched = response.data.content.find((item: QuestionListItem) => {
-          const itemId = String(item.id ?? '').trim().toLowerCase();
-          const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
-          return itemId === targetStr || itemTitle === targetStr;
-        });
-        pageNumber += 1;
-      } while (!matched && pageNumber < totalPages);
+    do {
+      const response = await fetchQuestionPage({
+        level: null,
+        companies: null,
+        topic: null,
+        searchText: null,
+        pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' as const },
+      }, signal);
+      totalPages = Math.max(1, Number(response.data.totalPages) || 1);
+      matched = response.data.content.find((item: QuestionListItem) => {
+        const itemId = String(item.id ?? '').trim().toLowerCase();
+        const itemTitle = String(item.title ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        return itemId === targetStr || itemTitle === targetStr;
+      });
+      pageNumber += 1;
+    } while (!matched && pageNumber < totalPages);
 
-      if (matched) {
-        // GET /question/{id}/testCases is currently rejected with 401 by the
-        // backend even for an authenticated account. Avoid an extra failed
-        // request after catalog fallback; map only catalog-provided cases.
-        const problemItem = matched;
-        return {
-          statusCode: 200,
-          message: 'Problem details fetched',
-          data: mapProblemDto(problemItem),
-        };
-      }
-    } catch (catalogErr: unknown) {
-      if (isRequestCanceled(catalogErr)) {
-        throw catalogErr;
-      }
+    if (matched) {
+      return this.getProblemById(matched.id, signal);
     }
 
     throw new Error(`Problem #${id} not found`);

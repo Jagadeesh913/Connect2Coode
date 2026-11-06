@@ -174,10 +174,11 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
         {/* Section Name & Sequence */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
           <div className="sm:col-span-3 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Section / Round Name <span className="text-rose-500">*</span>
             </label>
             <input
+              id="exam-section-name"
               type="text"
               {...register('sectionName', { required: 'Section name is required' })}
               placeholder="e.g. Cognitive Skills, SQL, Coding Round"
@@ -187,12 +188,13 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-sequence" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Sequence # <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <Hash className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-section-sequence"
                 type="number"
                 {...register('sequenceNumber', { required: true, valueAsNumber: true })}
                 className="w-full pl-8 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
@@ -203,10 +205,11 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
 
         {/* Parent Round Selector (Hierarchy) */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="exam-section-parent" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Parent Section / Round
           </label>
           <select
+            id="exam-section-parent"
             {...register('parentSectionId', {
               setValueAs: (v) => (v === '' || v === 'null' ? null : Number(v)),
             })}
@@ -227,10 +230,11 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
         {/* Section Type & Question Type */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Section Classification
             </label>
             <select
+              id="exam-section-type"
               {...register('sectionTypeId', {
                 valueAsNumber: true,
                 validate: (value) => value > 0 || 'Section classification is required',
@@ -247,10 +251,11 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-question-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Question Type Focus
             </label>
             <select
+              id="exam-section-question-type"
               {...register('questionTypeId', {
                 setValueAs: (v) => (v === '' || v === 'null' ? null : Number(v)),
               })}
@@ -268,12 +273,13 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
         {/* Duration, Questions Count, Total Marks */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-duration-minutes" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Duration (Minutes)
             </label>
             <div className="relative flex items-center">
               <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-section-duration-minutes"
                 type="number"
                 {...register('durationMinutes', {
                   setValueAs: (v) => (v === '' ? null : Number(v)),
@@ -285,12 +291,13 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-question-count" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Question Count
             </label>
             <div className="relative flex items-center">
               <FileText className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-section-question-count"
                 type="number"
                 {...register('questionCount', {
                   setValueAs: (v) => (v === '' ? null : Number(v)),
@@ -302,12 +309,13 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-section-total-marks" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Total Marks
             </label>
             <div className="relative flex items-center">
               <Award className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-section-total-marks"
                 type="number"
                 {...register('totalMarks', {
                   setValueAs: (v) => (v === '' ? null : Number(v)),

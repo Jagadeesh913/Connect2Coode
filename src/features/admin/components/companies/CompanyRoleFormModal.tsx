@@ -114,10 +114,11 @@ export const CompanyRoleFormModal: React.FC<CompanyRoleFormModalProps> = ({
         {/* Role Name & Code */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="company-role-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Role Name <span className="text-rose-500">*</span>
             </label>
             <input
+              id="company-role-name"
               type="text"
               {...register('roleName', { required: 'Role name is required' })}
               placeholder="e.g. Ninja, Digital, Prime"
@@ -127,12 +128,13 @@ export const CompanyRoleFormModal: React.FC<CompanyRoleFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="company-role-code" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Role Code <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <Tag className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="company-role-code"
                 type="text"
                 {...register('roleCode', { required: 'Role code is required' })}
                 placeholder="NINJA"
@@ -145,12 +147,13 @@ export const CompanyRoleFormModal: React.FC<CompanyRoleFormModalProps> = ({
 
         {/* Salary / CTC Compensation */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-role-salary" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Salary / CTC Package <span className="text-rose-500">*</span>
           </label>
           <div className="relative flex items-center">
             <IndianRupee className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
             <input
+              id="company-role-salary"
               type="text"
               {...register('salary', { required: 'Salary package is required' })}
               placeholder="e.g. 3.36 - 3.6 LPA or UG: 7.0 LPA / PG: 7.3 LPA"
@@ -162,10 +165,11 @@ export const CompanyRoleFormModal: React.FC<CompanyRoleFormModalProps> = ({
 
         {/* Description */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="company-role-description" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Role Description & Scope
           </label>
           <textarea
+            id="company-role-description"
             {...register('description')}
             rows={3}
             placeholder="e.g. Entry-level software engineer role across cloud, full-stack, and analytics..."

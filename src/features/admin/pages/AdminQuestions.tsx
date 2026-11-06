@@ -450,11 +450,9 @@ export const AdminQuestions: React.FC = () => {
             explanation: tc.explanation ? tc.explanation.trim() : '',
             isHidden: tc.isHidden === true,
             displayOrder: idx + 1,
-            typeRefGroupCode: 'TESTCASETYPE',
-            typeRefCode: tc.typeRefCode || (tc.isHidden ? 'NECESSARY' : 'SAMPLE'),
-            typeRefName:
-              tc.typeRefName ||
-              (tc.isHidden ? 'Mandatory Test Case' : 'Visible Sample Test Case'),
+            typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',
+            typeRefCode: tc.typeRefCode || '',
+            typeRefName: tc.typeRefName || '',
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
         } catch (tcErr: any) {

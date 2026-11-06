@@ -23,7 +23,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | Relative Path | Role & Purpose | Status | Notes / Evidence |
 | :--- | :--- | :---: | :--- |
 | `package.json` | Project scripts, Node engine, dependencies, overrides (`dompurify: 3.4.17`) | `PARTIALLY VERIFIED` | Node 22.12+ and <23 is declared; the changed tree still requires the final clean verification matrix. |
-| `vite.config.ts` | Vite 8 config, React plugin, Tailwind v4, proxy rules | `RUNTIME-VERIFIED` | Tested with `dev` and `build`. |
+| `vite.config.ts` | Vite 8 config, React plugin, Tailwind v4, proxy rules | `PARTIALLY VERIFIED` | Development proxy TLS verification is enabled; final dev/build verification is pending. |
 | `tsconfig.json` | TypeScript 5.9 compiler options (`strict: true`, ES2022) | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run typecheck`. |
 | `tsconfig.ci.json`| CI TypeScript configuration | `VERIFIED` | Used in CI environment checks. |
 | `.oxlintrc.json` | Oxlint rules (React hooks and exports) | `RUNTIME-VERIFIED` | Passes with 0 errors on 153 files in 35ms. |
@@ -37,7 +37,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `.env.production`| Production environment config | `VERIFIED` | Targets `https://api.connect2code.in/api/v1` and pins canonical output to `https://connect2code.in`. |
 | `.env` | Local development environment override (untracked) | `VERIFIED` | Local development override. |
 | `.gitignore` | Git exclusion rules (ignores `.env`, `graphify-out/`) | `VERIFIED` | Validated against git tracking. |
-| `.github/workflows/frontend-ci.yml` | GitHub Actions CI workflow | `PARTIALLY VERIFIED` | Typecheck uses the lockfile-installed script and Node 22; action references still use moving major tags. |
+| `.github/workflows/frontend-ci.yml` | GitHub Actions CI workflow | `PARTIALLY VERIFIED` | Typecheck uses the lockfile-installed script and Node 22; checkout/setup-node are pinned to reviewed immutable v7 SHAs. A CI run on this tree is still pending. |
 
 ---
 
@@ -51,7 +51,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
-| `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `RUNTIME-VERIFIED` | Combines all slices and clears protected cached data immediately on logout or forced unauthentication. |
+| `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `PARTIALLY VERIFIED` | Clears protected caches on logout/forced unauthentication and identity-changing auth while preserving same-user refresh state; final tests are pending. |
 | `src/app/hooks.ts` | Typed Redux hooks | `RUNTIME-VERIFIED` | React Redux 9 `withTypes` hooks for dispatch, selector, and store. |
 
 ---
@@ -75,6 +75,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/security/authContract.ts` | Login/refresh response contract validator | `RUNTIME-VERIFIED` | Requires non-empty access token plus user ID, role, and email; preserves modeled non-sensitive profile fields such as `avatarUrl` and rejects arbitrary credential properties. The deployed refresh DTO remains unverified. |
 | `src/core/security/refreshCoordinator.ts` | Cross-tab refresh rotation lock | `PARTIALLY VERIFIED` | Uses atomic Web Locks only; browsers without them fail before issuing refresh. Mocked exclusivity and fail-safe paths are tested, but real two-tab cookie rotation remains unverified. |
 | `src/core/security/tokenStorage.ts` | Memory-only access token and session profile storage | `RUNTIME-VERIFIED` | Exposes no refresh-token API, never reads or creates the backend HttpOnly cookie, purges legacy JavaScript-readable token aliases, and advances the stale-response epoch on clear. |
+| `src/shared/hooks/useAccessibleDialog.ts` | Shared non-admin dialog lifecycle | `PARTIALLY VERIFIED` | Owns initial focus, Tab containment, Escape close, body-scroll locking, and focus restoration; browser/assistive-technology verification is pending. |
 | `src/core/storage/userScopedStorage.ts` | User-scoped local storage with FNV-1a hash | `RUNTIME-VERIFIED` | Logout clears the departing user's scoped cache while retaining only explicitly preserved theme preference; a memory-only opaque last-resolved scope covers missing current identity without enumerating other users. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Includes unit-aware execution metrics/diagnostics, optional server bookmark timestamps, canonical institution filters, reference save unions, nullable profile responses, strict session-identity fields, and MCQ save payloads. |
@@ -93,14 +94,14 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/services/authService.ts` | Authentication REST service | `PARTIALLY VERIFIED` | Public signup cannot override `USER`; login validates identity before memory storage and logout clears scoped state. Backend role enforcement still requires acceptance evidence. |
 | `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
-| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `PARTIALLY VERIFIED` | Full-catalog callers and company questions follow reported pages, preserve the numeric filter, and normalize observed page fields; live scale/exam DTOs remain unverified. |
+| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `PARTIALLY VERIFIED` | Requires complete page metadata, follows reported pages, preserves numeric filters, and resolves text slugs to numeric IDs; live scale/exam DTOs remain unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Normalization, hidden masking, dynamic language mapping, positive IDs, non-empty code, and payload size bounds are implemented; final tests and a normal-user live submit remain unverified. |
 | `src/services/institutionService.ts` | Authenticated institution search autocomplete | `RUNTIME-VERIFIED` | Explicit protected policy, Bearer attachment, and protected-401 refresh behavior are tested in `authContract.test.mjs`. |
 | `src/services/learningSheetService.ts` | DSA sheets, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, and ordering are tested. Live API access remains backend-dependent. |
 | `src/services/mcqService.ts` | User/admin MCQ reads and aptitude scoring | `RUNTIME-VERIFIED` | Missing list options trigger detail fetch only at the answering boundary; existing options are reused and correctness remains option-level `isCorrect`. |
 | `src/services/problemService.ts` | Problem catalog and details service | `PARTIALLY VERIFIED` | Numeric detail failures propagate; legacy slug resolution follows real catalog pages and cannot hide a failed numeric detail request. |
 | `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Nullable reads, strict envelopes, and business-only save payloads are tested in `userInfoProfile.test.mjs`. |
-| `src/services/questionService.ts` | Problem CRUD and test case retrieval | `RUNTIME-VERIFIED` | Numeric direct lookup, cancellation, failure propagation, and preservation of absent test-case classification as blank are covered. |
+| `src/services/questionService.ts` | Problem CRUD and test case retrieval | `PARTIALLY VERIFIED` | Numeric direct lookup and detail-owned test-case reads are implemented without the unestablished direct GET; final tests are pending. |
 | `src/services/referenceService.ts` | Taxonomy group codes and group records | `PARTIALLY VERIFIED` | Authenticated group-code listing returned 200; encoded group paths and strict DTO validation are tested, while the current per-group production read is blocked by the backend's missing `referenceCodesByGroup` cache. |
 | `src/services/userQuestionService.ts` | Solved/attempted IDs, bookmarks, submissions | `RUNTIME-VERIFIED` | Missing required user/question identity rejects explicitly rather than returning a fabricated empty result. |
 | `src/services/admin/adminCompanyService.ts` | Admin company, role, section, exam authoring | `RUNTIME-VERIFIED` | Paginated reads delegate to the verified shared company service; business-only mutations and API-owned exam taxonomy IDs are regression-tested; live mutation remains backend-owned. |
@@ -137,7 +138,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Button.tsx` | Reusable button component | `RUNTIME-VERIFIED` | Defaults to a non-submitting button; loading and disabled actions remain locked. |
 | `src/shared/components/ui/ConfirmDialog.tsx` | Modal confirmation dialog | `RUNTIME-VERIFIED` | Unique labels, safe initial focus, Tab containment, focus restoration, body locking, and busy-state dismissal guards are source-tested. |
 | `src/shared/components/ui/EmptyState.tsx` | Empty state placeholder | `VERIFIED` | Used in empty tables/lists. |
-| `src/shared/components/ui/Footer.tsx` | Global footer | `RUNTIME-VERIFIED` | Verified in MainLayout. |
+| `src/shared/components/ui/Footer.tsx` | Global footer | `PARTIALLY VERIFIED` | Contains verified destinations, truthful newsletter status, and a dynamic year; final browser verification is pending. |
 | `src/shared/components/ui/FormFieldError.tsx` | Form validation message | `RUNTIME-VERIFIED` | Used across React Hook Form inputs. |
 | `src/shared/components/ui/Navbar.tsx` | Global top navigation bar | `RUNTIME-VERIFIED` | User avatar, theme toggle, nav links, and backend-response-role admin navigation visibility. |
 | `src/shared/components/ui/PageLoading.tsx` | Full-screen and container loading state | `RUNTIME-VERIFIED` | Route-shaped shimmer layouts, including a skeleton fallback for otherwise-unclassified routes. |
@@ -158,7 +159,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `hooks/useGoogleOAuthLogin.ts` | OAuth hook managing popup and postMessage | `RUNTIME-VERIFIED` | Tested in `googleOAuthLifecycle.test.mjs`. |
 | `components/AuthenticatedFeatureGate.tsx` | Shared authenticated learning-content mount boundary | `RUNTIME-VERIFIED` | Keeps API-owning feature pages unmounted during session restoration and while signed out, while reusing the standard loading, recovery, and sign-in states. |
 | `components/SessionRecoveryState.tsx` | Temporary startup-auth failure gate | `RUNTIME-VERIFIED` | Keeps protected content closed and offers a safe retry without treating network/5xx failure as logout. |
-| `pages/Login.tsx` | Login form page | `RUNTIME-VERIFIED` | Zod validation, authModalMode support, backend-response-role redirect selection, and synchronous duplicate auth-action guards. |
+| `pages/Login.tsx` | Login form page | `PARTIALLY VERIFIED` | Zod validation, role-based redirect, duplicate-action guards, and shared accessible modal lifecycle; final browser verification is pending. |
 | `pages/Signup.tsx` | Registration form page | `RUNTIME-VERIFIED` | Name, email, password matching validation. |
 | `pages/ForgotPassword.tsx` | Two-step OTP password reset | `RUNTIME-VERIFIED` | OTP generation & verification flow. |
 | `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Exchanges only the HttpOnly cookie, sends a credential-free popup signal, uses response role, and displays only safe errors. |
@@ -172,7 +173,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | URL-backed difficulty, topic, company, platform, search, page, and page-size controls dispatch canonical `/questions` queries; server totals drive pagination and client catalog slicing is prohibited. Unsupported status/sort catalog controls are not rendered. |
 | `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `RUNTIME-VERIFIED` | Uses unit-safe execution metrics and service-masked hidden cases, cancels history reads, restores scoped drafts, isolates clipboard operations, sanitizes failures, and accepts only non-zero passing verdicts. Browser-level proctoring remains unavailable. |
 | `pages/ProblemList.tsx` | Legacy standalone problem-list page | `DEPRECATED` | Removed in Phase 1 remediation; practice catalog is consolidated under `PracticePage.tsx`. |
-| `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `RUNTIME-VERIFIED` | Request ownership plus stale-row clearing and same-query refresh retention are tested in `problemSliceAbortRecovery.test.mjs`. |
+| `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `PARTIALLY VERIFIED` | Exact ownership now gates cache writes as well as visible rows/loading; updated regression tests are pending execution. |
 | `utils/problemEditorial.ts` | Problem solution editorial formatter | `VERIFIED` | Markdown editorial formatting. |
 | `utils/problemExecution.ts` | Output formatter, error parser, language resolver | `RUNTIME-VERIFIED` | Language entity/reference-ID resolution is tested. |
 | `utils/codeDiagnostics.ts` | Monaco and execution diagnostic mapper | `RUNTIME-VERIFIED` | Cross-language API misuse and deduplicated compiler line/column mapping are tested. |
@@ -184,9 +185,9 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/CompanyBrandLogo.tsx` | Local-first recruiter logo with remote/error cascade | `RUNTIME-VERIFIED` | Candidate behavior is covered by `companyLogos.test.mjs`; browser rendering uses a professional terminal monogram. |
 | `components/CompanyExamCard.tsx` | Exam card displaying rounds & syllabus | `RUNTIME-VERIFIED` | Verified on CompanyExamDetails. |
 | `pages/CompanyList.tsx` | Paginated recruiter directory | `RUNTIME-VERIFIED` | Each URL-backed page calls `/company/list`, uses server totals, clamps safely, scrolls on explicit pagination, and keeps cards keyboard operable. Unsupported company search/industry controls are omitted. |
-| `pages/CompanyDetails.tsx` | Company profile, exams, and practice questions | `RUNTIME-VERIFIED` | MCQ solve modals load missing options from detail with loading/retry/empty states; recruitment exams, coding questions, and MCQs remain server-paginated. |
+| `pages/CompanyDetails.tsx` | Company profile, exams, and practice questions | `PARTIALLY VERIFIED` | Server-paginated coding/MCQ data, complete exam-page loading, and accessible solve-dialog lifecycle; live scale/final browser verification is pending. |
 | `pages/CompanyExamDetails.tsx` | Detailed recruitment exam blueprint | `RUNTIME-VERIFIED` | Exam section duration & question counts. |
-| `redux/companySlice.ts` | Company Redux slice | `RUNTIME-VERIFIED` | Tested in `companyResilience.test.mjs`. |
+| `redux/companySlice.ts` | Company Redux slice | `PARTIALLY VERIFIED` | Owns company list/detail requests and caches; the unused duplicate company-problems stack was removed and final tests are pending. |
 | `types/companyExam.ts` | Exam & blueprint type definitions | `VERIFIED` | Full type declarations. |
 | `utils/companyLogoRegistry.ts` | Canonical aliases, bundled manifest, domain validation, and provider candidates | `RUNTIME-VERIFIED` | All 121 files remain bundled; all additional manifest entries and candidate-order rules are tested in `companyLogos.test.mjs`. |
 
@@ -211,16 +212,16 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/AdminPageHeader.tsx` | Admin page title & action buttons | `VERIFIED` | Page header. |
 | `components/AdminSidebar.tsx` | Admin navigation sidebar | `RUNTIME-VERIFIED` | Links to questions, mcqs, companies, etc. |
 | `components/AdminTable.tsx` | Reusable sortable admin table | `RUNTIME-VERIFIED` | Replaces stale rows with same-column skeletons for every pending request; clickable rows support Enter/Space and visible focus. |
-| `components/companies/*` | Company, exam, role, section modals | `RUNTIME-VERIFIED` | Exam sections load `EXAM SECTION TYPE` and `QUESTION TYPE` through shared reference state, require explicit classification, lock saves while taxonomy is loading, and never substitute legacy numeric IDs. |
-| `components/dashboard/*` | Dashboard metrics, code runner, overview | `RUNTIME-VERIFIED` | Live admin KPI metrics across 8 cards; code runner discovery uses generation-owned sequential pagination, synchronously ref-owned manual selection, selection-preserving reload, merge-stable details, per-question/language drafts, dynamic boilerplate, and real-time execution. |
-| `components/institutions/*` | Institution details, form, status modals | `RUNTIME-VERIFIED` | Tested in `institutionManagement.test.mjs`. |
-| `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | Dynamic reference library bindings (DIFF, TOPIC, QPF, TESTCASETYPE), sequential displayOrder on hints, and testcase assertions verified; live admin mutation remains backend-owned. |
+| `components/companies/*` | Company, exam, role, section modals | `PARTIALLY VERIFIED` | API reference classifications and programmatically associated form labels are implemented; final browser/tests are pending. |
+| `components/dashboard/*` | Dashboard metrics, code runner, overview | `PARTIALLY VERIFIED` | Code runner uses authoritative detail, dynamic boilerplate, sequential discovery, and labeled controls without bundled solutions; final tests are pending. |
+| `components/institutions/*` | Institution details, form, status modals | `PARTIALLY VERIFIED` | API-owned forms now have explicit label/control associations; final browser/tests are pending. |
+| `components/questions/*` | Question form, details, test case modals | `PARTIALLY VERIFIED` | API-owned taxonomy, labeled/grouped controls, and no static test-case-type fallback; final browser/tests and live mutation remain pending. |
 | `pages/AdminDashboard.tsx` | Live admin dashboard metrics | `PARTIALLY VERIFIED` | The runner owns question discovery and reports totals; company count uses one-row metadata. Difficulty requests remain independently cancellable. |
 | `pages/AdminCompanies.tsx` | Company CRUD page | `RUNTIME-VERIFIED` | Page and page-size changes call `/company/list`; cards are keyboard-operable and duplicate saves are synchronously guarded. Unsupported company search is not presented. Live mutation remains unverified. |
-| `pages/AdminInstitutions.tsx` | Institution directory management | `RUNTIME-VERIFIED` | Strict pages, authoritative edit details, clamped pagination, complete university options, and duplicate mutation guards. |
-| `pages/AdminLanguages.tsx` | Language compiler configuration | `RUNTIME-VERIFIED` | Loading KPIs use skeletons and save/deactivation handlers reject duplicate actions. |
+| `pages/AdminInstitutions.tsx` | Institution directory management | `PARTIALLY VERIFIED` | Detail/edit requests are abortable and generation-owned across competing modal actions; final tests are pending. |
+| `pages/AdminLanguages.tsx` | Language compiler configuration | `PARTIALLY VERIFIED` | Duplicate-action guards and explicit label/control associations are implemented; final tests are pending. |
 | `pages/AdminReferences.tsx` | Reference taxonomy administration | `PARTIALLY VERIFIED` | Admin-only mutations, generation-owned group reads, mutation locking, cache invalidation, and explicit hard-delete confirmation are locally verified; production mutations were not executed. |
-| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `RUNTIME-VERIFIED` | Strict list/detail handling, stable initial unfiltered requests during reference hydration, authoritative view/edit data, reference name payload attachment, page clamping, and option-level correctness are tested. |
+| `pages/AdminMcqs.tsx` | MCQ question bank authoring | `PARTIALLY VERIFIED` | View/edit reads are abortable/generation-owned, row activation uses authoritative detail, and authoring controls are labeled; final tests are pending. |
 | `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Strict pages, authoritative details, page clamping, full test case retrieval (both visible and hidden) on Manage Test Cases, and partial test-case-save feedback are tested; live admin mutation remains unverified. |
 | `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Create/edit modals cover sheets, sections, and association metadata; edit payload IDs and cache invalidation are regression-tested, but live authenticated mutations were not executed. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
@@ -241,27 +242,23 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Server problem bookmarks omit unprovided save timestamps; scoped local persistence, refresh failure preservation, and stale-response ownership are tested. |
 | `src/features/institutions/components/InstitutionAutocomplete.tsx` | College autocomplete input | `RUNTIME-VERIFIED` | Minimum-three-character debounce with cancellable requests and shaped dropdown-result skeletons. |
 | `src/features/interviews/pages/InterviewPrep.tsx` | Curated interview questions | `VERIFIED` | Gated by `ComingSoon`. |
-| `src/features/landing/pages/Landing.tsx` | Public landing page with demo runner | `RUNTIME-VERIFIED` | Verified in smoke preview. |
+| `src/features/landing/pages/Landing.tsx` | Public landing page and static practice preview | `PARTIALLY VERIFIED` | Removes simulated success, unmeasured totals, and testimonial claims; illustrative workflows are labeled and final preview verification is pending. |
 | `src/features/languages/redux/languageSlice.ts` | Language Redux slice | `RUNTIME-VERIFIED` | TTL, force refresh, and stale-response ownership tested. |
-| `src/features/profile/components/modals/*` | Academic and personal modals | `VERIFIED` | Reference-backed gender, API-owned editable fields, and read-only authenticated identity; unsupported photo editor removed. |
+| `src/features/profile/components/modals/*` | Academic and personal modals | `PARTIALLY VERIFIED` | Reference-backed/API-owned fields plus shared accessible dialog lifecycle; final browser verification is pending. |
+| `src/features/profile/utils/academicProfile.ts` | Academic institution identity normalization | `PARTIALLY VERIFIED` | Prevents stale/fuzzy institution IDs from being restored after free-text edits; final tests are pending. |
 | `src/features/profile/pages/ProfileSettings.tsx` | Profile settings & performance metrics | `RUNTIME-VERIFIED` | Academic/personal records are API-driven with no legacy identity fallbacks; the modal shares header identity fallbacks, unsupported local-only preferences are absent, enrichment requests are cancellable, progress metrics avoid duplicate calls, and saves use a synchronous mutation lock. |
 | `src/features/profile/redux/profileSlice.ts` | Profile Redux slice | `RUNTIME-VERIFIED` | Identity and `/userInfo` reads are user/request-owned; late responses from a previous account are ignored and valid-null caching is tested. |
 | `src/features/progress/redux/progressSlice.ts` | Progress Redux slice | `PARTIALLY VERIFIED` | Successful server results are authoritative; user-scoped local data is a failed-resource fallback only. Regression coverage was added but not yet executed on this tree. |
 | `src/features/references/redux/referenceSlice.ts` | Reference taxonomy Redux slice | `RUNTIME-VERIFIED` | Empty-result TTL caching and stale-response ownership tested. |
 | `src/features/roadmaps/pages/RoadmapDetails.tsx` | DSA and engineering roadmaps | `VERIFIED` | Gated by `ComingSoon`. |
-| `src/features/settings/pages/AppSettings.tsx` | Application settings (theme, notifications)| `VERIFIED` | Settings view. |
+| `src/features/settings/pages/AppSettings.tsx` | Read-only API transport configuration | `VERIFIED` | Describes configured endpoint/authentication behavior without claiming live health. |
 
 ---
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 159
+- **Total First-Party TypeScript/TSX Files in `src/`**: 160
 - **Total Automated Test Files in `scripts/tests/`**: 23
-- **Total Executed Automated Unit Tests**: 371 (371 Passed, 0 Failed; 101 reported suites across 23 files)
-- **TypeScript Static Check (`npm run typecheck`)**: 0 errors
-- **Oxlint Static Code Analysis (`npm run lint`)**: 0 warnings, 0 errors across 187 files
-- **Vite Production Bundler Build (`npm run build`)**: 0 errors; five prerendered public documents, a noindex app shell, `404.html`, and `sitemap.xml` generated.
-- **Documentation Integrity (`npm run verify:docs`)**: 288 internal links and source references passed.
-- **Architecture Verification (`npm run verify:architecture`)**: `RUNTIME-VERIFIED` — 163 source files scanned successfully.
-- **Preview Smoke Test (`scripts/smoke-preview.mjs`)**: `RUNTIME-VERIFIED` — Preview smoke test passes across 5 routes and 13 bundle assets.
+- **Declared Test Cases in Current Source (static count only)**: 369; this is not execution evidence.
+- **Final-tree Unit Tests / Typecheck / Lint / Build / Documentation / Architecture / Preview**: `UNKNOWN` — intentionally not executed in this session because no OS-level sandbox is available for repository-controlled scripts. Historical green results do not certify the modified tree.
 

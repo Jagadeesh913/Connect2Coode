@@ -183,7 +183,7 @@ export const dsaSheetSlice = createSlice({
       state.sheetError = null;
     });
     builder.addCase(fetchDsaSheets.fulfilled, (state, action) => {
-      if (state.sheetsRequestId && action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
       state.loadingSheets = false;
       state.sheetsRequestId = null;
       state.sheets = action.payload;
@@ -212,7 +212,7 @@ export const dsaSheetSlice = createSlice({
       }
     });
     builder.addCase(fetchDsaSheets.rejected, (state, action) => {
-      if (state.sheetsRequestId && action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && state.sheetsRequestId !== action.meta.requestId) return;
       state.loadingSheets = false;
       state.sheetsRequestId = null;
       if (action.meta?.aborted || action.meta?.condition) return;
@@ -233,7 +233,7 @@ export const dsaSheetSlice = createSlice({
     builder.addCase(fetchDsaSections.fulfilled, (state, action) => {
       const sheetId = action.payload?.sheetId;
       const ownedRequestId = sheetId !== undefined ? state.sectionRequestIds[sheetId] : undefined;
-      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
       if (sheetId !== undefined) {
         delete state.sectionRequestIds[sheetId];
       }
@@ -256,7 +256,7 @@ export const dsaSheetSlice = createSlice({
     builder.addCase(fetchDsaSections.rejected, (state, action) => {
       const sheetId = action.meta?.arg?.sheetId;
       const ownedRequestId = sheetId !== undefined ? state.sectionRequestIds[sheetId] : undefined;
-      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
       if (sheetId !== undefined) {
         delete state.sectionRequestIds[sheetId];
       }
@@ -283,7 +283,7 @@ export const dsaSheetSlice = createSlice({
     builder.addCase(fetchSectionQuestions.fulfilled, (state, action) => {
       const { sectionId, questions } = action.payload;
       const ownedRequestId = sectionId !== undefined ? state.questionRequestIds[sectionId] : undefined;
-      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
       if (sectionId !== undefined) {
         delete state.questionRequestIds[sectionId];
       }
@@ -297,7 +297,7 @@ export const dsaSheetSlice = createSlice({
     builder.addCase(fetchSectionQuestions.rejected, (state, action) => {
       const sectionId = action.meta?.arg?.sectionId;
       const ownedRequestId = sectionId !== undefined ? state.questionRequestIds[sectionId] : undefined;
-      if (ownedRequestId && action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
+      if (action.meta?.requestId && ownedRequestId !== action.meta.requestId) return;
       if (sectionId !== undefined) {
         delete state.questionRequestIds[sectionId];
       }

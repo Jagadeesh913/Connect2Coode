@@ -261,7 +261,11 @@ describe('BATCH-2A: F-041 Redux Abort-State Recovery & Request Ownership', () =>
 
       assert.equal(state3.loading, true, 'Loading must remain true because Request B is still in flight');
       assert.equal(state3.currentRequestId, 'req-B', 'Ownership must remain with Request B');
-      assert.ok(state3.listCache[JSON.stringify({ page: 1 })], 'Cache for older request is still saved');
+      assert.equal(
+        state3.listCache[JSON.stringify({ page: 1 })],
+        undefined,
+        'A superseded request must not warm a protected cache'
+      );
     });
 
     it('older non-aborted failure does not clear loading owned by newer request', () => {

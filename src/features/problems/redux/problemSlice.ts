@@ -334,6 +334,8 @@ const problemSlice = createSlice({
       })
       .addCase(fetchProblems.fulfilled, (state, action) => {
         const { key, problems, pagination, fetchedAt } = action.payload;
+        const isCurrent = state.listRequestId === action.meta.requestId;
+        if (!isCurrent) return;
 
         state.listCache = trimCache(
           {
@@ -343,15 +345,12 @@ const problemSlice = createSlice({
           MAX_LIST_CACHE_ENTRIES
         );
 
-        const isCurrent = state.listRequestId === action.meta.requestId;
-        if (isCurrent) {
-          state.listLoading = false;
-          state.listRequestId = null;
-          state.loading = state.listLoading || state.detailLoading;
-          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
-        }
+        state.listLoading = false;
+        state.listRequestId = null;
+        state.loading = state.listLoading || state.detailLoading;
+        if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
 
-        if (!isCurrent || state.activeListKey !== key) {
+        if (state.activeListKey !== key) {
           return;
         }
 
@@ -401,6 +400,8 @@ const problemSlice = createSlice({
       })
       .addCase(fetchProblemById.fulfilled, (state, action) => {
         const { key, problem, fetchedAt } = action.payload;
+        const isCurrent = state.detailRequestId === action.meta.requestId;
+        if (!isCurrent) return;
 
         state.detailCache = trimCache(
           {
@@ -410,15 +411,12 @@ const problemSlice = createSlice({
           MAX_DETAIL_CACHE_ENTRIES
         );
 
-        const isCurrent = state.detailRequestId === action.meta.requestId;
-        if (isCurrent) {
-          state.detailLoading = false;
-          state.detailRequestId = null;
-          state.loading = state.listLoading || state.detailLoading;
-          if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
-        }
+        state.detailLoading = false;
+        state.detailRequestId = null;
+        state.loading = state.listLoading || state.detailLoading;
+        if (state.currentRequestId === action.meta.requestId) state.currentRequestId = null;
 
-        if (!isCurrent || state.activeDetailKey !== key) {
+        if (state.activeDetailKey !== key) {
           return;
         }
 

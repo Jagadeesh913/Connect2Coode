@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -7,6 +7,7 @@ import { academicDetailsSchema, AcademicDetailsFormData } from '../../../../core
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { InstitutionAutocomplete } from '../../../institutions/components/InstitutionAutocomplete';
 import { GraduationCap, Hash, Calendar, FileText, X, Loader2 } from 'lucide-react';
+import { useAccessibleDialog } from '../../../../shared/hooks/useAccessibleDialog';
 
 export type AcademicFormData = AcademicDetailsFormData;
 
@@ -29,6 +30,8 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
   defaultCollege = '',
   submitting = false,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useAccessibleDialog(isOpen, onClose, dialogRef);
   const currentYear = new Date().getFullYear();
 
   const {
@@ -105,7 +108,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
       aria-labelledby="edit-academic-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in font-sans"
     >
-      <div className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
+      <div ref={dialogRef} className="w-full max-w-lg bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200 dark:border-white/10 shadow-2xl overflow-hidden text-left flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 dark:border-white/10 shrink-0">
           <div className="flex items-center gap-3">

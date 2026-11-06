@@ -355,10 +355,11 @@ export const AdminLanguages: React.FC = () => {
         <form onSubmit={handleSubmit(handleSaveLanguage)} className="space-y-4 font-sans text-left">
           {/* Reference Language Select */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-language-reference" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Reference Language <span className="text-rose-500">*</span>
             </label>
             <select
+              id="admin-language-reference"
               {...register('referenceId', { valueAsNumber: true })}
               disabled={submitting || refLanguages.length === 0}
               className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -377,10 +378,11 @@ export const AdminLanguages: React.FC = () => {
 
           {/* Judge0 Language ID */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-language-judge0-id" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Judge0 Compiler ID <span className="text-rose-500">*</span>
             </label>
             <input
+              id="admin-language-judge0-id"
               type="number"
               {...register('judge0LanguageId', { valueAsNumber: true })}
               placeholder="e.g. 62 for Java 17, 71 for Python 3"
@@ -395,10 +397,11 @@ export const AdminLanguages: React.FC = () => {
 
           {/* Version */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="admin-language-version" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Display Version
             </label>
             <input
+              id="admin-language-version"
               type="text"
               {...register('version')}
               placeholder="e.g. OpenJDK 17, Python 3.10"

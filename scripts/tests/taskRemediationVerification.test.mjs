@@ -167,12 +167,13 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.match(dashboardCodeRunnerSource, /selectedQuestionIdRef\.current/);
   });
 
-  it('DashboardCodeRunner ignores stale page responses without refetching selected details on catalog merges', async () => {
+  it('DashboardCodeRunner ignores stale page responses and never promotes catalog rows to details', async () => {
     const fs = await import('node:fs');
     const source = fs.readFileSync('src/features/admin/components/dashboard/DashboardCodeRunner.tsx', 'utf-8');
-    assert.match(source, /const questionsRef = useRef<QuestionOption\[\]>\(\[\]\)/);
-    assert.match(source, /questionsRef\.current = questions/);
-    assert.match(source, /questionsRef\.current\.find\(\(q\) => q\.id === selectedQuestionId\)/);
+    assert.equal(source.includes('questionsRef'), false);
+    assert.equal(source.includes("difficultyRefGroupCode: 'DIFF'"), false);
+    assert.equal(source.includes('SAMPLE_WORKING_SOLUTIONS'), false);
+    assert.match(source, /setQuestionDetailsError\(message\)/);
     assert.match(source, /\}, \[selectedQuestionId\]\);/);
     assert.match(source, /const pageGenerationRef = useRef\(0\)/);
     assert.match(source, /const generation = \+\+pageGenerationRef\.current/);

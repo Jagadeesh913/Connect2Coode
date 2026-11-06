@@ -52,23 +52,23 @@ export const Landing: React.FC = () => {
     [
       {
         quote:
-          'The platform is very clean and easy to use. I love the variety of problems and the detailed solutions.',
-        name: 'Sravanthi',
-        role: '3rd Year, CSE',
+          'Build a consistent problem-solving routine with topic-based practice and progress tracking.',
+        name: 'Practice workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_sravanthi.png',
       },
       {
         quote:
-          'Company-wise questions and mock tests are really helpful. My preparation became much more focused.',
-        name: 'Akhil',
-        role: 'Final Year, IT',
+          'Focus placement preparation with company-specific question catalogs and aptitude practice.',
+        name: 'Placement workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_akhil.png',
       },
       {
         quote:
-          'The coding environment is smooth and supports multiple languages. Perfect for consistent practice.',
-        name: 'Meghana',
-        role: '3rd Year, ECE',
+          'Use the coding workspace and API-provided language catalog to practice implementation skills.',
+        name: 'Coding workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_meghana.png',
       },
     ],
@@ -76,23 +76,23 @@ export const Landing: React.FC = () => {
     [
       {
         quote:
-          'The structured DSA roadmap took me from knowing basics to cracking tier-1 tech interviews with confidence.',
-        name: 'Rahul Sharma',
-        role: 'Final Year, CSE',
+          'Follow learning sheets in sequence and revisit completed sections while preparing for interviews.',
+        name: 'Learning-sheet workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_student1.png',
       },
       {
         quote:
-          'Mock company-specific tests matched the exact pattern of my interview. It felt like real placement prep!',
-        name: 'Sneha Patel',
-        role: 'Placed at Accenture',
+          'Review company-associated coding and aptitude questions without treating them as guaranteed interview content.',
+        name: 'Company-prep workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_student2.png',
       },
       {
         quote:
-          'The fast compiler and clean topic-wise questions made daily problem solving an effortless habit.',
-        name: 'Ankit Verma',
-        role: '3rd Year, IT',
+          'Filter the question bank by topic and difficulty to plan a focused practice session.',
+        name: 'Catalog workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_student3.png',
       },
     ],
@@ -100,23 +100,23 @@ export const Landing: React.FC = () => {
     [
       {
         quote:
-          'Aptitude and coding practice together on one platform is a game changer for campus placement prep.',
-        name: 'Kavya Rao',
-        role: 'Final Year, ECE',
+          'Combine aptitude and coding practice from one authenticated learner workspace.',
+        name: 'Combined-practice workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_student4.png',
       },
       {
         quote:
-          'Detailed explanations and multiple approaches for each problem saved me hundreds of hours of prep time.',
-        name: 'Vikram Seth',
-        role: 'Software Engineer Intern',
+          'Review backend-provided problem details, examples, constraints, and submission history when available.',
+        name: 'Review workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_akhil.png',
       },
       {
         quote:
-          'Clean UI, no clutter, and instant test case execution. By far the best student coding platform.',
-        name: 'Pooja Nair',
-        role: '3rd Year, CSE',
+          'Run visible examples during practice and submit against the server-owned evaluation contract.',
+        name: 'Evaluation workflow',
+        role: 'Illustrative learner scenario',
         avatar: '/avatar_sravanthi.png',
       },
     ],
@@ -142,20 +142,20 @@ export const Landing: React.FC = () => {
 
   const faqs = [
     {
-      q: 'Is connect2code free to use?',
-      a: 'Yes, connect2code is completely free for students. You can practice problems, attempt company-wise questions, and track your progress without any cost.',
+      q: 'What can I practice on connect2code?',
+      a: 'Authenticated learners can use the API-backed coding question bank, aptitude catalog, company preparation pages, and DSA learning sheets that are available to their account.',
     },
     {
       q: 'Can I practice company-wise questions?',
-      a: 'Yes! We provide curated previous year and pattern-based questions for top product and service-based companies including TCS, Infosys, Accenture, Cognizant, Amazon, Microsoft, Google, and more.',
+      a: 'Yes. The company directory and each company page display the coding questions, MCQs, and recruitment exams returned by the platform API.',
     },
     {
       q: 'Which programming languages are supported?',
-      a: 'Our platform supports all popular programming languages including Java, C++, Python, JavaScript, and C with fast real-time online compilation and test execution.',
+      a: 'The code editor lists the execution languages currently returned by the platform API. Availability can change with the backend configuration.',
     },
     {
       q: 'How is my progress tracked?',
-      a: 'Your profile tracks solved problems, difficulty distribution (Easy, Medium, Hard), topic proficiency, submission history, and test accuracy in real-time.',
+      a: 'Your profile summarizes server-reported solved and attempted questions. Problem pages can also show your server-provided submission history.',
     },
   ];
 
@@ -356,8 +356,8 @@ export const Landing: React.FC = () => {
                 className="h-9 w-auto object-contain shrink-0"
               />
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium leading-snug">
-                Join thousands of students <br className="hidden sm:inline" />
-                on their placement journey.
+                Explore coding, aptitude, company preparation, and learning sheets
+                from one learner workspace.
               </p>
             </div>
           </div>
@@ -386,36 +386,36 @@ export const Landing: React.FC = () => {
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-16 sm:mb-20">
         <div className="bg-white dark:bg-[#0D1322] border border-slate-100 dark:border-slate-800/80 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] p-3 sm:p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           
-          {/* Stat 1: 10K+ Aspiring Developers */}
+          {/* Verified feature summary: practice */}
           <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-100/70 dark:bg-blue-600/15 text-blue-600 dark:text-sky-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-users"></i>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">10K+</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aspiring Developers</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">Practice</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">API-backed Question Bank</div>
             </div>
           </div>
 
-          {/* Stat 2: 5K+ Practice Problems */}
+          {/* Verified feature summary: company preparation */}
           <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-emerald-100/70 dark:bg-emerald-600/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-file-lines"></i>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">5K+</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Practice Problems</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">Prepare</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Company Catalogs</div>
             </div>
           </div>
 
-          {/* Stat 3: 100+ Company Questions */}
+          {/* Verified feature summary: aptitude */}
           <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100/80 dark:border-slate-800/50">
             <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-100/70 dark:bg-amber-600/15 text-amber-600 dark:text-amber-400 flex items-center justify-center text-lg shrink-0 shadow-2xs">
               <i className="fa-solid fa-city"></i>
             </div>
             <div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">100+</div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Company Questions</div>
+              <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-tight">Assess</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Aptitude Practice</div>
             </div>
           </div>
 
@@ -494,7 +494,7 @@ export const Landing: React.FC = () => {
               </div>
               <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">DSA</h3>
               <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
-                Master core concepts with curated problems, multiple difficulty levels and detailed solutions.
+                Practice the API-provided question catalog by topic and difficulty, with details shown when the backend supplies them.
               </p>
 
               {/* Checklist */}
@@ -659,7 +659,7 @@ export const Landing: React.FC = () => {
         </div>
 
         <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-xl mx-auto mb-8">
-          Access curated questions from top product and service based companies and get familiar with real interview patterns.
+          Browse company-associated questions returned by the platform API. The logos below are navigation examples, not a guarantee of current catalog coverage or interview content.
         </p>
 
         {/* Marquee Row with navigation arrows on left and right */}
@@ -739,7 +739,7 @@ export const Landing: React.FC = () => {
               Practice Problems Across Different Topics.
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-              Explore a wide range of problems to strengthen your problem solving skills.
+              The topic chips are navigation examples; the authenticated question catalog remains the source of available topics and problems.
             </p>
 
             {/* Topic Chips Carousel Row with Left and Right Arrows */}
@@ -892,22 +892,22 @@ export const Landing: React.FC = () => {
       </section>
 
 
-      {/* 8. SECTION: "Loved by Aspiring Developers" (FEEDBACK - AUTOMATICALLY MOVES RIGHT TO LEFT) */}
+      {/* 8. SECTION: Illustrative learner workflows */}
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         {/* Badge */}
         <div className="flex justify-center mb-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
-            <span>WHAT LEARNERS SAY</span>
+            <span>ILLUSTRATIVE LEARNER WORKFLOWS</span>
           </div>
         </div>
 
         <div className="text-center mb-12">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-2">
-            Loved by Aspiring Developers
+            Ways to use connect2code
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            Students are already improving their skills and getting placement ready with connect2code.
+            These examples describe intended product workflows. They are not customer testimonials or placement claims.
           </p>
         </div>
 
@@ -928,7 +928,7 @@ export const Landing: React.FC = () => {
             type="button"
             onClick={handlePrevFeedback}
             className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
-            aria-label="Previous testimonials"
+            aria-label="Previous learner workflows"
           >
             <i className="fa-solid fa-chevron-left text-xs"></i>
           </button>
@@ -981,7 +981,7 @@ export const Landing: React.FC = () => {
             type="button"
             onClick={handleNextFeedback}
             className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
-            aria-label="Next testimonials"
+            aria-label="Next learner workflows"
           >
             <i className="fa-solid fa-chevron-right text-xs"></i>
           </button>

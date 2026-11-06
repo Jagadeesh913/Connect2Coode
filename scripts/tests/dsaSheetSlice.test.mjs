@@ -296,6 +296,13 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
       assert.deepEqual(stateRejected.sheets, []);
       assert.equal(stateRejected.selectedSheetId, null);
       assert.equal(stateRejected.loadingSheets, true);
+
+      const staleAfterReset = dsaSheetReducer(stateFulfilled, {
+        type: fetchDsaSheets.fulfilled.type,
+        meta: { requestId: 'pre-logout-request', arg: undefined },
+        payload: [{ id: 2, sheetName: 'Stale sheet', sheetCode: 'STALE', isActive: true }],
+      });
+      assert.deepEqual(staleAfterReset.sheets, [], 'A pre-logout response must not repopulate state');
     });
   });
 });

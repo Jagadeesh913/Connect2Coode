@@ -134,10 +134,11 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
         {/* Exam Name & Year */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="sm:col-span-2 space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-name" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Exam Name <span className="text-rose-500">*</span>
             </label>
             <input
+              id="exam-name"
               type="text"
               {...register('examName', { required: 'Exam name is required' })}
               placeholder="e.g. TCS NQT, Amazon SDE Assessment"
@@ -147,12 +148,13 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-year" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Year Edition <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <Calendar className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-year"
                 type="number"
                 {...register('year', { required: 'Year is required', valueAsNumber: true })}
                 className="w-full pl-8 pr-3 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
@@ -164,12 +166,13 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
         {/* Duration, Questions, Total Marks */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-duration-minutes" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Duration (Minutes) <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <Clock className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-duration-minutes"
                 type="number"
                 {...register('totalDurationMinutes', { required: true, valueAsNumber: true })}
                 placeholder="120"
@@ -179,12 +182,13 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-total-questions" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Total Questions <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <FileText className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-total-questions"
                 type="number"
                 {...register('totalQuestions', { required: true, valueAsNumber: true })}
                 placeholder="65"
@@ -194,12 +198,13 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            <label htmlFor="exam-total-marks" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Total Marks <span className="text-rose-500">*</span>
             </label>
             <div className="relative flex items-center">
               <Award className="w-3.5 h-3.5 text-slate-400 absolute left-3 pointer-events-none" />
               <input
+                id="exam-total-marks"
                 type="number"
                 {...register('totalMarks', { required: true, valueAsNumber: true })}
                 placeholder="100"
@@ -211,12 +216,13 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
 
         {/* Source Portal URL */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="exam-source-url" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Official Exam / Careers URL
           </label>
           <div className="relative flex items-center">
             <Globe className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
             <input
+              id="exam-source-url"
               type="url"
               {...register('sourceUrl')}
               placeholder="https://www.tcs.com/careers"
@@ -227,10 +233,11 @@ export const CompanyExamFormModal: React.FC<CompanyExamFormModalProps> = ({
 
         {/* Description */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+          <label htmlFor="exam-description" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Description & Exam Overview
           </label>
           <textarea
+            id="exam-description"
             {...register('description')}
             rows={3}
             placeholder="Key syllabus highlights, assessment pattern notes..."

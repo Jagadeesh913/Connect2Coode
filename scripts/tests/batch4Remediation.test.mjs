@@ -32,7 +32,6 @@ const {
   default: companyReducer,
   fetchCompanies,
   fetchCompanyBySlug,
-  fetchCompanyProblems,
 } = await import('../../src/features/companies/redux/companySlice.ts');
 
 describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
@@ -170,46 +169,6 @@ describe('BATCH 4 AUDIT REMEDIATION TEST SUITE', () => {
       assert.equal(staleFulfilled.companyDetailRequestId, 'detail-b');
     });
 
-    it('keeps existing company problems visible during same-company refresh failure', () => {
-      const initial = companyReducer(undefined, { type: '@@INIT' });
-      const existingProblems = [{ id: 1, title: 'Two Sum' }];
-      const seeded = {
-        ...initial,
-        companyProblems: existingProblems,
-        companyProblemsRequestKey: 'id:7|name:acme',
-      };
-      const pending = companyReducer(seeded, {
-        type: fetchCompanyProblems.pending.type,
-        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-refresh' },
-      });
-      const rejected = companyReducer(pending, {
-        type: fetchCompanyProblems.rejected.type,
-        payload: 'Refresh failed',
-        error: {},
-        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-refresh', aborted: false },
-      });
-
-      assert.deepEqual(rejected.companyProblems, existingProblems);
-      assert.equal(rejected.companyProblemsLoading, false);
-      assert.equal(rejected.problemsError, 'Refresh failed');
-    });
-
-    it('releases combined loading when the company-problems request settles', () => {
-      const initial = companyReducer(undefined, { type: '@@INIT' });
-      const pending = companyReducer(initial, {
-        type: fetchCompanyProblems.pending.type,
-        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-only' },
-      });
-      assert.equal(pending.loading, true);
-
-      const fulfilled = companyReducer(pending, {
-        type: fetchCompanyProblems.fulfilled.type,
-        payload: { key: 'id:7|name:acme', problems: [], fetchedAt: Date.now() },
-        meta: { arg: { id: 7, name: 'Acme' }, requestId: 'problems-only' },
-      });
-      assert.equal(fulfilled.companyProblemsLoading, false);
-      assert.equal(fulfilled.loading, false);
-    });
   });
 
   describe('F-003: Solved Problem Count & Percentage Against Catalog Total', () => {

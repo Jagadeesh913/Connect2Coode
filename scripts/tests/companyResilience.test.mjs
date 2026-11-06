@@ -52,13 +52,14 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       }
     });
 
-    it('resolves text slugs from the catalog without issuing an invalid detail request', async () => {
+    it('resolves text slugs through the catalog before issuing a numeric detail request', async () => {
       const originalGet = apiClient.get;
       const originalPost = apiClient.post;
       let detailCalled = false;
-      apiClient.get = async () => {
+      apiClient.get = async (url) => {
         detailCalled = true;
-        throw new Error('Text slugs must not call GET /company/{id}');
+        assert.equal(url, '/company/99');
+        return { statusCode: 200, message: 'OK', data: { id: 99, name: 'Target Corp' } };
       };
       apiClient.post = async (url) => {
         if (url.includes('/company/list') || url.includes('/company')) {
@@ -67,6 +68,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
             timestamp: '2026-11-06T00:00:00Z',
             data: {
               content: [{ id: 99, name: 'Target Corp', slug: 'target-corp' }],
+              totalElements: 1,
               totalPages: 1,
               pageNumber: 0,
               pageSize: 100,
@@ -78,10 +80,9 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
 
       try {
         const res = await companyService.getCompanyBySlug('target-corp');
-        assert.equal(detailCalled, false);
+        assert.equal(detailCalled, true);
         assert.equal(res.data.name, 'Target Corp');
         assert.equal(res.data.id, 99);
-        assert.equal(res.timestamp, '2026-11-06T00:00:00Z');
       } finally {
         apiClient.get = originalGet;
         apiClient.post = originalPost;
@@ -303,17 +304,6 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
 
     it('adminQuestionService.getTestCases loads all test cases including hidden evaluation cases from question details', async () => {
       const originalGetById = questionService.getById;
-      const originalApiClientGet = apiClient.get;
-
-      // Mock apiClient.get for /question/10/testCases to fail (triggering details fallback)
-      apiClient.get = async (url) => {
-        if (url.includes('/testCases')) {
-          const err = new Error('Not Found');
-          err.statusCode = 404;
-          throw err;
-        }
-        return typeof originalApiClientGet === 'function' ? originalApiClientGet(url) : { data: {} };
-      };
 
       questionService.getById = async (id) => {
         return {
@@ -340,37 +330,39 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         assert.equal(cases[2].isHidden, true);
       } finally {
         questionService.getById = originalGetById;
-        apiClient.get = originalApiClientGet;
       }
     });
 
-    it('adminQuestionService.getTestCases uses direct testCases endpoint when available', async () => {
+    it('adminQuestionService.getTestCases does not issue an unestablished direct GET', async () => {
       const originalApiClientGet = apiClient.get;
+      const originalGetById = questionService.getById;
       let directCalled = false;
 
       apiClient.get = async (url) => {
         if (url.includes('/question/42/testCases')) {
           directCalled = true;
-          return {
-            statusCode: 200,
-            message: 'OK',
-            data: [
-              { id: 101, input: '100', expectedOutput: '200', isHidden: false },
-              { id: 102, input: '300', expectedOutput: '600', isHidden: true },
-            ],
-          };
+          throw new Error('Unexpected direct GET');
         }
         return typeof originalApiClientGet === 'function' ? originalApiClientGet(url) : { data: {} };
       };
+      questionService.getById = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: {
+          id: 42,
+          title: 'Authoritative detail',
+          testCases: [{ id: 101, input: '100', expectedOutput: '200', isHidden: false }],
+        },
+      });
 
       try {
         const cases = await adminQuestionService.getTestCases(42);
-        assert.equal(directCalled, true, 'Direct testCases endpoint must be attempted');
-        assert.equal(cases.length, 2);
+        assert.equal(directCalled, false, 'Direct testCases GET must not be attempted');
+        assert.equal(cases.length, 1);
         assert.equal(cases[0].input, '100');
-        assert.equal(cases[1].isHidden, true);
       } finally {
         apiClient.get = originalApiClientGet;
+        questionService.getById = originalGetById;
       }
     });
   });
