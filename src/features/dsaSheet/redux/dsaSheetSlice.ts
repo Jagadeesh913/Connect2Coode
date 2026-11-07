@@ -13,7 +13,9 @@ export interface DsaSheetState {
   sections: DsaSheetSection[];
   sectionsBySheetId: Record<number, DsaSheetSection[]>;
   questionsBySection: Record<number, DsaSheetQuestionLink[]>;
+  subsectionsBySection: Record<number, DsaSheetSection[]>;
   expandedSectionId: number | null;
+  expandedSubsectionIds: number[];
 
   // Loading flags
   loadingSheets: boolean;
@@ -22,16 +24,21 @@ export interface DsaSheetState {
   sheetsRequestId: string | null;
   sectionRequestIds: Record<number, string>;
   questionRequestIds: Record<number, string>;
+  subsectionRequestIds: Record<number, string>;
+  loadingQuestionSectionIds: Record<number, boolean>;
+  loadingSubsectionIds: Record<number, boolean>;
 
   // Error messages
   sheetError: string | null;
   sectionsError: string | null;
   questionErrors: Record<number, string>;
+  subsectionErrors: Record<number, string>;
 
   // Timestamps for TTL cache validation
   sheetsFetchedAt: number | null;
   sectionsFetchedAt: Record<number, number>;
   questionsFetchedAt: Record<number, number>;
+  subsectionsFetchedAt: Record<number, number>;
 }
 
 const initialState: DsaSheetState = {
@@ -40,7 +47,9 @@ const initialState: DsaSheetState = {
   sections: [],
   sectionsBySheetId: {},
   questionsBySection: {},
+  subsectionsBySection: {},
   expandedSectionId: null,
+  expandedSubsectionIds: [],
 
   loadingSheets: true,
   loadingSections: false,
@@ -48,14 +57,19 @@ const initialState: DsaSheetState = {
   sheetsRequestId: null,
   sectionRequestIds: {},
   questionRequestIds: {},
+  subsectionRequestIds: {},
+  loadingQuestionSectionIds: {},
+  loadingSubsectionIds: {},
 
   sheetError: null,
   sectionsError: null,
   questionErrors: {},
+  subsectionErrors: {},
 
   sheetsFetchedAt: null,
   sectionsFetchedAt: {},
   questionsFetchedAt: {},
+  subsectionsFetchedAt: {},
 };
 
 export const fetchDsaSheets = createAsyncThunk<
@@ -137,6 +151,32 @@ export const fetchSectionQuestions = createAsyncThunk<
     Boolean(force || !getState().dsaSheet.questionRequestIds[sectionId]),
 });
 
+export const fetchDsaSubsections = createAsyncThunk<
+  { sectionId: number; subsections: DsaSheetSection[] },
+  { sectionId: number; force?: boolean },
+  { state: RootState }
+>('dsaSheet/fetchSubsections', async ({ sectionId, force }, { getState, rejectWithValue, signal }) => {
+  const { dsaSheet } = getState();
+  const cached = dsaSheet.subsectionsBySection[sectionId];
+  const fetchedAt = dsaSheet.subsectionsFetchedAt[sectionId];
+  if (!force && cached && fetchedAt && Date.now() - fetchedAt < DSA_SHEET_CACHE_TTL_MS) {
+    return { sectionId, subsections: cached };
+  }
+  try {
+    const result = await learningSheetService.getSubsections(sectionId, signal);
+    return { sectionId, subsections: result.filter((section) => section.isActive) };
+  } catch (error) {
+    if (isRequestCanceled(error)) throw error;
+    return rejectWithValue({
+      sectionId,
+      message: getActionableErrorMessage(error, 'Unable to load subsections.'),
+    });
+  }
+}, {
+  condition: ({ sectionId, force }, { getState }) =>
+    Boolean(force || !getState().dsaSheet.subsectionRequestIds[sectionId]),
+});
+
 export const dsaSheetSlice = createSlice({
   name: 'dsaSheet',
   initialState,
@@ -148,6 +188,7 @@ export const dsaSheetSlice = createSlice({
       state.sections = state.sectionsBySheetId[sheetId] ?? [];
       const firstSectionId = state.sections[0]?.id ?? null;
       state.expandedSectionId = firstSectionId;
+      state.expandedSubsectionIds = [];
       state.sectionsError = null;
       if (!state.sectionsBySheetId[sheetId]) {
         state.loadingSections = true;
@@ -160,19 +201,28 @@ export const dsaSheetSlice = createSlice({
       const sectionId = action.payload;
       const nextId = state.expandedSectionId === sectionId ? null : sectionId;
       state.expandedSectionId = nextId;
+      state.expandedSubsectionIds = [];
       if (nextId && state.questionsBySection[nextId] === undefined) {
         state.loadingQuestionSectionId = nextId;
       }
+    },
+    toggleSubsection(state, action: PayloadAction<number>) {
+      const sectionId = action.payload;
+      state.expandedSubsectionIds = state.expandedSubsectionIds.includes(sectionId)
+        ? state.expandedSubsectionIds.filter((id) => id !== sectionId)
+        : [...state.expandedSubsectionIds, sectionId];
     },
     invalidateDsaSheetCache(state) {
       state.sheetsFetchedAt = null;
       state.sectionsFetchedAt = {};
       state.questionsFetchedAt = {};
+      state.subsectionsFetchedAt = {};
     },
     resetDsaSheetErrors(state) {
       state.sheetError = null;
       state.sectionsError = null;
       state.questionErrors = {};
+      state.subsectionErrors = {};
     },
   },
   extraReducers: (builder) => {
@@ -277,6 +327,7 @@ export const dsaSheetSlice = createSlice({
       }
       state.loadingQuestionSectionId = sectionId ?? null;
       if (sectionId !== undefined) {
+        state.loadingQuestionSectionIds[sectionId] = true;
         delete state.questionErrors[sectionId];
       }
     });
@@ -290,6 +341,7 @@ export const dsaSheetSlice = createSlice({
       if (state.loadingQuestionSectionId === sectionId) {
         state.loadingQuestionSectionId = null;
       }
+      delete state.loadingQuestionSectionIds[sectionId];
       state.questionsBySection[sectionId] = questions;
       state.questionsFetchedAt[sectionId] = Date.now();
       delete state.questionErrors[sectionId];
@@ -304,12 +356,40 @@ export const dsaSheetSlice = createSlice({
       if (state.loadingQuestionSectionId === sectionId) {
         state.loadingQuestionSectionId = null;
       }
+      if (sectionId !== undefined) delete state.loadingQuestionSectionIds[sectionId];
       if (action.meta?.aborted || action.meta?.condition) return;
       const payload = action.payload as { sectionId: number; message: string } | undefined;
       const message = payload?.message || 'Unable to load section questions.';
       if (sectionId !== undefined) {
         state.questionErrors[sectionId] = message;
       }
+    });
+
+    // 4. Subsection hierarchy. This endpoint is backend-proposed; failures stay isolated
+    // from direct questions so a missing deployment cannot blank a valid section.
+    builder.addCase(fetchDsaSubsections.pending, (state, action) => {
+      const sectionId = action.meta.arg.sectionId;
+      state.subsectionRequestIds[sectionId] = action.meta.requestId;
+      state.loadingSubsectionIds[sectionId] = true;
+      delete state.subsectionErrors[sectionId];
+    });
+    builder.addCase(fetchDsaSubsections.fulfilled, (state, action) => {
+      const { sectionId, subsections } = action.payload;
+      if (state.subsectionRequestIds[sectionId] !== action.meta.requestId) return;
+      delete state.subsectionRequestIds[sectionId];
+      delete state.loadingSubsectionIds[sectionId];
+      delete state.subsectionErrors[sectionId];
+      state.subsectionsBySection[sectionId] = subsections;
+      state.subsectionsFetchedAt[sectionId] = Date.now();
+    });
+    builder.addCase(fetchDsaSubsections.rejected, (state, action) => {
+      const sectionId = action.meta.arg.sectionId;
+      if (state.subsectionRequestIds[sectionId] !== action.meta.requestId) return;
+      delete state.subsectionRequestIds[sectionId];
+      delete state.loadingSubsectionIds[sectionId];
+      if (action.meta.aborted || action.meta.condition) return;
+      const payload = action.payload as { sectionId: number; message: string } | undefined;
+      state.subsectionErrors[sectionId] = payload?.message || 'Unable to load subsections.';
     });
     builder.addMatcher(
       (action) =>
@@ -323,6 +403,7 @@ export const dsaSheetSlice = createSlice({
 export const {
   selectSheet,
   toggleSection,
+  toggleSubsection,
   invalidateDsaSheetCache,
   resetDsaSheetErrors,
 } = dsaSheetSlice.actions;

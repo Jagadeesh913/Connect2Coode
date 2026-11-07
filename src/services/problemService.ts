@@ -33,7 +33,6 @@ export const problemService = {
     const levelArr = parseToIdList(params.level ?? params.difficulty);
     const topicArr = parseToIdList(params.topic);
     const companiesArr = parseToIdList(params.companies ?? params.company);
-    const platformArr = parseToIdList(params.platform ?? params.platforms ?? params.qpf);
 
     const rawSearch = params.searchText?.trim()
       ? params.searchText.trim()
@@ -53,10 +52,6 @@ export const problemService = {
         sortDirection: 'ASC' as const,
       },
     };
-
-    if (platformArr && platformArr.length > 0) {
-      payload.platform = platformArr;
-    }
 
     try {
       const res = await fetchQuestionPage(payload, signal);

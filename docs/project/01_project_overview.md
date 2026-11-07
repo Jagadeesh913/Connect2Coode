@@ -25,7 +25,7 @@ The application combines:
 | **State Management** | Redux Toolkit | `^2.12.0` | Centralized predictable state with Redux Toolkit and React-Redux `^9.3.0`. |
 | **Routing** | React Router | `^7.18.2` | Data-router (`createBrowserRouter`) with lazy page code splitting and guards. |
 | **HTTP Transport** | Axios | `^1.19.0` | Unified client instance (`src/core/api/apiClient.ts`) with refresh interceptors. |
-| **Code Editor** | Monaco Editor | `^4.7.0` | VS Code-grade in-browser code editor via `@monaco-editor/react`. |
+| **Code Editor** | Monaco Editor | wrapper `^4.7.0`; engine `0.55.1` | VS Code-grade editor via `@monaco-editor/react`, with the engine and workers bundled locally for CSP-safe startup. |
 | **Schema Validation** | Zod | `4.6.7` | Runtime form and payload validation paired with `@hookform/resolvers`; pinned above the constrained-collection memory-exhaustion advisory. |
 | **Forms** | React Hook Form| `^7.84.0` | Performant, uncontrolled form management with automatic error mapping. |
 | **Form Resolver** | `@hookform/resolvers` | `^5.5.7` | Connects Zod schemas to React Hook Form on auth, profile, language, institution, company, and question forms. |
@@ -85,7 +85,7 @@ graph TB
 - **Authentication Lifecycle**: Email/password login, student signup, password reset with OTP, Google OAuth2 popup/callback, startup restoration, HTTP-401-driven refresh, same-tab deduplication, and Web-Locks-based cross-tab serialization. Browsers without Web Locks fail refresh safely instead of issuing an uncoordinated rotating-cookie request; live deployed multi-tab verification remains pending.
 - **API Transport Hardening**: Explicit public/protected request policy, bearer-header authentication, strict login/refresh identity validation, recursive elimination of legacy body token fields, and query-parameter token leak prevention.
 - **Authenticated Learning Gate**: Problems, problem workspaces, DSA sheets, Company Prep, and Aptitude retain stable navigable URLs but do not mount their API-owning page trees until startup session restoration succeeds. Signed-out visitors receive one shared sign-in state; only the required cookie-backed auth refresh may run before that decision.
-- **Problem Catalog & Filters**: Multi-faceted filtering by difficulty, topic, recruiter company, platform (LeetCode, GFG, HackerRank), search query, and pagination.
+- **Problem Catalog & Filters**: Server-owned filtering by difficulty, topic, recruiter company, search query, and pagination. Platform metadata is displayed from question DTOs but is not exposed as a filter because `/questions` has no verified platform-filter field.
 - **API-Driven DSA Sheets**: `/dsa-sheet` lists active learning sheets, ordered top-level sections, and lazily loaded linked questions with search and solved-state indicators. `/admin/dsa-sheets` creates sheets/sections and manages question associations through the supplied learning-sheet endpoints.
 - **Monaco Code Runner**: Code execution uses the `/language` API's table-ID-to-reference-ID mapping, automatic Java class sanitization (`Main`), and sample test case execution. The client does not guess compiler IDs when the catalog is unavailable.
 - **Company Exam Blueprints**: Recruitment exam schedules, role salaries, section durations, and question count visualizations.

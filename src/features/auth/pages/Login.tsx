@@ -439,6 +439,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                 <label htmlFor="login-email" className="text-sm font-medium text-gray-200">Email Address</label>
                 <input
                   id="login-email"
+                  data-dialog-initial-focus
                   type="email"
                   aria-invalid={Boolean(loginErrors.email)}
                   aria-describedby={loginErrors.email ? 'login-email-error' : undefined}

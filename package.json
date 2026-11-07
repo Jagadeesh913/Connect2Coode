@@ -24,6 +24,7 @@
     "axios": "^1.19.0",
     "framer-motion": "^12.43.0",
     "lucide-react": "^1.28.0",
+    "monaco-editor": "0.55.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-hook-form": "^7.84.0",

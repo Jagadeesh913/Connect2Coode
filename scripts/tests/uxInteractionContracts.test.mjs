@@ -53,6 +53,7 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /sectionsAbortRef\.current\?\.abort/);
     assert.match(source, /linksAbortRef\.current\?\.abort/);
     assert.match(source, /optionsAbortRef\.current\?\.abort/);
+    assert.match(source, /subsectionControllersRef\.current\.get\(sectionId\)\?\.abort/);
     assert.match(source, /getSections\(sheetId, controller\.signal\)/);
     assert.match(source, /getSectionQuestions\(sectionId, controller\.signal\)/);
     assert.match(source, /if \(submittingRef\.current\) return/);
@@ -68,17 +69,26 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /editingSheet \? \{ id: editingSheet\.id/);
     assert.match(source, /id: editingLink\?\.id \?\? null/);
     assert.match(source, /dispatch\(invalidateDsaSheetCache\(\)\)/);
+    assert.match(source, /const hierarchyPath: number\[\] = \[\]/);
+    assert.match(source, /for \(const hierarchySectionId of hierarchyPath\)/);
   });
 
   it('DSA user questions cancel superseded requests and keep errors scoped to the failed section', async () => {
     const pageSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
     const sliceSource = await readSource('src/features/dsaSheet/redux/dsaSheetSlice.ts');
     assert.match(pageSource, /dispatch\(fetchSectionQuestions\(/);
-    assert.match(pageSource, /promise\.abort\(\)/);
+    assert.match(pageSource, /expandedSectionQuestions !== undefined\) return/);
+    assert.match(pageSource, /expandedSectionSubsections !== undefined\) return/);
+    assert.equal(
+      (pageSource.match(/return \(\) => request\.abort\(\)/g) || []).length >= 2,
+      true,
+      'question and subsection requests must have independent abort lifecycles'
+    );
     assert.match(sliceSource, /learningSheetService\.getSectionQuestions\(sectionId, signal\)/);
     assert.match(pageSource, /questionErrors/);
-    assert.match(pageSource, /loadingQuestionSectionId === section\.id/);
-    assert.match(pageSource, /loadingQuestionSectionId === section\.id \? \([\s\S]*?<Skeleton/);
+    assert.match(pageSource, /loadingQuestionSectionIds\[sectionId\] \|\| loadingQuestionSectionId === sectionId/);
+    assert.match(pageSource, /fetchDsaSubsections/);
+    assert.match(pageSource, /subsectionErrors/);
     assert.match(pageSource, /sectionsError && sections\.length === 0 \? null/);
     assert.match(pageSource, /getDsaQuestionProblemPath\(link\)/);
   });
@@ -156,7 +166,16 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /difficulty: difficultyIds/);
     assert.match(source, /topic: topicIds/);
     assert.match(source, /companies: companyIds/);
-    assert.match(source, /platform: platformIds/);
+    assert.doesNotMatch(source, /platform: platformIds/);
+    assert.doesNotMatch(source, /fetchReferenceGroup\('QPF'\)/);
+    assert.match(source, /const hasUnresolvedFilters = useMemo/);
+    assert.match(source, /dispatch\(invalidateCompanyList\(\)\)/);
+    assert.match(
+      source,
+      /if \(hasPendingFilterResolution \|\| hasUnresolvedFilters\) \{\s*return;/,
+      'unresolved legacy filters must never degrade into an unfiltered request'
+    );
+    assert.match(source, /!hasPendingFilterResolution[\s\S]*?!hasUnresolvedFilters[\s\S]*?<Pagination/);
     assert.match(source, /const totalMatching = serverPagination\.total/);
     assert.doesNotMatch(source, /filteredProblems\.slice/);
   });
@@ -258,6 +277,22 @@ describe('shared UX interaction contracts', () => {
     const source = await readSource('src/shared/components/ui/PageLoading.tsx');
     assert.doesNotMatch(source, />Loading page…</);
     assert.match(source, /else \{[\s\S]*?<Skeleton/);
+  });
+
+  it('auth dialog focus is stable while typing and starts in the email field', async () => {
+    const dialogHook = await readSource('src/shared/hooks/useAccessibleDialog.ts');
+    const login = await readSource('src/features/auth/pages/Login.tsx');
+
+    assert.match(dialogHook, /const onCloseRef = useRef\(onClose\)/);
+    assert.match(dialogHook, /onCloseRef\.current\(\)/);
+    assert.match(dialogHook, /\[dialogRef, isOpen\]/);
+    assert.doesNotMatch(
+      dialogHook,
+      /\[dialogRef, isOpen, onClose\]/,
+      'Changing callback identities must not rerun initial focus and steal password input focus'
+    );
+    assert.match(dialogHook, /\[data-dialog-initial-focus\]/);
+    assert.match(login, /id="login-email"\s+data-dialog-initial-focus/);
   });
 
   it('problem drafts are user-scoped, editor clipboard is isolated, and admin routes stay unrestricted', async () => {

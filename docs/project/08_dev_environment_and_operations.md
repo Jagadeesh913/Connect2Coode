@@ -163,6 +163,7 @@ The smoke harness defaults to port 4173. Local runs may set `C2C_SMOKE_PORT` to 
 
 - `npm run verify:docs` runs `scripts/verify-documentation.mjs`. It is required in CI and validates the canonical `AGENTS.md` plus `docs/project/` links, repository-path references, and common unredacted-secret patterns.
 - The 2026-10-24 production build completed successfully after the dependency/API-state audit and Zod 4 security migration. Its Vite entry bundle was **464.34 kB / 134.19 kB gzip**; route modules remain lazy-loaded. The largest route/support chunks observed were `AdminModal` (**131.54 kB / 43.20 kB gzip**, including Framer Motion and loaded only by admin routes), `AdminQuestions` (**68.05 kB / 14.99 kB gzip**), and `ProblemDetails` (**58.17 kB / 12.27 kB gzip**; Monaco itself is loaded by its wrapper at runtime). These are build artifacts, not a load-capacity result.
+- The 2026-11-07 build bundles Monaco 0.55.1 and its workers locally rather than downloading `loader.js`. The application entry remains **491.31 kB / 142.24 kB gzip**; Monaco's editor core (**3,622.38 kB / 926.02 kB gzip**) and language workers are emitted separately and loaded only by lazy editor consumers. This proves CSP-compatible packaging, not deployed transfer latency or browser memory acceptance.
 
 ### 5,000-Concurrent-User Evaluation Plan
 

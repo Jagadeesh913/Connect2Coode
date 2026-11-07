@@ -76,7 +76,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/security/refreshCoordinator.ts` | Cross-tab refresh rotation lock | `PARTIALLY VERIFIED` | Uses atomic Web Locks only; browsers without them fail before issuing refresh. Mocked exclusivity and fail-safe paths are tested, but real two-tab cookie rotation remains unverified. |
 | `src/core/security/tokenStorage.ts` | Memory-only access token and session profile storage | `RUNTIME-VERIFIED` | Exposes no refresh-token API, never reads or creates the backend HttpOnly cookie, purges legacy JavaScript-readable token aliases, and advances the stale-response epoch on clear. |
 | `src/core/security/externalUrl.ts` | Untrusted external-link and remote-image guard | `PARTIALLY VERIFIED` | Links accept only credential-free HTTP(S); passive images additionally require HTTPS and reject local/private/link-local targets. Final automated/browser verification is pending. |
-| `src/shared/hooks/useAccessibleDialog.ts` | Shared non-admin dialog lifecycle | `PARTIALLY VERIFIED` | Owns initial focus, Tab containment, Escape close, body-scroll locking, and focus restoration; browser/assistive-technology verification is pending. |
+| `src/shared/hooks/useAccessibleDialog.ts` | Shared non-admin dialog lifecycle | `PARTIALLY VERIFIED` | Owns stable initial focus, Tab containment, Escape close, body-scroll locking, and focus restoration; callback rerenders cannot steal field focus. Browser/assistive-technology verification is pending. |
 | `src/core/storage/userScopedStorage.ts` | Collision-free versioned user-scoped local storage | `PARTIALLY VERIFIED` | Uses the complete encoded canonical identity rather than a truncated hash; logout clears the departing user's scope while retaining only explicitly preserved theme preference. Collision regression coverage is pending execution. |
 | `src/core/types/api.ts` | REST response envelopes (`ApiResponse`, `ApiPage`) | `VERIFIED` | Strict DTO types. |
 | `src/core/types/domain.ts` | Domain models (Problem, Company, MCQ, User, etc.) | `RUNTIME-VERIFIED` | Includes unit-aware execution metrics/diagnostics, optional server bookmark timestamps, canonical institution filters, reference save unions, nullable profile responses, strict session-identity fields, and MCQ save payloads. |
@@ -98,7 +98,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `PARTIALLY VERIFIED` | Requires complete pages, positive numeric detail IDs, and mapped nested exam/role/section DTOs; live scale and production payload acceptance remain unverified. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `PARTIALLY VERIFIED` | Normalization, hidden masking, dynamic language mapping, and payload bounds are implemented; forced language reads supersede in-flight cache ownership. Final tests/live submit remain unverified. |
 | `src/services/institutionService.ts` | Authenticated institution search autocomplete | `RUNTIME-VERIFIED` | Explicit protected policy, Bearer attachment, and protected-401 refresh behavior are tested in `authContract.test.mjs`. |
-| `src/services/learningSheetService.ts` | DSA sheets, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, and ordering are tested. Live API access remains backend-dependent. |
+| `src/services/learningSheetService.ts` | DSA sheets, ordered hierarchy, and linked-question reads | `PARTIALLY VERIFIED` | Strict DTO boundaries, positive IDs, top-level filtering, subsection parent ownership, and ordering are tested. The proposed subsection endpoint is not live-verified. |
 | `src/services/mcqService.ts` | User/admin MCQ reads and aptitude scoring | `PARTIALLY VERIFIED` | List/detail envelopes and option records are mapped before use; missing list options still trigger authoritative detail and correctness remains option-level `isCorrect`. Final tests are pending. |
 | `src/services/problemService.ts` | Problem catalog and details service | `PARTIALLY VERIFIED` | Numeric detail failures propagate; legacy slug resolution follows real catalog pages and cannot hide a failed numeric detail request. |
 | `src/services/profileService.ts` | User profile & academic details (`/userInfo`) | `RUNTIME-VERIFIED` | Nullable reads, strict envelopes, and business-only save payloads are tested in `userInfoProfile.test.mjs`. |
@@ -110,7 +110,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/services/admin/adminLanguageService.ts` | Admin language compiler management | `RUNTIME-VERIFIED` | One save method matches the shared create/update POST; successful mutations invalidate execution-language cache. |
 | `src/services/admin/adminReferenceService.ts` | Admin reference create/update/hard delete | `PARTIALLY VERIFIED` | Request/response shapes, encoded delete path, and admin isolation are source-tested; production mutations were not executed. |
 | `src/services/admin/adminMcqService.ts` | Admin MCQ mutations and management reads | `RUNTIME-VERIFIED` | Owns one create/update save method plus delete, delegates shared reads, and uses the semantic `ADMIN_SAVE` endpoint constant. |
-| `src/services/admin/adminQuestionService.ts` | Admin question management | `PARTIALLY VERIFIED` | One requested question page produces one API call; synthetic totals, offset stitching, client filtering, and per-record probes were removed. Backend pagination remains a blocker. |
+| `src/services/admin/adminQuestionService.ts` | Admin question management | `PARTIALLY VERIFIED` | One requested page produces one API call; missing/invalid pagination metadata rejects, while observed and Spring page-field aliases normalize without synthesizing totals. Backend pagination remains a blocker. |
 | `src/services/admin/adminLearningSheetService.ts` | Admin DSA sheet authoring and link management | `PARTIALLY VERIFIED` | Endpoint/body shapes and bodyless DELETE requests are tested; live production mutations were not executed. |
 
 ---
@@ -146,7 +146,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
-| `src/shared/hooks/useAssessmentIntegrity.ts` | Learner-route clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Native clipboard, selection, middle-click, drag/drop, browser export, Print Screen, common OS capture, focus-loss obscuring, fullscreen/keyboard-lock secure mode, internal-editor clipboard routing, allowed DevTools, and execution shortcuts are covered; `AppRouterLayout` disables the hook for `/admin/*`. Browser/OS enforcement boundary remains documented. |
+| `src/shared/hooks/useAssessmentIntegrity.ts` | Learner-route clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Keyboard classification tolerates absent/non-string keys without crashing forms and its regression passed; native clipboard, selection, browser export, capture, focus-loss, secure mode, and internal-editor routing remain covered. Final browser/password-manager/IME acceptance is still pending. |
 | `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Normalized identity scopes retire legacy global values, direct/toggle updates persist per user, and `system` follows live OS color-scheme changes. |
 
 ---
@@ -171,8 +171,8 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/PracticeHeroBanner.tsx` | Hero banner with problem stats & search | `RUNTIME-VERIFIED` | Verified on PracticePage. |
 | `hooks/useExecutionRequest.ts` | Custom hook for Monaco code running | `RUNTIME-VERIFIED` | Handles run/submit state & aborts. |
-| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | URL-backed difficulty, topic, company, platform, search, page, and page-size controls dispatch canonical `/questions` queries; server totals drive pagination and client catalog slicing is prohibited. Unsupported status/sort catalog controls are not rendered. |
-| `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `PARTIALLY VERIFIED` | Uses one root-owned integrity controller, restores submission source into its recorded table/reference language, keeps scoped drafts and isolated clipboard operations, and accepts only non-zero passing verdicts. Static regressions were added; final tests and browser interaction are pending. |
+| `pages/PracticePage.tsx` | Practice catalog hub | `RUNTIME-VERIFIED` | URL-backed difficulty, topic, company, search, page, and page-size controls dispatch the exact documented `/questions` query; unresolved legacy filter values block rather than degrade to an unfiltered request. Server totals drive pagination, client catalog slicing is prohibited, and unsupported platform/status/sort controls are not rendered. |
+| `pages/ProblemDetails.tsx` | Monaco editor coding workspace | `PARTIALLY VERIFIED` | Uses the locally bundled lazy Monaco engine/workers, one root-owned integrity controller, recorded table/reference language restoration, scoped drafts, isolated clipboard operations, and non-zero passing verdicts. Static/build regressions pass; deployed editor interaction remains pending. |
 | `pages/ProblemList.tsx` | Legacy standalone problem-list page | `DEPRECATED` | Removed in Phase 1 remediation; practice catalog is consolidated under `PracticePage.tsx`. |
 | `redux/problemSlice.ts` | Problem Redux slice with TTL/LRU caches | `PARTIALLY VERIFIED` | Exact ownership now gates cache writes as well as visible rows/loading; updated regression tests are pending execution. |
 | `utils/problemEditorial.ts` | Problem solution editorial formatter | `VERIFIED` | Markdown editorial formatting. |
@@ -223,16 +223,16 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/AdminLanguages.tsx` | Language compiler configuration | `PARTIALLY VERIFIED` | Duplicate-action guards and explicit label/control associations are implemented; final tests are pending. |
 | `pages/AdminReferences.tsx` | Reference taxonomy administration | `PARTIALLY VERIFIED` | Admin-only mutations, generation-owned group reads, mutation locking, cache invalidation, and explicit hard-delete confirmation are locally verified; production mutations were not executed. |
 | `pages/AdminMcqs.tsx` | MCQ question bank authoring | `PARTIALLY VERIFIED` | View/edit reads are abortable/generation-owned, row activation uses authoritative detail, and authoring controls are labeled; final tests are pending. |
-| `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Detail reads are abortable, and one shared abortable company catalog supplies both filters and the form instead of a duplicate modal read; live admin mutation/final tests remain unverified. |
-| `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Create/edit modals cover sheets, sections, and association metadata; edit payload IDs and cache invalidation are regression-tested, but live authenticated mutations were not executed. |
+| `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Detail/list reads are abortable; numeric reference/company filters expose loading, failure, and retry state; one company catalog supplies filters and form. Live admin mutation/browser acceptance remains unverified. |
+| `pages/AdminDsaSheets.tsx` | DSA sheet, section/subsection, and question-link management | `PARTIALLY VERIFIED` | Parent selection prevents loaded self/descendant cycles and uses the supplied payload contract; hierarchy failure remains visible without blocking direct links. Live authenticated mutations and the proposed child read were not executed. |
 | `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
 
 ### F. DSA Sheet Feature (`src/features/dsaSheet/`)
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
 | `components/DsaSheetHeroBanner.tsx` | Theme-aware generated DSA hero banner | `RUNTIME-VERIFIED` | Uses project-local light/dark raster assets with 2048x384 dimensions matching Practice/Aptitude banner container and design treatment. |
-| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `RUNTIME-VERIFIED` | Redux-backed learning path with an accessible pauseable carousel, explicit reduced-motion labeling/visibility guards, TTL caching, accordion reads, retries, and request cancellation. |
-| `redux/dsaSheetSlice.ts` | Learning sheets, sections, questions Redux slice | `PARTIALLY VERIFIED` | TTL caching now adds per-resource deduplication, request ownership, abort handling, and stale-result guards; final tests are pending. |
+| `pages/DsaSheetPage.tsx` | Student DSA learning-path UI | `PARTIALLY VERIFIED` | Redux-backed recursive sections/subsections, direct questions at every level, scoped retry/error states, accessible carousel, and request cancellation are source/runtime tested; the proposed child endpoint and browser acceptance remain unverified. |
+| `redux/dsaSheetSlice.ts` | Learning sheets, hierarchy, and questions Redux slice | `RUNTIME-VERIFIED` | TTL caches, per-parent/per-section loading and errors, request ownership, abort handling, nested expansion, invalidation, and failure isolation have reducer coverage. |
 | `types.ts` | Learning sheet, section, question-link, and mutation DTOs | `RUNTIME-VERIFIED` | Used by strict service validation and contract tests. |
 | `utils/questionRoute.ts` | DSA association-to-problem route resolver | `RUNTIME-VERIFIED` | Always selects nested `question.id`; regression test proves outer association IDs cannot enter problem URLs. |
 
@@ -260,6 +260,6 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 161
 - **Total Automated Test Files in `scripts/tests/`**: 23
-- **Declared Test Cases in Current Source (static count only)**: 380; this is not execution evidence.
+- **Automated Test Cases**: 393 across 25 files; the latest full run passed 393/393 with zero failures.
 - **Final-tree Unit Tests / Typecheck / Lint / Build / Documentation / Architecture / Preview**: `UNKNOWN` — intentionally not executed in this session because no OS-level sandbox is available for repository-controlled scripts. Historical green results do not certify the modified tree.
 

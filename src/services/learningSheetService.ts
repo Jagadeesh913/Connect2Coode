@@ -79,6 +79,19 @@ export const learningSheetService = {
       .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
   },
 
+  async getSubsections(sectionId: number, signal?: AbortSignal): Promise<DsaSheetSection[]> {
+    assertId(sectionId, 'Section ID');
+    const response: ApiResponse<unknown> = await apiClient.get(
+      API_ENDPOINTS.LEARNING_SHEET.SUBSECTIONS(sectionId),
+      { signal }
+    );
+    const subsections = requireArray(response.data, isSection, 'learning sheet subsections');
+    if (subsections.some((section) => section.parentSectionId !== sectionId)) {
+      throw new Error('Unexpected learning sheet subsections response format');
+    }
+    return subsections.sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
+  },
+
   async getSectionQuestions(sectionId: number, signal?: AbortSignal): Promise<DsaSheetQuestionLink[]> {
     assertId(sectionId, 'Section ID');
     const response: ApiResponse<unknown> = await apiClient.get(

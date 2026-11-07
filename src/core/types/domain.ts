@@ -100,9 +100,6 @@ export interface ProblemFilter {
   searchText?: string | null;
   company?: number[] | string | number | null;
   companies?: number[] | string[] | null;
-  platform?: number[] | string | number | null;
-  platforms?: number[] | string[] | null;
-  qpf?: number[] | string | number | null;
   page?: number;
   limit?: number;
 }
@@ -183,7 +180,6 @@ export interface QuestionListRequest {
   level: number[] | null;
   companies: number[] | null;
   topic: number[] | null;
-  platform?: Array<number | string> | null;
   searchText: string | null;
   pageRequest: PageRequest;
 }

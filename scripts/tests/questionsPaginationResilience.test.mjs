@@ -96,6 +96,50 @@ describe('Questions API pagination contract', () => {
     }
   });
 
+  it('rejects successful rows without authoritative pagination metadata', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: { content: [{ id: 1, title: 'Two Sum', description: 'Find a pair.' }] },
+      });
+      await assert.rejects(
+        () => adminQuestionService.getQuestions(request),
+        /Unexpected questions page number metadata/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('normalizes the documented pageNumber/pageSize aliases without changing totals', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: {
+          content: [],
+          pageNumber: 0,
+          pageSize: 10,
+          totalElements: 0,
+          totalPages: 0,
+        },
+      });
+      const response = await adminQuestionService.getQuestions({
+        ...request,
+        pageRequest: { ...request.pageRequest, pageNumber: 0 },
+      });
+      assert.equal(response.data.number, 0);
+      assert.equal(response.data.size, 10);
+      assert.equal(response.data.totalElements, 0);
+      assert.equal(response.data.totalPages, 0);
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
   it('propagates question-list failures through problemService', async () => {
     const originalPost = apiClient.post;
     try {
@@ -105,6 +149,57 @@ describe('Questions API pagination contract', () => {
       await assert.rejects(
         () => problemService.getProblems({ page: 3, limit: 10 }),
         /Questions Fetch Unsuccessful/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('sends only the documented question-list fields with numeric filter IDs', async () => {
+    const originalPost = apiClient.post;
+    let capturedPayload;
+    try {
+      apiClient.post = async (_url, payload) => {
+        capturedPayload = payload;
+        return {
+          statusCode: 200,
+          message: 'Questions Fetched Successfully',
+          data: {
+            content: [],
+            totalElements: 0,
+            totalPages: 0,
+            number: 1,
+            size: 25,
+          },
+        };
+      };
+
+      await problemService.getProblems({
+        page: 2,
+        limit: 25,
+        difficulty: [3, 3, 0],
+        topic: ['9', 'invalid'],
+        companies: [4],
+        searchText: '  arrays  ',
+        platform: [7],
+      });
+
+      assert.deepEqual(capturedPayload, {
+        level: [3],
+        companies: [4],
+        topic: [9],
+        searchText: 'arrays',
+        pageRequest: {
+          pageNumber: 1,
+          pageSize: 25,
+          sortBy: 'id',
+          sortDirection: 'ASC',
+        },
+      });
+      assert.equal(
+        Object.hasOwn(capturedPayload, 'platform'),
+        false,
+        'QPF metadata is not a documented POST /questions filter field'
       );
     } finally {
       apiClient.post = originalPost;

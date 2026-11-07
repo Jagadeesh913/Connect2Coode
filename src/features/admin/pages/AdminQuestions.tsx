@@ -47,13 +47,23 @@ export const AdminQuestions: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Reference Library & Companies Data for Filters
-  const { items: difficulties } = useReferenceGroup('DIFF');
-  const { items: topics } = useReferenceGroup('TOPIC');
+  const difficultyQuery = useReferenceGroup('DIFF');
+  const topicQuery = useReferenceGroup('TOPIC');
+  const difficulties = difficultyQuery.items;
+  const topics = topicQuery.items;
   const { items: qpfs } = useReferenceGroup('QPF');
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const [companiesError, setCompaniesError] = useState<string | null>(null);
   const [companiesRetry, setCompaniesRetry] = useState(0);
+  const filterOptionsPending = difficultyQuery.loading || topicQuery.loading || companiesLoading;
+  const filterOptionsError = difficultyQuery.error || topicQuery.error || companiesError;
+
+  const retryFilterOptions = useCallback(() => {
+    if (difficultyQuery.error) void difficultyQuery.retry();
+    if (topicQuery.error) void topicQuery.retry();
+    if (companiesError) setCompaniesRetry((attempt) => attempt + 1);
+  }, [companiesError, difficultyQuery, topicQuery]);
 
   // Modals State
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -677,6 +687,12 @@ export const AdminQuestions: React.FC = () => {
   return (
     <div className="space-y-6 font-sans text-left pb-12">
       <RequestStatus error={questions.length ? error : null} onRetry={fetchQuestions} />
+      <RequestStatus
+        pending={filterOptionsPending}
+        error={filterOptionsError}
+        onRetry={retryFilterOptions}
+        label="Loading question filter options…"
+      />
       {/* Page Header */}
       <AdminPageHeader
         title="DSA Problem Bank"
@@ -725,7 +741,9 @@ export const AdminQuestions: React.FC = () => {
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
           {/* Difficulty */}
           <select
+            aria-label="Filter questions by difficulty"
             value={selectedDifficulty}
+            disabled={difficultyQuery.loading || (difficulties.length === 0 && Boolean(difficultyQuery.error))}
             onChange={(e) => {
               setSelectedDifficulty(e.target.value);
               setPageNumber(0);
@@ -742,7 +760,9 @@ export const AdminQuestions: React.FC = () => {
 
           {/* Topic */}
           <select
+            aria-label="Filter questions by topic"
             value={selectedTopic}
+            disabled={topicQuery.loading || (topics.length === 0 && Boolean(topicQuery.error))}
             onChange={(e) => {
               setSelectedTopic(e.target.value);
               setPageNumber(0);
@@ -759,7 +779,9 @@ export const AdminQuestions: React.FC = () => {
 
           {/* Company */}
           <select
+            aria-label="Filter questions by company"
             value={selectedCompany}
+            disabled={companiesLoading || (companies.length === 0 && Boolean(companiesError))}
             onChange={(e) => {
               setSelectedCompany(e.target.value);
               setPageNumber(0);
@@ -776,6 +798,7 @@ export const AdminQuestions: React.FC = () => {
 
           {/* Page Size */}
           <select
+            aria-label="Questions per page"
             value={pageSize}
             onChange={(e) => {
               setPageSize(Number(e.target.value));

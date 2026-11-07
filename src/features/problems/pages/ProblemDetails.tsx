@@ -3,6 +3,7 @@ import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Editor, { type OnMount } from '@monaco-editor/react';
+import '../../../core/editor/monacoEnvironment';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { fetchProblemById } from '../redux/problemSlice';

@@ -20,6 +20,22 @@ export type QuestionListItem = DomainQuestionListItem;
 export type PaginatedQuestionResponse = QuestionPage;
 export type QuestionPayload = Question;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const requirePageInteger = (
+  primary: unknown,
+  alias: unknown,
+  label: string,
+  minimum: number
+): number => {
+  const value = typeof primary === 'number' ? primary : alias;
+  if (!Number.isInteger(value) || (value as number) < minimum) {
+    throw new Error(`Unexpected questions ${label} metadata`);
+  }
+  return value as number;
+};
+
 /**
  * Fetches a question page without fabricating records or pagination metadata.
  * The API owns this data, so malformed responses and server failures remain
@@ -35,9 +51,25 @@ export async function fetchQuestionPage(
     { signal }
   );
 
-  if (!response.data || !Array.isArray(response.data.content)) {
+  const data: unknown = response.data;
+  if (!isRecord(data) || !Array.isArray(data.content)) {
     throw new Error('Unexpected questions response format');
   }
+
+  const pageNumber = requirePageInteger(data.pageNumber, data.number, 'page number', 0);
+  const pageSize = requirePageInteger(data.pageSize, data.size, 'page size', 1);
+  const totalElements = requirePageInteger(data.totalElements, undefined, 'total elements', 0);
+  const totalPages = requirePageInteger(data.totalPages, undefined, 'total pages', 0);
+
+  response.data = {
+    ...(data as unknown as PaginatedQuestionResponse),
+    number: pageNumber,
+    size: pageSize,
+    pageNumber,
+    pageSize,
+    totalElements,
+    totalPages,
+  };
 
   return response;
 }

@@ -38,17 +38,21 @@ type AssessmentShortcut = Pick<
 export function classifyAssessmentShortcut(
   event: AssessmentShortcut
 ): AssessmentIntegrityViolation | null {
-  const key = event.key.toLowerCase();
+  // Some browsers, password managers, IMEs, and synthetic keyboard events can
+  // omit `key`. Assessment controls must fail open for an unknown key instead
+  // of crashing ordinary form input across the whole application shell.
+  const rawKey = typeof event.key === 'string' ? event.key : '';
+  const key = rawKey.toLowerCase();
   const primaryModifier = event.ctrlKey || event.metaKey;
   if (
-    event.key === 'PrintScreen' ||
+    rawKey === 'PrintScreen' ||
     (event.metaKey && event.shiftKey && ['3', '4', '5', 's'].includes(key)) ||
     (event.metaKey && (key === 'g' || (event.altKey && key === 'r')))
   ) {
     return 'print-screen';
   }
   if (
-    event.key === 'F12' ||
+    rawKey === 'F12' ||
     (primaryModifier && event.shiftKey && DEVELOPER_TOOL_KEYS.has(key)) ||
     (event.metaKey && event.altKey && DEVELOPER_TOOL_KEYS.has(key))
   ) {

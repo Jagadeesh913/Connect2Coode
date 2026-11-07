@@ -93,7 +93,6 @@ const getProblemListKey = (params?: ProblemFilter): string =>
     difficulty: normalizeFilterValue(params?.difficulty ?? params?.level),
     topic: normalizeFilterValue(params?.topic),
     companies: normalizeFilterValue(params?.companies ?? params?.company),
-    platform: normalizeFilterValue(params?.platform ?? params?.platforms ?? params?.qpf),
     page: params?.page ?? 1,
     limit: params?.limit ?? 10,
   });
@@ -141,11 +140,6 @@ export const sanitizeProblemFilters = (params?: ProblemFilter): ProblemFilter | 
   const companies = cleanArray(params.companies);
   if (companies) {
     sanitized.companies = companies as any;
-  }
-
-  const platform = cleanArray(params.platform);
-  if (platform) {
-    sanitized.platform = platform as any;
   }
 
   return sanitized;

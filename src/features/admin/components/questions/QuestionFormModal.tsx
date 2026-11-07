@@ -602,7 +602,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={submitting || referenceLoading || Boolean(referenceError)}
+              disabled={submitting}
               className="flex-1 sm:flex-initial px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center"
             >
               Cancel
@@ -610,7 +610,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit(handleFormSubmit)}
-              disabled={submitting}
+              disabled={submitting || referenceLoading || Boolean(referenceError)}
               className="flex-1 sm:flex-initial px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs hover:shadow-md cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-center"
             >
               {submitting ? 'Saving Problem...' : isEditing ? 'Update Problem' : 'Create Problem'}

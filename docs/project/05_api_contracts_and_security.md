@@ -111,7 +111,7 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 ### B. Problems & Questions ([`src/services/problemService.ts`](../../src/services/problemService.ts), [`src/services/questionService.ts`](../../src/services/questionService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/questions` | `POST` | `USER_OR_ADMIN` | Paginated search: `{ level: number[], companies: number[], topic: number[], searchText: string, pageRequest: { pageNumber, pageSize, sortBy, sortDirection } }` |
+| `/questions` | `POST` | `USER_OR_ADMIN` | Paginated search: `{ level: number[], companies: number[], topic: number[], searchText: string, pageRequest: { pageNumber, pageSize, sortBy, sortDirection } }`. Successful pages must include non-negative `totalElements`/`totalPages` plus `pageNumber`/`pageSize` (or Spring `number`/`size` aliases); missing metadata is rejected instead of synthesized. |
 | `/question/{id}` | `GET` | `USER_OR_ADMIN` | Authoritative numeric problem detail route. A request for a current catalog ID returned a backend `HttpResponseException` on 2026-10-23; the failure is surfaced because a catalog row is not a complete detail DTO. Text slugs may scan the catalog only to resolve a numeric ID before this request. |
 | `/question` | `POST` | `ADMIN_ONLY` | Creates/updates problem with title, description, constraints, hints, and tax references. |
 | `/question/{id}/testCases` | `POST` | `ADMIN_ONLY` | Attaches array of test cases (`input`, `expectedOutput`, `isHidden`, `displayOrder`). No authenticated GET contract is established; test-case reads reuse the authoritative question-detail response. Test cases, including hidden cases, remain backend-owned: failed mutations remain errors and must never fall back to browser storage or static client fixtures. |
@@ -158,9 +158,10 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 | :--- | :---: | :--- | :--- |
 | `/user/learningSheets` | `GET` | `USER_OR_ADMIN` | Lists sheets with `id`, `sheetCode`, `sheetName`, `description`, and `isActive`. |
 | `/user/learningSheets/{sheetId}/sections` | `GET` | `USER_OR_ADMIN` | Returns top-level sections. The client retains only `parentSectionId: null` and orders by `displayOrder`, then `id`. |
+| `/user/learningSheet/section/{sectionId}/subsections` | `GET` | `USER_OR_ADMIN` | **Proposed/unconfirmed backend addition.** Expected to return immediate children ordered by `displayOrder`. The client validates every returned `parentSectionId` against the requested section and isolates endpoint failure from direct section-question rendering. |
 | `/user/learningSheet/section/{sectionId}/questions` | `GET` | `USER_OR_ADMIN` | Returns question-link records ordered by `displayOrder`. The deletion identifier is the outer link `id`; problem navigation uses `question.id`. |
 | `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Saves a sheet. Create omits `id`; edit sends `{ id, sheetCode, sheetName, description, isActive }`. |
-| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a top-level section. Create omits `id`; edit sends `{ id, sheetId, parentSectionId, sectionName, displayOrder, isActive }`. |
+| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a section or subsection. Create omits `id`; edit sends `id`; both send `{ sheetId, parentSectionId, sectionName, displayOrder, isActive }`, where `parentSectionId: null` is top-level. |
 | `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section with bearer authentication and no invented credential body. |
 | `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Saves a problem association: create sends `id: null`; edit sends the outer association `id`, plus `{ sectionId, question: { id }, displayOrder, isActive }`. |
 | `/admin/learningSheet/section/{sectionId}/question/{linkId}` | `DELETE` | `ADMIN_ONLY` | Removes a section-question association without deleting the problem. The second path value is the association/link ID returned as the outer record `id`. |

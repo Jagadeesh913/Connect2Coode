@@ -78,6 +78,8 @@ export const API_ENDPOINTS = {
   LEARNING_SHEET: {
     LIST: '/user/learningSheets',
     SECTIONS: (sheetId: string | number) => `/user/learningSheets/${sheetId}/sections`,
+    SUBSECTIONS: (sectionId: string | number) =>
+      `/user/learningSheet/section/${sectionId}/subsections`,
     SECTION_QUESTIONS: (sectionId: string | number) =>
       `/user/learningSheet/section/${sectionId}/questions`,
     ADMIN_SAVE: '/admin/learningSheet',

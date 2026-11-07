@@ -51,7 +51,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - `detailCache`: TTL 5 minutes, max 40 entries. Keys based on normalized problem slug or ID.
   - LRU Trimming: `trimCache` evicts oldest cache entries when capacity is reached.
 - **Visible-query invariant**: When a page/filter request changes the list cache key, the reducer immediately swaps to a fresh matching cache entry or clears the visible rows and initializes pagination for the requested page. It never presents rows from the previous query under new controls. Same-query refreshes may retain their current rows while the refresh status is shown.
-- **Server-owned list controls**: Practice sends URL-backed difficulty, topic, company, platform, search, page, and page-size values through `fetchProblems` to `POST /questions`; it does not load a large catalog and slice it in the browser. Company directories request the selected `/company/list` page directly. Company-detail coding and MCQ tabs debounce search, resolve difficulty/subject IDs from reference groups, and request each page from `/questions` or `/mcq`. Controls without an observed backend field are not rendered as catalog filters.
+- **Server-owned list controls**: Practice sends URL-backed difficulty, topic, company, search, page, and page-size values through `fetchProblems` to `POST /questions`; it does not load a large catalog and slice it in the browser. Platform remains response metadata only because the captured list request does not establish a platform-filter field. Company directories request the selected `/company/list` page directly. Company-detail coding and MCQ tabs debounce search, resolve difficulty/subject IDs from reference groups, and request each page from `/questions` or `/mcq`. Controls without an observed backend field are not rendered as catalog filters.
 - **Request ownership**: Only the exact owning list/detail request may write a cache entry, replace visible rows, or release its loading state. A response arriving after logout, account switch, reset, or supersession is ignored before any protected cache write.
 
 ### 3. `companySlice` ([`src/features/companies/redux/companySlice.ts`](../../src/features/companies/redux/companySlice.ts))
@@ -103,14 +103,15 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Service cache coordination**: Redux applies a 30-minute TTL and stale-response ownership. The execution service deduplicates its transport request with the same TTL; forced refresh bypasses it. Successful admin mutations invalidate both caches before the next editor/run lookup. Execution refuses an ID absent from API catalog fields instead of applying a static mapping.
 
 ### 9. `dsaSheetSlice` ([`src/features/dsaSheet/redux/dsaSheetSlice.ts`](../../src/features/dsaSheet/redux/dsaSheetSlice.ts))
-- **Responsibilities**: Learning sheets catalog, selected sheet ID, sections by sheet ID, questions linked by section ID, accordion expansion, and granular loading/error flags (`loadingSheets`, `loadingSections`, `loadingQuestionSectionId`, `sheetError`, `sectionsError`, `questionErrors`).
+- **Responsibilities**: Learning sheets catalog, selected sheet ID, top-level sections by sheet ID, proposed child sections by parent ID, questions linked by any section/subsection ID, nested accordion expansion, and per-resource loading/error ownership.
 - **Caching Mechanics**:
   - `DSA_SHEET_CACHE_TTL_MS`: 5 minutes.
-  - Granular timestamps: `sheetsFetchedAt`, `sectionsFetchedAt[sheetId]`, `questionsFetchedAt[sectionId]`.
+  - Granular timestamps: `sheetsFetchedAt`, `sectionsFetchedAt[sheetId]`, `subsectionsFetchedAt[parentId]`, and `questionsFetchedAt[sectionId]`.
   - Seamless navigation: Switching between previously loaded sheets or accordion sections re-renders from memory instantly without layout shift or skeleton flashing.
   - Invalidation & Error Reset: `invalidateDsaSheetCache` and `resetDsaSheetErrors` provide programmatic cache flushes and retry resets.
 - **Superseded Request Cancellation**:
-  - In `DsaSheetPage`, `useEffect` calls capture the returned thunk promise and invoke `promise.abort()` during unmount or parameter transitions.
+  - In `DsaSheetPage`, question and subsection reads use independent effects and abort lifecycles, so either response can populate its cache without aborting the other. Request IDs prevent late writes; loading and error maps allow concurrent nested reads.
+  - The subsection read is explicitly unconfirmed backend capability. Its error is scoped to the parent and never clears already valid direct questions.
   - Successful admin sheet, section, association edit/delete operations dispatch `invalidateDsaSheetCache`, preventing an admin from seeing the previous five-minute cached student view after navigation.
 
 ### Persistence Middleware

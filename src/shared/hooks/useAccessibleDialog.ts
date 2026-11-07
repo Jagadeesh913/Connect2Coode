@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -9,6 +9,9 @@ export function useAccessibleDialog(
   onClose: () => void,
   dialogRef: RefObject<HTMLElement | null>
 ): void {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!isOpen || !dialog) return;
@@ -19,14 +22,17 @@ export function useAccessibleDialog(
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const focusTimer = window.setTimeout(
-      () => dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus(),
+      () => (
+        dialog.querySelector<HTMLElement>('[data-dialog-initial-focus]') ||
+        dialog.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)
+      )?.focus(),
       0
     );
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== 'Tab') return;
@@ -52,5 +58,5 @@ export function useAccessibleDialog(
       document.removeEventListener('keydown', handleKeyDown);
       previousFocus?.focus();
     };
-  }, [dialogRef, isOpen, onClose]);
+  }, [dialogRef, isOpen]);
 }

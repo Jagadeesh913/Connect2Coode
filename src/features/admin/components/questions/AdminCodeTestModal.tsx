@@ -3,6 +3,7 @@ import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Editor from '@monaco-editor/react';
+import '../../../../core/editor/monacoEnvironment';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';

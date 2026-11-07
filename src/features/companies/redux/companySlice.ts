@@ -164,7 +164,11 @@ export const fetchCompanyBySlug = createAsyncThunk(
 const companySlice = createSlice({
   name: 'companies',
   initialState,
-  reducers: {},
+  reducers: {
+    invalidateCompanyList(state) {
+      delete state.listCache[''];
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCompanies.pending, (state, action) => {
@@ -229,5 +233,7 @@ const companySlice = createSlice({
       });
   },
 });
+
+export const { invalidateCompanyList } = companySlice.actions;
 
 export default companySlice.reducer;

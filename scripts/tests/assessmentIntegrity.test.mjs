@@ -37,6 +37,7 @@ describe('assessment integrity shortcut classification', () => {
 
   it('preserves editor typing and execution shortcuts', () => {
     assert.equal(classifyAssessmentShortcut(shortcut('a')), null);
+    assert.equal(classifyAssessmentShortcut(shortcut(undefined)), null);
     assert.equal(classifyAssessmentShortcut(shortcut('Enter', { ctrlKey: true })), null);
     assert.equal(classifyAssessmentShortcut(shortcut("'", { ctrlKey: true })), null);
     assert.equal(classifyAssessmentShortcut(shortcut('z', { ctrlKey: true })), null);
