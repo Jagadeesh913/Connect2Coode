@@ -260,6 +260,6 @@ Every first-party source file has been inspected and assigned a verified status 
 
 - **Total First-Party TypeScript/TSX Files in `src/`**: 161
 - **Total Automated Test Files in `scripts/tests/`**: 23
-- **Declared Test Cases in Current Source (static count only)**: 379; this is not execution evidence.
+- **Declared Test Cases in Current Source (static count only)**: 380; this is not execution evidence.
 - **Final-tree Unit Tests / Typecheck / Lint / Build / Documentation / Architecture / Preview**: `UNKNOWN` — intentionally not executed in this session because no OS-level sandbox is available for repository-controlled scripts. Historical green results do not certify the modified tree.
 

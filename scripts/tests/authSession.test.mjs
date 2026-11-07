@@ -30,7 +30,7 @@ const { isAdminRole } = await import('../../src/core/security/jwt.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 const { isAuthSessionEvent } = await import('../../src/core/security/authSessionSync.ts');
 const authSliceModule = await import('../../src/features/auth/redux/authSlice.ts');
-const { default: authReducer, logoutUser, refreshSessionThunk, initializeAuth } = authSliceModule;
+const { default: authReducer, loginUser, logoutUser, refreshSessionThunk, initializeAuth } = authSliceModule;
 
 describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
 
@@ -185,6 +185,34 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(nextState.token, 'new-token');
       assert.equal(nextState.user?.email, 'user@c2c.test');
       assert.equal(nextState.user?.firstName, 'Current');
+    });
+
+    it('does not let a stale startup refresh return the user to login after successful login', () => {
+      const startupRequestId = 'startup-refresh';
+      const loginPayload = { token: 'fresh-login-token', id: 88, role: 'USER', email: 'fresh@c2c.test' };
+      const loadingState = authReducer(undefined, {
+        type: refreshSessionThunk.pending.type,
+        meta: { requestId: startupRequestId },
+      });
+      const loggedInState = authReducer(loadingState, {
+        type: loginUser.fulfilled.type,
+        payload: loginPayload,
+      });
+      const afterStale401 = authReducer(loggedInState, {
+        type: refreshSessionThunk.rejected.type,
+        meta: { requestId: startupRequestId },
+        payload: { statusCode: 401, message: 'Old refresh session missing' },
+      });
+      const afterStaleSuccess = authReducer(afterStale401, {
+        type: refreshSessionThunk.fulfilled.type,
+        meta: { requestId: startupRequestId },
+        payload: { token: 'old-refresh-token', id: 9, role: 'USER', email: 'old@c2c.test' },
+      });
+
+      assert.equal(afterStaleSuccess.status, 'AUTHENTICATED');
+      assert.equal(afterStaleSuccess.isAuthenticated, true);
+      assert.equal(afterStaleSuccess.token, 'fresh-login-token');
+      assert.equal(afterStaleSuccess.user?.email, 'fresh@c2c.test');
     });
   });
 

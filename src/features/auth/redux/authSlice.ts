@@ -205,7 +205,10 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(refreshSessionThunk.fulfilled, (state, action) => {
-        if (state.refreshRequestId && action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
+        // A login can complete while the unconditional startup refresh is
+        // still pending. Only the currently owned refresh may settle state;
+        // otherwise an old cookie failure/success can overwrite that login.
+        if (action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
         state.refreshRequestId = null;
         state.loading = false;
         state.status = 'AUTHENTICATED';
@@ -215,7 +218,7 @@ const authSlice = createSlice({
         state.user = buildUserProfile(action.payload, state.user);
       })
       .addCase(refreshSessionThunk.rejected, (state, action) => {
-        if (state.refreshRequestId && action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
+        if (action.meta?.requestId && state.refreshRequestId !== action.meta.requestId) return;
         state.refreshRequestId = null;
         state.loading = false;
         state.error = action.payload?.message || null;
@@ -239,6 +242,9 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
+        // Take ownership away from a startup refresh so its eventual result
+        // cannot return the user to the login screen after a real login.
+        state.refreshRequestId = null;
         state.loading = false;
         state.status = 'AUTHENTICATED';
         state.isAuthenticated = true;
