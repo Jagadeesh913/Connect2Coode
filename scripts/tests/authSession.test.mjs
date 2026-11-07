@@ -45,6 +45,8 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       const navbarSource = fs.readFileSync('src/shared/components/ui/Navbar.tsx', 'utf8');
       assert.match(adminRouteSource, /if \(!isAdminRole\(role\)\)/);
       assert.match(guestRouteSource, /if \(isAdminRole\(role\)\)/);
+      assert.match(navbarSource, /const isLoggedIn = isAuthenticated;/);
+      assert.doesNotMatch(navbarSource, /user !== undefined \? user !== null/);
       assert.match(navbarSource, /isAdmin = isLoggedIn && isAdminRole\(currentUser\?\.role\)/);
       assert.doesNotMatch(`${adminRouteSource}\n${guestRouteSource}\n${navbarSource}`, /isJwtAdmin/);
       assert.equal(isAdminRole('ADMIN'), true);
@@ -231,6 +233,22 @@ describe('BATCH-3: Security, Session Hygiene & Route Authorization', () => {
       assert.equal(isAuthSessionEvent({ type: 'session-updated', occurredAt: 1 }), true);
       assert.equal(isAuthSessionEvent({ type: 'session-cleared', token: 'must-not-exist' }), false);
       assert.equal(isAuthSessionEvent({ type: 'logout' }), false);
+    });
+
+    it('uses one BroadcastChannel per tab so a login event cannot echo into its origin tab', async () => {
+      const fs = await import('node:fs');
+      const source = fs.readFileSync('src/core/security/authSessionSync.ts', 'utf8');
+      const subscribeBody = source.match(
+        /export function subscribeToAuthSessionEvents[\s\S]*?\n}\n/
+      )?.[0];
+
+      assert.ok(subscribeBody, 'The cross-tab subscription must remain available');
+      assert.match(subscribeBody, /const channel = getPublisherChannel\(\)/);
+      assert.doesNotMatch(
+        subscribeBody,
+        /new BroadcastChannel/,
+        'A second same-tab channel receives the publisher channel\'s own login event'
+      );
     });
 
     it('stores access/profile state only in memory and never manages the refresh cookie', () => {

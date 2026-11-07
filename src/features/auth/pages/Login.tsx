@@ -116,16 +116,21 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     register: registerLogin,
     handleSubmit: handleSubmitLogin,
     setValue: setLoginValue,
+    clearErrors: clearLoginErrors,
     formState: { errors: loginErrors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    mode: 'onBlur',
+    mode: 'onSubmit',
     reValidateMode: 'onChange',
     defaultValues: {
       email: '',
       password: '',
     },
   });
+
+  useEffect(() => {
+    if (mode !== 'login') clearLoginErrors();
+  }, [clearLoginErrors, mode]);
 
   // React Hook Form for Signup
   const {
@@ -428,7 +433,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               </p>
             </div>
 
-            <form onSubmit={handleSubmitLogin(onLoginSubmit)} className="flex flex-col gap-4">
+            <form noValidate onSubmit={handleSubmitLogin(onLoginSubmit)} className="flex flex-col gap-4">
               {/* Email Address */}
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="login-email" className="text-sm font-medium text-gray-200">Email Address</label>

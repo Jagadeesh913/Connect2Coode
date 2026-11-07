@@ -70,11 +70,18 @@ export function publishAuthSessionEvent(type: AuthSessionEventType): void {
 export function subscribeToAuthSessionEvents(listener: (event: AuthSessionEvent) => void): () => void {
   if (supportsBroadcastChannel()) {
     try {
-      const channel = new BroadcastChannel(CHANNEL_NAME);
-      channel.onmessage = (message: MessageEvent<unknown>) => {
+      // Share the publisher channel in this tab. BroadcastChannel delivers a
+      // message to other channel objects, including objects created by the
+      // same page, but never echoes it to the object that sent it. Using one
+      // channel therefore preserves cross-tab sync without treating this
+      // tab's successful login as a remote login and discarding it again.
+      const channel = getPublisherChannel();
+      if (!channel) throw new Error('BroadcastChannel is unavailable');
+      const handleMessage = (message: MessageEvent<unknown>) => {
         if (isAuthSessionEvent(message.data)) listener(message.data);
       };
-      return () => channel.close();
+      channel.addEventListener('message', handleMessage);
+      return () => channel.removeEventListener('message', handleMessage);
     } catch {
       // Fall through to the browser-supported storage event transport.
     }

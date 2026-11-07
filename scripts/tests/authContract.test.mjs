@@ -54,7 +54,11 @@ export async function resolve(specifier, context, nextResolve) {
 register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL('./'));
 
 const axiosModule = await import('axios');
-const { apiClient, executeRefreshToken } = await import('../../src/core/api/apiClient.ts');
+const {
+  apiClient,
+  executeRefreshToken,
+  registerAuthFailureListener,
+} = await import('../../src/core/api/apiClient.ts');
 const { authService } = await import('../../src/services/authService.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
 const { getUserFromAuthSession, requireAuthSessionData } = await import('../../src/core/security/authContract.ts');
@@ -199,6 +203,57 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     tokenStorage.clearTokens();
   });
 
+  it('does not let a stale refresh 401 clear or notify failure after a newer login succeeds', async () => {
+    axiosModule.resetPostCalls();
+    tokenStorage.clearTokens();
+
+    let rejectRefresh;
+    axiosModule.setPostImpl(() => new Promise((_resolve, reject) => {
+      rejectRefresh = reject;
+    }));
+
+    let authFailureNotifications = 0;
+    const unregisterFailure = registerAuthFailureListener(() => {
+      authFailureNotifications += 1;
+    });
+    const originalPost = apiClient.post;
+
+    try {
+      const staleRefresh = executeRefreshToken();
+      await Promise.resolve();
+
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'Login Successful',
+        data: {
+          accessToken: 'new-login-access-token',
+          user: {
+            id: 84,
+            email: 'new-login@c2c.test',
+            role: 'USER',
+          },
+        },
+      });
+      await authService.login({
+        email: 'new-login@c2c.test',
+        password: 'valid-password',
+      });
+
+      rejectRefresh({
+        response: { status: 401, data: { message: 'Older refresh cookie was rejected' } },
+      });
+      await assert.rejects(() => staleRefresh);
+
+      assert.equal(tokenStorage.getAccessToken(), 'new-login-access-token');
+      assert.equal(tokenStorage.getUser()?.id, 84);
+      assert.equal(authFailureNotifications, 0);
+    } finally {
+      apiClient.post = originalPost;
+      unregisterFailure();
+      tokenStorage.clearTokens();
+    }
+  });
+
   it('keeps startup, retry, OAuth, and role decisions aligned with the contract', async () => {
     const fs = await import('node:fs');
     const apiClientSource = fs.readFileSync('src/core/api/apiClient.ts', 'utf8');
@@ -223,6 +278,26 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.match(loginSource, /isAdminRole\(userObj\?\.user\?\.role \|\| userObj\?\.role\)/);
     assert.match(callbackSource, /dispatch\(refreshSessionThunk\(\)\)/);
     assert.doesNotMatch(`${loginSource}\n${callbackSource}`, /isJwtAdmin/);
+  });
+
+  it('routes login validation through the submit handler instead of browser-native validation', async () => {
+    const fs = await import('node:fs');
+    const loginSource = fs.readFileSync('src/features/auth/pages/Login.tsx', 'utf8');
+    const loginForm = loginSource.match(
+      /<form[^>]*onSubmit=\{handleSubmitLogin\(onLoginSubmit\)\}[^>]*>[\s\S]*?<\/form>/u
+    )?.[0];
+
+    assert.ok(loginForm, 'The login form must remain connected to React Hook Form');
+    assert.match(
+      loginForm,
+      /<form[^>]*\bnoValidate\b[^>]*>/u,
+      'Browser-native validation must not bypass the submit handler and its visible Zod errors'
+    );
+    assert.doesNotMatch(
+      loginForm,
+      /<input[^>]*\brequired(?:\s|=|>)/u,
+      'Login fields must rely on the shared schema instead of duplicate native required rules'
+    );
   });
 
   it('rejects login or refresh payloads that cannot restore identity and role', () => {

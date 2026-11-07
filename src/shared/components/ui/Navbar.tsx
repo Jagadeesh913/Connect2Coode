@@ -26,8 +26,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { isAuthenticated, user: reduxUser } = useAppSelector((state) => state.auth);
   const { theme, toggleTheme } = useTheme();
 
-  const isLoggedIn = user !== undefined ? user !== null : (isAuthenticated && reduxUser !== null);
-  const currentUser = user || reduxUser || null;
+  // Redux authentication state is the sole session authority. Profile data is
+  // presentation-only and may be temporarily absent while a session is being
+  // restored; it must never turn an authenticated session back into guest UI.
+  const isLoggedIn = isAuthenticated;
+  const currentUser = reduxUser || user || null;
   const userDisplayName = currentUser?.fullName || currentUser?.firstName || currentUser?.email?.split('@')[0] || 'User';
   const userDisplayEmail = currentUser?.email || '';
   const userInitials = userDisplayName.slice(0, 2).toUpperCase();
