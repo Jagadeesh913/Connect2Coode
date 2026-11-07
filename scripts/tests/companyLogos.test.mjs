@@ -212,6 +212,9 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
       assert.equal(extractCompanyDomain('http://localhost:5173'), null);
       assert.equal(extractCompanyDomain('http://127.0.0.1/logo'), null);
       assert.equal(extractCompanyDomain('not a url'), null);
+      assert.equal(extractCompanyDomain('//tracker.example/logo'), null);
+      assert.equal(extractCompanyDomain('javascript:alert(1)'), null);
+      assert.equal(extractCompanyDomain('https://user:secret@example.com'), null);
     });
 
     it('uses reviewed local assets without unnecessary remote requests', () => {

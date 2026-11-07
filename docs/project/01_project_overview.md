@@ -91,7 +91,7 @@ graph TB
 - **Company Exam Blueprints**: Recruitment exam schedules, role salaries, section durations, and question count visualizations.
 - **Aptitude Bank**: Category-filtered practice (Quantitative, Reasoning, Verbal, Pseudocode), option synthesis respecting explicit `isCorrect: true/false`, and test submission scoring.
 - **Admin Hub**: Full CRUD operations for problems, test cases, recruitment companies, exam blueprints, compiler languages, and educational institutions.
-- **Multi-Tenant Client Storage**: Safe scoping of bookmarks, solved problem IDs, and user settings using FNV-1a hash identifiers in `userScopedStorage`.
+- **Multi-Tenant Client Storage**: Safe scoping of bookmarks, solved problem IDs, drafts, and user settings using a versioned, collision-free encoding of the complete canonical account identity in `userScopedStorage`.
 
 ### Known Limitations & Deferred Scopes
 - **Full Submission Backend NPE**: On remote backend, `POST /api/v1/submitCode` and `POST /api/v1/admin/submitCode` occasionally trigger an HTTP 500 error due to a backend NPE on `TestCase.getType()`. The frontend gracefully surfaces actionable feedback.

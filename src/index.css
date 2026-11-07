@@ -300,12 +300,46 @@ html.dark .shimmer-wave::after {
 /* ==========================================================================
    DROPDOWN & SELECT THEME STYLES (Clean Light/Dark Conversion)
    ========================================================================== */
-select {
-  color-scheme: light;
+select:not([multiple]) {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  padding: 0.625rem 2.75rem 0.625rem 0.875rem !important;
+  border: 1px solid var(--border-primary) !important;
+  border-radius: var(--radius-xl) !important;
+  background-color: var(--bg-surface-subtle) !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
+  background-position: right 0.875rem center !important;
+  background-repeat: no-repeat !important;
+  background-size: 1rem !important;
+  box-shadow: var(--shadow-subtle) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-sans) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  line-height: 1.25rem !important;
+  cursor: pointer;
+  outline: none !important;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
 
-html.dark select {
-  color-scheme: dark;
+select:not([multiple]):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--brand-blue) 55%, var(--border-primary)) !important;
+  background-color: var(--bg-surface) !important;
+}
+
+select:not([multiple]):focus-visible {
+  border-color: var(--brand-blue) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-blue) 18%, transparent) !important;
+}
+
+select:not([multiple]):disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+html.dark select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") !important;
 }
 
 select option {
@@ -327,51 +361,9 @@ html.dark select option {
 }
 
 .c2c-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-color: #F8FAFC;
-  color: #0F172A;
-  border: 1px solid #E2E8F0;
-  border-radius: 0.75rem;
-  padding: 0.625rem 2.5rem 0.625rem 0.875rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.25rem;
-  cursor: pointer;
-  outline: none;
-  transition: all 0.15s ease-in-out;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  /* Semantic alias retained for future reusable form components. */
 }
 
-.c2c-select:hover {
-  border-color: #93C5FD;
-  background-color: #FFFFFF;
-}
-
-.c2c-select:focus {
-  border-color: #2563EB;
-  background-color: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-
-html.dark .c2c-select {
-  background-color: #111A2E;
-  color: #F8FAFC;
-  border-color: rgba(51, 65, 85, 0.8);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-}
-
-html.dark .c2c-select:hover {
-  border-color: #3B82F6;
-  background-color: #141F36;
-}
-
-html.dark .c2c-select:focus {
-  border-color: #3B82F6;
-  background-color: #141F36;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-}
 
 /* ==========================================================================
    TOAST POPUP MESSAGES DESIGN SYSTEM

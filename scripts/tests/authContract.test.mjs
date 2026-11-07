@@ -92,6 +92,29 @@ it('forces public signup to USER even when an untyped caller supplies another ro
   }
 });
 
+it('normalizes the login accessToken alias before persisting or returning the session', async () => {
+  const originalPost = apiClient.post;
+  tokenStorage.clearTokens({ broadcast: false });
+  try {
+    apiClient.post = async () => ({
+      statusCode: 200,
+      message: 'Login Successful',
+      data: {
+        accessToken: 'login-access-token',
+        user: { id: 7, role: 'USER', email: 'login@c2c.test' },
+      },
+    });
+    const response = await authService.login({ email: 'login@c2c.test', password: 'example-password' });
+    assert.equal(response.data?.token, 'login-access-token');
+    assert.equal('accessToken' in response.data, false);
+    assert.equal(tokenStorage.getAccessToken(), 'login-access-token');
+    assert.equal(tokenStorage.getUser()?.email, 'login@c2c.test');
+  } finally {
+    apiClient.post = originalPost;
+    tokenStorage.clearTokens({ broadcast: false });
+  }
+});
+
 const installMemoryStorage = () => {
   const values = new Map();
   globalThis.localStorage = {
@@ -125,10 +148,13 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
       data: {
         statusCode: 200,
         data: {
-          token: 'new-access-token',
-          id: 42,
-          email: 'user@c2c.test',
-          role: 'USER',
+          accessToken: 'new-access-token',
+          user: {
+            id: 42,
+            email: 'user@c2c.test',
+            role: 'USER',
+            refreshToken: 'must-not-enter-user-state',
+          },
         },
       },
     });
@@ -138,6 +164,8 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.equal(secondResult.token, 'new-access-token');
     assert.equal(tokenStorage.getAccessToken(), 'new-access-token');
     assert.equal(tokenStorage.getUser()?.role, 'USER');
+    assert.equal('accessToken' in firstResult, false);
+    assert.equal('refreshToken' in tokenStorage.getUser(), false);
   });
 
   it('preserves the active in-memory session when refresh fails temporarily', async () => {
@@ -182,6 +210,16 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.doesNotMatch(apiClientSource, /status === 401 \|\| status === 403/);
     assert.doesNotMatch(apiClientSource, /Proactively Refresh|isTokenValid\(token\)/);
     assert.match(layoutSource, /dispatch\(initializeAuth\(\)\);\s*dispatch\(refreshSessionThunk\(\)\);/);
+    assert.match(
+      fs.readFileSync('src/core/guards/GuestRoute.tsx', 'utf8'),
+      /<SessionRecoveryState allowSignIn \/>/,
+      'A temporary startup refresh failure must not permanently hide the login UI'
+    );
+    assert.match(
+      fs.readFileSync('src/features/auth/components/SessionRecoveryState.tsx', 'utf8'),
+      /tokenStorage\.clearTokens\(\);[\s\S]*dispatch\(setUnauthenticatedSession\(\)\)/,
+      'The guest recovery gate must provide an explicit account-replacement path'
+    );
     assert.match(loginSource, /isAdminRole\(userObj\?\.user\?\.role \|\| userObj\?\.role\)/);
     assert.match(callbackSource, /dispatch\(refreshSessionThunk\(\)\)/);
     assert.doesNotMatch(`${loginSource}\n${callbackSource}`, /isJwtAdmin/);
@@ -199,6 +237,10 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     assert.deepEqual(
       requireAuthSessionData({ token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test' }),
       { token: 'jwt', id: 1, role: 'ADMIN', email: 'admin@c2c.test', firstName: undefined, lastName: undefined, fullName: undefined, avatarUrl: undefined, isDarkTheme: undefined }
+    );
+    assert.deepEqual(
+      requireAuthSessionData({ accessToken: 'jwt-alias', id: 3, role: 'USER', email: 'user@c2c.test' }),
+      { token: 'jwt-alias', id: 3, role: 'USER', email: 'user@c2c.test', firstName: undefined, lastName: undefined, fullName: undefined, avatarUrl: undefined, isDarkTheme: undefined }
     );
     const nested = requireAuthSessionData({
       token: 'jwt',
@@ -235,6 +277,7 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
       isDarkTheme: undefined,
     });
     assert.equal('token' in user, false);
+    assert.equal('accessToken' in user, false);
     assert.equal('refreshToken' in user, false);
   });
 
@@ -396,6 +439,23 @@ describe('Backend-owned refresh-cookie authentication contract', () => {
     tokenStorage.setUser(user);
     assert.equal(userScopedStorage.getItem('problem_progress'), null);
     assert.equal(userScopedStorage.getItem('theme_pref'), 'dark');
+  });
+
+  it('keeps accounts isolated even when their legacy 32-bit scope hashes collide', () => {
+    installMemoryStorage();
+    const firstUser = { id: 'vyvfha1cvvv8l', email: 'first@c2c.test', role: 'USER' };
+    const secondUser = { id: 'qia85adwygw5', email: 'second@c2c.test', role: 'USER' };
+
+    tokenStorage.setUser(firstUser);
+    userScopedStorage.setItem('problem_progress', 'first-account');
+    tokenStorage.setUser(secondUser);
+    assert.equal(userScopedStorage.getItem('problem_progress'), null);
+    userScopedStorage.setItem('problem_progress', 'second-account');
+
+    tokenStorage.setUser(firstUser);
+    assert.equal(userScopedStorage.getItem('problem_progress'), 'first-account');
+    tokenStorage.setUser(secondUser);
+    assert.equal(userScopedStorage.getItem('problem_progress'), 'second-account');
   });
 
   it('keeps OAuth refresh failures generic and removes hardcoded problem samples', async () => {

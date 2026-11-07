@@ -169,11 +169,12 @@ To ensure complete technical precision, every documented endpoint separates thre
 ---
 
 ### POST /auth/login
+> **Acceptance pending:** The schema below reflects the current frontend contract, but the deployed JSON envelope and HttpOnly `Set-Cookie` attributes still require a controlled browser verification.
 - **Feature / Module**: Authentication
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/login`
 - **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/login`
-- **Purpose**: Authenticates credentials and returns JWT Bearer token and refresh token.
+- **Purpose**: Authenticates credentials, returns access-token identity JSON, and receives the refresh session through an HttpOnly cookie.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.login`), `src/features/auth/redux/authSlice.ts`
 - **Authentication Requirement**: `PUBLIC`
 - **Required Role(s)**: None
@@ -201,7 +202,6 @@ To ensure complete technical precision, every documented endpoint separates thre
     "message": "Login Successful",
     "data": {
       "token": "[REDACTED_ACCESS_TOKEN]",
-      "refreshToken": "[REDACTED_REFRESH_TOKEN]",
       "role": "USER",
       "id": 63,
       "firstName": "Sakhamuri",
@@ -222,28 +222,18 @@ To ensure complete technical precision, every documented endpoint separates thre
 ---
 
 ### POST /auth/refresh
+> **Acceptance pending:** The current request is bodyless and cookie-backed; deployed rotation, response shape, CSRF, and CORS still require controlled browser verification.
 - **Feature / Module**: Authentication & Token Management
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/refresh`
 - **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/refresh`
-- **Purpose**: Exchanges a valid refresh token for a fresh short-lived JWT access token and rolling refresh token.
+- **Purpose**: Uses the backend-owned HttpOnly refresh cookie to rotate the session and return a fresh short-lived JWT access token.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.refreshToken`), Axios response interceptor in `src/core/api/apiClient.ts`
-- **Authentication Requirement**: `SESSION_RENEWAL` (`refreshToken` body only; no access JWT)
+- **Authentication Requirement**: `SESSION_RENEWAL` (bodyless request; browser supplies the HttpOnly cookie)
 - **Required Role(s)**: Any valid authenticated session (`USER` or `ADMIN`)
-- **Bearer Token Behavior**: Does not require an Authorization header; relies on `refreshToken` in request body.
+- **Bearer Token Behavior**: Does not require an Authorization header; relies exclusively on the backend-owned refresh cookie.
 - **Required Headers**: `Content-Type: application/json`
-- **Request Body Schema**:
-  ```typescript
-  interface RefreshTokenPayload {
-    refreshToken: string;
-  }
-  ```
-- **Safe Request Example**:
-  ```json
-  {
-    "refreshToken": "[REDACTED_REFRESH_TOKEN]"
-  }
-  ```
+- **Request Body Schema**: None.
 - **Success Response Schema & Example**:
   ```json
   {
@@ -251,7 +241,6 @@ To ensure complete technical precision, every documented endpoint separates thre
     "message": "Token Refreshed Successfully",
     "data": {
       "token": "[REDACTED_NEW_ACCESS_TOKEN]",
-      "refreshToken": "[REDACTED_NEW_REFRESH_TOKEN]",
       "role": "USER",
       "id": 63,
       "firstName": "Sakhamuri",
@@ -347,20 +336,16 @@ To ensure complete technical precision, every documented endpoint separates thre
 ---
 
 ### POST /auth/logout
+> **Acceptance pending:** The current request is bodyless and cookie-backed; deployed revocation, cookie clearing, CSRF, and CORS still require controlled browser verification.
 - **Feature / Module**: Session Termination
 - **HTTP Method**: `POST`
 - **Exact Path**: `/auth/logout`
 - **Full Remote URL**: `https://api.connect2code.in/api/v1/auth/logout`
 - **Purpose**: Invalidates the active refresh token session on the server.
 - **Frontend Caller**: `src/services/authService.ts` (`authService.logout`)
-- **Authentication Requirement**: `PUBLIC` (Accepts only the refresh token used for server-side session invalidation)
+- **Authentication Requirement**: `PUBLIC` transport endpoint; the browser supplies the backend-owned HttpOnly refresh cookie.
 - **Required Role(s)**: Any
-- **Request Body Schema**:
-  ```json
-  {
-    "refreshToken": "string"
-  }
-  ```
+- **Request Body Schema**: None.
 - **Success Response Example**:
   ```json
   {

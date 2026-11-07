@@ -174,6 +174,7 @@ const authSlice = createSlice({
       state.status = 'UNAUTHENTICATED';
       state.isAuthenticated = false;
       state.loading = false;
+      state.error = null;
       state.token = null;
       state.user = null;
       state.refreshRequestId = null;

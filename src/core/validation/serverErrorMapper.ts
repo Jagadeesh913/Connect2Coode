@@ -4,8 +4,25 @@ export interface StandardApiError {
   statusCode?: number;
   message?: string;
   errors?: string[] | Record<string, string> | null;
-  data?: any;
+  data?: unknown;
 }
+
+type UnknownRecord = Record<string, unknown>;
+
+const asRecord = (value: unknown): UnknownRecord | null =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as UnknownRecord
+    : null;
+
+const firstString = (...values: unknown[]): string => {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+};
+
+const firstErrorString = (value: unknown): string =>
+  Array.isArray(value) ? firstString(value[0]) : '';
 
 /**
  * Extracts specific error messages from C2CResponse or standard backend errors
@@ -15,14 +32,14 @@ export const parseServerErrorMessage = (
   fallback = 'An unexpected error occurred.'
 ): string => {
   if (!error) return fallback;
-  const err = error as any;
-  if (Array.isArray(err?.errors) && err.errors.length > 0 && typeof err.errors[0] === 'string') {
-    return err.errors[0];
-  }
-  if (Array.isArray(err?.response?.data?.errors) && err.response.data.errors.length > 0 && typeof err.response.data.errors[0] === 'string') {
-    return err.response.data.errors[0];
-  }
-  return err?.response?.data?.message || err?.message || fallback;
+  const err = asRecord(error);
+  const responseData = asRecord(asRecord(err?.response)?.data);
+  return firstString(
+    firstErrorString(err?.errors),
+    firstErrorString(responseData?.errors),
+    responseData?.message,
+    err?.message,
+  ) || fallback;
 };
 
 /**
@@ -35,28 +52,32 @@ export const getActionableErrorMessage = (
 ): string => {
   if (!error) return fallbackMessage;
 
-  const err = error as StandardApiError & {
-    response?: { status?: number; data?: any };
-    message?: string;
-    code?: string;
-  };
+  const err = asRecord(error);
+  if (!err) return fallbackMessage;
+  const response = asRecord(err.response);
+  const responseData = asRecord(response?.data);
+  const data = asRecord(err.data);
 
-  const statusCode =
-    err?.statusCode ??
-    err?.response?.status ??
-    (typeof err?.data === 'object' && err?.data?.statusCode ? Number(err.data.statusCode) : undefined);
+  const rawStatus = err.statusCode ?? response?.status ?? data?.statusCode;
+  const parsedStatus = typeof rawStatus === 'number'
+    ? rawStatus
+    : typeof rawStatus === 'string' && rawStatus.trim()
+      ? Number(rawStatus)
+      : Number.NaN;
+  const statusCode = Number.isFinite(parsedStatus) ? parsedStatus : undefined;
 
-  const rawMessage =
-    err?.response?.data?.message ||
-    err?.message ||
-    (Array.isArray(err?.errors) && err.errors[0]) ||
-    '';
+  const rawMessage = firstString(
+    responseData?.message,
+    err.message,
+    firstErrorString(err.errors),
+  );
+  const errorCode = typeof err.code === 'string' ? err.code : '';
 
   // Check for network errors & timeouts first
   if (
-    err?.code === 'ECONNABORTED' ||
-    err?.code === 'ERR_NETWORK' ||
-    err?.code === 'ECONNREFUSED' ||
+    errorCode === 'ECONNABORTED' ||
+    errorCode === 'ERR_NETWORK' ||
+    errorCode === 'ECONNREFUSED' ||
     rawMessage.includes('timeout') ||
     rawMessage.toLowerCase().includes('network error')
   ) {
@@ -154,13 +175,16 @@ export const mapServerErrorsToForm = <T extends FieldValues>(
 ): boolean => {
   if (!error) return false;
 
-  const err = error as StandardApiError & { response?: { data?: any } };
+  const err = asRecord(error);
+  if (!err) return false;
+  const responseData = asRecord(asRecord(err.response)?.data);
+  const data = asRecord(err.data);
   const rawErrors =
-    err?.errors ||
-    err?.response?.data?.errors ||
-    (err as any)?.fieldErrors ||
-    (err as any)?.response?.data?.fieldErrors ||
-    (err as any)?.data?.errors;
+    err.errors ||
+    responseData?.errors ||
+    err.fieldErrors ||
+    responseData?.fieldErrors ||
+    data?.errors;
   let hasMappedField = false;
 
   // Case 1: errors is an object { fieldName: "Error message" }

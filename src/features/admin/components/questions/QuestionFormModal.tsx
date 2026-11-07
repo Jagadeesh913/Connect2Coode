@@ -6,7 +6,7 @@ import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
-import { adminCompanyService, CompanyItem } from '../../../../services/admin/adminCompanyService';
+import type { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
@@ -32,6 +32,10 @@ interface QuestionFormModalProps {
   onSubmit: (data: QuestionFormData) => Promise<void>;
   initialData?: QuestionPayload | null;
   submitting?: boolean;
+  companyOptions: CompanyItem[];
+  companyOptionsLoading: boolean;
+  companyOptionsError: string | null;
+  onRetryCompanyOptions: () => void;
 }
 
 export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
@@ -40,6 +44,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   onSubmit,
   initialData,
   submitting = false,
+  companyOptions,
+  companyOptionsLoading,
+  companyOptionsError,
+  onRetryCompanyOptions,
 }) => {
   const isEditing = Boolean(initialData?.id);
   const [activeTab, setActiveTab] = useState<'METADATA' | 'TESTCASES'>('METADATA');
@@ -53,7 +61,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   const topics = topicQuery.items;
   const qpfs = qpfQuery.items;
   const testCaseTypes = testCaseTypeQuery.items;
-  const [allCompanies, setAllCompanies] = useState<CompanyItem[]>([]);
+  const allCompanies = companyOptions;
   const [selectedCompanies, setSelectedCompanies] = useState<CompanyItem[]>([]);
 
   // Question Hints State
@@ -103,50 +111,18 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     },
   });
 
-  const [companiesLoading, setCompaniesLoading] = useState(true);
-  const [companiesError, setCompaniesError] = useState<string | null>(null);
-  const [referenceRetry, setReferenceRetry] = useState(0);
   const referenceLoading =
-    companiesLoading ||
+    companyOptionsLoading ||
     difficultyQuery.loading ||
     topicQuery.loading ||
     qpfQuery.loading ||
     testCaseTypeQuery.loading;
   const referenceError =
-    companiesError ||
+    companyOptionsError ||
     difficultyQuery.error ||
     topicQuery.error ||
     qpfQuery.error ||
     testCaseTypeQuery.error;
-
-  // Fetch Reference Libraries and Companies from REAL backend API
-  useEffect(() => {
-    if (!isOpen) return;
-
-    let isMounted = true;
-    setCompaniesLoading(true);
-    setCompaniesError(null);
-    const loadReferenceData = async () => {
-      try {
-        const compRes = await adminCompanyService.getCompanies();
-
-        if (!isMounted) return;
-
-        const compList = compRes.data;
-
-        setAllCompanies(Array.isArray(compList) ? compList : []);
-      } catch {
-        if (isMounted) setCompaniesError('Unable to load company options. Retry before saving.');
-      } finally {
-        if (isMounted) setCompaniesLoading(false);
-      }
-    };
-
-    loadReferenceData();
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, referenceRetry]);
 
   const initializedFormIdentity = useRef<string | null>(null);
 
@@ -652,7 +628,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
             void topicQuery.retry();
             void qpfQuery.retry();
             void testCaseTypeQuery.retry();
-            setReferenceRetry((value) => value + 1);
+            onRetryCompanyOptions();
           }}
           label="Loading form options…"
         />

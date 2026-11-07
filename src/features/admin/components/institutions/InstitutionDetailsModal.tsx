@@ -3,6 +3,7 @@ import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import type { Institution } from '../../../../core/types/domain';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
+import { getSafeExternalUrl } from '../../../../core/security/externalUrl';
 import {
   GraduationCap,
   Building2,
@@ -25,6 +26,7 @@ export const InstitutionDetailsModal: React.FC<InstitutionDetailsModalProps> = (
   institution,
   loading = false,
 }) => {
+  const safeWebsiteUrl = getSafeExternalUrl(institution?.website);
   if (!isOpen) return null;
 
   return (
@@ -100,13 +102,13 @@ export const InstitutionDetailsModal: React.FC<InstitutionDetailsModalProps> = (
               </p>
             </div>
 
-            {institution.website && (
+            {safeWebsiteUrl && (
               <div className="sm:col-span-2 space-y-1 pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                   <Globe className="w-3 h-3 text-blue-500" /> Web Portal
                 </span>
                 <a
-                  href={institution.website}
+                  href={safeWebsiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1.5 font-mono truncate"

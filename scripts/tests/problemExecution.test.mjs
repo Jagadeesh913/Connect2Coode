@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   resolveActiveQuestionId,
   canExecuteProblem,
+  resolveExecutionLanguage,
   resolveExecutionLanguageName,
 } from '../../src/features/problems/utils/problemExecution.ts';
 import {
@@ -128,6 +129,9 @@ describe('BATCH-2: Problem Workspace & Code Execution Integrity (F-001, F-009, F
     ];
 
     it('matches both language entity IDs and backend reference IDs', () => {
+      assert.equal(resolveExecutionLanguage(languages, 1)?.name, 'Java');
+      assert.equal(resolveExecutionLanguage(languages, 6)?.name, 'C++');
+      assert.equal(resolveExecutionLanguage(languages, 99), null);
       assert.equal(resolveExecutionLanguageName(languages, 1), 'Java');
       assert.equal(resolveExecutionLanguageName(languages, 6), 'C++');
     });

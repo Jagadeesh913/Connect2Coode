@@ -111,8 +111,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
             ]);
           }
         }
-      } catch (err) {
-        console.warn('Failed to load existing test cases:', err);
+      } catch {
       } finally {
         if (isMounted) setCasesLoading(false);
       }

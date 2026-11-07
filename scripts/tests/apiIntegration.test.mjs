@@ -386,6 +386,32 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
+    it('lets a forced language refresh supersede an older in-flight read', async () => {
+      const originalGet = apiClient.get;
+      const resolvers = [];
+      apiClient.get = () => new Promise((resolve) => resolvers.push(resolve));
+
+      try {
+        executionService.invalidateLanguageCache();
+        const oldRead = executionService.getLanguageDropdown();
+        const freshRead = executionService.getLanguageDropdown(true);
+        assert.equal(resolvers.length, 2, 'force must start a distinct transport request');
+
+        resolvers[1]({ data: [{ id: 2, languageName: 'Python', referenceId: 6 }] });
+        assert.equal((await freshRead)[0].name, 'Python');
+        resolvers[0]({ data: [{ id: 1, languageName: 'Java', referenceId: 5 }] });
+        assert.equal((await oldRead)[0].name, 'Java');
+        assert.equal(
+          (await executionService.getLanguageDropdown())[0].name,
+          'Python',
+          'the stale completion must not overwrite the fresh service cache'
+        );
+      } finally {
+        executionService.invalidateLanguageCache();
+        apiClient.get = originalGet;
+      }
+    });
+
     it('resolves language IDs only from the backend registry', async () => {
       const originalGet = apiClient.get;
       apiClient.get = async () => ({

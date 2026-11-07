@@ -24,6 +24,7 @@ import { GraduationCap, Code2 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 import { Pagination } from '../../../shared/components/ui/Pagination';
+import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -90,6 +91,7 @@ export const CompanyDetails: React.FC = () => {
   } = useAppSelector((state) => state.companies);
   const routeMatches = companyDetailRequestKey === slug?.trim().toLowerCase();
   const company = routeMatches ? selectedCompany : null;
+  const safeCompanyWebsite = getSafeExternalUrl(company?.website);
   const isDetailsLoading = !routeMatches || (detailsLoading ?? loading);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
@@ -245,7 +247,7 @@ export const CompanyDetails: React.FC = () => {
   }, [activeSection, debouncedQuestionSearch, selectedDifficulty]);
 
   useLayoutEffect(() => {
-    if (!companyId) return;
+    if (!companyId || activeTab !== 'practice') return;
     if (activeSection !== 'coding') {
       setCodingLoading(false);
       return;
@@ -277,11 +279,11 @@ export const CompanyDetails: React.FC = () => {
       if (!controller.signal.aborted) setCodingLoading(false);
     });
     return () => controller.abort();
-  }, [activeSection, companyId, debouncedQuestionSearch, pageSize, questionPage, selectedDifficultyId, codingRetry]);
+  }, [activeSection, activeTab, companyId, debouncedQuestionSearch, pageSize, questionPage, selectedDifficultyId, codingRetry]);
 
   // Load only the selected section; errors settle independently and are retryable.
   useEffect(() => {
-    if (!companyId || activeSection === 'coding') return;
+    if (!companyId || activeTab !== 'practice' || activeSection === 'coding') return;
     const subjectCode = SECTIONS.find((section) => section.id === activeSection)?.subjectCode;
     const subjectId = subjectReferences.find(
       (subject) => String(subject.refCode).toUpperCase() === subjectCode
@@ -322,7 +324,7 @@ export const CompanyDetails: React.FC = () => {
       if (!controller.signal.aborted) setMcqsLoading(false);
     });
     return () => controller.abort();
-  }, [companyId, activeSection, mcqRetry, subjectReferences, subjectsError, subjectsLoading, selectedDifficultyId, debouncedQuestionSearch, questionPage, pageSize]);
+  }, [companyId, activeTab, activeSection, mcqRetry, subjectReferences, subjectsError, subjectsLoading, selectedDifficultyId, debouncedQuestionSearch, questionPage, pageSize]);
 
   const isQuestionsLoading = isDetailsLoading || codingLoading || !company;
   const filteredProblems = codingProblems;
@@ -582,9 +584,9 @@ export const CompanyDetails: React.FC = () => {
                   </span>
                 )}
 
-                {company.website && (
+                {safeCompanyWebsite && (
                   <a
-                    href={company.website}
+                    href={safeCompanyWebsite}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-2xs transition-colors"
@@ -763,7 +765,10 @@ export const CompanyDetails: React.FC = () => {
                 type="text"
                 placeholder={`Search ${currentSectionConfig.label} questions by title, tags or keywords...`}
                 value={questionSearch}
-                onChange={(e) => setQuestionSearch(e.target.value)}
+                onChange={(e) => {
+                  setQuestionSearch(e.target.value);
+                  setQuestionPage(1);
+                }}
                 className="w-full bg-transparent pl-7 pr-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none"
               />
             </div>
@@ -774,7 +779,10 @@ export const CompanyDetails: React.FC = () => {
               <div className="relative flex-1 sm:flex-initial">
                 <select
                   value={selectedDifficulty}
-                  onChange={(e) => setSelectedDifficulty(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedDifficulty(e.target.value);
+                    setQuestionPage(1);
+                  }}
                   disabled={difficultiesLoading || Boolean(difficultiesError)}
                   className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
                 >

@@ -751,7 +751,6 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       setTotalPages(computedPages);
     } catch (err: any) {
       if (controller.signal.aborted || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
-      console.error('Error fetching questions for Aptitude:', err);
       setError('Unable to load questions. Please try again.');
 
     } finally {

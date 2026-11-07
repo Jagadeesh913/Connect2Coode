@@ -187,7 +187,7 @@ export const CompanyBrandLogo: React.FC<CompanyBrandLogoProps> = ({
           className={`w-full h-full object-contain drop-shadow-[0_1px_1px_rgba(15,23,42,0.12)] ${isDarkInvert ? 'dark:brightness-0 dark:invert transition-all' : ''}`}
           loading={loading}
           decoding="async"
-          referrerPolicy="strict-origin-when-cross-origin"
+          referrerPolicy="no-referrer"
           onError={advanceCandidate}
         />
       </div>

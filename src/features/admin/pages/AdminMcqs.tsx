@@ -164,8 +164,7 @@ export const AdminMcqs: React.FC = () => {
         const compRes = await companyService.getCompanies();
         if (!isMounted) return;
         setCompanies(Array.isArray(compRes.data) ? compRes.data : []);
-      } catch (err) {
-        console.warn('Failed to load MCQ filter references from API:', err);
+      } catch {
       }
     };
     loadReferences();
@@ -311,7 +310,7 @@ export const AdminMcqs: React.FC = () => {
     setEditingLoadingId(mcq.id);
     try {
       try {
-        const detailRes = await adminMcqService.getMcqById(mcq.id);
+        const detailRes = await adminMcqService.getMcqById(mcq.id, controller.signal);
         if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
         const detailData = detailRes.data;
         if (!detailData || typeof detailData !== 'object' || !detailData.id) {
@@ -355,7 +354,7 @@ export const AdminMcqs: React.FC = () => {
     setEditingMcq(null);
     setViewLoadingId(mcq.id);
     try {
-      const detailRes = await adminMcqService.getMcqById(mcq.id);
+      const detailRes = await adminMcqService.getMcqById(mcq.id, controller.signal);
       if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       const detailData = detailRes.data;
       if (!detailData || typeof detailData !== 'object' || !detailData.id) {

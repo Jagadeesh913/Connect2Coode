@@ -12,6 +12,7 @@ import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { adminCompanyService, CompanyItem } from '../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
+import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 import {
   Plus,
   RotateCw,
@@ -201,6 +202,7 @@ export const AdminCompanies: React.FC = () => {
       header: 'Company Profile',
       className: 'min-w-[220px]',
       cell: (row) => {
+        const safeWebsiteUrl = getSafeExternalUrl(row.website);
         return (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0 shadow-2xs overflow-hidden">
@@ -215,15 +217,15 @@ export const AdminCompanies: React.FC = () => {
               <span className="font-bold text-slate-900 dark:text-white truncate">
                 {row.name}
               </span>
-              {row.website ? (
+              {safeWebsiteUrl ? (
                 <a
-                  href={row.website}
+                  href={safeWebsiteUrl}
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono truncate"
                 >
-                  <span className="truncate">{row.website.replace(/^https?:\/\//, '')}</span>
+                  <span className="truncate">{(row.website || safeWebsiteUrl).replace(/^https?:\/\//, '')}</span>
                   <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                 </a>
               ) : (
@@ -401,6 +403,7 @@ export const AdminCompanies: React.FC = () => {
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">There are currently no companies registered in the catalog.</p>
             </div>
           ) : companies.map((c) => {
+            const safeWebsiteUrl = getSafeExternalUrl(c.website);
             return (
               <div
                 key={c.id || c.name}
@@ -449,16 +452,16 @@ export const AdminCompanies: React.FC = () => {
                 )}
 
                 <div className="pt-2 border-t border-slate-200/80 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                  {c.website ? (
+                  {safeWebsiteUrl ? (
                     <a
-                      href={c.website}
+                      href={safeWebsiteUrl}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(e) => e.stopPropagation()}
                       className="text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-mono text-[11px] truncate max-w-[150px]"
                     >
                       <Globe className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{c.website.replace(/^https?:\/\//, '')}</span>
+                      <span className="truncate">{(c.website || safeWebsiteUrl).replace(/^https?:\/\//, '')}</span>
                     </a>
                   ) : (
                     <span className="text-slate-400 text-[11px] italic">No URL</span>

@@ -214,14 +214,22 @@ describe('BATCH-1: Network Transport & API Client Base URL Resolution (F-005, F-
         );
       });
 
-      it('preserves valid production HTTPS URLs in deployed production', () => {
+      it('allows only the canonical production API base in deployed production', () => {
         assert.equal(
           resolveDeploymentApiBaseUrl('https://api.connect2code.in/api/v1', false),
           'https://api.connect2code.in/api/v1'
         );
         assert.equal(
           resolveDeploymentApiBaseUrl('https://staging.connect2code.in/api/v1', false),
-          'https://staging.connect2code.in/api/v1'
+          'https://api.connect2code.in/api/v1'
+        );
+        assert.equal(
+          resolveDeploymentApiBaseUrl('https://attacker.example/api/v1', false),
+          'https://api.connect2code.in/api/v1'
+        );
+        assert.equal(
+          resolveDeploymentApiBaseUrl('http://api.connect2code.in/api/v1', false),
+          'https://api.connect2code.in/api/v1'
         );
       });
     });

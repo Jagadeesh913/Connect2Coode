@@ -26,6 +26,7 @@ import type {
 } from '../../../companies/types/companyExam';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../../core/validation';
+import { getSafeExternalUrl } from '../../../../core/security/externalUrl';
 import {
   Building2,
   ExternalLink,
@@ -61,7 +62,16 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   loading = false,
   initialTab = 'overview',
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'exams'>(initialTab);
+  const safeCompanyWebsite = getSafeExternalUrl(company?.website);
+  const tabSessionKey = isOpen ? `${company?.id ?? 'none'}:${initialTab}` : 'closed';
+  const [tabState, setTabState] = useState<{
+    sessionKey: string;
+    tab: 'overview' | 'exams';
+  }>({ sessionKey: tabSessionKey, tab: initialTab });
+  const activeTab = tabState.sessionKey === tabSessionKey ? tabState.tab : initialTab;
+  const setActiveTab = (tab: 'overview' | 'exams') => {
+    setTabState({ sessionKey: tabSessionKey, tab });
+  };
 
   // Tagged DSA Questions State
   const [problems, setProblems] = useState<any[]>([]);
@@ -89,13 +99,6 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
 
   const [savingAction, setSavingAction] = useState(false);
 
-  // Sync initial tab when opened
-  useEffect(() => {
-    if (isOpen) {
-      setActiveTab(initialTab);
-    }
-  }, [isOpen, initialTab]);
-
   const readEpoch = useRef(0);
   const invalidateReads = useCallback(() => {
     readEpoch.current += 1;
@@ -105,13 +108,13 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   const [examErrors, setExamErrors] = useState<Record<number, string>>({});
 
   // Load tagged DSA problems
-  const fetchProblems = useCallback(async () => {
+  const fetchProblems = useCallback(async (signal?: AbortSignal) => {
     if (!company?.id) return;
     const epoch = readEpoch.current;
     setProblemsLoading(true);
     setProblemsError(null);
     try {
-      const res = await adminCompanyService.getCompanyProblems(company.id);
+      const res = await adminCompanyService.getCompanyProblems(company.id, signal);
       if (epoch !== readEpoch.current) return;
       setProblems(res.data);
     } catch {
@@ -122,7 +125,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   }, [company?.id]);
 
   // Load recruitment exams
-  const fetchExams = useCallback(async () => {
+  const fetchExams = useCallback(async (signal?: AbortSignal) => {
     if (!company?.id) return;
     const companyId = company.id;
     const epoch = readEpoch.current;
@@ -132,19 +135,23 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       const firstPage = await companyService.getCompanyExamsList(companyId, {
         pageSize: 50,
         pageNumber: 0,
-      });
-      const remainingPages = Array.from(
-        { length: Math.max(0, firstPage.data.totalPages - 1) },
-        (_, index) => index + 1
-      );
-      const additionalPages = await Promise.all(
-        remainingPages.map((pageNumber) =>
-          companyService.getCompanyExamsList(companyId, { pageSize: 50, pageNumber })
-        )
-      );
+      }, signal);
+      const totalPages = firstPage.data.totalPages;
+      if (!Number.isSafeInteger(totalPages) || totalPages < 0) {
+        throw new Error('Unexpected company exam pagination metadata');
+      }
+      const pages = [firstPage];
+      for (let pageNumber = 1; pageNumber < totalPages; pageNumber += 1) {
+        signal?.throwIfAborted();
+        pages.push(await companyService.getCompanyExamsList(
+          companyId,
+          { pageSize: 50, pageNumber },
+          signal
+        ));
+      }
       if (epoch !== readEpoch.current) return;
       const seen = new Set<number>();
-      const content = [firstPage, ...additionalPages]
+      const content = pages
         .flatMap((page) => page.data.content)
         .filter((exam) => {
           if (seen.has(exam.id)) return false;
@@ -191,10 +198,22 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       return;
     }
 
-    fetchProblems();
-    fetchExams();
     return invalidateReads;
-  }, [isOpen, company?.id, fetchProblems, fetchExams, invalidateReads]);
+  }, [isOpen, company?.id, invalidateReads]);
+
+  useEffect(() => {
+    if (!isOpen || !company?.id) return;
+    const controller = new AbortController();
+    if (activeTab === 'overview') {
+      void fetchProblems(controller.signal);
+    } else {
+      void fetchExams(controller.signal);
+    }
+    return () => {
+      controller.abort();
+      invalidateReads();
+    };
+  }, [activeTab, company?.id, fetchExams, fetchProblems, invalidateReads, isOpen]);
 
   const toggleExpandExam = (examId: number) => {
     if (expandedExamId === examId) {
@@ -399,14 +418,14 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                     </AdminBadge>
                   </div>
 
-                  {company.website && (
+                  {safeCompanyWebsite && (
                     <a
-                      href={company.website}
+                      href={safeCompanyWebsite}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-mono truncate flex items-center gap-1 shrink-0"
                     >
-                      <span>{company.website.replace(/^https?:\/\//, '')}</span>
+                      <span>{(company.website || safeCompanyWebsite).replace(/^https?:\/\//, '')}</span>
                       <ExternalLink className="w-3 h-3 shrink-0" />
                     </a>
                   )}
@@ -547,7 +566,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={fetchExams}
+                      onClick={() => void fetchExams()}
                       disabled={examsLoading}
                       className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 transition-colors shadow-2xs cursor-pointer"
                       title="Refresh Exams"

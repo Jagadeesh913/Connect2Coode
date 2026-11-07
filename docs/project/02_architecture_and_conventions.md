@@ -101,7 +101,7 @@ resolve: {
 ### D. Safe Multi-Tenant Browser Storage
 Browser `localStorage` is shared across tabs and sessions. To prevent one user from seeing another user's bookmarks or solved problem progress:
 - Always use [`src/core/storage/userScopedStorage.ts`](../../src/core/storage/userScopedStorage.ts).
-- It computes a fast 32-bit FNV-1a hash of the logged-in user's identity (`id:<userId>` or `email:<email>`), isolating stored keys as `c2c:user:<hash>:<key>`. Unauthenticated users use the `guest` scope.
+- It encodes the complete canonical logged-in identity (`id:<userId>` or `email:<email>`) into a versioned collision-free scope, isolating stored keys as `c2c:user:v2:<encoded-identity>:<key>`. Unauthenticated users use the `guest` scope. The previous truncated 32-bit hash format is intentionally not read into the new scope because distinct accounts could collide.
 
 ---
 

@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { register } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -47,10 +48,36 @@ const {
   getActionableErrorMessage,
   mapServerErrorsToForm,
 } = await import('../../src/core/validation/index.ts');
+const { getSafeExternalUrl, getSafeRemoteImageUrl } = await import('../../src/core/security/externalUrl.ts');
 
 describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
 
+  it('gives every native single-select the shared design-system treatment', () => {
+    const stylesheet = fs.readFileSync('src/index.css', 'utf8');
+    assert.match(stylesheet, /select:not\(\[multiple\]\)\s*\{/);
+    assert.match(stylesheet, /background-image: url\("data:image\/svg\+xml/);
+    assert.match(stylesheet, /select:not\(\[multiple\]\):focus-visible/);
+    assert.match(stylesheet, /html\.dark select:not\(\[multiple\]\)/);
+  });
+
   describe('1. Common Rules & Sanitization', () => {
+    it('sanitizes API-supplied external links at the rendering boundary', () => {
+      assert.equal(getSafeExternalUrl('example.com/path'), 'https://example.com/path');
+      assert.equal(getSafeExternalUrl('https://example.com/path?q=1'), 'https://example.com/path?q=1');
+      assert.equal(getSafeExternalUrl('http://localhost:3000'), 'http://localhost:3000/');
+      assert.equal(getSafeExternalUrl('javascript:alert(1)'), null);
+      assert.equal(getSafeExternalUrl('data:text/html,<script>alert(1)</script>'), null);
+      assert.equal(getSafeExternalUrl('//evil.example'), null);
+      assert.equal(getSafeExternalUrl('https://user:secret@example.com'), null);
+      assert.equal(getSafeExternalUrl('https:\\evil.example'), null);
+      assert.equal(getSafeRemoteImageUrl('https://cdn.example.com/avatar.png'), 'https://cdn.example.com/avatar.png');
+      assert.equal(getSafeRemoteImageUrl('http://cdn.example.com/avatar.png'), null);
+      assert.equal(getSafeRemoteImageUrl('https://localhost/avatar.png'), null);
+      assert.equal(getSafeRemoteImageUrl('https://127.0.0.1/avatar.png'), null);
+      assert.equal(getSafeRemoteImageUrl('https://192.168.1.10/avatar.png'), null);
+      assert.equal(getSafeRemoteImageUrl('https://[::1]/avatar.png'), null);
+    });
+
     it('emailRule accepts valid standard emails and rejects malformed addresses', () => {
       assert.doesNotThrow(() => emailRule.parse('student@university.edu'));
       assert.doesNotThrow(() => emailRule.parse('user.name+tag@sub.domain.co.in'));
@@ -364,6 +391,19 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.equal(
         getActionableErrorMessage({ code: 'ECONNREFUSED' }),
         "We couldn't connect to the server. Check your connection and try again."
+      );
+    });
+
+    it('falls back safely when proxies return malformed non-string error fields', () => {
+      const fallback = 'Request failed safely.';
+      assert.equal(parseServerErrorMessage({ message: { internal: true } }, fallback), fallback);
+      assert.equal(
+        getActionableErrorMessage({ statusCode: 400, message: 12345 }, fallback),
+        fallback
+      );
+      assert.equal(
+        getActionableErrorMessage({ response: { status: '401', data: { message: [] } } }, fallback),
+        'Your session has expired. Please log in again to continue.'
       );
     });
 

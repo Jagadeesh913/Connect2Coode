@@ -11,7 +11,7 @@ import { TestCaseModal } from '../components/questions/TestCaseModal';
 import { AdminCodeTestModal } from '../components/questions/AdminCodeTestModal';
 import { QuestionPayload, QuestionTestCase } from '../../../services/questionService';
 import { adminQuestionService } from '../../../services/admin/adminQuestionService';
-import { adminCompanyService } from '../../../services/admin/adminCompanyService';
+import { adminCompanyService, type CompanyItem } from '../../../services/admin/adminCompanyService';
 import { toast } from 'react-hot-toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
@@ -50,7 +50,10 @@ export const AdminQuestions: React.FC = () => {
   const { items: difficulties } = useReferenceGroup('DIFF');
   const { items: topics } = useReferenceGroup('TOPIC');
   const { items: qpfs } = useReferenceGroup('QPF');
-  const [companies, setCompanies] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<CompanyItem[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
+  const [companiesError, setCompaniesError] = useState<string | null>(null);
+  const [companiesRetry, setCompaniesRetry] = useState(0);
 
   // Modals State
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -82,22 +85,24 @@ export const AdminQuestions: React.FC = () => {
 
   // Companies use their own API/store domain; reference groups are shared by Redux.
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
     const fetchCompanies = async () => {
+      setCompaniesLoading(true);
+      setCompaniesError(null);
       try {
-        const compRes = await adminCompanyService.getCompanies();
-        if (!active) return;
+        const compRes = await adminCompanyService.getCompanies(controller.signal);
+        if (controller.signal.aborted) return;
         const compList = compRes.data;
         setCompanies(Array.isArray(compList) ? compList : []);
-      } catch (err) {
-        console.warn('Failed to load company filter data:', err);
+      } catch {
+        if (!controller.signal.aborted) setCompaniesError('Unable to load company options.');
+      } finally {
+        if (!controller.signal.aborted) setCompaniesLoading(false);
       }
     };
     void fetchCompanies();
-    return () => {
-      active = false;
-    };
-  }, []);
+    return () => controller.abort();
+  }, [companiesRetry]);
 
   /**
    * REAL API ONLY — POST /api/v1/questions
@@ -232,7 +237,7 @@ export const AdminQuestions: React.FC = () => {
     const requestId = ++detailRequestId.current;
     setEditingQuestionId(question.id);
     try {
-      const response = await adminQuestionService.getQuestionById(question.id);
+      const response = await adminQuestionService.getQuestionById(question.id, controller.signal);
       if (requestId !== detailRequestId.current) return;
       const detail = response.data;
       const cases = (detail.testCases && detail.testCases.length > 0)
@@ -260,7 +265,7 @@ export const AdminQuestions: React.FC = () => {
     const requestId = ++detailRequestId.current;
     setLoadingTestCasesId(question.id);
     try {
-      const response = await adminQuestionService.getQuestionById(question.id);
+      const response = await adminQuestionService.getQuestionById(question.id, controller.signal);
       if (requestId !== detailRequestId.current) return;
       const detail = response.data;
       let cases = (detail.testCases && detail.testCases.length > 0)
@@ -763,7 +768,7 @@ export const AdminQuestions: React.FC = () => {
           >
             <option value="">All Companies</option>
             {companies.map((c) => (
-              <option key={c.id} value={c.id}>
+              <option key={c.id ?? c.name} value={c.id ?? ''}>
                 {c.name}
               </option>
             ))}
@@ -831,6 +836,10 @@ export const AdminQuestions: React.FC = () => {
         onSubmit={handleSaveQuestion}
         initialData={selectedQuestion}
         submitting={submitting}
+        companyOptions={companies}
+        companyOptionsLoading={companiesLoading}
+        companyOptionsError={companiesError}
+        onRetryCompanyOptions={() => setCompaniesRetry((attempt) => attempt + 1)}
       />
 
       {/* Question Details Modal */}

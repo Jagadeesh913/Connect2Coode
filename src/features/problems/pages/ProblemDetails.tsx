@@ -20,6 +20,7 @@ import { NotFound } from '../../../shared/components/errors/NotFound';
 import {
   resolveActiveQuestionId,
   canExecuteProblem,
+  resolveExecutionLanguage,
   resolveExecutionLanguageName,
 } from '../utils/problemExecution';
 import { toast } from 'react-hot-toast';
@@ -27,7 +28,6 @@ import { userQuestionService } from '../../../services/userQuestionService';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { extractTestCasesFromProblem } from '../../admin/utils/testCaseUtils';
-import { useAssessmentIntegrity } from '../../../shared/hooks/useAssessmentIntegrity';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 import {
   analyzeSourceCode,
@@ -136,18 +136,10 @@ export const ProblemDetails: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageDropdownItem | null>(null);
 
   // Editor State
-  const lastIntegrityNoticeAt = useRef(0);
-  const { bindTarget: bindWorkspace, targetRef: workspaceRef, violationCount } = useAssessmentIntegrity<HTMLDivElement>({
-    onViolation: (violation) => {
-      const now = Date.now();
-      if (now - lastIntegrityNoticeAt.current < 1500) return;
-      lastIntegrityNoticeAt.current = now;
-      const message = violation === 'tab-switch'
-        ? 'Leaving the assessment window was detected.'
-        : 'This action is disabled in the coding assessment workspace.';
-      toast.error(message, { id: 'assessment-integrity-warning' });
-    },
-  });
+  // AppRouterLayout owns the single assessment-integrity controller. This ref
+  // is only the fullscreen target; installing another controller here would
+  // register duplicate capture listeners around Monaco.
+  const workspaceRef = useRef<HTMLDivElement>(null);
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
@@ -431,7 +423,6 @@ export const ProblemDetails: React.FC = () => {
     }
 
     if (!internalEditorClipboardRef.current) {
-      toast.error('Paste is limited to code copied inside this editor.', { id: 'internal-editor-clipboard' });
       return;
     }
     if (isExecuting) return;
@@ -881,7 +872,7 @@ export const ProblemDetails: React.FC = () => {
 
   return (
     <div
-      ref={bindWorkspace}
+      ref={workspaceRef}
       className={`relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 min-h-screen ${
         isFullscreen
           ? 'fixed inset-0 z-[999] w-screen h-screen overflow-y-auto bg-[#FBFBFD] dark:bg-[#070A13] p-3 sm:p-5'
@@ -933,7 +924,7 @@ export const ProblemDetails: React.FC = () => {
             title="Clipboard, context-menu, drag/drop, printing, source-view and screen-capture shortcuts are restricted in this workspace; Developer Tools remain available"
           >
             <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
-            Integrity mode{violationCount > 0 ? ` · ${violationCount}` : ''}
+            Integrity mode
           </span>
           <button
             type="button"
@@ -1281,13 +1272,18 @@ export const ProblemDetails: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (selectedLanguage) {
-                                    setCodeByLang((prev) => ({
-                                      ...prev,
-                                      [selectedLanguage.id]: sub.sourceCode || '',
-                                    }));
-                                    toast.success('Loaded submission code into editor');
+                                  const submissionLanguage = resolveExecutionLanguage(languages, sub.languageId);
+                                  if (!submissionLanguage) {
+                                    toast.error('The language used by this submission is no longer available.');
+                                    return;
                                   }
+                                  setSelectedLanguage(submissionLanguage);
+                                  setCodeByLang((prev) => ({
+                                    ...prev,
+                                    [submissionLanguage.id]: sub.sourceCode || '',
+                                  }));
+                                  setMobileWorkspaceTab('editor');
+                                  toast.success(`Loaded ${submissionLanguage.name} submission into editor`);
                                 }}
                                 className="text-blue-600 dark:text-blue-400 hover:underline font-sans cursor-pointer flex items-center gap-1.5"
                               >

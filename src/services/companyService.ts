@@ -7,6 +7,9 @@ import { fetchQuestionPage } from './admin/adminQuestionService';
 import type {
   CompanyExamItem,
   CompanyExamDetailsData,
+  CompanyRoleItem,
+  CompanyExamSectionItem,
+  ReferenceRef,
   PaginatedData,
   PageRequestPayload,
 } from '../features/companies/types/companyExam';
@@ -15,6 +18,94 @@ export type CompanyItem = Company;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const requireFiniteNumber = (value: unknown, label: string): number => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`Unexpected ${label} format`);
+  }
+  return value;
+};
+
+const requireString = (value: unknown, label: string): string => {
+  if (typeof value !== 'string') throw new Error(`Unexpected ${label} format`);
+  return value;
+};
+
+const requireBoolean = (value: unknown, label: string): boolean => {
+  if (typeof value !== 'boolean') throw new Error(`Unexpected ${label} format`);
+  return value;
+};
+
+const mapReference = (value: unknown, label: string): ReferenceRef => {
+  if (!isRecord(value)) throw new Error(`Unexpected ${label} format`);
+  return {
+    id: requireFiniteNumber(value.id, `${label} ID`),
+    refGroupCode: requireString(value.refGroupCode, `${label} group code`),
+    refCode: requireString(value.refCode, `${label} code`),
+    refName: requireString(value.refName, `${label} name`),
+    isActive: requireBoolean(value.isActive, `${label} active flag`),
+  };
+};
+
+const mapCompanyExam = (value: unknown): CompanyExamItem => {
+  if (!isRecord(value)) throw new Error('Unexpected company exam record format');
+  return {
+    id: requireFiniteNumber(value.id, 'company exam ID'),
+    companyId: requireFiniteNumber(value.companyId, 'company exam company ID'),
+    examName: requireString(value.examName, 'company exam name'),
+    year: requireFiniteNumber(value.year, 'company exam year'),
+    description: requireString(value.description, 'company exam description'),
+    totalDurationMinutes: requireFiniteNumber(value.totalDurationMinutes, 'company exam duration'),
+    totalQuestions: requireFiniteNumber(value.totalQuestions, 'company exam question count'),
+    totalMarks: requireFiniteNumber(value.totalMarks, 'company exam marks'),
+    sourceUrl: requireString(value.sourceUrl, 'company exam source URL'),
+    isActive: requireBoolean(value.isActive, 'company exam active flag'),
+  };
+};
+
+const mapCompanyRole = (value: unknown): CompanyRoleItem => {
+  if (!isRecord(value)) throw new Error('Unexpected company role record format');
+  return {
+    id: requireFiniteNumber(value.id, 'company role ID'),
+    companyExamId: requireFiniteNumber(value.companyExamId, 'company role exam ID'),
+    roleName: requireString(value.roleName, 'company role name'),
+    roleCode: requireString(value.roleCode, 'company role code'),
+    salary: requireString(value.salary, 'company role salary'),
+    description: requireString(value.description, 'company role description'),
+  };
+};
+
+const mapCompanyExamSection = (value: unknown, depth = 0): CompanyExamSectionItem => {
+  if (!isRecord(value) || depth > 10) {
+    throw new Error('Unexpected company exam section record format');
+  }
+  const childSections = value.sections === undefined
+    ? undefined
+    : Array.isArray(value.sections)
+      ? value.sections.map((section) => mapCompanyExamSection(section, depth + 1))
+      : (() => { throw new Error('Unexpected company exam child sections format'); })();
+
+  const optionalNumber = (field: unknown, label: string): number | null | undefined =>
+    field === undefined || field === null ? field : requireFiniteNumber(field, label);
+
+  return {
+    id: requireFiniteNumber(value.id, 'company exam section ID'),
+    companyExamId: requireFiniteNumber(value.companyExamId, 'company exam section exam ID'),
+    parentSectionId: value.parentSectionId === null
+      ? null
+      : requireFiniteNumber(value.parentSectionId, 'company exam parent section ID'),
+    sectionName: requireString(value.sectionName, 'company exam section name'),
+    sectionType: mapReference(value.sectionType, 'company exam section type'),
+    questionType: value.questionType === null || value.questionType === undefined
+      ? value.questionType
+      : mapReference(value.questionType, 'company exam question type'),
+    questionCount: optionalNumber(value.questionCount, 'company exam section question count'),
+    durationMinutes: optionalNumber(value.durationMinutes, 'company exam section duration'),
+    totalMarks: optionalNumber(value.totalMarks, 'company exam section marks'),
+    sequenceNumber: optionalNumber(value.sequenceNumber, 'company exam section sequence') ?? undefined,
+    sections: childSections,
+  };
+};
 
 const mapCompanyItem = (value: unknown): CompanyItem => {
   if (!isRecord(value) || typeof value.name !== 'string' || !value.name.trim()) {
@@ -171,12 +262,7 @@ export const companyService = {
       ...res,
       data: normalizePage(
         res.data,
-        (item) => {
-          if (!isRecord(item) || typeof item.id !== 'number' || typeof item.examName !== 'string') {
-            throw new Error('Unexpected company exam record format');
-          }
-          return item as unknown as CompanyExamItem;
-        },
+        mapCompanyExam,
         'company exams'
       ),
     };
@@ -203,9 +289,9 @@ export const companyService = {
     return {
       ...res,
       data: {
-        exam: res.data.exam as unknown as CompanyExamItem,
-        roles: res.data.roles as CompanyExamDetailsData['roles'],
-        pattern: res.data.pattern as CompanyExamDetailsData['pattern'],
+        exam: mapCompanyExam(res.data.exam),
+        roles: res.data.roles.map(mapCompanyRole),
+        pattern: res.data.pattern.map((section) => mapCompanyExamSection(section)),
       },
     };
   },
@@ -238,7 +324,12 @@ export const companyService = {
       throw new Error(`Company not found for slug: ${slug}`);
     }
 
-    return this.getCompanyBySlug(String(matched.id), signal);
+    const matchedId = Number(matched.id);
+    if (!Number.isSafeInteger(matchedId) || matchedId <= 0) {
+      throw new Error(`Company record for slug "${slug}" has no valid backend ID`);
+    }
+
+    return this.getCompanyBySlug(String(matchedId), signal);
   },
 
   async getCompanyProblems(

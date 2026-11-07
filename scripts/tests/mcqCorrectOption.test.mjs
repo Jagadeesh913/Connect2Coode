@@ -153,6 +153,9 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
         statusCode: 200,
         data: {
           id: 4,
+          subjectGroupCode: 'SUBJECT',
+          subjectRefCode: 'APTITUDE',
+          subjectRefName: 'Aptitude',
           question: 'Detail question',
           options: [
             { id: 1, optionLabel: 'A', optionText: 'First', isCorrect: false },
@@ -172,6 +175,27 @@ describe('MCQ & Aptitude Bank: Correct Option Identification (isCorrect)', () =>
       assert.equal(calls[0][0], '/mcq/4');
       assert.equal(calls[0][1].signal, controller.signal);
       assert.equal(synthesizeMcqOptions(detail).find((option) => option.isCorrect)?.optionLabel, 'B');
+    } finally {
+      apiClient.get = originalGet;
+    }
+  });
+
+  it('rejects malformed MCQ option records at the API boundary', async () => {
+    const originalGet = apiClient.get;
+    apiClient.get = async () => ({
+      statusCode: 200,
+      data: {
+        id: 6,
+        subjectGroupCode: 'SUBJECT',
+        subjectRefCode: 'APTITUDE',
+        subjectRefName: 'Aptitude',
+        question: 'Malformed option payload',
+        options: [null],
+      },
+    });
+
+    try {
+      await assert.rejects(() => mcqService.getMcqById(6), /Unexpected MCQ option #1/);
     } finally {
       apiClient.get = originalGet;
     }

@@ -89,18 +89,9 @@ export const resolveDeploymentApiBaseUrl = (
   }
 
   // In deployed production environments (e.g. static production SPA):
-  // - Guard against accidentally baking localhost or loopback addresses into client production bundles.
-  // - Guard against relative API paths when the static host lacks an API reverse proxy.
-  // - Fallback safely to the canonical production backend.
-  if (
-    resolved.includes('localhost') ||
-    resolved.includes('127.0.0.1') ||
-    !resolved.startsWith('http')
-  ) {
-    return DEFAULT_API_BASE_URL;
-  }
-
-  return resolved;
+  // The production API origin and path are fixed by contract. Never allow a
+  // build-time variable to redirect authenticated traffic to another host.
+  return resolved === DEFAULT_API_BASE_URL ? resolved : DEFAULT_API_BASE_URL;
 };
 
 export const getBaseUrl = (): string => {
@@ -115,10 +106,7 @@ export const getBaseUrl = (): string => {
 export const BASE_URL = getBaseUrl();
 
 export const getGoogleOAuthUrl = (): string => {
-  const envUrl = typeof import.meta !== 'undefined' && import.meta.env
-    ? import.meta.env.VITE_API_BASE_URL
-    : undefined;
-  return `${getBackendOrigin(envUrl)}/oauth2/authorization/google`;
+  return `${getBackendOrigin(BASE_URL)}/oauth2/authorization/google`;
 };
 
 export const isRequestCanceled = (error: unknown): boolean => axios.isCancel(error);

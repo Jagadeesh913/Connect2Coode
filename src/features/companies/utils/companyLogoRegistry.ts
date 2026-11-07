@@ -1,3 +1,5 @@
+import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
+
 /**
  * Production-Quality Company Logo Registry (Frontend-Only)
  * 
@@ -723,11 +725,11 @@ export function resolveCompanyLogo(rawName: string | undefined | null): CompanyL
 
 export function extractCompanyDomain(website: string | undefined | null): string | null {
   if (!website || typeof website !== 'string') return null;
-  const candidate = website.trim();
+  const candidate = getSafeRemoteImageUrl(website);
   if (!candidate) return null;
 
   try {
-    const url = new URL(/^https?:\/\//i.test(candidate) ? candidate : `https://${candidate}`);
+    const url = new URL(candidate);
     const hostname = url.hostname.toLowerCase().replace(/^www\./, '');
     if (
       !hostname.includes('.') ||

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import type { CompanyExamItem } from '../types/companyExam';
 import { Clock, FileText, Award, ExternalLink, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 
 interface CompanyExamCardProps {
   exam: CompanyExamItem;
@@ -14,6 +15,8 @@ export const CompanyExamCard: React.FC<CompanyExamCardProps> = ({
   companyId,
   companyName,
 }) => {
+  const safeSourceUrl = getSafeExternalUrl(exam.sourceUrl);
+
   return (
     <div className="group relative bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden">
       {/* Ambient background glow on hover */}
@@ -34,9 +37,9 @@ export const CompanyExamCard: React.FC<CompanyExamCardProps> = ({
             )}
           </div>
 
-          {exam.sourceUrl && (
+          {safeSourceUrl && (
             <a
-              href={exam.sourceUrl}
+              href={safeSourceUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors"

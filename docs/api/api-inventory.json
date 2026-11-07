@@ -110,7 +110,7 @@
     "method": "POST",
     "path": "/auth/login",
     "fullUrl": "https://api.connect2code.in/api/v1/auth/login",
-    "purpose": "Authenticate user credentials and issue JWT access token and refresh token",
+    "purpose": "Authenticate user credentials, return access-token identity JSON, and issue the refresh session only through an HttpOnly cookie",
     "frontendCallers": [
       "src/services/authService.ts (authService.login)",
       "src/features/auth/redux/authSlice.ts"
@@ -159,9 +159,9 @@
               "type": "string",
               "description": "JWT Access Token"
             },
-            "refreshToken": {
+            "accessToken": {
               "type": "string",
-              "description": "Refresh Token UUID"
+              "description": "Backend compatibility alias for the JWT access token"
             },
             "role": {
               "type": "string",
@@ -185,21 +185,15 @@
       }
     },
     "postmanRequest": {
-      "name": "1. Authentication",
+      "name": "Auth - Login",
       "id": "58775230-85cf2599-b130-4c1f-ad5c-ddeaae17f18a",
       "inCollection": true
     },
-    "testResults": {
-      "anonymousStatus": 200,
-      "userStatus": 200,
-      "adminStatus": 200,
-      "latencyMs": 1347,
-      "observedBehavior": "Successfully authenticates USER (id: 63) and ADMIN (id: 1) accounts issuing JWT Bearer tokens"
-    },
-    "functionalStatus": "PASS",
-    "authVerificationStatus": "VERIFIED",
-    "evidenceMethod": "POSTMAN_EXECUTED",
-    "notes": "Present in Postman collection CONNECT2CODE - All 32 Platform APIs and executed via Postman MCP runCollection"
+    "testResults": null,
+    "functionalStatus": "INCONCLUSIVE",
+    "authVerificationStatus": "NOT_TESTED",
+    "evidenceMethod": "NOT_VERIFIED",
+    "notes": "Historical body-token evidence was invalidated by the cookie migration. Current JSON shape, HttpOnly Set-Cookie, CORS, and CSRF require a controlled deployed browser acceptance run."
   },
   {
     "id": "AUTH-03",
@@ -207,7 +201,7 @@
     "method": "POST",
     "path": "/auth/refresh",
     "fullUrl": "https://api.connect2code.in/api/v1/auth/refresh",
-    "purpose": "Exchange a valid refresh token for a fresh short-lived JWT access token",
+    "purpose": "Use the backend-owned refresh cookie to rotate the session and return a fresh short-lived JWT access token",
     "frontendCallers": [
       "src/services/authService.ts (authService.refreshToken)",
       "src/core/api/apiClient.ts (Axios 401 response interceptor)"
@@ -217,22 +211,10 @@
       "USER",
       "ADMIN"
     ],
-    "headers": {
-      "Content-Type": "application/json"
-    },
+    "headers": {},
     "pathParameters": null,
     "queryParameters": null,
-    "requestSchema": {
-      "type": "object",
-      "required": [
-        "refreshToken"
-      ],
-      "properties": {
-        "refreshToken": {
-          "type": "string"
-        }
-      }
-    },
+    "requestSchema": null,
     "responseSchema": {
       "type": "object",
       "properties": {
@@ -250,7 +232,7 @@
             "token": {
               "type": "string"
             },
-            "refreshToken": {
+            "accessToken": {
               "type": "string"
             },
             "role": {
@@ -264,17 +246,11 @@
       }
     },
     "postmanRequest": null,
-    "testResults": {
-      "anonymousStatus": 500,
-      "userStatus": 200,
-      "adminStatus": 200,
-      "latencyMs": 1165,
-      "observedBehavior": "Anonymous with invalid token returns 500; valid refresh token returns 200 OK with rolling fresh tokens"
-    },
-    "functionalStatus": "PASS",
-    "authVerificationStatus": "VERIFIED",
-    "evidenceMethod": "DIRECT_HTTP_PROBE",
-    "notes": "Missing from Postman collection. Verified via direct HTTP probe with fresh token."
+    "testResults": null,
+    "functionalStatus": "INCONCLUSIVE",
+    "authVerificationStatus": "NOT_TESTED",
+    "evidenceMethod": "NOT_VERIFIED",
+    "notes": "Historical request-body evidence was invalidated by the cookie migration. Bodyless refresh, cookie validation/rotation, response shape, CORS, and CSRF remain unverified."
   },
   {
     "id": "AUTH-04",
@@ -292,9 +268,7 @@
       "USER",
       "ADMIN"
     ],
-    "headers": {
-      "Content-Type": "application/json"
-    },
+    "headers": {},
     "pathParameters": null,
     "queryParameters": null,
     "requestSchema": {
@@ -426,14 +400,7 @@
     },
     "pathParameters": null,
     "queryParameters": null,
-    "requestSchema": {
-      "type": "object",
-      "properties": {
-        "refreshToken": {
-          "type": "string"
-        }
-      }
-    },
+    "requestSchema": null,
     "responseSchema": {
       "type": "object",
       "properties": {
@@ -450,17 +417,11 @@
       }
     },
     "postmanRequest": null,
-    "testResults": {
-      "anonymousStatus": 200,
-      "userStatus": 200,
-      "adminStatus": 200,
-      "latencyMs": 298,
-      "observedBehavior": "Returns 200 OK response across all caller states"
-    },
-    "functionalStatus": "PASS",
-    "authVerificationStatus": "VERIFIED",
-    "evidenceMethod": "DIRECT_HTTP_PROBE",
-    "notes": "Missing from Postman collection. Verified via direct HTTP probe."
+    "testResults": null,
+    "functionalStatus": "INCONCLUSIVE",
+    "authVerificationStatus": "NOT_TESTED",
+    "evidenceMethod": "NOT_VERIFIED",
+    "notes": "Historical request-body evidence was invalidated by the cookie migration. Bodyless logout revocation, cookie clearing, CORS, and CSRF remain unverified."
   },
   {
     "id": "REF-01",

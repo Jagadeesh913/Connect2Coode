@@ -5,6 +5,7 @@ import { logoutUser, openAuthModal, type UserProfile } from '../../../features/a
 import { useTheme } from '../../context/ThemeContext';
 import { isAdminRole } from '../../../core/security/jwt';
 import { BrandLogo } from './BrandLogo';
+import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
 
 export interface NavbarProps {
   user?: UserProfile | null;
@@ -30,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const userDisplayName = currentUser?.fullName || currentUser?.firstName || currentUser?.email?.split('@')[0] || 'User';
   const userDisplayEmail = currentUser?.email || '';
   const userInitials = userDisplayName.slice(0, 2).toUpperCase();
+  const safeAvatarUrl = getSafeRemoteImageUrl(currentUser?.avatarUrl);
 
   const isAdmin = isLoggedIn && isAdminRole(currentUser?.role);
 
@@ -168,9 +170,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   aria-controls="c2c-profile-menu"
                 >
                   <div className="relative">
-                    {currentUser?.avatarUrl ? (
+                    {safeAvatarUrl ? (
                       <img
-                        src={currentUser.avatarUrl}
+                        src={safeAvatarUrl}
+                        referrerPolicy="no-referrer"
                         alt={userDisplayName}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700 shadow-xs"
                       />
@@ -188,9 +191,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {isProfileDropdownOpen && (
                   <div id="c2c-profile-menu" className="absolute right-0 top-full mt-2.5 w-56 bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 flex flex-col p-2 gap-1 font-sans">
                     <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50 rounded-xl flex items-center gap-2.5">
-                      {currentUser?.avatarUrl ? (
+                      {safeAvatarUrl ? (
                         <img
-                          src={currentUser.avatarUrl}
+                          src={safeAvatarUrl}
+                          referrerPolicy="no-referrer"
                           alt={userDisplayName}
                           className="w-8 h-8 rounded-full object-cover shrink-0"
                         />
@@ -333,9 +337,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               {isLoggedIn ? (
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-3 px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl mb-1">
-                    {currentUser?.avatarUrl ? (
+                    {safeAvatarUrl ? (
                       <img
-                        src={currentUser.avatarUrl}
+                        src={safeAvatarUrl}
+                        referrerPolicy="no-referrer"
                         alt={userDisplayName}
                         className="w-9 h-9 rounded-full object-cover shrink-0"
                       />

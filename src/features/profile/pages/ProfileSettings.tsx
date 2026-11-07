@@ -20,6 +20,7 @@ import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
 import type { AcademicDetailsFormData, PersonalInfoFormData } from '../../../core/validation';
 import { normalizeCollegeId } from '../utils/academicProfile';
+import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
 
 // Lucide Icons
 import {
@@ -49,6 +50,7 @@ export const UserProfilePage: React.FC = () => {
     userInfoError: academicError,
   } = useAppSelector((state) => state.profile);
   const authUser = useAppSelector((state) => state.auth.user);
+  const safeAvatarUrl = getSafeRemoteImageUrl(profile?.avatarUrl);
 
   // Modals state
   const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
@@ -469,9 +471,10 @@ export const UserProfilePage: React.FC = () => {
               {/* Avatar Container with Camera Badge */}
               <div className="relative shrink-0">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#DCEBFF] dark:bg-blue-950/70 text-[#1E40AF] dark:text-blue-300 font-bold text-2xl sm:text-3xl flex items-center justify-center overflow-hidden shadow-inner ring-4 ring-white dark:ring-neutral-800">
-                  {profile?.avatarUrl ? (
+                  {safeAvatarUrl ? (
                     <img
-                      src={profile.avatarUrl}
+                      src={safeAvatarUrl}
+                      referrerPolicy="no-referrer"
                       alt={fullName}
                       className="w-full h-full object-cover"
                     />

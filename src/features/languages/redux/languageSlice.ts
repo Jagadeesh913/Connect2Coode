@@ -38,8 +38,8 @@ export const fetchLanguages = createAsyncThunk<
   {
     condition: (arg, { getState }) => {
       const state = getState() as { languages: LanguageState };
-      if (state.languages.loading) return false;
       if (arg?.force) return true;
+      if (state.languages.loading) return false;
       return !state.languages.lastFetchedAt ||
         Date.now() - state.languages.lastFetchedAt >= LANGUAGE_CACHE_TTL_MS;
     },
@@ -52,6 +52,8 @@ const languageSlice = createSlice({
   reducers: {
     invalidateLanguages(state) {
       state.lastFetchedAt = null;
+      state.currentRequestId = null;
+      state.loading = false;
     },
   },
   extraReducers: (builder) => {

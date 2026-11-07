@@ -19,7 +19,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | M-03 | Remove hard-coded question totals, offset stitching, tail probes, and per-record fan-out after addressing the backend defect | Frontend workaround was removed. One requested page now produces one API request and real failures remain failures. The backend pagination/data defect is still an external release blocker. | `PARTIALLY VERIFIED` |
 | M-04 | Do not fabricate server bookmark timestamps | Server records omit timestamps the API did not return. | `PARTIALLY VERIFIED` |
 | L-01 | Do not label configured auth/RBAC as live-validated system health | Misleading labels and invented fallback role were removed. | `PARTIALLY VERIFIED` |
-| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | The current source statically declares 369 tests, but the modified final tree has not been executed in an OS-level sandbox. Historical green results cannot certify these changes. | `UNKNOWN` |
+| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | The current source statically declares 379 tests, but the modified final tree has not been executed in an OS-level sandbox. Historical green results cannot certify these changes. | `UNKNOWN` |
 | Gate | No existing behavior is broken and final remediation report exists | Requires runtime journeys and external acceptance checks below. | `UNKNOWN` |
 
 ## 3. Deep-audit remediation checklist
@@ -28,6 +28,8 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 
 | ID | Check | Resolution / evidence required | Status |
 | :--- | :--- | :--- | :---: |
+| AUTH-01 | Login and refresh accept the deployed access-token field without exposing refresh credentials | The boundary now accepts the workspace-evidenced `token` and `accessToken` spellings and emits only canonical `token`; refresh-token fields remain discarded. The deployed envelope still requires browser/API confirmation. | `PARTIALLY VERIFIED` |
+| AUTH-02 | A failed startup refresh cannot permanently hide login | Guest recovery retains the safe retry path and adds an explicit **Sign in instead** action that clears client access/profile memory and stale-response ownership without touching the HttpOnly cookie. Final interaction/browser verification is pending. | `PARTIALLY VERIFIED` |
 | P1-01 | Public signup cannot choose an authorization role | `role` was removed from `SignUpPayload`; request construction writes `USER` after spreading caller data. Backend must independently ignore/reject caller role fields. | `PARTIALLY VERIFIED` |
 | P1-07 | Refresh behavior on browsers without Web Locks is intentional and tested | Current policy fails closed when safe rotating-cookie coordination is unavailable. Product browser-support approval and cross-tab runtime tests remain required. | `PARTIALLY VERIFIED` |
 | P1-08 | Logout/account switch cannot be undone by stale auth or protected-cache responses | Refresh is epoch/request-owned, identity changes reset protected slices, and problem/DSA cache writes require exact ownership. Final reducer/browser tests remain pending. | `PARTIALLY VERIFIED` |
@@ -35,6 +37,9 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | SEC-02 | Hidden test inputs/outputs never enter an ordinary user response | Frontend masking is defense-in-depth only. Verify the network response for successful submit and question detail using a USER account. | `UNKNOWN` |
 | SEC-03 | User-ID path endpoints enforce ownership server-side | Client passes authenticated user IDs but cannot establish object-level authorization. Test same-user and cross-user IDs for progress, bookmarks, profile, and submissions. | `UNKNOWN` |
 | SEC-04 | CSP restricts executable and network sources | Deployment CSP now defines default, script, style, font, image, connect, worker, object, frame, form and base policies. Validate Monaco workers, OAuth, fonts, logos, and API calls in deployed browsers. | `PARTIALLY VERIFIED` |
+| SEC-05 | API-supplied links/images cannot execute schemes or passively probe local targets | Anchors pass through a credential-free HTTP(S) guard; avatars and website-derived logos additionally require HTTPS and reject local/private/link-local targets. Final automated/browser verification is pending. | `PARTIALLY VERIFIED` |
+| SEC-06 | Production configuration cannot redirect API/OAuth traffic to an arbitrary origin | Non-local builds accept only the exact canonical HTTPS API base; OAuth derives from that validated base. Final production bundle/browser inspection is pending. | `PARTIALLY VERIFIED` |
+| SEC-07 | Distinct authenticated identities cannot collide in browser-storage scope | Storage keys now contain a versioned encoding of the complete canonical identity; a regression uses a known collision pair from the removed 32-bit scheme. Final tests are pending. | `PARTIALLY VERIFIED` |
 
 ### API authority and data integrity
 
@@ -49,6 +54,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | DATA-02 | Removing a company from an existing question persists | Current backend save behavior inserts associations and rejects duplicates; no verified removal contract exists. The UI must not claim this mutation is supported until backend replace/remove semantics are supplied. | `NOT WORKING` |
 | DATA-03 | Question list/detail and nullable fields have separate boundary handling | Numeric details require a valid detail DTO; legacy text slugs scan real pages; nullable hints/test cases are handled without fabricated values. | `PARTIALLY VERIFIED` |
 | DATA-04 | Company pages and slugs use verified metadata/identity | Page envelopes require complete metadata; numeric IDs are direct and text slugs resolve through the real paginated catalog. | `PARTIALLY VERIFIED` |
+| DATA-05 | Malformed error/MCQ/company-exam payloads fail safely at service boundaries | Error fields are type-guarded; MCQ records/options and nested exam/role/section DTOs are mapped; slug matches without numeric IDs reject without recursion. Final tests/live payload acceptance are pending. | `PARTIALLY VERIFIED` |
 
 ### Requests, caching, performance, and reliability
 
@@ -61,6 +67,9 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | PERF-05 | Code execution payloads are bounded before transport | Positive integer IDs, non-empty code, 200,000-character source limit, and 64,000-character custom-input limit are enforced client-side. Backend limits remain required. | `PARTIALLY VERIFIED` |
 | PERF-06 | Large pages/components do not cause unacceptable render or bundle cost | Several feature pages remain very large. Bundle analysis, React profiling, list-scale tests, and route-level lazy-loading evidence are still required. | `UNKNOWN` |
 | PERF-07 | Duplicate question/test-case reads and dead business stacks are removed | Dashboard detail uses one authoritative request, test cases reuse detail, the unused company-problems thunk/cache and legacy ProblemList were removed, and shared dialog behavior replaces repeated focus logic. | `PARTIALLY VERIFIED` |
+| PERF-08 | Post-mutation cache refresh cannot be rejected or overwritten by an older read | Reference/language force refreshes supersede in-flight reads and invalidation clears ownership before refreshing. Final reducer tests are pending. | `PARTIALLY VERIFIED` |
+| PERF-09 | Hidden tabs and admin catalogs do not create unnecessary request bursts | Company questions load only on the Practice tab; admin company modal loads only the active tab, aborts on switch/close, and reads exam pages sequentially; Admin Questions shares one company catalog with its form. Final browser/network verification is pending. | `PARTIALLY VERIFIED` |
+| EDITOR-01 | Monaco receives one integrity controller and restores historical source into the correct runtime | Duplicate workspace-level integrity listeners were removed; the root shell remains authoritative. Submission restore now resolves both language table IDs and reference IDs, switches language, and rejects unavailable mappings. Static regressions were added; browser interaction remains pending. | `PARTIALLY VERIFIED` |
 
 ### Admin, profile, company, DSA, and execution journeys
 
@@ -83,7 +92,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | :--- | :--- | :--- | :---: |
 | OPS-01 | CI uses the lockfile toolchain | Typecheck uses the installed package script; checkout and setup-node are pinned to reviewed immutable v7 SHAs. A CI run and dependency-update policy remain required. | `PARTIALLY VERIFIED` |
 | OPS-02 | Runtime version is reproducible | `package.json` now declares Node `>=22.12.0 <23`; deployment and CI must use that range. | `PARTIALLY VERIFIED` |
-| OPS-03 | Postman workspace is an authoritative, secret-free contract source | The workspace is fragmented: the collection labelled “All 32 APIs” contains only a small subset, legacy hosts/body tokens remain in diagnostic collections, assertions sometimes pass unconditionally, and a credential was embedded in a collection. Revoke/rotate it and sanitize/version the workspace. | `NOT WORKING` |
+| OPS-03 | Postman workspace is an authoritative, secret-free contract source | The five-request collection was renamed as the canonical contract, moved to `{{base_url}}`, changed to collection-level `{{access_token}}`, and verified to contain no legacy Render host, literal JWT-like value, or explicit Authorization header. The workspace remains fragmented and incomplete; rotate the formerly exposed credential, consolidate the remaining endpoints, and add meaningful assertions before treating it as authoritative. | `PARTIALLY VERIFIED` |
 | OPS-04 | Dependency/build/security checks run on the final tree | Run clean install/lockfile validation, dependency audit, tests, typecheck, lint, architecture/docs checks, build, preview smoke, and deployment header checks. | `UNKNOWN` |
 | OPS-05 | Development proxy verifies upstream TLS | All proxy targets use default TLS certificate verification; final dev proxy smoke is pending. | `PARTIALLY VERIFIED` |
 
@@ -94,7 +103,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 3. Prove hidden test data is absent from USER network responses.
 4. Define company-question replace/remove semantics and verify removals persist.
 5. Repair the learning-sheet section-question 500 and the submit-code null test-case failure.
-6. Rotate the credential exposed in Postman, remove secrets and legacy token fields, and publish one canonical environment/collection with meaningful assertions.
+6. Rotate the credential formerly exposed in Postman, consolidate the fragmented workspace into the sanitized canonical collection/environment, and add meaningful assertions for the complete API surface.
 7. Execute the final verification matrix and supported-browser production journeys.
 8. Supply reviewed privacy/terms/legal content and add routes only after approval; complete the assistive-technology/browser audit.
 9. Define the update policy for the now-immutable GitHub Action pins and verify the workflow on the final tree.

@@ -50,7 +50,7 @@
 
 ### 9. Postman workspace contract and credential hygiene
 - **Status**: `NOT WORKING`
-- **Observed State**: The workspace collection labelled as the complete API contains only a small subset, diagnostic collections retain legacy hosts and body-token patterns, some assertions pass unconditionally, and an access credential was embedded in collection data.
+- **Observed State**: The former “All 32” collection contains only five requests. It has now been renamed as the canonical contract, parameterized with `{{base_url}}` and an empty `{{access_token}}`, and verified free of legacy Render URLs, literal JWT-like values, and request-level Authorization headers. Other diagnostic collections remain fragmented, some assertions pass unconditionally, and the credential previously embedded in collection data still requires owner-side revocation/rotation.
 - **Required Operations**: Revoke/rotate the exposed credential, remove all secrets, consolidate one canonical environment and collection against `https://api.connect2code.in/api/v1`, replace unconditional tests with contract assertions, and version the result. The current workspace is historical evidence, not a complete authoritative specification.
 
 
@@ -96,6 +96,7 @@
 ### Decision 4: Java Class Renaming to `Main` for Judge0
 - **Context**: Judge0 Java compiler expects a class with a `public static void main` method located in a class named `Main`. Students frequently write LeetCode-style code with `public class Solution`.
 - **Decision**: [`src/services/executionService.ts`](../../src/services/executionService.ts) automatically substitutes `public class Solution` with `public class Main` before dispatching code to `/runCode`.
+- **Editor ownership**: `AppRouterLayout` is the only assessment-integrity event owner. `ProblemDetails` retains a plain workspace ref for fullscreen targeting, avoiding duplicate capture listeners around Monaco. Historical submission source is restored into the language identified by the submission's table/reference ID; unavailable runtimes are reported instead of silently loading code into a different selected language.
 
 ### Decision 5: Language Reference ID Mapping
 - **Context**: The database language table assigns IDs 1-4 (e.g. 1 = Java, 2 = C++, 3 = Python, 4 = C). However, the Judge0 execution engine expects Reference IDs 5-8 (5 = Java, 6 = C++, 7 = Python, 8 = C).
@@ -103,7 +104,7 @@
 
 ### Decision 6: Backend-Owned Refresh Cookie and Memory-Only Access Session
 - **Context**: The previous client mirrored credentials and profile objects into `localStorage` and `sessionStorage`, while the profile page retained an unscoped academic-record cache. This contradicted the documented storage policy and could leave sensitive data after a session.
-- **Decision**: Access tokens and session identity remain only in memory/Redux. Login/refresh responses must contain `token`, `id`, `role`, and `email`. The frontend exposes no refresh-token storage API and sends no refresh token in refresh/logout bodies; the backend owns the HttpOnly cookie and its rotation/revocation. Startup refresh is unconditional, and refresh rotation is serialized both within and across tabs. Logout clears memory, Redux caches, and the departing user's persisted cache while preserving only theme preference.
+- **Decision**: Access tokens and session identity remain only in memory/Redux. Login/refresh responses must contain a non-empty access token (`token` or the backend compatibility alias `accessToken`), `id`, `role`, and `email`; the authentication boundary normalizes either access-token spelling to canonical `token`. The frontend exposes no refresh-token storage API and sends no refresh token in refresh/logout bodies; the backend owns the HttpOnly cookie and its rotation/revocation. Startup refresh is unconditional, and refresh rotation is serialized both within and across tabs. Logout clears memory, Redux caches, and the departing user's persisted cache while preserving only theme preference.
 - **Guardrail**: Only refresh HTTP 401 proves the cookie invalid and clears authentication. Network, malformed response, and 5xx failures preserve an active session or enter the startup retry gate. Legacy readable refresh-cookie cleanup remains a backend `Set-Cookie` migration responsibility because frontend JavaScript must not manage that cookie.
 
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
@@ -249,3 +250,18 @@
 - **UI truthfulness**: Fake newsletter success, unsupported resource labels, unmeasured adoption/content totals, named unverified testimonials, simulated compiler success, and live-health claims were removed or replaced with explicitly illustrative/configuration wording.
 - **Accessibility**: Shared dialog lifecycle behavior covers login, profile editing, company MCQ solving, and admin focus restoration. Admin form labels were statically associated with their controls and multi-control sections received group semantics; an assistive-technology/browser run remains required before production certification.
 - **External release requirements**: Approved privacy/terms/legal content, deployed-header/browser validation, an update policy for immutable GitHub Action pins, sanitized canonical Postman artifacts, and live backend authorization/execution acceptance remain outside the evidence available in this checkout.
+
+### Decision 28: Untrusted external-link rendering boundary (2026-11-07)
+
+- **Context**: Admin forms validate newly entered website URLs, but company, institution, and exam records returned by the API may predate those validators or be modified outside this frontend. Rendering those stored values directly in `href` left the browser boundary dependent on backend data hygiene.
+- **Decision**: `getSafeExternalUrl` is the rendering guard for API-supplied external anchors. It permits only credential-free HTTP(S), rejects protocol-relative, backslash, invalid-host, and non-web-scheme values, and upgrades legacy bare hostnames to HTTPS. `getSafeRemoteImageUrl` additionally requires HTTPS and rejects local/private/link-local targets before session avatars or website-derived logos can trigger passive browser requests. Unsafe values fall back to non-clickable text, initials, or local logo assets.
+- **Verification boundary**: Source coverage and regression cases were added, but the final test/typecheck/lint/build/browser matrix has not been executed in an OS-level sandbox, so this remediation remains `PARTIALLY VERIFIED`.
+
+### Decision 29: Phase 1 boundary hardening and cache supersession (2026-11-07)
+
+- **Network authority**: Production API and OAuth destinations are pinned to `https://api.connect2code.in`; build-time configuration cannot redirect authenticated traffic to an arbitrary origin. Development/preview overrides remain available only in local mode.
+- **Account isolation**: User-scoped storage now versions and encodes the complete canonical identity instead of truncating it to a collision-prone 32-bit FNV value. Legacy hash keys are not read into the new scope because doing so could reintroduce collision data.
+- **Untrusted DTOs and errors**: Error messages/status codes are type-guarded before string operations. MCQ pages/details and company exam/role/section payloads are mapped before rendering, and text company routes reject catalog records without a numeric backend ID instead of recursively reloading the catalog.
+- **Request ownership**: Reference/language invalidation clears stale request ownership and forced refreshes can supersede in-flight reads. Admin question/MCQ detail controllers now reach the transport. Company practice data is lazy by selected tab; the admin company modal loads only its active tab, cancels on switch/close, and reads exam pages sequentially rather than with unbounded fan-out. Admin Questions owns one abortable company catalog request and passes that result into its form instead of downloading the same catalog again when the modal opens.
+- **Sensitive browser output**: Expected API failures retain visible error/retry state without logging raw transport objects. Avatar and external links are HTTP(S)-guarded; avatar requests suppress the referrer.
+- **Verification boundary**: Regression cases and static graph extraction cover these changes, but the full executable verification matrix and live backend/browser acceptance remain pending.

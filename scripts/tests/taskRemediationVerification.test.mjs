@@ -244,12 +244,12 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     const adminQuestionsSource = fs.readFileSync('src/features/admin/pages/AdminQuestions.tsx', 'utf-8');
     const adminMcqsSource = fs.readFileSync('src/features/admin/pages/AdminMcqs.tsx', 'utf-8');
 
-    assert.match(adminQuestionsSource, /handleEditClick[\s\S]*getQuestionById\(question\.id\)/);
+    assert.match(adminQuestionsSource, /handleEditClick[\s\S]*getQuestionById\(question\.id/);
     assert.match(adminQuestionsSource, /Question saved, but its test cases were not attached/);
     assert.doesNotMatch(adminQuestionsSource, /Backend rejected test case attachment/);
     assert.match(adminMcqsSource, /Unable to load complete MCQ data for editing/);
     assert.match(adminMcqsSource, /has no editable options in its detail response/);
-    assert.match(adminMcqsSource, /handleOpenViewModal[\s\S]*getMcqById\(mcq\.id\)/);
+    assert.match(adminMcqsSource, /handleOpenViewModal[\s\S]*getMcqById\(mcq\.id/);
     assert.match(adminMcqsSource, /Unable to load complete MCQ details/);
   });
 

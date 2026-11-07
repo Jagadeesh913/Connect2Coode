@@ -16,6 +16,7 @@ export interface AuthResponseData {
   role?: string;
   isDarkTheme?: boolean;
   token?: string;
+  accessToken?: string;
   user?: {
     id?: number | string;
     firstName?: string;

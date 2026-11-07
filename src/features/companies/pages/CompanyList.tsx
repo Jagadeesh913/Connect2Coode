@@ -8,6 +8,7 @@ import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { companyService } from '../../../services/companyService';
 import type { CompanyItem } from '../types/companyExam';
+import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 import {
   ExternalLink,
   ArrowRight,
@@ -180,6 +181,7 @@ export const CompanyList: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {companies.map((company) => {
               const companyTargetId = company.id || company.slug;
+              const safeWebsiteUrl = getSafeExternalUrl(company.website);
 
               return (
                 <div
@@ -212,9 +214,9 @@ export const CompanyList: React.FC = () => {
                         />
                       </div>
 
-                      {company.website && (
+                      {safeWebsiteUrl && (
                         <a
-                          href={company.website.startsWith('http') ? company.website : `https://${company.website}`}
+                          href={safeWebsiteUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}

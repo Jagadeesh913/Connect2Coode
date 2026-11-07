@@ -4,13 +4,10 @@ import type { User } from '../types/domain';
 const GUEST_SCOPE = 'guest';
 let lastResolvedAccountScope: string | null = null;
 
-function hashScope(value: string): string {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i += 1) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(36);
+function encodeScope(value: string): string {
+  // Encoding the complete canonical identity is injective. A truncated hash is
+  // not: two valid account IDs could otherwise resolve to the same local key.
+  return `v2:${encodeURIComponent(value)}`;
 }
 
 function getIdentityKey(): string {
@@ -30,17 +27,17 @@ function getIdentityKey(): string {
 function getScope(): string {
   const identity = getIdentityKey();
   if (identity === GUEST_SCOPE) return GUEST_SCOPE;
-  const scope = hashScope(identity);
+  const scope = encodeScope(identity);
   lastResolvedAccountScope = scope;
   return scope;
 }
 
 function getScopeForUser(user: Pick<User, 'id' | 'email'> | null): string {
   if (user?.id !== undefined && user?.id !== null && String(user.id).trim()) {
-    return hashScope(`id:${String(user.id)}`);
+    return encodeScope(`id:${String(user.id)}`);
   }
   if (user?.email) {
-    return hashScope(`email:${String(user.email).trim().toLowerCase()}`);
+    return encodeScope(`email:${String(user.email).trim().toLowerCase()}`);
   }
   return GUEST_SCOPE;
 }

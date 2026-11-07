@@ -32,6 +32,7 @@ import {
   Info,
 } from 'lucide-react';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
+import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 
 export const CompanyExamDetails: React.FC = () => {
   const { companyId, examId, slug } = useParams<{
@@ -48,6 +49,7 @@ export const CompanyExamDetails: React.FC = () => {
   const effectiveCompanyId = companyId;
 
   const [details, setDetails] = useState<CompanyExamDetailsData | null>(null);
+  const safeSourceUrl = getSafeExternalUrl(details?.exam.sourceUrl);
   const [company, setCompany] = useState<Company | null>(null);
   const [siblingExams, setSiblingExams] = useState<CompanyExamItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -325,9 +327,9 @@ export const CompanyExamDetails: React.FC = () => {
 
                 {/* Right Column: Portal Link & Sibling Editions Switcher */}
                 <div className="shrink-0 flex flex-col sm:flex-row lg:flex-col items-start sm:items-center lg:items-end gap-3">
-                  {details.exam.sourceUrl && (
+                  {safeSourceUrl && (
                     <a
-                      href={details.exam.sourceUrl}
+                      href={safeSourceUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 dark:text-blue-400 text-xs sm:text-sm font-semibold transition-all shadow-2xs"

@@ -123,9 +123,8 @@ export const AdminDashboard: React.FC = () => {
         totalMcqs: mcqRes.status === 'fulfilled' ? totalMcqs : previous.totalMcqs,
         totalSheets: sheetsRes.status === 'fulfilled' ? totalSheets : previous.totalSheets,
       }));
-    } catch (err) {
+    } catch {
       if (controller.signal.aborted) return;
-      console.warn('Dashboard fetch error:', err);
       setError('Dashboard metrics could not be refreshed. Previous values, if available, are retained.');
     } finally {
       if (!controller.signal.aborted) {
@@ -205,9 +204,8 @@ export const AdminDashboard: React.FC = () => {
           ? 'Could not refresh ' + failures.join(', ') + ' difficulty metrics. Previous values, if available, are retained.'
           : null
       );
-    } catch (err) {
+    } catch {
       if (controller.signal.aborted) return;
-      console.warn('Dashboard difficulty fetch error:', err);
       setDifficultyMetricsError('Difficulty metrics could not be refreshed. Previous values, if available, are retained.');
     } finally {
       if (!controller.signal.aborted) setDifficultyMetricsLoading(false);

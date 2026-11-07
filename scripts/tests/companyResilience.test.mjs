@@ -89,6 +89,66 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
       }
     });
 
+    it('rejects a slug match without a numeric backend ID instead of recursing', async () => {
+      const originalGet = apiClient.get;
+      const originalPost = apiClient.post;
+      let detailCalls = 0;
+      apiClient.get = async () => { detailCalls += 1; return { data: {} }; };
+      apiClient.post = async () => ({
+        statusCode: 200,
+        data: {
+          content: [{ name: 'Legacy Corp', slug: 'legacy-corp' }],
+          totalElements: 1,
+          totalPages: 1,
+          pageNumber: 0,
+          pageSize: 100,
+        },
+      });
+
+      try {
+        await assert.rejects(
+          () => companyService.getCompanyBySlug('legacy-corp'),
+          /has no valid backend ID/
+        );
+        assert.equal(detailCalls, 0);
+      } finally {
+        apiClient.get = originalGet;
+        apiClient.post = originalPost;
+      }
+    });
+
+    it('rejects malformed nested exam records before the page renders them', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: {
+          exam: {
+            id: 1,
+            companyId: 2,
+            examName: 'Placement Test',
+            year: 2026,
+            description: '',
+            totalDurationMinutes: 60,
+            totalQuestions: 10,
+            totalMarks: 100,
+            sourceUrl: 'https://example.com',
+            isActive: true,
+          },
+          roles: [null],
+          pattern: [],
+        },
+      });
+
+      try {
+        await assert.rejects(
+          () => companyService.getCompanyExamDetails(1),
+          /Unexpected company role record format/
+        );
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
     it('preserves numeric company filtering and propagates its failure without a global name fallback', async () => {
       const originalPost = apiClient.post;
       apiClient.post = async (_url, payload) => {

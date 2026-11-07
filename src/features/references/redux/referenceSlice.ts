@@ -55,11 +55,11 @@ export const fetchReferenceGroup = createAsyncThunk<
     condition: (request, { getState }) => {
       const state = getState();
       const groupCode = getRequestGroupCode(request);
+      const force = typeof request === 'object' && Boolean(request.force);
+      if (force) return true;
       if (state.references.loading[groupCode]) {
         return false;
       }
-      const force = typeof request === 'object' && Boolean(request.force);
-      if (force) return true;
       const lastFetchedAt = state.references.lastFetchedAt[groupCode];
       return !lastFetchedAt || Date.now() - lastFetchedAt >= REFERENCE_CACHE_TTL_MS;
     },
@@ -73,6 +73,8 @@ const referenceSlice = createSlice({
     invalidateReferenceGroup(state, action: PayloadAction<string>) {
       const groupCode = normalizeReferenceGroupCode(action.payload);
       state.lastFetchedAt[groupCode] = null;
+      state.requestIds[groupCode] = null;
+      state.loading[groupCode] = false;
     },
   },
   extraReducers: (builder) => {

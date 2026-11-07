@@ -29,7 +29,6 @@ export const AppRouterLayout: React.FC = () => {
   const navigate = useNavigate();
   const userId = useAppSelector((state) => state.auth?.user?.id);
   const hasInitializedRef = useRef(false);
-  const lastIntegrityNoticeAt = useRef(0);
   const isAdminRoute = location.pathname === '/admin' || location.pathname.startsWith('/admin/');
   const {
     bindTarget: bindProtectedSurface,
@@ -40,19 +39,6 @@ export const AppRouterLayout: React.FC = () => {
   } = useAssessmentIntegrity<HTMLDivElement>({
     enabled: !isAdminRoute,
     obscureOnFocusLoss: !isAdminRoute,
-    onViolation: (violation) => {
-      const now = Date.now();
-      if (now - lastIntegrityNoticeAt.current < 1500) return;
-      lastIntegrityNoticeAt.current = now;
-      toast.error(
-        violation === 'print-screen'
-          ? 'Screen capture shortcuts are disabled on this site.'
-          : violation === 'secure-mode-exit'
-            ? 'Secure mode ended. Re-enable it before continuing your assessment.'
-          : 'Copy, paste, export, and capture shortcuts are restricted.',
-        { id: 'global-integrity-warning' }
-      );
-    },
   });
   const isProblemWorkspace = !isAdminRoute && /^\/problems\/[^/]+$/.test(location.pathname);
 

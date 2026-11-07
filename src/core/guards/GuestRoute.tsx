@@ -17,7 +17,7 @@ export const GuestRoute: React.FC = () => {
     return <GuardLoader />;
   }
 
-  if (status === 'RECOVERY_REQUIRED') return <SessionRecoveryState />;
+  if (status === 'RECOVERY_REQUIRED') return <SessionRecoveryState allowSignIn />;
 
   if (isAuthenticated) {
     if (isAdminRole(role)) {

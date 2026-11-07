@@ -2,7 +2,7 @@
 
 This document provides the definitive, evidence-based authorization matrix for all APIs in the **Connect-2-Code** platform.
 
-Every classification is based on actual, live HTTP probes executed with Anonymous credentials, authenticated regular `USER` Bearer tokens, and authenticated `ADMIN` Bearer tokens.
+Every classification records historical live probes executed with Anonymous credentials, authenticated regular `USER` Bearer tokens, and authenticated `ADMIN` Bearer tokens. Authentication rows API-002, API-003, and API-006 predate the cookie-based refresh migration and must not be treated as current deployment acceptance evidence.
 
 ---
 
@@ -43,11 +43,11 @@ Every classification is based on actual, live HTTP probes executed with Anonymou
 | ID | HTTP Method & Path | Anonymous | USER Token | ADMIN Token | Access Classification | Functional Status | Auth Verification | Evidence Method | Notes & Limitations |
 | :--- | :--- | :---: | :---: | :---: | :--- | :---: | :---: | :--- | :--- |
 | **API-001** | `POST /signUp` | `500`* | `N/A` | `N/A` | **`PUBLIC`** | `PASS` | `VERIFIED` | `POSTMAN_EXECUTED` | *Tested via Postman MCP collection runner; returns 500 `"Email is already Registered"` when probed with existing email, verifying public accessibility without token. |
-| **API-002** | `POST /auth/login` | `200` | `200` | `200` | **`PUBLIC`** | `PASS` | `VERIFIED` | `POSTMAN_EXECUTED` | Tested via Postman MCP collection runner. Issues JWT token and refresh token for USER (`id: 63`) and ADMIN (`id: 1`). |
-| **API-003** | `POST /auth/refresh` | `500`* | `200` | `200` | **`USER_OR_ADMIN`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | *Anonymous fails with `"Refresh token invalid or expired"`. Valid refresh token in payload successfully issues rolling JWT tokens. |
+| **API-002** | `POST /auth/login` | `200`* | `200`* | `200`* | **`PUBLIC`** | `INCONCLUSIVE` | `NOT_TESTED` | `NOT_VERIFIED` | *Historical body-token result only. Current JSON shape and HttpOnly cookie issuance require a new controlled browser acceptance run. |
+| **API-003** | `POST /auth/refresh` | `500`* | `200`* | `200`* | **`USER_OR_ADMIN`** | `INCONCLUSIVE` | `NOT_TESTED` | `NOT_VERIFIED` | *Historical request-body refresh result only. Current bodyless cookie validation and rotation are unverified. |
 | **API-004** | `POST /auth/generatePasswordResetOtp` | `200` | `200` | `200` | **`PUBLIC`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | Generates 6-digit OTP and sends email via SMTP without requiring authentication. |
 | **API-005** | `POST /auth/verifyPasswordResetOtp` | `500`* | `500`* | `500`* | **`PUBLIC`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | *Returns 500 `"Password Reset Failed"` when provided dummy OTP, proving public accessibility and backend validation handling. |
-| **API-006** | `POST /auth/logout` | `200` | `200` | `200` | **`PUBLIC`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | Invalidation endpoint accepts refresh token in body. Returns 200 across all caller states. |
+| **API-006** | `POST /auth/logout` | `200`* | `200`* | `200`* | **`PUBLIC`** | `INCONCLUSIVE` | `NOT_TESTED` | `NOT_VERIFIED` | *Historical request-body result only. Current cookie revocation and clearing are unverified. |
 | **API-007** | `GET /referenceLibrary/refGroupCode/TOPIC` | `401` | `200` | `200` | **`USER_OR_ADMIN`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | Returns 11 topic taxonomy records. Anonymous strictly rejected with 401. |
 | **API-008** | `GET /referenceLibrary/refGroupCode/DIFF` | `401` | `200` | `200` | **`USER_OR_ADMIN`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | Returns 4 difficulty tiers (Basic, Easy, Medium, Hard). |
 | **API-009** | `GET /referenceLibrary/refGroupCode/QPF` | `401` | `200` | `200` | **`USER_OR_ADMIN`** | `PASS` | `VERIFIED` | `DIRECT_HTTP_PROBE` | Returns question platform flag records. |

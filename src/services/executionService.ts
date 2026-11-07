@@ -131,6 +131,7 @@ export const isExecutionResultSuccessful = (result: ExecutionResultData): boolea
 
 let cachedLanguages: LanguageDropdownItem[] | null = null;
 let languageFetchPromise: Promise<LanguageDropdownItem[]> | null = null;
+let languageFetchGeneration = 0;
 let languageCacheTime = 0;
 const LANGUAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 export const MAX_SOURCE_CODE_LENGTH = 200_000;
@@ -138,6 +139,7 @@ export const MAX_CUSTOM_INPUT_LENGTH = 64_000;
 
 export const executionService = {
   invalidateLanguageCache(): void {
+    languageFetchGeneration += 1;
     cachedLanguages = null;
     languageFetchPromise = null;
     languageCacheTime = 0;
@@ -156,11 +158,12 @@ export const executionService = {
       return cachedLanguages;
     }
 
-    if (languageFetchPromise) {
+    if (languageFetchPromise && !force) {
       return languageFetchPromise;
     }
 
-    languageFetchPromise = (async () => {
+    const requestGeneration = ++languageFetchGeneration;
+    const requestPromise = (async () => {
       const res: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.LANGUAGE.BASE);
       const data = res.data;
       if (Array.isArray(data) && data.length > 0) {
@@ -192,17 +195,21 @@ export const executionService = {
             isActive: item.isActive !== false,
           };
         });
-        cachedLanguages = list;
-        languageCacheTime = Date.now();
+        if (requestGeneration === languageFetchGeneration) {
+          cachedLanguages = list;
+          languageCacheTime = Date.now();
+        }
         return list;
       }
 
       throw new Error('The backend returned no supported languages');
     })().finally(() => {
-      languageFetchPromise = null;
+      if (languageFetchPromise === requestPromise) {
+        languageFetchPromise = null;
+      }
     });
-
-    return languageFetchPromise;
+    languageFetchPromise = requestPromise;
+    return requestPromise;
   },
 
   /**

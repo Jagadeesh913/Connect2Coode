@@ -21,13 +21,18 @@ export interface ExecutionReadinessParams {
   selectedLanguage: ExecutionLanguageLike | null;
 }
 
+export const resolveExecutionLanguage = <T extends ExecutionLanguageLike>(
+  languages: T[],
+  languageId: number
+): T | null => languages.find(
+  (item) => item.id === languageId || item.referenceId === languageId
+) ?? null;
+
 export const resolveExecutionLanguageName = (
   languages: Array<ExecutionLanguageLike & { name?: string; languageName?: string }>,
   languageId: number
 ): string => {
-  const language = languages.find(
-    (item) => item.id === languageId || item.referenceId === languageId
-  );
+  const language = resolveExecutionLanguage(languages, languageId);
   return language?.name || language?.languageName || `Language #${languageId}`;
 };
 

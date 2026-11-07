@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 const { classifyAssessmentShortcut } = await import(
   '../../src/shared/hooks/useAssessmentIntegrity.ts'
@@ -48,5 +49,9 @@ describe('assessment integrity shortcut classification', () => {
     assert.equal(getInternalEditorClipboardAction(shortcut('Insert', { ctrlKey: true })), 'copy');
     assert.equal(getInternalEditorClipboardAction(shortcut('Insert', { shiftKey: true })), 'paste');
     assert.equal(getInternalEditorClipboardAction(shortcut('z', { ctrlKey: true })), null);
+    const rootSource = fs.readFileSync('src/layouts/AppRouterLayout.tsx', 'utf8');
+    const workspaceSource = fs.readFileSync('src/features/problems/pages/ProblemDetails.tsx', 'utf8');
+    assert.match(rootSource, /useAssessmentIntegrity<HTMLDivElement>/);
+    assert.doesNotMatch(workspaceSource, /useAssessmentIntegrity/);
   });
 });

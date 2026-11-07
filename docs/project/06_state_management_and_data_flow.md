@@ -39,7 +39,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Bootstrap behavior**: If the access token is expired but refresh-session evidence exists, `initializeAuth` leaves the state at `LOADING` for `AppRouterLayout`'s refresh attempt instead of deleting the refresh session before it runs.
 - **Refresh ownership**: `/auth/refresh` is bodyless; the browser sends the backend-owned HttpOnly cookie. Startup, OAuth completion, and 401 retry all call the same same-tab/Web-Locks coordinator. A browser without Web Locks enters the recoverable failure path without sending an uncoordinated refresh. Validated token/profile fields update memory and Redux; no refresh-token API exists in `tokenStorage`.
 - **Authorization presentation**: Admin routing/navigation uses only the role supplied by login/refresh response data. JWT payload claims are not decoded for authorization decisions.
-- **Session response boundary**: Login and refresh establish authentication only after validating `token`, `id`, `role`, and `email`.
+- **Session response boundary**: Login and refresh establish authentication only after validating the access token (`token` or backend compatibility alias `accessToken`), `id`, `role`, and `email`. The boundary normalizes the result to canonical `token` before Redux or storage receives it.
 - **Startup recovery state**: `RECOVERY_REQUIRED` distinguishes network/5xx/contract failures from refresh HTTP 401. Route guards render a retry gate without exposing protected content; only HTTP 401 becomes `UNAUTHENTICATED`.
 - **Feature mount boundary**: `AuthenticatedFeatureGate` keeps Problems, Problem Details, DSA Sheet, Company Prep, and Aptitude page trees unmounted until the session is authenticated. Their catalog/reference/detail effects therefore cannot issue API calls for signed-out visitors. The bodyless cookie-backed `/auth/refresh` still runs because it is the only contract-safe way to discover an existing HttpOnly-cookie session.
 - **Reducer purity**: Cookie reads occur in the `initializeAuth` action prepare callback and token writes occur in `authService`; reducers only apply action payloads.
@@ -133,28 +133,18 @@ graph LR
     end
 
     subgraph ScopedStorage [userScopedStorage]
-        ScopedKey["c2c:user:<hash>:problem_progress"]
-        BookmarksLocal["c2c:user:<hash>:bookmarks"]
+        ScopedKey["c2c:user:v2:<encoded-identity>:problem_progress"]
+        BookmarksLocal["c2c:user:v2:<encoded-identity>:bookmarks"]
     end
 ```
 
 Access credentials and session profile metadata are held only in per-tab memory/Redux. `tokenStorage` never reads or writes the HttpOnly refresh cookie; it only removes obsolete JavaScript-readable access/profile aliases left by older builds. Server-owned academic records, admin question metadata, test cases, and submission history are held in memory and refreshed from their APIs, never mirrored to browser storage. The retained user-scoped storage is limited to manual/offline progress, COMPANY/APTITUDE bookmark fallbacks, and the active identity's theme preference. `ProtectedRoute` stores `post_auth_redirect` separately in `sessionStorage` for the current tab.
 
-On logout, the application removes the departing user's complete scoped cache—including progress, local bookmarks, and code drafts—before clearing memory. Only the non-sensitive `theme_pref` preference is retained. Other users' hashed scopes are never read or modified.
+On logout, the application removes the departing user's complete scoped cache—including progress, local bookmarks, and code drafts—before clearing memory. Only the non-sensitive `theme_pref` preference is retained. Other users' encoded scopes are never read or modified.
 
 ### `userScopedStorage` Architecture
 Browser storage is shared across users on the same machine. To eliminate privacy leaks when a user logs out and another logs in:
 1. When unauthenticated, scope is string `"guest"`.
 2. When authenticated, scope key is `id:<userId>` or `email:<email>`.
-3. Identity is hashed using an FNV-1a 32-bit algorithm:
-   ```ts
-   function hashScope(value: string): string {
-     let hash = 2166136261;
-     for (let i = 0; i < value.length; i += 1) {
-       hash ^= value.charCodeAt(i);
-       hash = Math.imul(hash, 16777619);
-     }
-     return (hash >>> 0).toString(36);
-   }
-   ```
-4. All local keys become `c2c:user:<hash>:<key>`. Each user's browser data is completely isolated.
+3. The complete canonical identity is encoded with `encodeURIComponent` and versioned as `v2:<encoded-identity>`. This is injective for the input string and avoids cross-account collisions caused by the previous truncated 32-bit hash.
+4. All local keys become `c2c:user:v2:<encoded-identity>:<key>`. Each user's browser data is isolated without relying on a probabilistic hash.

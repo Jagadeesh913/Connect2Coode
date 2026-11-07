@@ -49,7 +49,10 @@ export function requireAuthSessionData(value: unknown): AuthSessionData {
   const nestedUser = data.user && typeof data.user === 'object' && !Array.isArray(data.user)
     ? data.user as Record<string, unknown>
     : null;
-  const token = requiredText(data.token);
+  // The backend has used both `token` and `accessToken` for the access JWT.
+  // Normalize that wire-level compatibility alias here so credentials still
+  // have one canonical name everywhere else in the application.
+  const token = requiredText(data.token) ?? requiredText(data.accessToken);
   const id = nestedUser?.id ?? data.id;
   const role = requiredText(nestedUser?.role ?? data.role);
   const email = requiredText(nestedUser?.email ?? data.email);

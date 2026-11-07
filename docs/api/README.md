@@ -57,7 +57,10 @@ The frontend API client (`src/core/api/apiClient.ts`) resolves the base URL acco
 
 ## 3. Authentication & Token Architecture
 
-The Connect-2-Code platform utilizes a stateless JSON Web Token (JWT) Bearer authentication architecture paired with long-lived refresh tokens.
+> [!WARNING]
+> The sequence and auth rows below are historical evidence from the retired body-token contract. They are not current acceptance evidence after the backend cookie migration. The current contract is documented in [`docs/project/05_api_contracts_and_security.md`](../project/05_api_contracts_and_security.md): login JSON contains no refresh token, refresh/logout are bodyless, and the backend owns the rotating HttpOnly cookie. Cookie attributes, CSRF, CORS, rotation, and revocation remain unverified on the deployment.
+
+The Connect-2-Code platform uses a JWT Bearer access token paired with a backend-owned refresh session. The following diagram is retained only to explain the archived probes and must not be implemented by current clients.
 
 ```mermaid
 sequenceDiagram
@@ -108,7 +111,7 @@ The platform APIs are managed in Postman via the connected **Postman Model Conte
 ### Workspace & Collection Details
 
 - **Postman Workspace**: `JAGADEESH SAKHAMURI's Workspace` (ID: `e2b1ba19-064e-4021-839c-35294e960cf9`)
-- **Collection Name**: `CONNECT2CODE - All 32 Platform APIs`
+- **Collection Name**: `Connect2Code - Canonical API Contract` (currently five sanitized requests; expansion is pending)
 - **Collection UID**: `58775230-41b6471c-396a-41f1-949d-f66ccc83d8e7`
 
 ### Safe Usage Guidelines
