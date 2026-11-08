@@ -11,7 +11,7 @@ import {
   adminLanguageService,
   AdminLanguageItem,
 } from '../../../services/admin/adminLanguageService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { FormFieldError } from '../../../shared/components/ui/FormFieldError';

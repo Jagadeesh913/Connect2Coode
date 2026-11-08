@@ -7,7 +7,7 @@ import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
 import type { CompanyItem } from '../../../../services/admin/adminCompanyService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../utils/testCaseUtils';

@@ -10,7 +10,7 @@ import {
   verifyPasswordResetOtpThunk,
 } from '../redux/authSlice';
 import { authService } from '../../../services/authService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
 import { useAccessibleDialog } from '../../../shared/hooks/useAccessibleDialog';
@@ -935,7 +935,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         role="dialog"
         aria-modal="true"
         aria-label={`${mode === 'login' ? 'Log in' : mode === 'signup' ? 'Create account' : 'Reset password'} dialog`}
-        className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans"
+        className="fixed inset-0 z-[9999] bg-[#070A13]/95 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fade-in font-sans"
       >
         {cardElement}
       </div>

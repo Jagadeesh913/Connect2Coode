@@ -208,30 +208,21 @@ export interface AdminLanguage {
 export interface UserInfoData {
   id?: number | null;
   userId?: number | string;
-  firstName?: string | null;
-  lastName?: string | null;
-  regNumber?: string;
-  joinedYear?: number | string;
-  passedOutYear?: number | string;
-  college?: string;
-  collegeName?: string;
-  collegeId?: number | string | null;
-  bio?: string;
-  gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
-  dob?: string | null;
-}
-
-export interface SaveUserInfoPayload {
-  id?: number | null;
-  userId?: number;
   regNumber: string;
   joinedYear: number;
   passedOutYear: number;
   college: string;
-  collegeId?: string | number | null;
   bio: string;
-  gender?: ReferenceItem | { id: number; refGroupCode?: string; refCode?: string; refName?: string; isActive?: boolean } | null;
-  dob?: string | null;
+}
+
+export interface SaveUserInfoPayload {
+  id?: number | null;
+  userId: number;
+  regNumber: string;
+  joinedYear: number;
+  passedOutYear: number;
+  college: string;
+  bio: string;
 }
 
 export interface UserProfile {

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { mcqService } from '../../../services/mcqService';
 import type { McqQuestion } from '../../../core/types/domain';
 import {

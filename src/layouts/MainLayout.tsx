@@ -5,7 +5,7 @@ import { logoutUser, closeAuthModal } from '../features/auth/redux/authSlice';
 import { Navbar } from '../shared/components/ui/Navbar';
 import { Footer } from '../shared/components/ui/Footer';
 import { Login } from '../features/auth/pages/Login';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 
 export const MainLayout: React.FC = () => {
   const dispatch = useAppDispatch();

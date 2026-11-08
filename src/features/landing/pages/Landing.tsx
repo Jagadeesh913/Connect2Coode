@@ -6,7 +6,7 @@ import { Login } from '../../auth/pages/Login';
 import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 
 export const Landing: React.FC = () => {
   const dispatch = useAppDispatch();

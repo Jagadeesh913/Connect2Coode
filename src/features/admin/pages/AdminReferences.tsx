@@ -3,7 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { Edit3, LibraryBig, Plus, RotateCw, Trash2 } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { useAppDispatch } from '../../../app/hooks';
 import type {
   CreateReferenceItemRequest,

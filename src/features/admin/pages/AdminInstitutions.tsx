@@ -10,7 +10,7 @@ import { InstitutionDetailsModal } from '../components/institutions/InstitutionD
 import { InstitutionStatusModal } from '../components/institutions/InstitutionStatusModal';
 import { adminInstitutionService, InstitutionItem } from '../../../services/admin/adminInstitutionService';
 import type { InstitutionType } from '../../../core/types/domain';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import {
   GraduationCap,

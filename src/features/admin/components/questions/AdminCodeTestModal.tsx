@@ -9,7 +9,7 @@ import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import {
   Play,
   Send,

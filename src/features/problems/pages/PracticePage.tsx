@@ -10,7 +10,7 @@ import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../co
 import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies, invalidateCompanyList } from '../../companies/redux/companySlice';
 import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { Lock } from 'lucide-react';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PracticeHeroBanner } from '../components/PracticeHeroBanner';

@@ -36,7 +36,6 @@ const {
   signupSchema,
   forgotPasswordStep1Schema,
   forgotPasswordStep2Schema,
-  personalInfoSchema,
   academicDetailsSchema,
   institutionSelectionSchema,
   adminInstitutionSchema,
@@ -58,6 +57,9 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
     assert.match(stylesheet, /background-image: url\("data:image\/svg\+xml/);
     assert.match(stylesheet, /select:not\(\[multiple\]\):focus-visible/);
     assert.match(stylesheet, /html\.dark select:not\(\[multiple\]\)/);
+    assert.match(stylesheet, /@supports \(appearance: base-select\)/);
+    assert.match(stylesheet, /::picker\(select\)/);
+    assert.match(stylesheet, /option:checked/);
   });
 
   describe('1. Common Rules & Sanitization', () => {
@@ -217,17 +219,20 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       );
     });
 
-    it('personalInfoSchema validates names and phone number', () => {
-      assert.doesNotThrow(() => personalInfoSchema.parse({
-        fullName: 'Arya Stark',
-        email: 'arya@winterfell.org',
-        phone: '+91 9876543210',
-      }));
-
-      assert.throws(
-        () => personalInfoSchema.parse({ fullName: 'A', email: 'arya@winterfell.org' }),
-        /must be at least 2 characters/
-      );
+    it('academicDetailsSchema retains only the established user-info fields', () => {
+      const parsed = academicDetailsSchema.parse({
+        college: 'National Institute of Technology',
+        regNumber: 'CS202201',
+        joinedYear: 2020,
+        passedOutYear: 2024,
+        bio: 'Competitive programmer.',
+        collegeId: 42,
+        gender: 'MALE',
+        dob: '2002-01-01',
+      });
+      assert.equal('collegeId' in parsed, false);
+      assert.equal('gender' in parsed, false);
+      assert.equal('dob' in parsed, false);
     });
 
     it('institutionSelectionSchema requires selecting a valid institution', () => {

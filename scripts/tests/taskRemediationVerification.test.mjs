@@ -319,9 +319,10 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     // ProblemService degraded object check
     assert.match(problemServiceSource, /Number\(\(data as Record<string, unknown>\)\.id\) === numericId/);
 
-    // ProfileSettings memoized initialData check
-    assert.match(profileSettingsSource, /personalInfoInitialData = useMemo/);
-    assert.match(profileSettingsSource, /initialData=\{personalInfoInitialData\}/);
+    // ProfileSettings accepts only the established user-info DTO boundary.
+    assert.doesNotMatch(profileSettingsSource, /EditPersonalInfoModal|personalInfoInitialData/);
+    assert.doesNotMatch(profileSettingsSource, /userInfo\?\.(?:collegeId|collegeName|gender|dob)/);
+    assert.match(profileSettingsSource, /defaultCollege=\{userInfo\?\.college \|\| ''\}/);
     assert.match(profileSettingsSource, /useEffect\(\(\) => \{\s*void dispatch\(fetchUserProfile\(\)\);\s*if \(effectiveUserId\)/);
   });
 });

@@ -24,7 +24,7 @@ import type {
   CompanyExamSectionItem,
   CompanyExamDetailsData,
 } from '../../../companies/types/companyExam';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../../core/validation';
 import { getSafeExternalUrl } from '../../../../core/security/externalUrl';
 import {

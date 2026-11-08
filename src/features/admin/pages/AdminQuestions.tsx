@@ -12,7 +12,7 @@ import { AdminCodeTestModal } from '../components/questions/AdminCodeTestModal';
 import { QuestionPayload, QuestionTestCase } from '../../../services/questionService';
 import { adminQuestionService } from '../../../services/admin/adminQuestionService';
 import { adminCompanyService, type CompanyItem } from '../../../services/admin/adminCompanyService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
 import {

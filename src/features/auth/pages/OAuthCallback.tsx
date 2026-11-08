@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppDispatch } from '../../../app/hooks';
 import { refreshSessionThunk, closeAuthModal } from '../redux/authSlice';
 import { isAdminRole, getSafeRedirectUrl } from '../../../core/security/jwt';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 const getOAuthErrorMessage = (errorCode: string): string => {

@@ -6,7 +6,7 @@ import { fetchCompanyBySlug } from '../redux/companySlice';
 import { CompanyDetailsSkeleton, TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { CompanyBrandLogo } from '../components/CompanyBrandLogo';
 import { mcqService } from '../../../services/mcqService';
 import type { McqQuestion, Problem } from '../../../core/types/domain';

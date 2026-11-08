@@ -1,8 +1,5 @@
 import { z } from 'zod';
 import {
-  nameRule,
-  emailRule,
-  optionalPhoneRule,
   requiredTextRule,
   optionalUrlRule,
 } from '../commonRules';
@@ -10,29 +7,12 @@ import {
 const currentYear = new Date().getFullYear();
 
 /**
- * Personal Information Modal Schema
- */
-export const personalInfoSchema = z.object({
-  fullName: nameRule('Full name'),
-  email: emailRule,
-  phone: optionalPhoneRule,
-  dob: z.string().trim().optional().or(z.literal('')).nullable(),
-  gender: z.any().optional().nullable(),
-  location: z.string().trim().optional().or(z.literal('')),
-  bio: z.string().trim().optional().or(z.literal('')),
-});
-
-export type PersonalInfoFormData = z.infer<typeof personalInfoSchema>;
-
-/**
- * Academic Details Modal Schema
+ * The verified /userInfo DTO contains only these editable fields.
  * Cross-field rule: passedOutYear must be greater than or equal to joinedYear.
  */
 export const academicDetailsSchema = z
   .object({
     regNumber: requiredTextRule('Registration number', 1),
-    degree: z.string().trim().optional().or(z.literal('')),
-    branch: z.string().trim().optional().or(z.literal('')),
     joinedYear: z.coerce
       .number({ error: 'Please select a valid joined year' })
       .int()
@@ -44,9 +24,6 @@ export const academicDetailsSchema = z
       .min(1990, 'Graduation year cannot be earlier than 1990')
       .max(currentYear + 10, 'Graduation year cannot exceed 10 years in the future'),
     college: requiredTextRule('College or university name', 2),
-    collegeId: z.union([z.string(), z.number()]).nullish(),
-    dob: z.string().trim().optional().or(z.literal('')).nullable(),
-    gender: z.any().optional().nullable(),
     bio: z.string().trim().max(500, 'Bio cannot exceed 500 characters').optional().or(z.literal('')),
   })
   .refine((data) => data.passedOutYear >= data.joinedYear, {

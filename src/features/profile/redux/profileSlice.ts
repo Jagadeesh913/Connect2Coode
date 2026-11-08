@@ -118,8 +118,7 @@ export const saveUserInfoThunk = createAsyncThunk<
         ...payload,
         ...res.data,
         userId,
-        college: res.data?.college || res.data?.collegeName || payload.college,
-        collegeName: res.data?.collegeName || res.data?.college || payload.college,
+        college: res.data.college,
       };
     } catch (err: any) {
       return rejectWithValue(err?.message || 'Unable to save academic details.');

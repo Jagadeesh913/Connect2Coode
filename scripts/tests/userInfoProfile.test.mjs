@@ -31,19 +31,47 @@ const { companyService } = await import('../../src/services/companyService.ts');
 const { adminCompanyService } = await import('../../src/services/admin/adminCompanyService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
-const { normalizeCollegeId } = await import('../../src/features/profile/utils/academicProfile.ts');
-
 describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userId})', () => {
-  it('does not restore a stale institution ID after a free-text college edit', () => {
-    assert.equal(normalizeCollegeId('2250'), '2250');
-    assert.equal(normalizeCollegeId(''), null);
-    assert.equal(normalizeCollegeId('   '), null);
-    assert.equal(normalizeCollegeId(undefined), null);
-  });
-
   it('API_ENDPOINTS: accurately defines USER_INFO parameterized endpoint', () => {
     assert.equal(API_ENDPOINTS.USER.USER_INFO(68), '/userInfo/68');
     assert.equal(API_ENDPOINTS.USER.USER_INFO('101'), '/userInfo/101');
+    assert.equal(API_ENDPOINTS.USER.GET_THEME(89), '/89/getTheme');
+    assert.equal(API_ENDPOINTS.USER.THEME(89, false), '/89/theme/false');
+  });
+
+  describe('profileService theme preference', () => {
+    it('gets the backend-owned preference through the protected shared client', async () => {
+      let capturedUrl = '';
+      apiClient.get = async (url) => {
+        capturedUrl = url;
+        return { statusCode: 200, message: 'Theme preference retrieved successfully', data: { isDarkTheme: true }, errors: null };
+      };
+
+      const result = await profileService.getThemePreference(89);
+      assert.equal(capturedUrl, '/89/getTheme');
+      assert.deepEqual(result.data, { isDarkTheme: true });
+    });
+
+    it('saves only the boolean path value and never places credentials in a body', async () => {
+      let capturedUrl = '';
+      let capturedBody = 'unexpected';
+      apiClient.post = async (url, body) => {
+        capturedUrl = url;
+        capturedBody = body;
+        return { statusCode: 200, message: 'Theme preference updated successfully', data: { isDarkTheme: false }, errors: null };
+      };
+
+      const result = await profileService.saveThemePreference(89, false);
+      assert.equal(capturedUrl, '/89/theme/false');
+      assert.equal(capturedBody, undefined);
+      assert.deepEqual(result.data, { isDarkTheme: false });
+    });
+
+    it('rejects an invalid account ID or malformed success payload', async () => {
+      await assert.rejects(() => profileService.getThemePreference('invalid'));
+      apiClient.get = async () => ({ statusCode: 200, data: { isDarkTheme: 'true' } });
+      await assert.rejects(() => profileService.getThemePreference(89), /Unexpected theme preference response format/);
+    });
   });
 
   describe('profileService.getUserInfo', () => {
@@ -103,11 +131,35 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
     it('scopes a valid profile response to the requested user when userId is omitted', async () => {
       apiClient.get = async () => ({
         statusCode: 200,
-        data: { id: 7, regNumber: 'C2C-89', college: 'Example College' },
+        data: {
+          id: 7,
+          regNumber: 'C2C-89',
+          joinedYear: 2022,
+          passedOutYear: 2026,
+          college: 'Example College',
+          bio: '',
+        },
       });
 
       const res = await profileService.getUserInfo(89);
       assert.equal(res.data.userId, 89);
+    });
+
+    it('rejects a profile record returned for a different user', async () => {
+      apiClient.get = async () => ({
+        statusCode: 200,
+        data: {
+          id: 7,
+          userId: 90,
+          regNumber: 'C2C-89',
+          joinedYear: 2022,
+          passedOutYear: 2026,
+          college: 'Example College',
+          bio: '',
+        },
+      });
+
+      await assert.rejects(() => profileService.getUserInfo(89), /Unexpected user profile response format/);
     });
   });
 
@@ -155,7 +207,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.college, 'ABC Engineering College');
     });
 
-    it('sends POST /userInfo/{userId} with business fields only', async () => {
+    it('sends only the established user-info DTO fields', async () => {
       let capturedUrl = '';
       let capturedPayload = null;
 
@@ -168,17 +220,11 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
           data: {
             id: 1,
             userId: 89,
-            firstName: 'connecttocodetechsolutions',
-            lastName: null,
             regNumber: '192G1A0497',
             joinedYear: 2024,
             passedOutYear: 2028,
-            collegeName:
-              'Ambaba Commerce College, Maniba Institute of Business Management & Deviba Institute of Computer Application',
-            collegeId: 2250,
+            college: 'Anantha Lakshmi Institute of Technology & Sciences',
             bio: 'just for test',
-            gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
-            dob: '2002-01-14',
           },
           errors: null,
           timestamp: '2026-10-22T14:56:51.2029399',
@@ -192,10 +238,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
         joinedYear: 2024,
         passedOutYear: 2028,
         college: 'Anantha Lakshmi Institute of Technology & Sciences',
-        collegeId: '2250',
         bio: 'just for test',
-        gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
-        dob: '2002-01-14',
       };
 
       tokenStorage.setAccessToken('sample_access_jwt_token_xyz');
@@ -208,26 +251,16 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(capturedPayload.joinedYear, 2024);
       assert.equal(capturedPayload.passedOutYear, 2028);
       assert.equal(capturedPayload.college, 'Anantha Lakshmi Institute of Technology & Sciences');
-      assert.equal(capturedPayload.collegeId, '2250');
       assert.equal(capturedPayload.bio, 'just for test');
-      assert.deepEqual(capturedPayload.gender, {
-        id: 102,
-        refGroupCode: 'GENDER',
-        refCode: 'MALE',
-        refName: 'Male',
-        isActive: true,
-      });
-      assert.equal(capturedPayload.dob, '2002-01-14');
+      assert.deepEqual(Object.keys(capturedPayload).sort(), [
+        'bio', 'college', 'id', 'joinedYear', 'passedOutYear', 'regNumber', 'userId',
+      ]);
       assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
       assert.equal(res.statusCode, 200);
       assert.equal(res.data.id, 1);
-      assert.equal(
-        res.data.collegeName,
-        'Ambaba Commerce College, Maniba Institute of Business Management & Deviba Institute of Computer Application'
-      );
-      assert.equal(res.data.collegeId, 2250);
+      assert.equal(res.data.college, 'Anantha Lakshmi Institute of Technology & Sciences');
     });
   });
 

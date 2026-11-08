@@ -9,7 +9,7 @@ import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { adminMcqService } from '../../../services/admin/adminMcqService';
 import { companyService } from '../../../services/companyService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import type { McqQuestion, Company, AdminSaveMcqPayload } from '../../../core/types/domain';
 import { cleanQuestionText, synthesizeMcqOptions } from '../../aptitude/utils/mcqUtils';

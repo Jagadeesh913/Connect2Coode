@@ -5,29 +5,22 @@ import {
   fetchUserInfoThunk,
   saveUserInfoThunk,
 } from '../redux/profileSlice';
-import { institutionService } from '../../../services/institutionService';
-import type { Institution, SaveUserInfoPayload } from '../../../core/types/domain';
+import type { SaveUserInfoPayload } from '../../../core/types/domain';
 import { getActionableErrorMessage } from '../../../core/validation';
 
 // Modals
-import { EditPersonalInfoModal } from '../components/modals/EditPersonalInfoModal';
 import { EditAcademicModal } from '../components/modals/EditAcademicModal';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { openAuthModal, generatePasswordResetOtpThunk } from '../../auth/redux/authSlice';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
-import type { AcademicDetailsFormData, PersonalInfoFormData } from '../../../core/validation';
-import { normalizeCollegeId } from '../utils/academicProfile';
-import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
+import type { AcademicDetailsFormData } from '../../../core/validation';
 
 // Lucide Icons
 import {
-  User,
-  Pencil,
   Mail,
-  Camera,
   SquareCode,
   TrendingUp,
   Star,
@@ -35,6 +28,7 @@ import {
   GraduationCap,
   Settings,
   Lock,
+  Pencil,
 } from 'lucide-react';
 
 export const UserProfilePage: React.FC = () => {
@@ -50,21 +44,10 @@ export const UserProfilePage: React.FC = () => {
     userInfoError: academicError,
   } = useAppSelector((state) => state.profile);
   const authUser = useAppSelector((state) => state.auth.user);
-  const safeAvatarUrl = getSafeRemoteImageUrl(profile?.avatarUrl);
-
   // Modals state
-  const [isPersonalModalOpen, setIsPersonalModalOpen] = useState<boolean>(false);
   const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const mutationPendingRef = useRef(false);
-
-  // Institution display enrichment remains page-local; academic data lives in Redux.
-  const [institution, setInstitution] = useState<Institution | null>(null);
-
-  useEffect(() => {
-    // Page-local enrichment must never survive an account switch.
-    setInstitution(null);
-  }, [authUser?.id, authUser?.email]);
 
   const {
     solvedItems,
@@ -165,110 +148,6 @@ export const UserProfilePage: React.FC = () => {
     }
   }, [dispatch, effectiveUserId, sectionRetry]);
 
-  // Auto-enrich institution metadata from real API if college is present
-  useEffect(() => {
-    const collegeName = userInfo?.college || userInfo?.collegeName;
-    if (!collegeName) {
-      setInstitution(null);
-      return;
-    }
-    if (institution?.name && institution.name.toLowerCase() === collegeName.toLowerCase()) return;
-
-    const controller = new AbortController();
-    institutionService.searchInstitutions(collegeName, controller.signal).then((res) => {
-      if (controller.signal.aborted) return;
-      const list = res?.data || [];
-      if (list.length > 0) {
-        const cleanedQuery = collegeName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const match = list.find((item) => {
-          const itemClean = item.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          return itemClean === cleanedQuery;
-        });
-
-        if (match) {
-          setInstitution({
-            id: match.id,
-            name: match.name.replace(/^"+|"+$/g, '').trim(),
-            institutionType: match.institutionType,
-            state: match.state,
-            district: match.district,
-            isActive: true,
-            aisheCode: '',
-          });
-        } else {
-          // A fuzzy search result is not proof of an institution association.
-          setInstitution(null);
-        }
-      }
-    }).catch(() => {
-      if (!controller.signal.aborted) setInstitution(null);
-    });
-
-    return () => {
-      controller.abort();
-    };
-  }, [userInfo?.college, userInfo?.collegeName, institution?.name]);
-
-  // Handle Personal Info Submit
-  const handleSavePersonalInfo = async (data: PersonalInfoFormData) => {
-    if (!effectiveUserId) {
-      toast.error('Please log in to save personal information.');
-      dispatch(openAuthModal({ mode: 'login' }));
-      return;
-    }
-
-    const joinedYear = Number(userInfo?.joinedYear);
-    const passedOutYear = Number(userInfo?.passedOutYear);
-    if (
-      !userInfo?.regNumber?.trim() ||
-      !(userInfo?.college || userInfo?.collegeName)?.trim() ||
-      !Number.isInteger(joinedYear) ||
-      joinedYear <= 0 ||
-      !Number.isInteger(passedOutYear) ||
-      passedOutYear <= 0
-    ) {
-      toast.error('Complete your academic details before saving personal information.');
-      setIsPersonalModalOpen(false);
-      setIsAcademicModalOpen(true);
-      return;
-    }
-
-    if (mutationPendingRef.current) return;
-    mutationPendingRef.current = true;
-    setSubmitting(true);
-    try {
-      await dispatch(
-        saveUserInfoThunk({
-          userId: effectiveUserId,
-          payload: {
-            id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
-            userId: Number(effectiveUserId),
-            regNumber: userInfo.regNumber!.trim(),
-            joinedYear,
-            passedOutYear,
-            college: (userInfo.college || userInfo.collegeName)!.trim(),
-            collegeId: userInfo.collegeId !== undefined && userInfo.collegeId !== null ? String(userInfo.collegeId) : null,
-            bio: data.bio?.trim() || '',
-            gender: data.gender ?? null,
-            dob: data.dob || null,
-          },
-        })
-      ).unwrap();
-
-      toast.success('Personal information updated successfully.');
-      setIsPersonalModalOpen(false);
-    } catch (err: any) {
-      const errorMsg = getActionableErrorMessage(
-        err,
-        'Unable to save personal information. Please try again.'
-      );
-      toast.error(errorMsg);
-    } finally {
-      mutationPendingRef.current = false;
-      setSubmitting(false);
-    }
-  };
-
   // Handle Academic Info Submit -> POST /api/v1/userInfo/{userId}
   const handleSaveAcademic = async (data: AcademicDetailsFormData) => {
     if (!effectiveUserId) {
@@ -281,10 +160,6 @@ export const UserProfilePage: React.FC = () => {
     mutationPendingRef.current = true;
     setSubmitting(true);
     try {
-      // The submitted form is authoritative. A free-text college edit clears
-      // collegeId in the modal and must not resurrect the previous institution.
-      const resolvedCollegeId = normalizeCollegeId(data.collegeId);
-
       const payload: SaveUserInfoPayload = {
         id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
         userId: Number(effectiveUserId),
@@ -292,10 +167,7 @@ export const UserProfilePage: React.FC = () => {
         joinedYear: Number(data.joinedYear),
         passedOutYear: Number(data.passedOutYear),
         college: (data.college || '').trim(),
-        collegeId: resolvedCollegeId,
         bio: (data.bio || '').trim(),
-        gender: data.gender !== undefined ? data.gender : (userInfo?.gender ?? null),
-        dob: data.dob !== undefined && data.dob !== '' ? data.dob : (userInfo?.dob ?? null),
       };
 
       // Direct unwrap: any backend error throws directly into catch block
@@ -305,18 +177,6 @@ export const UserProfilePage: React.FC = () => {
           payload,
         })
       ).unwrap();
-
-      if (payload.college) {
-        setInstitution({
-          id: resolvedCollegeId ? Number(resolvedCollegeId) : 0,
-          name: payload.college,
-          institutionType: 'COLLEGE',
-          state: '',
-          district: '',
-          isActive: true,
-          aisheCode: '',
-        } as Institution);
-      }
 
       toast.success('Academic details saved successfully.');
       setIsAcademicModalOpen(false);
@@ -381,42 +241,10 @@ export const UserProfilePage: React.FC = () => {
 
   // Real academic values from userInfo API
   const regNumber = userInfo?.regNumber || '';
-  const collegeName = userInfo?.college || userInfo?.collegeName || '';
+  const collegeName = userInfo?.college || '';
   const joinedYear = userInfo?.joinedYear;
   const passedOutYear = userInfo?.passedOutYear;
   const bio = userInfo?.bio || '';
-  const genderDisplay: string =
-    userInfo?.gender?.refName ||
-    userInfo?.gender?.refCode ||
-    '—';
-  const dobDisplay = userInfo?.dob || '—';
-  const collegeIdDisplay =
-    userInfo?.collegeId !== undefined && userInfo?.collegeId !== null
-      ? String(userInfo.collegeId)
-      : institution?.id
-      ? String(institution.id)
-      : null;
-
-  const personalInfoInitialData = useMemo(
-    () => ({
-      fullName,
-      firstName: profile?.firstName || authUser?.firstName,
-      email,
-      bio: userInfo?.bio,
-      gender: userInfo?.gender,
-      dob: userInfo?.dob,
-    }),
-    [
-      fullName,
-      profile?.firstName,
-      authUser?.firstName,
-      email,
-      userInfo?.bio,
-      userInfo?.gender,
-      userInfo?.dob,
-    ]
-  );
-
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   if (!isAuthenticated) {
@@ -468,29 +296,11 @@ export const UserProfilePage: React.FC = () => {
           <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             {/* Left: Avatar + User Details */}
             <div className="flex items-center gap-5 sm:gap-6">
-              {/* Avatar Container with Camera Badge */}
+              {/* Session identity is display-only until a verified avatar API exists. */}
               <div className="relative shrink-0">
                 <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#DCEBFF] dark:bg-blue-950/70 text-[#1E40AF] dark:text-blue-300 font-bold text-2xl sm:text-3xl flex items-center justify-center overflow-hidden shadow-inner ring-4 ring-white dark:ring-neutral-800">
-                  {safeAvatarUrl ? (
-                    <img
-                      src={safeAvatarUrl}
-                      referrerPolicy="no-referrer"
-                      alt={fullName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>{initials}</span>
-                  )}
+                  <span>{initials}</span>
                 </div>
-                <button
-                  type="button"
-                  disabled
-                  title="Profile photo updates are not supported by the current API"
-                  aria-label="Profile photo updates are not supported by the current API"
-                  className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-slate-500 text-white flex items-center justify-center shadow-md cursor-not-allowed border-2 border-white dark:border-neutral-900"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
               </div>
 
               {/* User Identity Info */}
@@ -510,17 +320,6 @@ export const UserProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Right: Edit Profile Button */}
-            <div className="shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsPersonalModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-all cursor-pointer shadow-xs bg-white dark:bg-neutral-900"
-              >
-                <Pencil className="w-4 h-4" />
-                <span>Edit Personal Info</span>
-              </button>
-            </div>
           </div>
         </div>
 
@@ -591,69 +390,8 @@ export const UserProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* 2x2 Detailed Information Cards Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Card 1: Personal Information */}
-          <div
-            id="personal-card"
-            className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/5">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                  <User className="w-4 h-4" />
-                </div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                  Personal Information
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsPersonalModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-950/30 transition-colors cursor-pointer"
-              >
-                <Pencil className="w-3 h-3" />
-                <span>Edit</span>
-              </button>
-            </div>
-
-            {/* Key-Value Rows (Only real verified session/API fields) */}
-            <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Full Name</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-words">
-                  {fullName || '—'}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Email Address</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-all">
-                  {email || '—'}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Gender</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 capitalize">
-                  {genderDisplay}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Date of Birth</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 font-mono">
-                  {dobDisplay}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0 pt-0.5">About / Bio</span>
-                <span className="text-slate-700 dark:text-slate-300 flex-1 text-left italic text-xs leading-relaxed min-w-0 break-words">
-                  {bio || 'No bio provided yet.'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Academic Details */}
+          {/* User-info API details */}
           <div
             id="academic-card"
             className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 shadow-xs space-y-4"
@@ -692,12 +430,6 @@ export const UserProfilePage: React.FC = () => {
                 <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">College / Institute</span>
                 <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0 break-words">
                   {collegeName || '—'}
-                </span>
-              </div>
-              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
-                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">College ID</span>
-                <span className="text-slate-900 dark:text-slate-100 font-mono flex-1 text-left min-w-0">
-                  {collegeIdDisplay ? `#${collegeIdDisplay}` : '—'}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
@@ -769,22 +501,13 @@ export const UserProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Personal Information Modal */}
-      <EditPersonalInfoModal
-        isOpen={isPersonalModalOpen}
-        onClose={() => setIsPersonalModalOpen(false)}
-        onSubmit={handleSavePersonalInfo}
-        initialData={personalInfoInitialData}
-        submitting={submitting}
-      />
-
       {/* Edit Academic Details Modal */}
       <EditAcademicModal
         isOpen={isAcademicModalOpen}
         onClose={() => setIsAcademicModalOpen(false)}
         onSubmit={handleSaveAcademic}
         initialData={userInfo}
-        defaultCollege={userInfo?.college || userInfo?.collegeName || ''}
+        defaultCollege={userInfo?.college || ''}
         submitting={submitting}
       />
 

@@ -13,7 +13,7 @@ import { registerAuthListener, registerAuthFailureListener } from '../core/api/a
 import { tokenStorage } from '../core/security/tokenStorage';
 import { isAdminRole } from '../core/security/jwt';
 import { subscribeToAuthSessionEvents } from '../core/security/authSessionSync';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { RouteMetadata } from '../core/metadata/RouteMetadata';
 import { useAssessmentIntegrity } from '../shared/hooks/useAssessmentIntegrity';
 
@@ -33,12 +33,11 @@ export const AppRouterLayout: React.FC = () => {
   const {
     bindTarget: bindProtectedSurface,
     enterSecureMode,
-    isContentObscured,
     isSecureModeActive,
     secureModeSupported,
   } = useAssessmentIntegrity<HTMLDivElement>({
     enabled: !isAdminRoute,
-    obscureOnFocusLoss: !isAdminRoute,
+    obscureOnFocusLoss: false,
   });
   const isProblemWorkspace = !isAdminRoute && /^\/problems\/[^/]+$/.test(location.pathname);
 
@@ -169,17 +168,6 @@ export const AppRouterLayout: React.FC = () => {
           <i className={`fa-solid ${isSecureModeActive ? 'fa-shield-circle-check' : 'fa-expand'}`} aria-hidden="true"></i>
           {isSecureModeActive ? 'Secure mode on' : 'Enter secure mode'}
         </button>
-      )}
-      {!isAdminRoute && isContentObscured && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#070A13] p-6 text-center text-white" role="alert" aria-live="assertive">
-          <div className="max-w-sm">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-400/30 bg-blue-500/15 text-2xl text-blue-300">
-              <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
-            </div>
-            <h2 className="text-xl font-extrabold">Assessment content protected</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">Return focus to this window to continue. Content is hidden while the page is inactive.</p>
-          </div>
-        </div>
       )}
     </div>
   );

@@ -47,6 +47,10 @@ export const API_ENDPOINTS = {
     QUESTION_SUBMISSIONS: (userId: string | number, questionId: string | number) =>
       `/${userId}/question/${questionId}/getSubmissions`,
     USER_INFO: (userId: string | number) => `/userInfo/${userId}`,
+    THEME: (userId: string | number, isDarkTheme: boolean) =>
+      `/${encodeURIComponent(String(userId))}/theme/${isDarkTheme}`,
+    GET_THEME: (userId: string | number) =>
+      `/${encodeURIComponent(String(userId))}/getTheme`,
   },
   LANGUAGE: {
     BASE: '/language',

@@ -6,7 +6,7 @@ import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Badge } from '../../../shared/components/ui/Badge';
 import { BookmarkItemSkeleton } from '../../../shared/components/ui/Skeleton';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 
 export const BookmarksList: React.FC = () => {
   const dispatch = useAppDispatch();

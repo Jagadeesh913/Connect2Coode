@@ -10,7 +10,7 @@ import { CompanyFormModal, CompanyFormData } from '../components/companies/Compa
 import { CompanyDetailsModal } from '../components/companies/CompanyDetailsModal';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { adminCompanyService, CompanyItem } from '../../../services/admin/adminCompanyService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 import {

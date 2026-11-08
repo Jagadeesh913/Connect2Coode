@@ -4,7 +4,7 @@ import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload, QuestionTestCase } from '../../../../services/questionService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import { getActionableErrorMessage } from '../../../../core/validation';

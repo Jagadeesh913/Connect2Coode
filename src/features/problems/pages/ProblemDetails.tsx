@@ -24,7 +24,7 @@ import {
   resolveExecutionLanguage,
   resolveExecutionLanguageName,
 } from '../utils/problemExecution';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import { userQuestionService } from '../../../services/userQuestionService';
 import { useTheme } from '../../../shared/context/ThemeContext';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
@@ -38,6 +38,7 @@ import {
 import { getInternalEditorClipboardAction } from '../utils/internalEditorClipboard';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 
 interface QuestionTestCase {
   id?: number;
@@ -514,8 +515,8 @@ export const ProblemDetails: React.FC = () => {
   );
 
   // Handle Language Dropdown Change
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newLangId = Number(e.target.value);
+  const handleLanguageChange = (value: string) => {
+    const newLangId = Number(value);
     const targetLang = languages.find((l) => l.id === newLangId);
     if (targetLang) {
       setSelectedLanguage(targetLang);
@@ -558,7 +559,6 @@ export const ProblemDetails: React.FC = () => {
       [selectedLanguage.id]: template,
     }));
     setIsResetConfirmOpen(false);
-    toast.success('Code reset to default starter template');
   };
 
 
@@ -1284,7 +1284,6 @@ export const ProblemDetails: React.FC = () => {
                                     [submissionLanguage.id]: sub.sourceCode || '',
                                   }));
                                   setMobileWorkspaceTab('editor');
-                                  toast.success(`Loaded ${submissionLanguage.name} submission into editor`);
                                 }}
                                 className="text-blue-600 dark:text-blue-400 hover:underline font-sans cursor-pointer flex items-center gap-1.5"
                               >
@@ -1388,27 +1387,17 @@ export const ProblemDetails: React.FC = () => {
                 <div className="relative inline-flex items-center min-w-36">
                   {loadingLanguages && languages.length === 0 ? (
                     <Skeleton className="h-8 w-36 rounded-full" />
-                  ) : <select
+                  ) : <C2CSelect
                     id="languageSelect"
                     value={selectedLanguage?.id ?? ''}
                     onChange={handleLanguageChange}
-                    aria-busy={loadingLanguages}
-                    disabled={loadingLanguages || isExecuting || languages.length === 0}
-                    className="appearance-none bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-xs rounded-full pl-8 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
-                  >
-                    {languages.length === 0 ? (
-                      <option value="" disabled>
-                        {loadingLanguages ? 'Loading languages…' : 'No languages available'}
-                      </option>
-                    ) : (
-                      languages.map((l) => (
-                        <option key={l.id} value={l.id} className="bg-white dark:bg-slate-800 text-slate-900 dark:text-white">
-                          {l.name}
-                        </option>
-                      ))
-                    )}
-                  </select>}
-                  {selectedLanguage && <i className={`text-xs absolute left-3 pointer-events-none ${
+                    busy={loadingLanguages}
+                    disabled={isExecuting || languages.length === 0}
+                    placeholder={loadingLanguages ? 'Loading languages…' : 'No languages available'}
+                    ariaLabel="Programming language"
+                    options={languages.map((language) => ({ value: language.id, label: language.name }))}
+                    buttonClassName="pl-8 pr-3"
+                    leading={selectedLanguage ? <i className={`text-xs ${
                     monacoLang === 'python'
                       ? 'fa-brands fa-python text-blue-500'
                       : monacoLang === 'cpp'
@@ -1416,8 +1405,8 @@ export const ProblemDetails: React.FC = () => {
                       : monacoLang === 'javascript'
                       ? 'fa-brands fa-js text-amber-500'
                       : 'fa-brands fa-java text-orange-500'
-                  }`}></i>}
-                  {selectedLanguage && <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3 pointer-events-none"></i>}
+                  }`} /> : undefined}
+                  />}
                 </div>
               </div>
 

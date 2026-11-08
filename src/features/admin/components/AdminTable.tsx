@@ -34,6 +34,9 @@ export function AdminTable<T>({
   keyExtractor,
   className = '',
 }: AdminTableProps<T>) {
+  const isInitialLoad = loading && data.length === 0;
+  const isRefreshing = loading && data.length > 0;
+
   if (!loading && (!data || data.length === 0)) {
     return (
       <AdminEmptyState
@@ -47,9 +50,14 @@ export function AdminTable<T>({
   return (
     <div
       aria-busy={loading}
-      className={`w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0D1322] shadow-xs font-sans transition-colors ${className}`}
+      className={`relative w-full overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0D1322] shadow-xs font-sans transition-colors ${className}`}
     >
       <RequestStatus pending={loading} label={data.length ? 'Updating records…' : 'Loading records…'} />
+      {isRefreshing && (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-10 h-1 overflow-hidden bg-slate-100/80 dark:bg-slate-800/80">
+          <div className="h-full w-2/5 rounded-full bg-blue-500/80 animate-pulse" />
+        </div>
+      )}
       <div className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
         <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-[640px]">
           <thead>
@@ -67,7 +75,7 @@ export function AdminTable<T>({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/60">
-            {loading ? Array.from({ length: 10 }, (_, row) => (
+            {isInitialLoad ? Array.from({ length: 10 }, (_, row) => (
               <tr key={row} aria-hidden="true">
                 {columns.map((col, index) => <td key={index} className={`px-4 py-3.5 ${col.className || ''}`}><Skeleton className="h-7 w-full" /></td>)}
               </tr>

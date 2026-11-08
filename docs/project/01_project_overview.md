@@ -96,5 +96,5 @@ graph TB
 ### Known Limitations & Deferred Scopes
 - **Full Submission Backend NPE**: On remote backend, `POST /api/v1/submitCode` and `POST /api/v1/admin/submitCode` occasionally trigger an HTTP 500 error due to a backend NPE on `TestCase.getType()`. The frontend gracefully surfaces actionable feedback.
 - **Text Slug Details**: `GET /question/{numericId}` is verified; human-readable slugs are not accepted by the backend controller, so only slug navigation uses the paginated catalog fallback.
-- **Base Profile Mutation**: Direct probes found `/user/profile` unmapped. Identity fields and an existing avatar are read from the authenticated session, while supported bio/gender/date-of-birth/academic updates use `/userInfo/{userId}`. Avatar editing is disabled until a server contract exists.
+- **Base Profile Mutation**: Direct probes found `/user/profile` unmapped. Identity fields are read from the authenticated session. The supplied `/userInfo/{userId}` DTO supports only registration number, joined/passed-out years, college text, and bio; avatar and other personal-profile edits remain disabled until a server contract exists.
 - **Render Backend Cold-Starts**: If the backend host is dormant, initial requests take 30–60 seconds to awaken. The frontend client configures generous 60–120s timeouts and friendly cold-start toast explanations.

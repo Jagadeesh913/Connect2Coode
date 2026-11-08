@@ -1,8 +1,9 @@
 /* eslint-disable react-refresh/only-export-components -- provider and hook share one context module */
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect, useRef } from 'react';
 import { useAppSelector } from '../../app/hooks';
 import { tokenStorage } from '../../core/security/tokenStorage';
 import { userScopedStorage } from '../../core/storage/userScopedStorage';
+import { profileService } from '../../services/profileService';
 
 type Theme = 'dark' | 'light';
 type ThemePreference = Theme | 'system';
@@ -85,12 +86,41 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     : 'guest';
   const [preference, setPreference] = useState<ThemePreference>(loadScopedThemePreference);
   const [theme, setThemeState] = useState<Theme>(() => resolveThemePreference(preference));
+  const themeRequestVersionRef = useRef(0);
+  const themeSaveQueueRef = useRef(Promise.resolve());
+
+  const authenticatedUserId =
+    isAuthenticated && user?.id !== undefined && user?.id !== null && String(user.id).trim()
+      ? user.id
+      : null;
 
   useEffect(() => {
     const nextPreference = loadScopedThemePreference();
     setPreference(nextPreference);
     setThemeState(resolveThemePreference(nextPreference));
   }, [authStatus, isAuthenticated, scopeKey]);
+
+  // The backend is authoritative for an authenticated account's explicit
+  // light/dark setting. Browser storage remains a per-user cache and guest
+  // fallback; it does not replace the server preference.
+  useEffect(() => {
+    if (authenticatedUserId === null) return;
+    const controller = new AbortController();
+    const requestVersion = ++themeRequestVersionRef.current;
+
+    void profileService.getThemePreference(authenticatedUserId, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted || requestVersion !== themeRequestVersionRef.current) return;
+        const nextPreference: Theme = response.data.isDarkTheme ? 'dark' : 'light';
+        userScopedStorage.setItem('theme_pref', nextPreference);
+        setPreference(nextPreference);
+      })
+      // A theme endpoint failure must not log the user out or discard a local
+      // preference. The next authenticated session can retry the server read.
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [authenticatedUserId, scopeKey]);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -115,7 +145,21 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const updateTheme = useCallback((nextPreference: ThemePreference) => {
     userScopedStorage.setItem('theme_pref', nextPreference);
     setPreference(nextPreference);
-  }, []);
+    if (authenticatedUserId === null || nextPreference === 'system') return;
+
+    // A choice made while the initial server read is in flight wins over that
+    // stale read; the queued mutation below will persist this choice.
+    themeRequestVersionRef.current += 1;
+    const isDarkTheme = nextPreference === 'dark';
+    // Serialize mutations so rapid toggles cannot arrive out of order and
+    // leave the persisted server preference opposite to the visible theme.
+    themeSaveQueueRef.current = themeSaveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        await profileService.saveThemePreference(authenticatedUserId, isDarkTheme);
+      })
+      .catch(() => undefined);
+  }, [authenticatedUserId]);
 
   const setTheme = useCallback((nextPreference: ThemePreference) => {
     updateTheme(nextPreference);

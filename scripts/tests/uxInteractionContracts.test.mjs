@@ -11,6 +11,26 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /type=\{type\}/);
   });
 
+  it('uses a branded, keyboard-accessible listbox for the code-editor language selector', async () => {
+    const select = await readSource('src/shared/components/ui/C2CSelect.tsx');
+    const workspace = await readSource('src/features/problems/pages/ProblemDetails.tsx');
+    assert.match(select, /role="listbox"/);
+    assert.match(select, /role="option"/);
+    assert.match(select, /aria-expanded=\{open\}/);
+    assert.match(select, /event\.key === 'ArrowDown'/);
+    assert.match(select, /event\.key === 'Escape'/);
+    assert.match(workspace, /<C2CSelect/);
+    assert.doesNotMatch(workspace, /<select[\s\S]*?id="languageSelect"/);
+  });
+
+  it('treats the authenticated theme API as authoritative without allowing its initial read to overwrite a new toggle', async () => {
+    const themeContext = await readSource('src/shared/context/ThemeContext.tsx');
+    assert.match(themeContext, /profileService\.getThemePreference/);
+    assert.match(themeContext, /profileService\.saveThemePreference/);
+    assert.match(themeContext, /themeRequestVersionRef\.current \+= 1/);
+    assert.match(themeContext, /themeSaveQueueRef\.current/);
+  });
+
   it('pagination can lock every navigation control while its request is pending', async () => {
     const source = await readSource('src/shared/components/ui/Pagination.tsx');
     assert.match(source, /disabled\?: boolean/);
@@ -180,13 +200,26 @@ describe('shared UX interaction contracts', () => {
     assert.doesNotMatch(source, /filteredProblems\.slice/);
   });
 
-  it('clickable admin table rows expose keyboard activation', async () => {
+  it('admin tables use geometry-preserving skeletons initially and a refresh indicator without discarding existing rows', async () => {
     const source = await readSource('src/features/admin/components/AdminTable.tsx');
-    assert.match(source, /\{loading \? Array\.from/);
-    assert.doesNotMatch(source, /loading && data\.length === 0/);
+    assert.match(source, /const isInitialLoad = loading && data\.length === 0/);
+    assert.match(source, /const isRefreshing = loading && data\.length > 0/);
+    assert.match(source, /\{isInitialLoad \? Array\.from/);
+    assert.match(source, /\{isRefreshing && \(/);
+    assert.match(source, /aria-busy=\{loading\}/);
     assert.match(source, /tabIndex=\{onRowClick \? 0 : undefined\}/);
     assert.match(source, /event\.key === 'Enter' \|\| event\.key === ' '/);
     assert.match(source, /focus-visible:ring/);
+  });
+
+  it('auth modal hides the underlying layout boundary and notifications replace stale messages', async () => {
+    const login = await readSource('src/features/auth/pages/Login.tsx');
+    const notifications = await readSource('src/shared/notifications/toast.ts');
+    assert.match(login, /bg-\[#070A13\]\/95 backdrop-blur-md/);
+    assert.match(notifications, /ACTIVE_TOAST_ID = 'c2c-active-notification'/);
+    assert.match(notifications, /MAX_MESSAGE_LENGTH = 140/);
+    assert.equal((notifications.match(/hotToast\.dismiss\(ACTIVE_TOAST_ID\)/g) || []).length, 3);
+    assert.match(notifications, /id: ACTIVE_TOAST_ID/);
   });
 
   it('high-impact mutations use synchronous guards against duplicate submissions', async () => {
@@ -219,11 +252,12 @@ describe('shared UX interaction contracts', () => {
       /profile\?\.(?:institution|collegeName|regNumber|joinedYear|graduationYear|passedOutYear|bio|gender|dob)/
     );
     assert.doesNotMatch(source, /profile\.(?:regNumber|collegeName|institutionId|joinedYear|graduationYear|passedOutYear|bio|dob)/);
-    assert.match(source, /bio: userInfo\?\.bio/);
-    assert.match(source, /gender: userInfo\?\.gender/);
-    assert.match(source, /dob: userInfo\?\.dob/);
-    assert.match(source, /fullName,\s*firstName: profile\?\.firstName \|\| authUser\?\.firstName,\s*email,/);
-    assert.match(source, /defaultCollege=\{userInfo\?\.college \|\| userInfo\?\.collegeName \|\| ''\}/);
+    assert.match(source, /bio: \(data\.bio \|\| ''\)\.trim\(\)/);
+    assert.doesNotMatch(source, /userInfo\?\.(?:gender|dob|collegeId|collegeName)/);
+    assert.doesNotMatch(source, /EditPersonalInfoModal/);
+    assert.match(source, /const fullName\s*=/);
+    assert.match(source, /authUser\?\.fullName/);
+    assert.match(source, /defaultCollege=\{userInfo\?\.college \|\| ''\}/);
     assert.match(source, /Account Security/);
     assert.match(source, /generatePasswordResetOtpThunk/);
     assert.match(source, /saveUserInfoThunk/);
@@ -321,7 +355,8 @@ describe('shared UX interaction contracts', () => {
     assert.match(appLayout, /className=\{isAdminRoute \? 'contents' : 'c2c-protected-surface contents'\}/);
     assert.match(appLayout, /document\.exitFullscreen/);
     assert.doesNotMatch(appLayout, /c2c-security-watermark/);
-    assert.match(appLayout, /Assessment content protected/);
+    assert.doesNotMatch(appLayout, /Assessment content protected/);
+    assert.match(appLayout, /obscureOnFocusLoss: false/);
     assert.match(appLayout, /Enter secure mode/);
     assert.match(globalStyles, /\.c2c-protected-surface::before/);
     assert.doesNotMatch(globalStyles, /body > \*/);

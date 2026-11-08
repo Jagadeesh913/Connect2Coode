@@ -85,7 +85,7 @@ All HTTP communication MUST go through `apiClient` in [`src/core/api/apiClient.t
 - **Enforcement**: [`scripts/verify-architecture.mjs`](../../scripts/verify-architecture.mjs) scans all files in `src/` and fails CI if direct `axios` or `fetch()` calls exist.
 
 ### B. Path Aliasing
-Use `@/` to import from `src/` where appropriate, configured in `vite.config.ts`:
+Use `@/` to import from `src/` where appropriate, configured in both `vite.config.ts` and `tsconfig.json` so Vite and TypeScript resolve the same source paths:
 ```ts
 resolve: {
   alias: {

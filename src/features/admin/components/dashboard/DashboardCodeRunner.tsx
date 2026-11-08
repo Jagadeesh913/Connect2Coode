@@ -9,7 +9,7 @@ import { AdminBadge } from '../AdminBadge';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
-import { toast } from 'react-hot-toast';
+import { toast } from '@/shared/notifications/toast';
 import {
   Play,
   Send,
@@ -438,13 +438,12 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         });
         selectQuestionId(list[0].id);
         setManualQuestionId(String(list[0].id));
-        toast.success(`Found ${list.length} question(s) matching "${searchFilter}"`);
       } else {
         toast.error(`No questions found matching "${searchFilter}"`);
       }
-    } catch (err: any) {
+    } catch {
       if (generation !== pageGenerationRef.current) return;
-      toast.error('Search failed: ' + (err?.message || 'Server error'));
+      toast.error('Could not search problems. Try again.');
     } finally {
       if (generation === pageGenerationRef.current) {
         setIsSearchingBackend(false);
@@ -509,7 +508,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
           };
           setQuestions((prev) => [...prev, newOpt].sort((a, b) => a.id - b.id));
           selectQuestionId(num);
-          toast.success(`Loaded Question #${num}: ${qData.title}`);
         } else {
           toast.error(`Question #${num} not found`);
         }
@@ -529,7 +527,6 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     );
     setSourceCode(starter);
     setCodeDrafts((prev) => ({ ...prev, [key]: starter }));
-    toast.success('Code editor reset to boilerplate template.');
   };
 
   const executionRequest = useExecutionRequest('dashboard');

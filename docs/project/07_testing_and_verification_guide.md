@@ -36,7 +36,7 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic profile contracts, requested-user identity repair, business-only service payloads, and all-page company loading. | 15 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
 | [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, responsive toast placement, and deployment-header contracts. | 24 |
-| **Current declared total** | **All 25 test files** | **393 tests; latest full run passed (393/393).** |
+| **Current declared total** | **All 25 test files** | **399 tests; latest full run passed (399/399).** |
 
 ---
 
