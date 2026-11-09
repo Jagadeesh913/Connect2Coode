@@ -10,6 +10,7 @@ import { AdminRoute } from '../core/guards/AdminRoute';
 import { AdminLayout } from '../features/admin/components/AdminLayout';
 import { PageLoading } from '../shared/components/ui/PageLoading';
 import { AuthenticatedFeatureGate } from '../features/auth/components/AuthenticatedFeatureGate';
+import { RouteErrorBoundary } from '../shared/components/errors/RouteErrorBoundary';
 
 // Static imports for Auth (already shared via MainLayout)
 import { Login } from '../features/auth/pages/Login';
@@ -178,6 +179,7 @@ const appRoutes = [
 export const router = createBrowserRouter([
   {
     element: <AppRouterLayout />,
+    errorElement: <RouteErrorBoundary />,
     children: appRoutes,
   },
 ]);

@@ -8,6 +8,11 @@ Phase 1 covers the frontend API-contract and production-readiness audit started 
 
 Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED`, `PARTIALLY VERIFIED`, `INFERRED`, `UNKNOWN`, and `NOT WORKING`.
 
+## Company API/logo follow-up (2026-11-09)
+
+- `POST /company/list` is verified with the paginated envelope and exact company fields `id`, `name`, `logo`, `website`, and `isActive`; user and admin logo surfaces use the validated API `logo` before fallback art.
+- `/admin/companies` is a frontend route, not a verified backend endpoint. The active mutation target is `POST /admin/company`, while historical `POST /company` evidence conflicts; fresh authenticated admin evidence is still required before changing that endpoint.
+
 ## 2. Original checkpoint checklist
 
 | ID | Original item | Current disposition | Status |
@@ -19,7 +24,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | M-03 | Remove hard-coded question totals, offset stitching, tail probes, and per-record fan-out after addressing the backend defect | Frontend workaround was removed. One requested page now produces one API request and real failures remain failures. The backend pagination/data defect is still an external release blocker. | `PARTIALLY VERIFIED` |
 | M-04 | Do not fabricate server bookmark timestamps | Server records omit timestamps the API did not return. | `PARTIALLY VERIFIED` |
 | L-01 | Do not label configured auth/RBAC as live-validated system health | Misleading labels and invented fallback role were removed. | `PARTIALLY VERIFIED` |
-| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | Fresh final-tree execution passed 393/393 tests, TypeScript, oxlint, Vite production build, architecture verification, documentation integrity, and `git diff --check`. Browser/password-manager/IME acceptance remains a separate manual gate. | `RUNTIME-VERIFIED` |
+| Gate | Tests, typecheck, lint, build, architecture and docs checks pass after all changes | Fresh final-tree execution passed 402/402 tests, TypeScript, oxlint, Vite production build, architecture verification, documentation integrity, and `git diff --check`. Browser/password-manager/IME acceptance remains a separate manual gate. | `RUNTIME-VERIFIED` |
 | Gate | No existing behavior is broken and final remediation report exists | Requires runtime journeys and external acceptance checks below. | `UNKNOWN` |
 
 ## 3. Deep-audit remediation checklist
@@ -58,6 +63,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | P1-04 | Bookmark synchronization scope is explicit | Problem bookmarks are server-owned. COMPANY/APTITUDE bookmarks remain user-scoped local data because no API contract exists. Cross-device sync requires backend endpoints and is not claimed. | `PARTIALLY VERIFIED` |
 | P1-05 | Company questions are not capped at 50 | Service follows every reported page and deduplicates by question ID. | `PARTIALLY VERIFIED` |
 | P1-06 | Company catalog and slug lookup are not capped at 100 | Full-catalog callers use all reported pages; dashboard count uses a one-row metadata request. | `PARTIALLY VERIFIED` |
+| P1-07 | API-backed coding-question listings do not drift visually or behaviorally | Practice is the source-of-truth `CodingQuestionTable`; Company Prep, learner DSA Sheet, and admin company questions adapt verified DTOs into that component. MCQ flows remain purpose-built, and static roadmap content is explicitly not represented as API-driven. Deployed browser acceptance remains required. | `PARTIALLY VERIFIED` |
 | P2-06 / P2-07 | Question page metadata accepts the observed `pageNumber` / `pageSize` contract | Shared question-page boundary accepts observed fields or Spring aliases, requires authoritative totals/page identity, and rejects missing metadata instead of synthesizing it. | `PARTIALLY VERIFIED` |
 | DATA-01 | Profile renders and saves only contract-supported user-info fields | Legacy college ID/name, gender, date-of-birth, avatar, and personal-edit paths were removed; exact DTO mapping and payload tests cover the frontend boundary. | `PARTIALLY VERIFIED` |
 | DATA-02 | Removing a company from an existing question persists | Current backend save behavior inserts associations and rejects duplicates; no verified removal contract exists. The UI must not claim this mutation is supported until backend replace/remove semantics are supplied. | `NOT WORKING` |
@@ -91,7 +97,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | J-05 | Run and submit code | Accepted, wrong answer, compile error, runtime error, timeout, custom input, and hidden-case response. | `UNKNOWN` |
 | J-06 | Admin questions and test cases | Create/edit, visible/hidden cases, company add/remove, and mutation refresh. | `UNKNOWN` |
 | J-07 | Admin companies/exams/roles/sections | CRUD and relationship updates with USER/ADMIN authorization checks. | `UNKNOWN` |
-| J-08 | DSA sheet admin and learner hierarchy | Frontend supports section/subsection authoring, recursive learner navigation, direct questions at each level, mapping-ID removal, cache ownership, and isolated hierarchy failure. Production subsection GET deployment, section 4 repair, and live authenticated mutations remain required. | `NOT WORKING` |
+| J-08 | DSA sheet admin and learner workflow | Frontend follows the supplied three-level API contract: documented sheet detail, sections, and section-question reads; POST create/update with mapping IDs; mapping-ID removal; and Redux cache ownership. Live authenticated reads/mutations and backend inactive/relationship/ADMIN enforcement remain required. | `PARTIALLY VERIFIED` |
 | J-11 | Practice platform filtering | QPF reference data exists for display/authoring, but no verified `/questions` request field filters it. The old undocumented payload behavior is intentionally not restored because it could show unfiltered server pages under a selected platform. | `NOT WORKING` |
 | J-09 | Responsive and accessibility pass | Dialog focus/Escape/scroll behavior, reduced-motion controls, and admin label/group associations are implemented. Keyboard, screen-reader, and responsive browser acceptance remains pending. | `PARTIALLY VERIFIED` |
 | J-10 | Public UI claims and navigation are truthful | Fake newsletter success, mismatched footer resources, simulated execution, unmeasured totals, and unverified testimonial claims were removed/reworded. Approved legal pages/content are still absent. | `PARTIALLY VERIFIED` |

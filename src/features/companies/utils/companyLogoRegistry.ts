@@ -6,8 +6,8 @@ import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
  * Sources reference: WorldVectorLogo (https://worldvectorlogo.com/)
  * 
  * Architectural Guarantees:
- * 1. ZERO dependency on backend logo URLs (completely ignores backend logoUrl / logo_url).
- * 2. All assets served locally from `/companies/` through frontend hosting (optimized for 2,000+ concurrent users).
+ * 1. Validated API `logo` URLs are preferred; unsafe values never become image sources.
+ * 2. Bundled assets and vetted domain-derived sources provide resilient fallback.
  * 3. Exact aspect-ratio preservation with object-fit: contain.
  * 4. Deterministic initial/monogram fallback with accessible brand palettes.
  * 5. High-speed O(1) canonical alias resolution for all Indian and global enterprise recruiters.
@@ -746,20 +746,24 @@ export function extractCompanyDomain(website: string | undefined | null): string
 
 export interface CompanyLogoCandidate {
   src: string;
-  source: 'local' | 'brandfetch' | 'official-favicon' | 'simple-icons';
+  source: 'api' | 'local' | 'brandfetch' | 'official-favicon' | 'simple-icons';
 }
 
 /**
- * Builds a deterministic, deduplicated logo cascade. Arbitrary backend logo
- * URLs are intentionally excluded; remote candidates use a validated company
- * domain or a fixed, reviewed brand CDN.
+ * Builds a deterministic, deduplicated logo cascade. A backend-provided logo
+ * is preferred only after it passes the shared HTTPS/public-host boundary;
+ * local and domain-derived candidates remain resilient fallbacks.
  */
 export function getCompanyLogoCandidates(
   name: string | undefined | null,
   website: string | undefined | null,
-  brandfetchClientId?: string | null
+  brandfetchClientId?: string | null,
+  backendLogo?: string | null
 ): CompanyLogoCandidate[] {
   const candidates: CompanyLogoCandidate[] = [];
+  const safeBackendLogo = getSafeRemoteImageUrl(backendLogo);
+  if (safeBackendLogo) candidates.push({ src: safeBackendLogo, source: 'api' });
+
   const local = resolveCompanyLogo(name);
   if (local) candidates.push({ src: local.assetPath, source: 'local' });
 

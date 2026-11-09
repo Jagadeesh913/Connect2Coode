@@ -29,7 +29,18 @@ describe('reference library management contract', () => {
     assert.match(service, /Number\.isFinite\(item\.id\)/);
     assert.match(service, /normalizeGroupCode\(item\.refGroupCode\) === expectedGroupCode/);
     assert.match(service, /typeof item\.isActive === 'boolean'/);
+    assert.match(service, /item\.logoUrl === undefined \|\| item\.logoUrl === null \|\| typeof item\.logoUrl === 'string'/);
     assert.match(service, /response\.data\.some\(\(item\) => !isReferenceItem\(item, normalizedGroupCode\)\)/);
+  });
+
+  it('preserves API-owned QPF logo metadata for the shared coding-question list', async () => {
+    const types = read('src/core/types/domain.ts');
+    const table = read('src/features/problems/components/CodingQuestionTable.tsx');
+    assert.match(types, /logoUrl\?: string \| null/);
+    assert.match(table, /useReferenceGroup\('QPF'\)/);
+    assert.match(table, /getSafeRemoteImageUrl\(logoUrl\)/);
+    assert.match(table, /platform\.logoUrl/);
+    assert.doesNotMatch(table, /<span className="truncate max-w-\[130px\]">\{label\}<\/span>/);
   });
 
   it('keeps reads shared while isolating mutations in an admin service', () => {

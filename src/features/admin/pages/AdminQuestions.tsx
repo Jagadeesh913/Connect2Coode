@@ -814,10 +814,10 @@ export const AdminQuestions: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && questions.length === 0 && <AdminErrorState message={error} onRetry={fetchQuestions} />}
+      {!loading && error && questions.length === 0 && <AdminErrorState message={error} onRetry={fetchQuestions} />}
 
       {/* Questions Table */}
-      {(!error || questions.length > 0) && (
+      {(!error || questions.length > 0 || loading) && (
         <div className="space-y-4">
           <AdminTable<QuestionPayload>
             columns={columns}

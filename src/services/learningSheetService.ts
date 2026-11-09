@@ -71,25 +71,24 @@ export const learningSheetService = {
     return requireArray(response.data, isSheet, 'learning sheets');
   },
 
+  async getSheet(sheetId: number, signal?: AbortSignal): Promise<DsaSheet> {
+    assertId(sheetId, 'Sheet ID');
+    const response: ApiResponse<unknown> = await apiClient.get(
+      API_ENDPOINTS.LEARNING_SHEET.DETAILS(sheetId),
+      { signal }
+    );
+    if (!isSheet(response.data) || response.data.id !== sheetId) {
+      throw new Error('Unexpected learning sheet response format');
+    }
+    return response.data;
+  },
+
   async getSections(sheetId: number, signal?: AbortSignal): Promise<DsaSheetSection[]> {
     assertId(sheetId, 'Sheet ID');
     const response: ApiResponse<unknown> = await apiClient.get(API_ENDPOINTS.LEARNING_SHEET.SECTIONS(sheetId), { signal });
     return requireArray(response.data, isSection, 'learning sheet sections')
-      .filter((section) => section.parentSectionId === null)
+      .filter((section) => section.sheetId === sheetId)
       .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
-  },
-
-  async getSubsections(sectionId: number, signal?: AbortSignal): Promise<DsaSheetSection[]> {
-    assertId(sectionId, 'Section ID');
-    const response: ApiResponse<unknown> = await apiClient.get(
-      API_ENDPOINTS.LEARNING_SHEET.SUBSECTIONS(sectionId),
-      { signal }
-    );
-    const subsections = requireArray(response.data, isSection, 'learning sheet subsections');
-    if (subsections.some((section) => section.parentSectionId !== sectionId)) {
-      throw new Error('Unexpected learning sheet subsections response format');
-    }
-    return subsections.sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
   },
 
   async getSectionQuestions(sectionId: number, signal?: AbortSignal): Promise<DsaSheetQuestionLink[]> {
@@ -98,7 +97,11 @@ export const learningSheetService = {
       API_ENDPOINTS.LEARNING_SHEET.SECTION_QUESTIONS(sectionId),
       { signal }
     );
-    return requireArray(response.data, isQuestionLink, 'learning sheet questions')
+    const links = requireArray(response.data, isQuestionLink, 'learning sheet questions');
+    if (links.some((link) => link.sectionId !== null && link.sectionId !== sectionId)) {
+      throw new Error('Unexpected learning sheet questions response format');
+    }
+    return links
       .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);
   },
 };

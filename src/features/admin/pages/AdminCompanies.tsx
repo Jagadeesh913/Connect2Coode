@@ -362,10 +362,10 @@ export const AdminCompanies: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && companies.length === 0 && <AdminErrorState message={error} onRetry={fetchCompanies} />}
+      {!loading && error && companies.length === 0 && <AdminErrorState message={error} onRetry={fetchCompanies} />}
 
       {/* Main Content: Table or Grid */}
-      {(!error || companies.length > 0) && viewMode === 'table' && (
+      {(!error || companies.length > 0 || loading) && viewMode === 'table' && (
         <AdminTable<CompanyItem>
           columns={columns}
           data={companies}
@@ -386,7 +386,7 @@ export const AdminCompanies: React.FC = () => {
         />
       )}
 
-      {(!error || companies.length > 0) && viewMode === 'grid' && (
+      {(!error || companies.length > 0 || loading) && viewMode === 'grid' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading && companies.length === 0 ? (
             Array.from({ length: 6 }, (_, index) => (

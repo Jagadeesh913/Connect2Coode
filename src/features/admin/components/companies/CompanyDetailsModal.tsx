@@ -5,6 +5,7 @@ import { AdminBadge } from '../AdminBadge';
 import { CompanyItem, adminCompanyService } from '../../../../services/admin/adminCompanyService';
 import { companyService } from '../../../../services/companyService';
 import { CompanyBrandLogo } from '../../../companies/components/CompanyBrandLogo';
+import { CodingQuestionTable } from '../../../problems/components/CodingQuestionTable';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import {
   CompanyExamFormModal,
@@ -27,6 +28,7 @@ import type {
 import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../../core/validation';
 import { getSafeExternalUrl } from '../../../../core/security/externalUrl';
+import type { Problem } from '../../../../core/types/domain';
 import {
   Building2,
   ExternalLink,
@@ -74,7 +76,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   };
 
   // Tagged DSA Questions State
-  const [problems, setProblems] = useState<any[]>([]);
+  const [problems, setProblems] = useState<Problem[]>([]);
   const [problemsLoading, setProblemsLoading] = useState<boolean>(false);
 
   // Recruitment Exams State
@@ -505,46 +507,17 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
                       <Code2 className="w-3.5 h-3.5 text-blue-600" />
                       <span>Tagged DSA Questions ({problems.length})</span>
                     </div>
-                    <RequestStatus error={problemsError} onRetry={fetchProblems} />
                   </div>
 
-                  {problemsLoading ? (
-                    <div role="status" aria-label="Loading tagged questions" className="space-y-2">
-                      <Skeleton className="h-12 w-full rounded-xl" count={3} />
-                    </div>
-                  ) : problems.length === 0 && !problemsError ? (
-                    <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl text-slate-500 italic text-xs text-center">
-                      No DSA questions currently tagged to this company.
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2 max-h-60 overflow-y-auto pr-1">
-                      {problems.map((p: any, idx: number) => (
-                        <div
-                          key={p.id || idx}
-                          className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl flex items-center justify-between text-xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors"
-                        >
-                          <div className="flex items-center gap-2 font-sans min-w-0">
-                            <span className="font-mono text-slate-400 text-[11px] shrink-0">#{p.id}</span>
-                            <span className="font-bold text-slate-800 dark:text-slate-200 truncate">
-                              {p.title}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {p.difficultyName || p.difficulty ? (
-                              <AdminBadge variant="neutral" size="sm">
-                                {p.difficultyName || p.difficulty}
-                              </AdminBadge>
-                            ) : null}
-                            {p.topicName || p.topic ? (
-                              <AdminBadge variant="primary" size="sm">
-                                {p.topicName || p.topic}
-                              </AdminBadge>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <CodingQuestionTable
+                    questions={problems}
+                    companies={company ? [company] : []}
+                    loading={problemsLoading}
+                    error={problemsError}
+                    onRetry={() => void fetchProblems()}
+                    emptyTitle="No tagged coding questions"
+                    emptyDescription="No coding questions are currently tagged to this company."
+                  />
                 </div>
               </div>
             )}

@@ -766,10 +766,10 @@ export const AdminMcqs: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && mcqs.length === 0 && <AdminErrorState message={error} onRetry={fetchMcqs} />}
+      {!loading && error && mcqs.length === 0 && <AdminErrorState message={error} onRetry={fetchMcqs} />}
 
       {/* MCQs Table */}
-      {(!error || mcqs.length > 0) && (
+      {(!error || mcqs.length > 0 || loading) && (
         <div className="space-y-4">
           <AdminTable<McqQuestion>
             columns={columns}

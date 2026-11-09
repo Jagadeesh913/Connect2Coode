@@ -132,10 +132,11 @@ Historically, the client sent `jwtToken` in mutating request bodies in addition 
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/company/list` | `POST` | `USER_OR_ADMIN` | Service payload: `{ pageNumber, pageSize, sortBy, sortDirection }` with bearer authentication. The response page uses `content`, `pageNumber`, `pageSize`, `totalElements`, `totalPages`, `first`, and `last`. Captured records contain `id`, `name`, `logo`, `website`, and `isActive`. Live 2026-11-03 probes confirmed pagination and also confirmed that `searchText`, `search`, `query`, `name`, and `companyName` are silently ignored; they must not be exposed as server filters. |
+| `/company` | `GET` | `USER_OR_ADMIN` | Historical direct-probe evidence records an unpaginated `data: Company[]` read with `id`, `name`, `logo`, `website`, and `isActive`. The active UI uses the newer paginated `/company/list` contract; do not substitute this route without fresh endpoint evidence. |
 | `/company/{id}` | `GET` | `USER_OR_ADMIN` | Company details by numeric ID; captured records contain `id`, `name`, `logo`, `website`, and `isActive`. |
 | `/company/{companyId}/exams/list` | `POST` | `USER_OR_ADMIN` | Services send pagination/sort business fields with bearer authentication. |
 | `/company/exams/{examId}` | `GET` | `USER_OR_ADMIN` | Detailed exam blueprint (exam info, recruitment roles, exam sections). |
-| `/admin/company` | `POST` | `ADMIN_ONLY` | Creates or updates company record. |
+| `/admin/company` | `POST` | `ADMIN_ONLY` | Current frontend create/update target. It sends `{ id: number|null, name, website, logo, description, isActive }`; its live write contract remains `PARTIALLY VERIFIED`. `/admin/companies` is the admin UI route, not a verified REST endpoint. Historical `POST /company` evidence conflicts with this target and requires fresh admin evidence before any endpoint change. |
 | `/admin/companyRole` | `POST` | `ADMIN_ONLY` | Creates or updates recruitment role (`roleName`, `roleCode`, `salary`). |
 | `/admin/examSection` | `POST` | `ADMIN_ONLY` | Creates or updates an exam section / round. `sectionTypeId` and optional `questionTypeId` must be selected from `EXAM SECTION TYPE` and `QUESTION TYPE`; no legacy numeric fallback is permitted. |
 | `/admin/companyExam` | `POST` | `ADMIN_ONLY` | Creates or updates company exam schedule (`examName`, `year`, `totalDurationMinutes`). |
@@ -157,11 +158,11 @@ The backend names this resource `learningSheet`; the product UI intentionally pr
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
 | `/user/learningSheets` | `GET` | `USER_OR_ADMIN` | Lists sheets with `id`, `sheetCode`, `sheetName`, `description`, and `isActive`. |
-| `/user/learningSheets/{sheetId}/sections` | `GET` | `USER_OR_ADMIN` | Returns top-level sections. The client retains only `parentSectionId: null` and orders by `displayOrder`, then `id`. |
-| `/user/learningSheet/section/{sectionId}/subsections` | `GET` | `USER_OR_ADMIN` | **Proposed/unconfirmed backend addition.** Expected to return immediate children ordered by `displayOrder`. The client validates every returned `parentSectionId` against the requested section and isolates endpoint failure from direct section-question rendering. |
+| `/user/learningSheets/{sheetId}` | `GET` | `USER_OR_ADMIN` | Returns the selected sheet for the admin edit form. The returned `id` must match the requested path ID. |
+| `/user/learningSheets/{sheetId}/sections` | `GET` | `USER_OR_ADMIN` | Returns the sections supplied for one sheet, ordered by `displayOrder`, then `id`. The client validates `sheetId` and never requests an undocumented child-section endpoint. |
 | `/user/learningSheet/section/{sectionId}/questions` | `GET` | `USER_OR_ADMIN` | Returns question-link records ordered by `displayOrder`. The deletion identifier is the outer link `id`; problem navigation uses `question.id`. |
-| `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Saves a sheet. Create omits `id`; edit sends `{ id, sheetCode, sheetName, description, isActive }`. |
-| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a section or subsection. Create omits `id`; edit sends `id`; both send `{ sheetId, parentSectionId, sectionName, displayOrder, isActive }`, where `parentSectionId: null` is top-level. |
+| `/admin/learningSheet` | `POST` | `ADMIN_ONLY` | Saves a sheet. Create sends `id: null`; edit sends the existing `id`, with `{ sheetCode, sheetName, description, isActive }`. |
+| `/admin/learningSheet/section` | `POST` | `ADMIN_ONLY` | Saves a section or nested section. Create sends `id: null`; edit sends the existing `id`, with `{ sheetId, parentSectionId, sectionName, displayOrder, isActive }`, where `parentSectionId: null` is top-level. |
 | `/admin/learningSheet/section/{sectionId}` | `DELETE` | `ADMIN_ONLY` | Deletes a section with bearer authentication and no invented credential body. |
 | `/admin/learningSheet/question` | `POST` | `ADMIN_ONLY` | Saves a problem association: create sends `id: null`; edit sends the outer association `id`, plus `{ sectionId, question: { id }, displayOrder, isActive }`. |
 | `/admin/learningSheet/section/{sectionId}/question/{linkId}` | `DELETE` | `ADMIN_ONLY` | Removes a section-question association without deleting the problem. The second path value is the association/link ID returned as the outer record `id`. |
@@ -237,7 +238,7 @@ Problem bookmarks are server-owned. `bookmarkSlice` hydrates only `questionId`, 
 ### H. Compiler Languages & Taxonomy ([`src/services/referenceService.ts`](../../src/services/referenceService.ts), [`src/services/admin/adminReferenceService.ts`](../../src/services/admin/adminReferenceService.ts), [`src/services/admin/adminLanguageService.ts`](../../src/services/admin/adminLanguageService.ts))
 | Endpoint | Method | Access | Description / Payload |
 | :--- | :---: | :--- | :--- |
-| `/referenceLibrary/refGroupCode/{groupCode}` | `GET` | `USER_OR_ADMIN` | Returns API-owned taxonomy terms. Current callers request `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, subject-specific topic groups, `GENDER`, `LANG`, and `TESTCASETYPE`. |
+| `/referenceLibrary/refGroupCode/{groupCode}` | `GET` | `USER_OR_ADMIN` | Returns API-owned taxonomy terms. Current callers request `DIFF`, `TOPIC`, `QPF`, `SUBJECT`, subject-specific topic groups, `GENDER`, `LANG`, and `TESTCASETYPE`. QPF items may include an optional `logoUrl`; `CodingQuestionTable` displays only a final-boundary HTTPS/public-safe logo and otherwise preserves an accessible platform-icon fallback. |
 | `/referenceLibrary/refGroupCode/list` | `GET` | `USER_OR_ADMIN` | Returns all reference group codes as strings. The authenticated 2026-11-01 response contained 15 codes; clients consume the returned list rather than hardcoding its length or membership. |
 | `/referenceLibrary` | `POST` | `ADMIN_ONLY` | Creates when no `id` is present using `{ refGroupCode, refGroupName, refCode, refName, isActive }`; updates when `id` is present using `{ id, refGroupCode, refCode, refName, isActive }`. Authentication is bearer-header only. A group is created by saving its first record. |
 | `/referenceLibrary/refGroupCode/{groupCode}/refCode/{refCode}` | `DELETE` | `ADMIN_ONLY` | Irreversible hard delete. The admin UI requires an explicit confirmation and URL-encodes both path segments. |

@@ -4,6 +4,8 @@
 
 All routing is defined in [`src/routes/appRoutes.tsx`](../../src/routes/appRoutes.tsx) using React Router v7 `createBrowserRouter`.
 
+The root router defines a themed [`RouteErrorBoundary`](../../src/shared/components/errors/RouteErrorBoundary.tsx) as its `errorElement`. A route-render, loader, or route-match error therefore shows a project-themed recovery screen with retry and home actions, never React Router's development-style “Unexpected Application Error” page or raw error details.
+
 ```mermaid
 graph TD
     Root["/"] --> Landing["Landing Page"]

@@ -133,8 +133,8 @@ sequenceDiagram
    - `<ProgressHydrator />` (hydrates solved/attempted problem IDs per user scope)
    - `<ThemeProvider>` (light/dark class on `<html>`)
    - `<Toaster>` (react-hot-toast with custom glassmorphism styles)
-   - `<AppErrorBoundary>` (catches runtime rendering crashes)
-   - `<RouterProvider router={router} />` (React Router v7)
+   - `<AppErrorBoundary>` (catches runtime rendering crashes outside router-managed routes)
+   - `<RouterProvider router={router} />` (React Router v7). The root router also owns a themed `errorElement` (`RouteErrorBoundary`) because React Router handles route-render failures before a conventional application boundary can receive them.
 
 `AppRouterLayout` mounts [`RouteMetadata`](../../src/core/metadata/RouteMetadata.tsx) around every route. [`pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts) owns the route defaults and canonical policy; dynamic problem, company, and company-exam pages use [`usePageMetadata`](../../src/core/metadata/usePageMetadata.ts) only after the loaded entity matches the current route. The override is keyed to React Router's navigation key so metadata from a previous detail page cannot survive client-side navigation.
 
@@ -148,10 +148,11 @@ sequenceDiagram
 2. **Component Structure**:
    - Keep components focused and modular.
    - Separate complex data-fetching or modal logic into subcomponents (e.g. `src/features/admin/components/`).
+   - `CodingQuestionTable` in `src/features/problems/components/` is the single renderer for API-backed coding-question listings. Practice, Company Prep, the learner DSA Sheet, and the admin company-question view supply their own verified DTOs and callbacks; MCQ answer flows and editorial roadmap content are deliberately not coerced into this coding-question contract.
 3. **Icons & UI Assets**:
    - Use `lucide-react` for standard UI iconography.
    - Use `<BrandLogo />` for all Connect2Code branding.
-   - Use `<CompanyBrandLogo />` for recruiter logos. It serves known brands from `public/companies/` and owns the reviewed dynamic fallback cascade; feature components must not render backend logo URLs directly.
+   - Use `<CompanyBrandLogo />` for recruiter logos. It validates and renders the documented API `logo` field centrally, then owns bundled/domain-derived fallback candidates; feature components must not render backend logo URLs directly.
 4. **Form Management**:
    - Use `react-hook-form` with `@hookform/resolvers/zod`.
    - Pass validation schemas from `src/core/validation/`.

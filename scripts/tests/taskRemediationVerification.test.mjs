@@ -304,7 +304,7 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.doesNotMatch(companyDetailsSource, /sectionTotals\.coding \?\? questionTotal/);
     assert.match(companyDetailsSource, /itemLabel="exams"/);
     assert.match(companyDetailsSource, /itemLabel="questions"/);
-    assert.match(companyDetailsSource, /codingError \? \([\s\S]*?<td colSpan=\{6\}><RequestStatus error=\{codingError\}/);
+    assert.match(companyDetailsSource, /<CodingQuestionTable[\s\S]*?error=\{codingError\}/);
 
     // Auth slice & OAuth callback check
     assert.match(authSliceSource, /return await executeRefreshToken\(\)/);

@@ -35,7 +35,6 @@ const {
   fetchDsaSheets,
   fetchDsaSections,
   fetchSectionQuestions,
-  fetchDsaSubsections,
   toggleSubsection,
 } = dsaSheetSliceModule;
 
@@ -49,7 +48,6 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
     assert.deepEqual(state.sections, []);
     assert.deepEqual(state.sectionsBySheetId, {});
     assert.deepEqual(state.questionsBySection, {});
-    assert.deepEqual(state.subsectionsBySection, {});
     assert.equal(state.expandedSectionId, null);
     assert.equal(state.loadingSheets, true);
     assert.equal(state.loadingSections, false);
@@ -57,7 +55,6 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
     assert.equal(state.sheetError, null);
     assert.equal(state.sectionsError, null);
     assert.deepEqual(state.questionErrors, {});
-    assert.deepEqual(state.subsectionErrors, {});
   });
 
   describe('fetchDsaSheets extraReducers', () => {
@@ -120,7 +117,7 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
   describe('selectSheet and toggleSection actions', () => {
     it('switches selectedSheetId and restores cached sections without re-triggering loading', () => {
       const cachedSections = [
-        { id: 201, sheetId: 102, sectionName: 'Arrays & Hashing', orderIndex: 1, isActive: true },
+        { id: 201, sheetId: 102, parentSectionId: null, sectionName: 'Arrays & Hashing', displayOrder: 1, isActive: true },
       ];
       const state0 = {
         ...getInitialState(),
@@ -163,8 +160,8 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
       };
 
       const mockSections = [
-        { id: 401, sheetId: 101, sectionName: 'Arrays', orderIndex: 1, isActive: true },
-        { id: 402, sheetId: 101, sectionName: 'Linked List', orderIndex: 2, isActive: true },
+        { id: 401, sheetId: 101, parentSectionId: null, sectionName: 'Arrays', displayOrder: 1, isActive: true },
+        { id: 402, sheetId: 101, parentSectionId: null, sectionName: 'Linked List', displayOrder: 2, isActive: true },
       ];
 
       const state1 = dsaSheetReducer(state0, {
@@ -253,24 +250,7 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
     });
   });
 
-  describe('subsection hierarchy', () => {
-    it('caches active children under their exact parent and owns loading by request ID', () => {
-      let state = dsaSheetReducer(getInitialState(), {
-        type: fetchDsaSubsections.pending.type,
-        meta: { requestId: 'sub-1', arg: { sectionId: 401 } },
-      });
-      assert.equal(state.loadingSubsectionIds[401], true);
-      const children = [{ id: 402, sheetId: 101, parentSectionId: 401, sectionName: 'Prefix Sum', displayOrder: 1, isActive: true }];
-      state = dsaSheetReducer(state, {
-        type: fetchDsaSubsections.fulfilled.type,
-        meta: { requestId: 'sub-1', arg: { sectionId: 401 } },
-        payload: { sectionId: 401, subsections: children },
-      });
-      assert.deepEqual(state.subsectionsBySection[401], children);
-      assert.equal(state.loadingSubsectionIds[401], undefined);
-      assert.notEqual(state.subsectionsFetchedAt[401], undefined);
-    });
-
+  describe('nested-section UI state', () => {
     it('tracks independently expanded nested sections', () => {
       let state = dsaSheetReducer(getInitialState(), toggleSubsection(402));
       state = dsaSheetReducer(state, toggleSubsection(403));
@@ -279,21 +259,6 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
       assert.deepEqual(state.expandedSubsectionIds, [403]);
     });
 
-    it('isolates subsection endpoint failure from direct question data', () => {
-      const questions = [{ id: 1, question: { id: 9 }, sectionId: 401 }];
-      let state = { ...getInitialState(), questionsBySection: { 401: questions } };
-      state = dsaSheetReducer(state, {
-        type: fetchDsaSubsections.pending.type,
-        meta: { requestId: 'sub-error', arg: { sectionId: 401 } },
-      });
-      state = dsaSheetReducer(state, {
-        type: fetchDsaSubsections.rejected.type,
-        meta: { requestId: 'sub-error', arg: { sectionId: 401 } },
-        payload: { sectionId: 401, message: 'Endpoint not deployed.' },
-      });
-      assert.equal(state.subsectionErrors[401], 'Endpoint not deployed.');
-      assert.deepEqual(state.questionsBySection[401], questions);
-    });
   });
 
   describe('cache invalidation and error reset', () => {
@@ -303,14 +268,12 @@ describe('dsaSheetSlice: Redux Toolkit Architecture & State Management', () => {
         sheetsFetchedAt: 12345,
         sectionsFetchedAt: { 101: 12345 },
         questionsFetchedAt: { 401: 12345 },
-        subsectionsFetchedAt: { 401: 12345 },
       };
 
       const state1 = dsaSheetReducer(state0, invalidateDsaSheetCache());
       assert.equal(state1.sheetsFetchedAt, null);
       assert.deepEqual(state1.sectionsFetchedAt, {});
       assert.deepEqual(state1.questionsFetchedAt, {});
-      assert.deepEqual(state1.subsectionsFetchedAt, {});
     });
 
     it('clears all error messages when resetDsaSheetErrors is called', () => {

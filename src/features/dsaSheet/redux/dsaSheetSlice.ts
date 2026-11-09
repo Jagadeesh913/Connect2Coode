@@ -13,7 +13,6 @@ export interface DsaSheetState {
   sections: DsaSheetSection[];
   sectionsBySheetId: Record<number, DsaSheetSection[]>;
   questionsBySection: Record<number, DsaSheetQuestionLink[]>;
-  subsectionsBySection: Record<number, DsaSheetSection[]>;
   expandedSectionId: number | null;
   expandedSubsectionIds: number[];
 
@@ -24,21 +23,17 @@ export interface DsaSheetState {
   sheetsRequestId: string | null;
   sectionRequestIds: Record<number, string>;
   questionRequestIds: Record<number, string>;
-  subsectionRequestIds: Record<number, string>;
   loadingQuestionSectionIds: Record<number, boolean>;
-  loadingSubsectionIds: Record<number, boolean>;
 
   // Error messages
   sheetError: string | null;
   sectionsError: string | null;
   questionErrors: Record<number, string>;
-  subsectionErrors: Record<number, string>;
 
   // Timestamps for TTL cache validation
   sheetsFetchedAt: number | null;
   sectionsFetchedAt: Record<number, number>;
   questionsFetchedAt: Record<number, number>;
-  subsectionsFetchedAt: Record<number, number>;
 }
 
 const initialState: DsaSheetState = {
@@ -47,7 +42,6 @@ const initialState: DsaSheetState = {
   sections: [],
   sectionsBySheetId: {},
   questionsBySection: {},
-  subsectionsBySection: {},
   expandedSectionId: null,
   expandedSubsectionIds: [],
 
@@ -57,19 +51,15 @@ const initialState: DsaSheetState = {
   sheetsRequestId: null,
   sectionRequestIds: {},
   questionRequestIds: {},
-  subsectionRequestIds: {},
   loadingQuestionSectionIds: {},
-  loadingSubsectionIds: {},
 
   sheetError: null,
   sectionsError: null,
   questionErrors: {},
-  subsectionErrors: {},
 
   sheetsFetchedAt: null,
   sectionsFetchedAt: {},
   questionsFetchedAt: {},
-  subsectionsFetchedAt: {},
 };
 
 export const fetchDsaSheets = createAsyncThunk<
@@ -151,32 +141,6 @@ export const fetchSectionQuestions = createAsyncThunk<
     Boolean(force || !getState().dsaSheet.questionRequestIds[sectionId]),
 });
 
-export const fetchDsaSubsections = createAsyncThunk<
-  { sectionId: number; subsections: DsaSheetSection[] },
-  { sectionId: number; force?: boolean },
-  { state: RootState }
->('dsaSheet/fetchSubsections', async ({ sectionId, force }, { getState, rejectWithValue, signal }) => {
-  const { dsaSheet } = getState();
-  const cached = dsaSheet.subsectionsBySection[sectionId];
-  const fetchedAt = dsaSheet.subsectionsFetchedAt[sectionId];
-  if (!force && cached && fetchedAt && Date.now() - fetchedAt < DSA_SHEET_CACHE_TTL_MS) {
-    return { sectionId, subsections: cached };
-  }
-  try {
-    const result = await learningSheetService.getSubsections(sectionId, signal);
-    return { sectionId, subsections: result.filter((section) => section.isActive) };
-  } catch (error) {
-    if (isRequestCanceled(error)) throw error;
-    return rejectWithValue({
-      sectionId,
-      message: getActionableErrorMessage(error, 'Unable to load subsections.'),
-    });
-  }
-}, {
-  condition: ({ sectionId, force }, { getState }) =>
-    Boolean(force || !getState().dsaSheet.subsectionRequestIds[sectionId]),
-});
-
 export const dsaSheetSlice = createSlice({
   name: 'dsaSheet',
   initialState,
@@ -186,7 +150,7 @@ export const dsaSheetSlice = createSlice({
       if (state.selectedSheetId === sheetId) return;
       state.selectedSheetId = sheetId;
       state.sections = state.sectionsBySheetId[sheetId] ?? [];
-      const firstSectionId = state.sections[0]?.id ?? null;
+      const firstSectionId = state.sections.find((section) => section.parentSectionId === null)?.id ?? null;
       state.expandedSectionId = firstSectionId;
       state.expandedSubsectionIds = [];
       state.sectionsError = null;
@@ -216,13 +180,11 @@ export const dsaSheetSlice = createSlice({
       state.sheetsFetchedAt = null;
       state.sectionsFetchedAt = {};
       state.questionsFetchedAt = {};
-      state.subsectionsFetchedAt = {};
     },
     resetDsaSheetErrors(state) {
       state.sheetError = null;
       state.sectionsError = null;
       state.questionErrors = {};
-      state.subsectionErrors = {};
     },
   },
   extraReducers: (builder) => {
@@ -247,7 +209,7 @@ export const dsaSheetSlice = createSlice({
         state.selectedSheetId = nextId;
         if (nextId) {
           state.sections = state.sectionsBySheetId[nextId] ?? [];
-          const firstSectionId = state.sections[0]?.id ?? null;
+          const firstSectionId = state.sections.find((section) => section.parentSectionId === null)?.id ?? null;
           state.expandedSectionId = firstSectionId;
           state.loadingSections = !state.sectionsBySheetId[nextId];
           if (firstSectionId && state.questionsBySection[firstSectionId] === undefined) {
@@ -295,7 +257,7 @@ export const dsaSheetSlice = createSlice({
       if (state.selectedSheetId === action.payload.sheetId) {
         state.sections = action.payload.sections;
         if (state.expandedSectionId === null || !action.payload.sections.some((s) => s.id === state.expandedSectionId)) {
-          const firstSectionId = action.payload.sections[0]?.id ?? null;
+          const firstSectionId = action.payload.sections.find((section) => section.parentSectionId === null)?.id ?? null;
           state.expandedSectionId = firstSectionId;
           if (firstSectionId && state.questionsBySection[firstSectionId] === undefined) {
             state.loadingQuestionSectionId = firstSectionId;
@@ -365,32 +327,6 @@ export const dsaSheetSlice = createSlice({
       }
     });
 
-    // 4. Subsection hierarchy. This endpoint is backend-proposed; failures stay isolated
-    // from direct questions so a missing deployment cannot blank a valid section.
-    builder.addCase(fetchDsaSubsections.pending, (state, action) => {
-      const sectionId = action.meta.arg.sectionId;
-      state.subsectionRequestIds[sectionId] = action.meta.requestId;
-      state.loadingSubsectionIds[sectionId] = true;
-      delete state.subsectionErrors[sectionId];
-    });
-    builder.addCase(fetchDsaSubsections.fulfilled, (state, action) => {
-      const { sectionId, subsections } = action.payload;
-      if (state.subsectionRequestIds[sectionId] !== action.meta.requestId) return;
-      delete state.subsectionRequestIds[sectionId];
-      delete state.loadingSubsectionIds[sectionId];
-      delete state.subsectionErrors[sectionId];
-      state.subsectionsBySection[sectionId] = subsections;
-      state.subsectionsFetchedAt[sectionId] = Date.now();
-    });
-    builder.addCase(fetchDsaSubsections.rejected, (state, action) => {
-      const sectionId = action.meta.arg.sectionId;
-      if (state.subsectionRequestIds[sectionId] !== action.meta.requestId) return;
-      delete state.subsectionRequestIds[sectionId];
-      delete state.loadingSubsectionIds[sectionId];
-      if (action.meta.aborted || action.meta.condition) return;
-      const payload = action.payload as { sectionId: number; message: string } | undefined;
-      state.subsectionErrors[sectionId] = payload?.message || 'Unable to load subsections.';
-    });
     builder.addMatcher(
       (action) =>
         action.type === 'auth/logout/fulfilled' ||

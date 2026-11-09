@@ -196,12 +196,27 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
     });
   });
 
-  describe('4. Zero Backend Logo URL Dependency', () => {
-    it('resolution functions ignore backend URLs completely', () => {
-      // Regardless of what URL is passed in, resolving by name alone works
-      const res = resolveCompanyLogo('Google');
-      assert.equal(res?.assetPath, '/companies/google.svg');
-      assert.ok(!res?.assetPath.includes('http'), 'Resolved asset path must be local relative path');
+  describe('4. API Logo Contract', () => {
+    it('prioritizes a valid backend HTTPS logo before local and domain fallbacks', () => {
+      const logo = 'https://img.logo.dev/google.com?size=128';
+      const candidates = getCompanyLogoCandidates('Google', 'https://google.com', undefined, logo);
+
+      assert.deepEqual(candidates.slice(0, 2), [
+        { src: logo, source: 'api' },
+        { src: '/companies/google.svg', source: 'local' },
+      ]);
+    });
+
+    it('rejects unsafe backend logo URLs and retains the resilient fallback cascade', () => {
+      const candidates = getCompanyLogoCandidates(
+        'Google',
+        'https://google.com',
+        undefined,
+        'http://127.0.0.1:8080/logo.svg'
+      );
+
+      assert.equal(candidates[0]?.source, 'local');
+      assert.ok(!candidates.some((candidate) => candidate.source === 'api'));
     });
   });
 
@@ -217,7 +232,7 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
       assert.equal(extractCompanyDomain('https://user:secret@example.com'), null);
     });
 
-    it('uses reviewed local assets without unnecessary remote requests', () => {
+    it('uses local assets when the API logo is absent', () => {
       assert.deepEqual(getCompanyLogoCandidates('Google', 'https://google.com', 'client-id'), [
         { src: '/companies/google.svg', source: 'local' },
         { src: 'https://cdn.brandfetch.io/google.com?c=client-id', source: 'brandfetch' },
@@ -236,7 +251,7 @@ describe('PRODUCTION COMPANY LOGO SYSTEM TEST SUITE', () => {
       ]);
     });
 
-    it('works without provider configuration and never consumes arbitrary backend logo URLs', () => {
+    it('works without provider configuration when the API logo is absent', () => {
       assert.deepEqual(getCompanyLogoCandidates('Linear', 'https://linear.app'), [
         { src: 'https://cdn.simpleicons.org/linear', source: 'simple-icons' },
         { src: 'https://linear.app/favicon.ico', source: 'official-favicon' },

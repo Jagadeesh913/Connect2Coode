@@ -19,7 +19,8 @@ const isReferenceItem = (value: unknown, expectedGroupCode: string): value is Re
     item.refCode.trim().length > 0 &&
     typeof item.refName === 'string' &&
     item.refName.trim().length > 0 &&
-    typeof item.isActive === 'boolean'
+    typeof item.isActive === 'boolean' &&
+    (item.logoUrl === undefined || item.logoUrl === null || typeof item.logoUrl === 'string')
   );
 };
 

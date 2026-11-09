@@ -25,6 +25,7 @@ import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
+import { CodingQuestionTable } from '../../problems/components/CodingQuestionTable';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
 
@@ -809,163 +810,28 @@ export const CompanyDetails: React.FC = () => {
           {/* VIEW 1: CODING PROBLEMS TABLE */}
           {activeSection === 'coding' ? (
             <>
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 border border-slate-200 dark:border-slate-800 rounded-2xl">
-              <table className="w-full text-left border-collapse min-w-[560px]">
-                <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-[#0A101D]">
-                    <th className="py-3.5 px-4 w-12 text-center">#</th>
-                    <th className="py-3.5 px-4">Title</th>
-                    <th className="py-3.5 px-4 w-32">Difficulty</th>
-                    <th className="py-3.5 px-4 w-28">Status</th>
-                    <th className="py-3.5 px-2 w-10 text-center"></th>
-                    <th className="py-3.5 px-4 w-24 text-right"></th>
-                  </tr>
-                </thead>
+            {!isAuthenticated && codingProblems.length === 0 ? (
+              <EmptyState
+                title="Sign in to view questions"
+                description={`Sign in to view recruitment problems, practice coding solutions, and track your progress for ${company.name}.`}
+                actionText="Sign In"
+                onAction={() => dispatch(openAuthModal({ mode: 'login' }))}
+              />
+            ) : (
+              <CodingQuestionTable
+                questions={filteredProblems}
+                companies={company ? [company] : []}
+                loading={isQuestionsLoading}
+                error={codingError}
+                onRetry={() => setCodingRetry((value) => value + 1)}
+                emptyDescription={codingTotalCount === 0 && !debouncedQuestionSearch && !selectedDifficulty ? 'Coding problems for this company will appear once added.' : 'Try adjusting your search or difficulty filter.'}
+                isSolved={(problem) => Boolean(solvedByProblemId[String(problem.id)])}
+                isBookmarked={(problem) => bookmarks.some((bookmark) => isBookmarkItem(bookmark, problem.id, 'PROBLEM'))}
+                onBookmark={handleBookmarkToggle}
+              />
+            )}
 
-                <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-xs sm:text-sm">
-                  {isQuestionsLoading ? (
-                    <TableRowSkeleton rows={8} />
-                  ) : !isAuthenticated && codingProblems.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-14 text-center text-slate-500 dark:text-slate-400">
-                        <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
-                          <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl shadow-xs">
-                            <i className="fa-solid fa-lock"></i>
-                          </div>
-                          <span className="font-bold text-base text-slate-900 dark:text-white">Sign In to View Questions</span>
-                          <span className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                            Sign in to view recruitment problems, practice coding solutions, and track your progress for {company.name}.
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
-                            className="mt-1 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
-                          >
-                            Sign In
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : codingError ? (
-                    <tr><td colSpan={6}><RequestStatus error={codingError} onRetry={() => setCodingRetry((value) => value + 1)} /></td></tr>
-                  ) : filteredProblems.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <i className="fa-solid fa-code text-2xl text-slate-300 dark:text-slate-600"></i>
-                          <span className="font-semibold text-sm">No coding problems found</span>
-                          <span className="text-xs text-slate-400">
-                            {codingTotalCount === 0 && !debouncedQuestionSearch && !selectedDifficulty
-                              ? 'Coding problems for this company will appear once added.'
-                              : 'Try adjusting your search or difficulty filter.'}
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredProblems.map((problem, index) => {
-                      const isSolved = Boolean(solvedByProblemId[problem.id]);
-                      const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, problem.id, 'PROBLEM'));
-                      const diff = problem.difficulty?.toLowerCase();
 
-                      return (
-                        <tr
-                          key={problem.id}
-                          className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                        >
-                          {/* # Index */}
-                          <td className="py-3.5 px-4 text-center font-mono text-xs font-semibold text-slate-400">
-                            {(questionPage - 1) * pageSize + index + 1}
-                          </td>
-
-                          {/* Title */}
-                          <td className="py-3.5 px-4 font-semibold text-slate-900 dark:text-white">
-                            <Link
-                              to={`/problems/${problem.slug || problem.id}`}
-                              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            >
-                              {problem.title}
-                            </Link>
-                          </td>
-
-                          {/* Difficulty with colored dot */}
-                          <td className="py-3.5 px-4">
-                            {problem.difficulty ? (
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`w-2 h-2 rounded-full ${
-                                    diff === 'easy'
-                                      ? 'bg-emerald-500'
-                                      : diff === 'hard'
-                                      ? 'bg-rose-500'
-                                      : 'bg-amber-500'
-                                  }`}
-                                ></span>
-                                <span
-                                  className={`font-medium capitalize ${
-                                    diff === 'easy'
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : diff === 'hard'
-                                      ? 'text-rose-600 dark:text-rose-400'
-                                      : 'text-amber-600 dark:text-amber-400'
-                                  }`}
-                                >
-                                  {problem.difficulty}
-                                </span>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-xs">—</span>
-                            )}
-                          </td>
-
-                          {/* Status Pill */}
-                          <td className="py-3.5 px-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold select-none ${
-                                isSolved
-                                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/80 dark:border-slate-700/60'
-                              }`}
-                              title={isSolved ? 'Solved via successful code submission' : 'Not yet solved'}
-                            >
-                              <i className={`fa-solid ${isSolved ? 'fa-check text-[10px]' : 'fa-minus text-[10px]'}`}></i>
-                              <span>{isSolved ? 'Solved' : 'Not Solved'}</span>
-                            </span>
-                          </td>
-
-                          {/* Bookmark Button */}
-                          <td className="py-3.5 px-2 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => handleBookmarkToggle(problem, e)}
-                              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                                isBookmarked
-                                  ? 'text-blue-600 dark:text-blue-400'
-                                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                              }`}
-                              title={isBookmarked ? 'Remove Bookmark' : 'Bookmark Question'}
-                            >
-                              <i className={`fa-${isBookmarked ? 'solid' : 'regular'} fa-bookmark text-sm`}></i>
-                            </button>
-                          </td>
-
-                          {/* Solve Button */}
-                          <td className="py-3.5 px-4 text-right">
-                            <Link
-                              to={`/problems/${problem.slug || problem.id}`}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl border border-blue-500 hover:border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:text-blue-400 dark:hover:bg-blue-600 dark:hover:text-white font-semibold text-xs transition-colors"
-                            >
-                              <span>Solve</span>
-                              <i className="fa-solid fa-arrow-right text-[10px]"></i>
-                            </Link>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
             {questionTotalPages > 1 && (
               <Pagination
                 className="mt-5"

@@ -1,15 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { fetchProblems, resetFilters } from '../redux/problemSlice';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
 import { openAuthModal } from '../../auth/redux/authSlice';
-import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 import { Pagination } from '../../../shared/components/ui/Pagination';
-import type { Problem, ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
+import type { ReferenceItem, Company as CompanyItem } from '../../../core/types/domain';
 import { fetchReferenceGroup } from '../../references/redux/referenceSlice';
 import { fetchCompanies, invalidateCompanyList } from '../../companies/redux/companySlice';
-import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
+import { CodingQuestionTable } from '../components/CodingQuestionTable';
 import { toast } from '@/shared/notifications/toast';
 import { Lock } from 'lucide-react';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
@@ -586,96 +585,6 @@ export const PracticePage: React.FC = () => {
     currentRequestKey,
   ]);
 
-  // Company lookup map for retrieving authentic logos and websites
-  const companyMap = useMemo(() => {
-    const map = new Map<string, CompanyItem>();
-    serverCompanies.forEach((c) => {
-      if (c.name) map.set(c.name.toLowerCase().trim(), c);
-      if (c.slug) map.set(c.slug.toLowerCase().trim(), c);
-    });
-    return map;
-  }, [serverCompanies]);
-
-  // Difficulty color styling for the question number (#)
-  const getDifficultyNumberColor = (difficulty: string) => {
-    if (!difficulty) return 'text-slate-400 dark:text-slate-500';
-    const d = difficulty.toLowerCase().trim();
-    if (d.includes('easy')) {
-      return 'text-emerald-600 dark:text-emerald-400 font-bold';
-    }
-    if (d.includes('medium')) {
-      return 'text-amber-500 dark:text-orange-400 font-bold';
-    }
-    if (d.includes('hard')) {
-      return 'text-rose-600 dark:text-rose-400 font-bold';
-    }
-    if (d.includes('basic') || d.includes('school')) {
-      return 'text-sky-500 dark:text-sky-400 font-bold';
-    }
-    return 'text-slate-500 dark:text-slate-400 font-bold';
-  };
-
-  const getPlatformBadge = (prob: Problem) => {
-    const rawPlatform =
-      prob.questionPlatform ||
-      prob.qpfRefName ||
-      prob.examPlatform ||
-      prob.platformName ||
-      prob.qpfRefCode;
-
-    const pLower = (rawPlatform || 'Unspecified').toLowerCase();
-    let badgeColor =
-      'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60';
-    let displayName = rawPlatform || 'Unspecified';
-    let iconClass = 'fa-solid fa-laptop-code';
-
-    if (pLower.includes('leetcode')) {
-      badgeColor =
-        'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60';
-      displayName = 'LeetCode';
-      iconClass = 'fa-solid fa-code';
-    } else if (pLower.includes('hackerrank')) {
-      badgeColor =
-        'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60';
-      displayName = 'HackerRank';
-      iconClass = 'fa-solid fa-code';
-    } else if (pLower.includes('geeks') || pLower.includes('gfg')) {
-      badgeColor =
-        'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-200/80 dark:border-green-800/60';
-      displayName = 'GeeksforGeeks';
-      iconClass = 'fa-solid fa-code';
-    } else if (pLower.includes('tcs') || pLower.includes('ion')) {
-      badgeColor =
-        'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60';
-      displayName = 'TCS iON';
-      iconClass = 'fa-solid fa-laptop-code';
-    } else if (pLower.includes('aon')) {
-      badgeColor =
-        'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200/80 dark:border-sky-800/60';
-      displayName = 'AON';
-      iconClass = 'fa-solid fa-shield-halved';
-    } else if (pLower.includes('mettl')) {
-      badgeColor =
-        'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60';
-      displayName = 'Mettl';
-      iconClass = 'fa-solid fa-laptop-file';
-    } else if (pLower.includes('connect')) {
-      badgeColor =
-        'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60';
-      displayName = 'Connect 2 Code';
-      iconClass = 'fa-solid fa-code';
-    }
-
-    return (
-      <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-semibold border ${badgeColor}`}
-      >
-        <i className={`${iconClass} text-[10px]`}></i>
-        <span className="truncate max-w-[130px]">{displayName}</span>
-      </span>
-    );
-  };
-
   return (
     <div className="relative w-full flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 overflow-x-hidden min-h-screen pb-20">
       
@@ -1166,197 +1075,26 @@ export const PracticePage: React.FC = () => {
               />
             ) : (
               <>
-                <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
-                  <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
-                    <table className="w-full text-left border-collapse min-w-[640px]">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800/80 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider bg-slate-50/50 dark:bg-slate-900/30">
-                          <th className="py-3 px-4 w-16 text-center shrink-0">#</th>
-                          <th className="py-3 px-4 min-w-[200px]">Title</th>
-                          <th className="py-3 px-4 w-28 whitespace-nowrap">Platform</th>
-                          <th className="py-3 px-4 w-28 whitespace-nowrap">Companies</th>
-                          <th className="py-3 px-2 w-10 text-center shrink-0"></th>
-                          <th className="py-3 px-4 w-28 text-right whitespace-nowrap">Action</th>
-                        </tr>
-                      </thead>
+                {hasUnresolvedFilters ? (
+                  <EmptyState
+                    title="Some filters could not be resolved"
+                    description="Results were not requested without the selected filters. Retry the reference data or clear the invalid filters."
+                    actionText="Retry filter data"
+                    onAction={handleFilterResolutionRetry}
+                  />
+                ) : (
+                  <CodingQuestionTable
+                    questions={displayedProblems}
+                    companies={serverCompanies}
+                    loading={isProblemsLoading}
+                    error={error && displayedProblems.length === 0 ? error : null}
+                    onRetry={() => setRetryAttempt((value) => value + 1)}
+                    isSolved={(problem) => Boolean(solvedByProblemId[String(problem.id)])}
+                    isBookmarked={(problem) => bookmarks.some((bookmark) => isBookmarkItem(bookmark, problem.id, 'PROBLEM'))}
+                    onBookmark={(problem, event) => handleBookmarkToggle(String(problem.id), problem.title, problem.difficulty, problem.topic || problem.category, event)}
+                  />
+                )}
 
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-xs">
-                        {hasUnresolvedFilters ? (
-                          <tr>
-                            <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                              <div className="flex flex-col items-center justify-center gap-2">
-                                <i className="fa-solid fa-filter-circle-xmark text-amber-500 text-2xl mb-1"></i>
-                                <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                                  Some filters could not be resolved
-                                </span>
-                                <span className="text-xs text-slate-400 max-w-md">
-                                  Results were not requested without the selected filters. Retry the reference data or clear the invalid filters.
-                                </span>
-                                <div className="mt-2 flex items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={handleFilterResolutionRetry}
-                                    className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
-                                  >
-                                    Retry filter data
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={handleResetFilters}
-                                    className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                                  >
-                                    Clear filters
-                                  </button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : isProblemsLoading ? (
-                          <TableRowSkeleton rows={Math.min(pageSize, 25)} showTopic={false} showDifficulty={false} />
-                        ) : error && displayedProblems.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <i className="fa-solid fa-triangle-exclamation text-amber-500 text-2xl mb-1"></i>
-                            <span className="font-semibold text-sm text-slate-800 dark:text-slate-200">
-                              Unable to load problems
-                            </span>
-                            <span className="text-xs text-slate-400 max-w-md">{error}</span>
-                            <button
-                              type="button"
-                              onClick={() => setRetryAttempt((value) => value + 1)}
-                              className="mt-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer"
-                            >
-                              Retry
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : displayedProblems.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                          <div className="flex flex-col items-center justify-center gap-2">
-                            <i className="fa-solid fa-code text-2xl text-slate-300 dark:text-slate-600"></i>
-                            <span className="font-medium text-sm">No problems found</span>
-                            <span className="text-xs text-slate-400">Try adjusting your filters or search term</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      displayedProblems.map((prob) => {
-                        const isBookmarked = bookmarks.some((b) => isBookmarkItem(b, prob.id, 'PROBLEM'));
-                        const isSolved = Boolean(solvedByProblemId[String(prob.id)]);
-                        const questionId = prob.questionId || prob.id;
-
-                        return (
-                          <tr
-                            key={prob.id}
-                            className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors"
-                          >
-                            {/* 1. Question ID (Colored by difficulty) */}
-                            <td
-                              className={`py-3 px-4 text-center font-mono text-xs font-semibold shrink-0 ${getDifficultyNumberColor(prob.difficulty)}`}
-                              title={`Question ID: ${questionId} • Difficulty: ${prob.difficulty || 'Unknown'}`}
-                            >
-                              {questionId}
-                            </td>
-
-                            {/* 2. Title */}
-                            <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm">
-                              <Link
-                                to={`/problems/${prob.slug || prob.id}`}
-                                className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors inline-block leading-snug"
-                              >
-                                {prob.title}
-                              </Link>
-                            </td>
-
-                            {/* 3. Platform */}
-                            <td className="py-3 px-4">
-                              {getPlatformBadge(prob)}
-                            </td>
-
-                            {/* 4. Companies (Display only 2 company icons) */}
-                            <td className="py-3 px-4 whitespace-nowrap">
-                              {prob.companies && prob.companies.length > 0 ? (
-                                <div
-                                  className="flex items-center gap-1.5 flex-nowrap"
-                                  title={
-                                    prob.companies.length > 2
-                                      ? `Companies: ${prob.companies.join(', ')}`
-                                      : undefined
-                                  }
-                                >
-                                  {prob.companies.slice(0, 2).map((compName, cIdx) => {
-                                    const compData = companyMap.get(compName.toLowerCase().trim());
-                                    return (
-                                      <CompanyCircleBadge
-                                        key={cIdx}
-                                        name={compName}
-                                        logoUrl={compData?.logo}
-                                        website={compData?.website}
-                                      />
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 text-xs">—</span>
-                              )}
-                            </td>
-
-                            {/* 5. Bookmark Ribbon */}
-                            <td className="py-3 px-2 text-center">
-                              <button
-                                type="button"
-                                onClick={(e) =>
-                                  handleBookmarkToggle(
-                                    String(prob.id),
-                                    prob.title,
-                                    prob.difficulty,
-                                    prob.topic || prob.category,
-                                    e
-                                  )
-                                }
-                                aria-label="Bookmark problem"
-                                className={`p-1 rounded-md transition-colors cursor-pointer ${
-                                  isBookmarked
-                                    ? 'text-blue-600 dark:text-blue-400'
-                                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'
-                                }`}
-                              >
-                                <i className={`fa-${isBookmarked ? 'solid' : 'regular'} fa-bookmark text-xs`}></i>
-                              </button>
-                            </td>
-
-                            {/* 6. Action (Solved vs Solve) */}
-                            <td className="py-3 px-4 text-right">
-                              {isSolved ? (
-                                <Link
-                                  to={`/problems/${prob.slug || prob.id}`}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/60 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors no-underline shadow-2xs"
-                                  title="Solved - Click to review or solve again"
-                                >
-                                  <i className="fa-solid fa-check text-[9px]"></i>
-                                  <span>Solved</span>
-                                </Link>
-                              ) : (
-                                <Link
-                                  to={`/problems/${prob.slug || prob.id}`}
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors border border-blue-200 dark:border-blue-800/60 no-underline shadow-2xs"
-                                >
-                                  <span>Solve</span>
-                                  <i className="fa-solid fa-arrow-right text-[9px]"></i>
-                                </Link>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
 
             {/* Pagination Controls (Reflects total matching filtered problems) */}
             {!isProblemsLoading &&

@@ -1,48 +1,40 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   BookOpenCheck,
-  CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Circle,
   Lock,
   Pause,
   Play,
   Search,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { Badge } from '../../../shared/components/ui/Badge';
 import { Button } from '../../../shared/components/ui/Button';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { openAuthModal } from '../../auth/redux/authSlice';
+import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
+import { fetchCompanies } from '../../companies/redux/companySlice';
+import { CodingQuestionTable, type CodingQuestionListItem } from '../../problems/components/CodingQuestionTable';
 import { DsaSheetHeroBanner } from '../components/DsaSheetHeroBanner';
 import {
   fetchDsaSections,
   fetchDsaSheets,
-  fetchDsaSubsections,
   fetchSectionQuestions,
   selectSheet,
   toggleSection,
   toggleSubsection,
 } from '../redux/dsaSheetSlice';
 import type { DsaSheet } from '../types';
-import { getDsaQuestionProblemPath } from '../utils/questionRoute';
-
-const difficultyVariant = (difficulty: string): 'easy' | 'medium' | 'hard' | 'neutral' => {
-  const normalized = difficulty.toLowerCase();
-  if (normalized === 'basic' || normalized === 'easy') return 'easy';
-  if (normalized === 'medium') return 'medium';
-  if (normalized === 'hard') return 'hard';
-  return 'neutral';
-};
+import { toast } from '@/shared/notifications/toast';
 
 export const DsaSheetPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { isAuthenticated, loading: authLoading } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
+  const { bookmarks } = useAppSelector((state) => state.bookmarks);
+  const companies = useAppSelector((state) => state.companies.companies);
   const {
     sheets,
     selectedSheetId,
@@ -50,16 +42,13 @@ export const DsaSheetPage: React.FC = () => {
     expandedSectionId,
     expandedSubsectionIds,
     questionsBySection,
-    subsectionsBySection,
     loadingSheets,
     loadingSections,
     loadingQuestionSectionId,
     loadingQuestionSectionIds,
-    loadingSubsectionIds,
     sheetError,
     sectionsError,
     questionErrors,
-    subsectionErrors,
   } = useAppSelector((state) => state.dsaSheet);
 
   const [search, setSearch] = useState('');
@@ -94,6 +83,12 @@ export const DsaSheetPage: React.FC = () => {
   }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+    const request = dispatch(fetchCompanies());
+    return () => request.abort();
+  }, [dispatch, isAuthenticated]);
+
+  useEffect(() => {
     if (selectedSheetId) {
       const promise = dispatch(fetchDsaSections({ sheetId: selectedSheetId }));
       return () => {
@@ -105,21 +100,12 @@ export const DsaSheetPage: React.FC = () => {
   const expandedSectionQuestions = expandedSectionId
     ? questionsBySection[expandedSectionId]
     : undefined;
-  const expandedSectionSubsections = expandedSectionId
-    ? subsectionsBySection[expandedSectionId]
-    : undefined;
 
   useEffect(() => {
     if (!expandedSectionId || expandedSectionQuestions !== undefined) return;
     const request = dispatch(fetchSectionQuestions({ sectionId: expandedSectionId }));
     return () => request.abort();
   }, [dispatch, expandedSectionId, expandedSectionQuestions]);
-
-  useEffect(() => {
-    if (!expandedSectionId || expandedSectionSubsections !== undefined) return;
-    const request = dispatch(fetchDsaSubsections({ sectionId: expandedSectionId }));
-    return () => request.abort();
-  }, [dispatch, expandedSectionId, expandedSectionSubsections]);
 
   // Group sheets into pairs so exactly two sheet options are displayed at a time
   const sheetSlides = useMemo<DsaSheet[][]>(() => {
@@ -185,10 +171,40 @@ export const DsaSheetPage: React.FC = () => {
 
   const selectedSheet = sheets.find((sheet) => sheet.id === selectedSheetId) ?? null;
   const normalizedSearch = search.trim().toLowerCase();
+  const sectionsByParent = useMemo(() => {
+    const grouped: Record<number, typeof sections> = {};
+    sections.forEach((section) => {
+      if (section.parentSectionId !== null) {
+        (grouped[section.parentSectionId] ??= []).push(section);
+      }
+    });
+    Object.values(grouped).forEach((children) =>
+      children.sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id)
+    );
+    return grouped;
+  }, [sections]);
+  const rootSections = useMemo(
+    () => sections.filter((section) => section.parentSectionId === null),
+    [sections]
+  );
 
   const requestNode = (sectionId: number, force = false) => {
     void dispatch(fetchSectionQuestions({ sectionId, force }));
-    void dispatch(fetchDsaSubsections({ sectionId, force }));
+  };
+
+  const handleBookmark = (question: CodingQuestionListItem, event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const wasBookmarked = bookmarks.some((bookmark) => isBookmarkItem(bookmark, question.id, 'PROBLEM'));
+    void dispatch(toggleBookmarkItem({
+      itemId: question.id,
+      type: 'PROBLEM',
+      title: question.title,
+      difficulty: question.difficulty,
+      category: question.topic || question.category || '',
+    })).unwrap()
+      .then(() => toast.success(wasBookmarked ? 'Bookmark removed' : 'Problem bookmarked'))
+      .catch(() => toast.error('Unable to update bookmark. Please try again.'));
   };
 
   const renderQuestions = (sectionId: number) => {
@@ -198,53 +214,35 @@ export const DsaSheetPage: React.FC = () => {
           [question.title, question.topicName, question.difficultyName, ...question.companies]
             .some((value) => value.toLowerCase().includes(normalizedSearch)))
       : questions;
-    if (loadingQuestionSectionIds[sectionId] || loadingQuestionSectionId === sectionId) {
-      return <div className="p-5 space-y-3"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>;
-    }
-    if (questionErrors[sectionId]) {
-      return (
-        <div role="alert" className="flex flex-col items-center gap-3 px-5 py-8 text-center text-sm text-rose-600 dark:text-rose-300">
-          <span>{questionErrors[sectionId]}</span>
-          <Button size="sm" variant="outline" onClick={() => void dispatch(fetchSectionQuestions({ sectionId, force: true }))}>Retry questions</Button>
-        </div>
-      );
-    }
-    if (filteredQuestions.length === 0) {
-      return <div className="px-5 py-6 text-center text-sm text-slate-500 dark:text-slate-400">{normalizedSearch && questions.length ? 'No loaded questions match your search.' : 'No active questions are directly linked here.'}</div>;
-    }
+    const questionRows = filteredQuestions.map(({ question }) => ({
+          id: String(question.id),
+          questionId: String(question.id),
+          slug: String(question.id),
+          title: question.title,
+          difficulty: question.difficultyName,
+          topic: question.topicName,
+          category: question.topicName,
+          companies: question.companies,
+          questionPlatform: question.questionPlatform,
+    }));
+
     return (
-      <ol className="divide-y divide-slate-100 dark:divide-slate-800/80">
-        {filteredQuestions.map((link, questionIndex) => {
-          const solved = Boolean(solvedByProblemId[String(link.question.id)]);
-          return (
-            <li key={link.id}>
-              <Link to={getDsaQuestionProblemPath(link)} className="group flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                <div className="pt-0.5 text-slate-400">{solved ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <Circle className="w-5 h-5" />}</div>
-                <span className="w-7 pt-0.5 text-xs font-mono font-bold text-slate-400">{String(questionIndex + 1).padStart(2, '0')}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">{link.question.title}</h3><Badge size="sm" variant={difficultyVariant(link.question.difficultyName)}>{link.question.difficultyName}</Badge><Badge size="sm">{link.question.topicName}</Badge></div>
-                  <p className="mt-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{link.question.description}</p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-400 dark:text-slate-500">{link.question.questionPlatform && <span>{link.question.questionPlatform}</span>}{link.question.companies.slice(0, 3).map((company) => <span key={company}>• {company}</span>)}</div>
-                </div>
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
+      <CodingQuestionTable
+        questions={questionRows}
+        companies={companies}
+        loading={Boolean(loadingQuestionSectionIds[sectionId] || loadingQuestionSectionId === sectionId)}
+        error={questionErrors[sectionId] ?? null}
+        onRetry={() => requestNode(sectionId, true)}
+        emptyDescription={normalizedSearch && questions.length ? 'No loaded questions match your search.' : 'No active questions are directly linked here.'}
+        isSolved={(question) => Boolean(solvedByProblemId[String(question.id)])}
+        isBookmarked={(question) => bookmarks.some((bookmark) => isBookmarkItem(bookmark, question.id, 'PROBLEM'))}
+        onBookmark={handleBookmark}
+      />
     );
   };
 
   const renderSubsections = (parentId: number, depth = 0): React.ReactNode => {
-    const children = subsectionsBySection[parentId] ?? [];
-    if (loadingSubsectionIds[parentId]) return <div className="px-5 pb-5"><Skeleton className="h-12 w-full" /></div>;
-    if (subsectionErrors[parentId]) {
-      return (
-        <div role="alert" className="mx-4 mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
-          <span>Subsections are unavailable from the current backend: {subsectionErrors[parentId]}</span>
-          <Button size="sm" variant="ghost" onClick={() => void dispatch(fetchDsaSubsections({ sectionId: parentId, force: true }))}>Retry</Button>
-        </div>
-      );
-    }
+    const children = sectionsByParent[parentId] ?? [];
     if (!children.length) return null;
     return (
       <div className={`space-y-2 border-t border-slate-100 p-3 dark:border-slate-800 ${depth ? 'ml-3' : ''}`}>
@@ -432,9 +430,9 @@ export const DsaSheetPage: React.FC = () => {
             {/* Overview & Search Controls Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {sections.length > 0 && (
+                    {rootSections.length > 0 && (
                   <span>
-                    {sections.length} {sections.length === 1 ? 'Section' : 'Sections'} Available
+                    {rootSections.length} {rootSections.length === 1 ? 'Section' : 'Sections'} Available
                   </span>
                 )}
               </div>
@@ -458,11 +456,11 @@ export const DsaSheetPage: React.FC = () => {
 
             {loadingSections ? (
               <div className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>
-            ) : sectionsError && sections.length === 0 ? null : sections.length === 0 ? (
+            ) : sectionsError && rootSections.length === 0 ? null : rootSections.length === 0 ? (
               <EmptyState title="No sections published" description="This DSA sheet does not have any active sections yet." />
             ) : (
               <div className="space-y-4">
-                {sections.map((section, sectionIndex) => {
+                {rootSections.map((section, sectionIndex) => {
                   const isExpanded = expandedSectionId === section.id;
                   const questions = questionsBySection[section.id] ?? [];
                   const solvedCount = questions.filter(({ question }) => Boolean(solvedByProblemId[String(question.id)])).length;

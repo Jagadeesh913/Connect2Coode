@@ -6,6 +6,8 @@ export interface ReferenceItem {
   refCode: string;
   refName: string;
   isActive: boolean;
+  /** Optional backend-owned image for visual reference groups such as QPF. */
+  logoUrl?: string | null;
 }
 
 export interface CreateReferenceItemRequest {

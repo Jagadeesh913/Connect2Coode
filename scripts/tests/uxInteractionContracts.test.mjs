@@ -68,14 +68,15 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*?parseAptitudeSubjectCode/);
   });
 
-  it('DSA admin requests cancel superseded section, link, and option loads', async () => {
+  it('DSA admin requests cancel superseded documented API reads and refresh after mutations', async () => {
     const source = await readSource('src/features/admin/pages/AdminDsaSheets.tsx');
     assert.match(source, /sectionsAbortRef\.current\?\.abort/);
     assert.match(source, /linksAbortRef\.current\?\.abort/);
     assert.match(source, /optionsAbortRef\.current\?\.abort/);
-    assert.match(source, /subsectionControllersRef\.current\.get\(sectionId\)\?\.abort/);
     assert.match(source, /getSections\(sheetId, controller\.signal\)/);
+    assert.match(source, /learningSheetService\.getSheet\(sheet\.id, controller\.signal\)/);
     assert.match(source, /getSectionQuestions\(sectionId, controller\.signal\)/);
+    assert.doesNotMatch(source, /getSubsections/);
     assert.match(source, /if \(submittingRef\.current\) return/);
     assert.match(source, /submittingRef\.current = true/);
     assert.match(source, /sheetError/);
@@ -86,31 +87,30 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /openEditSheet/);
     assert.match(source, /openEditSection/);
     assert.match(source, /openEditLink/);
-    assert.match(source, /editingSheet \? \{ id: editingSheet\.id/);
+    assert.match(source, /id: editingSheet\?\.id \?\? null/);
     assert.match(source, /id: editingLink\?\.id \?\? null/);
     assert.match(source, /dispatch\(invalidateDsaSheetCache\(\)\)/);
-    assert.match(source, /const hierarchyPath: number\[\] = \[\]/);
-    assert.match(source, /for \(const hierarchySectionId of hierarchyPath\)/);
+    assert.match(source, /await loadSections\(selectedSheetId\)/);
   });
 
-  it('DSA user questions cancel superseded requests and keep errors scoped to the failed section', async () => {
+  it('DSA user questions cancel superseded documented requests and keep errors scoped to the failed section', async () => {
     const pageSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
     const sliceSource = await readSource('src/features/dsaSheet/redux/dsaSheetSlice.ts');
     assert.match(pageSource, /dispatch\(fetchSectionQuestions\(/);
     assert.match(pageSource, /expandedSectionQuestions !== undefined\) return/);
-    assert.match(pageSource, /expandedSectionSubsections !== undefined\) return/);
     assert.equal(
-      (pageSource.match(/return \(\) => request\.abort\(\)/g) || []).length >= 2,
+      (pageSource.match(/return \(\) => request\.abort\(\)/g) || []).length >= 1,
       true,
-      'question and subsection requests must have independent abort lifecycles'
+      'section-question requests must be aborted when their owner changes'
     );
     assert.match(sliceSource, /learningSheetService\.getSectionQuestions\(sectionId, signal\)/);
     assert.match(pageSource, /questionErrors/);
     assert.match(pageSource, /loadingQuestionSectionIds\[sectionId\] \|\| loadingQuestionSectionId === sectionId/);
-    assert.match(pageSource, /fetchDsaSubsections/);
-    assert.match(pageSource, /subsectionErrors/);
-    assert.match(pageSource, /sectionsError && sections\.length === 0 \? null/);
-    assert.match(pageSource, /getDsaQuestionProblemPath\(link\)/);
+    assert.match(pageSource, /const sectionsByParent = useMemo/);
+    assert.doesNotMatch(pageSource, /fetchDsaSubsections|getSubsections/);
+    assert.match(pageSource, /sectionsError && rootSections\.length === 0 \? null/);
+    assert.match(pageSource, /<CodingQuestionTable/);
+    assert.match(pageSource, /questionId: String\(question\.id\)/);
   });
 
   it('DSA carousel exposes pause controls and stops motion for focus, reduced motion, and hidden tabs', async () => {
@@ -148,6 +148,28 @@ describe('shared UX interaction contracts', () => {
       const source = await readSource(path);
       assert.match(source, /useLayoutEffect\(\(\) => \{[\s\S]*?dispatch\([\s\S]*?fetchProblems\(/);
     }
+  });
+
+  it('uses one API-driven coding-question table across learner and company surfaces', async () => {
+    const [practice, companyDetails, dsaSheet, adminCompany, table] = await Promise.all([
+      readSource('src/features/problems/pages/PracticePage.tsx'),
+      readSource('src/features/companies/pages/CompanyDetails.tsx'),
+      readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx'),
+      readSource('src/features/admin/components/companies/CompanyDetailsModal.tsx'),
+      readSource('src/features/problems/components/CodingQuestionTable.tsx'),
+    ]);
+
+    for (const source of [practice, companyDetails, dsaSheet, adminCompany]) {
+      assert.match(source, /CodingQuestionTable/);
+    }
+    assert.match(practice, /fetchProblems\(/);
+    assert.match(companyDetails, /getCompanyProblemsPaginated\(/);
+    assert.match(dsaSheet, /fetchSectionQuestions\(/);
+    assert.match(adminCompany, /adminCompanyService\.getCompanyProblems\(/);
+    assert.match(table, /CompanyCircleBadge/);
+    assert.match(table, /TableRowSkeleton/);
+    assert.match(table, /onBookmark/);
+    assert.doesNotMatch(dsaSheet, /getDsaQuestionProblemPath/);
   });
 
   it('company catalog pagination is URL-backed, server-owned, and keyboard accessible', async () => {
@@ -210,6 +232,31 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /tabIndex=\{onRowClick \? 0 : undefined\}/);
     assert.match(source, /event\.key === 'Enter' \|\| event\.key === ' '/);
     assert.match(source, /focus-visible:ring/);
+    assert.match(source, /const renderAccessorValue = \(value: unknown\): React\.ReactNode/);
+    assert.match(source, /if \(typeof value === 'string' \|\| typeof value === 'number' \|\| typeof value === 'bigint'\)/);
+    assert.match(source, /return '—';/);
+  });
+
+  it('uses a themed router boundary and keeps admin list skeletons ahead of recoverable errors', async () => {
+    const routes = await readSource('src/routes/appRoutes.tsx');
+    const routeBoundary = await readSource('src/shared/components/errors/RouteErrorBoundary.tsx');
+    assert.match(routes, /import \{ RouteErrorBoundary \}/);
+    assert.match(routes, /errorElement: <RouteErrorBoundary \/>/);
+    assert.match(routeBoundary, /useRouteError/);
+    assert.match(routeBoundary, /isRouteErrorResponse/);
+    assert.match(routeBoundary, /bg-\[var\(--bg-page\)\]/);
+    assert.doesNotMatch(routeBoundary, /error\.message/);
+
+    for (const path of [
+      'src/features/admin/pages/AdminCompanies.tsx',
+      'src/features/admin/pages/AdminInstitutions.tsx',
+      'src/features/admin/pages/AdminMcqs.tsx',
+      'src/features/admin/pages/AdminQuestions.tsx',
+    ]) {
+      const source = await readSource(path);
+      assert.match(source, /!loading && error &&/);
+      assert.match(source, /\|\| loading\) &&/);
+    }
   });
 
   it('auth modal hides the underlying layout boundary and notifications replace stale messages', async () => {
@@ -302,7 +349,7 @@ describe('shared UX interaction contracts', () => {
     }
 
     const companyDetails = await readSource('src/features/admin/components/companies/CompanyDetailsModal.tsx');
-    assert.match(companyDetails, /problemsLoading \? \([\s\S]*?Loading tagged questions[\s\S]*?<Skeleton/);
+    assert.match(companyDetails, /<CodingQuestionTable[\s\S]*?loading=\{problemsLoading\}/);
     assert.match(companyDetails, /examsLoading && exams\.length === 0 \? \([\s\S]*?Loading company exams[\s\S]*?<Skeleton/);
     assert.match(companyDetails, /detailsLoading \? \([\s\S]*?Loading exam roles and pattern[\s\S]*?<Skeleton/);
   });

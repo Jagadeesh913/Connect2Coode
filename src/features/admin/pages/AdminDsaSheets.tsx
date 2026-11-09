@@ -74,9 +74,6 @@ export const AdminDsaSheets: React.FC = () => {
   const dispatch = useAppDispatch();
   const [sheets, setSheets] = useState<DsaSheet[]>([]);
   const [sections, setSections] = useState<DsaSheetSection[]>([]);
-  const [subsectionsByParent, setSubsectionsByParent] = useState<Record<number, DsaSheetSection[]>>({});
-  const [subsectionsError, setSubsectionsError] = useState<string | null>(null);
-  const [loadingSubsections, setLoadingSubsections] = useState(false);
   const [links, setLinks] = useState<DsaSheetQuestionLink[]>([]);
   const [questionOptions, setQuestionOptions] = useState<QuestionListItem[]>([]);
   const [selectedSheetId, setSelectedSheetId] = useState<number | null>(null);
@@ -102,8 +99,8 @@ export const AdminDsaSheets: React.FC = () => {
   const selectedSheetIdRef = useRef<number | null>(null);
   const selectedSectionIdRef = useRef<number | null>(null);
   const sheetsAbortRef = useRef<AbortController | null>(null);
+  const sheetDetailAbortRef = useRef<AbortController | null>(null);
   const sectionsAbortRef = useRef<AbortController | null>(null);
-  const subsectionControllersRef = useRef<Map<number, AbortController>>(new Map());
   const linksAbortRef = useRef<AbortController | null>(null);
   const optionsAbortRef = useRef<AbortController | null>(null);
 
@@ -144,8 +141,6 @@ export const AdminDsaSheets: React.FC = () => {
       const result = await learningSheetService.getSections(sheetId, controller.signal);
       if (controller.signal.aborted) return;
       setSections(result);
-      setSubsectionsByParent({});
-      setSubsectionsError(null);
       const current = selectedSectionIdRef.current;
       const next = current && result.some((section) => section.id === current) ? current : result[0]?.id ?? null;
       if (next !== current) setLoadingLinks(next !== null);
@@ -161,28 +156,6 @@ export const AdminDsaSheets: React.FC = () => {
       if (sectionsAbortRef.current === controller) setLoadingSections(false);
     }
   }, []);
-
-  const loadSubsections = useCallback(async (sectionId: number, force = false) => {
-    if (!force && Object.hasOwn(subsectionsByParent, sectionId)) return;
-    subsectionControllersRef.current.get(sectionId)?.abort();
-    const controller = new AbortController();
-    subsectionControllersRef.current.set(sectionId, controller);
-    setLoadingSubsections(true);
-    setSubsectionsError(null);
-    try {
-      const result = await learningSheetService.getSubsections(sectionId, controller.signal);
-      if (controller.signal.aborted) return;
-      setSubsectionsByParent((current) => ({ ...current, [sectionId]: result }));
-    } catch (requestError) {
-      if (controller.signal.aborted) return;
-      setSubsectionsError(getActionableErrorMessage(requestError, 'The backend subsection endpoint is unavailable.'));
-    } finally {
-      if (subsectionControllersRef.current.get(sectionId) === controller) {
-        subsectionControllersRef.current.delete(sectionId);
-      }
-      setLoadingSubsections(subsectionControllersRef.current.size > 0);
-    }
-  }, [subsectionsByParent]);
 
   const loadLinks = useCallback(async (sectionId: number) => {
     linksAbortRef.current?.abort();
@@ -207,13 +180,8 @@ export const AdminDsaSheets: React.FC = () => {
   useEffect(() => {
     sectionsAbortRef.current?.abort();
     linksAbortRef.current?.abort();
-    subsectionControllersRef.current.forEach((controller) => controller.abort());
-    subsectionControllersRef.current.clear();
-    setLoadingSubsections(false);
     setLinks([]);
     setSections([]);
-    setSubsectionsByParent({});
-    setSubsectionsError(null);
     selectedSectionIdRef.current = null;
     setSelectedSectionId(null);
     if (selectedSheetId) void loadSections(selectedSheetId);
@@ -229,15 +197,10 @@ export const AdminDsaSheets: React.FC = () => {
     if (selectedSectionId) void loadLinks(selectedSectionId);
     else setLinks([]);
   }, [loadLinks, selectedSectionId]);
-  useEffect(() => {
-    if (selectedSectionId) void loadSubsections(selectedSectionId);
-  }, [loadSubsections, selectedSectionId]);
-
   useEffect(() => () => {
     sheetsAbortRef.current?.abort();
+    sheetDetailAbortRef.current?.abort();
     sectionsAbortRef.current?.abort();
-    subsectionControllersRef.current.forEach((controller) => controller.abort());
-    subsectionControllersRef.current.clear();
     linksAbortRef.current?.abort();
     optionsAbortRef.current?.abort();
   }, []);
@@ -273,30 +236,45 @@ export const AdminDsaSheets: React.FC = () => {
   const selectedSheet = sheets.find((sheet) => sheet.id === selectedSheetId) ?? null;
   const visibleSections = useMemo(() => {
     const result: Array<{ section: DsaSheetSection; depth: number }> = [];
+    const childrenByParent = new Map<number | null, DsaSheetSection[]>();
+    sections.forEach((section) => {
+      const current = childrenByParent.get(section.parentSectionId) ?? [];
+      current.push(section);
+      childrenByParent.set(section.parentSectionId, current);
+    });
+    childrenByParent.forEach((items) => items.sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id));
+    const visited = new Set<number>();
     const visit = (items: DsaSheetSection[], depth: number) => {
       items.forEach((section) => {
+        if (visited.has(section.id)) return;
+        visited.add(section.id);
         result.push({ section, depth });
-        visit(subsectionsByParent[section.id] ?? [], depth + 1);
+        visit(childrenByParent.get(section.id) ?? [], depth + 1);
       });
     };
-    visit(sections, 0);
+    visit(childrenByParent.get(null) ?? [], 0);
+    sections.forEach((section) => {
+      if (!visited.has(section.id)) visit([section], 0);
+    });
     return result;
-  }, [sections, subsectionsByParent]);
+  }, [sections]);
   const selectedSection = visibleSections.find(({ section }) => section.id === selectedSectionId)?.section ?? null;
   const parentOptions = useMemo(() => {
     const excluded = new Set<number>();
-    const markDescendants = (sectionId: number) => {
-      for (const child of subsectionsByParent[sectionId] ?? []) {
-        excluded.add(child.id);
-        markDescendants(child.id);
-      }
-    };
     if (editingSection) {
       excluded.add(editingSection.id);
-      markDescendants(editingSection.id);
+      visibleSections.forEach(({ section }) => {
+        let parentId = section.parentSectionId;
+        const visited = new Set<number>();
+        while (parentId !== null && !visited.has(parentId)) {
+          if (parentId === editingSection.id) excluded.add(section.id);
+          visited.add(parentId);
+          parentId = visibleSections.find(({ section: candidate }) => candidate.id === parentId)?.section.parentSectionId ?? null;
+        }
+      });
     }
     return visibleSections.filter(({ section }) => !excluded.has(section.id));
-  }, [editingSection, subsectionsByParent, visibleSections]);
+  }, [editingSection, visibleSections]);
   const linkedQuestionIds = useMemo(() => new Set(links.map((link) => link.question.id)), [links]);
   const availableQuestionOptions = questionOptions.filter(
     (question) => !linkedQuestionIds.has(question.id) || question.id === editingLink?.question.id
@@ -308,15 +286,29 @@ export const AdminDsaSheets: React.FC = () => {
     setSheetModalOpen(true);
   };
 
-  const openEditSheet = (sheet: DsaSheet) => {
-    setEditingSheet(sheet);
-    sheetForm.reset({
-      sheetCode: sheet.sheetCode,
-      sheetName: sheet.sheetName,
-      description: sheet.description,
-      isActive: sheet.isActive,
-    });
-    setSheetModalOpen(true);
+  const openEditSheet = async (sheet: DsaSheet) => {
+    sheetDetailAbortRef.current?.abort();
+    const controller = new AbortController();
+    sheetDetailAbortRef.current = controller;
+    try {
+      const details = await learningSheetService.getSheet(sheet.id, controller.signal);
+      if (controller.signal.aborted) return;
+      setEditingSheet(details);
+      sheetForm.reset({
+        sheetCode: details.sheetCode,
+        sheetName: details.sheetName,
+        description: details.description,
+        isActive: details.isActive,
+      });
+      setSheetModalOpen(true);
+    } catch (requestError) {
+      if (!controller.signal.aborted) {
+        toast.error(getActionableErrorMessage(requestError, 'Unable to load learning sheet details.'));
+      }
+    }
+  };
+  const openEditSheetFromList = (sheet: DsaSheet) => {
+    void openEditSheet(sheet);
   };
 
   const closeSheetModal = () => {
@@ -374,8 +366,6 @@ export const AdminDsaSheets: React.FC = () => {
     if (sheetId === selectedSheetId) return;
     sectionsAbortRef.current?.abort();
     linksAbortRef.current?.abort();
-    subsectionControllersRef.current.forEach((controller) => controller.abort());
-    subsectionControllersRef.current.clear();
     setSections([]);
     setLinks([]);
     setSelectedSectionId(null);
@@ -400,9 +390,10 @@ export const AdminDsaSheets: React.FC = () => {
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const response = await adminLearningSheetService.saveSheet(
-        editingSheet ? { id: editingSheet.id, ...values } : values
-      );
+      const response = await adminLearningSheetService.saveSheet({
+        id: editingSheet?.id ?? null,
+        ...values,
+      });
       toast.success(response.message || (editingSheet ? 'DSA sheet updated' : 'DSA sheet created'));
       dispatch(invalidateDsaSheetCache());
       sheetForm.reset();
@@ -424,21 +415,8 @@ export const AdminDsaSheets: React.FC = () => {
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      const hierarchyPath: number[] = [];
-      const visitedAncestors = new Set<number>();
-      let ancestorId = values.parentSectionId;
-      while (ancestorId) {
-        if (visitedAncestors.has(ancestorId)) {
-          throw new Error('Cannot save a cyclic learning-sheet hierarchy.');
-        }
-        visitedAncestors.add(ancestorId);
-        hierarchyPath.unshift(ancestorId);
-        ancestorId =
-          visibleSections.find(({ section }) => section.id === ancestorId)?.section.parentSectionId ??
-          null;
-      }
       const response = await adminLearningSheetService.saveSection({
-        ...(editingSection ? { id: editingSection.id } : {}),
+        id: editingSection?.id ?? null,
         ...values,
         sheetId: selectedSheetId,
         parentSectionId: values.parentSectionId,
@@ -449,9 +427,6 @@ export const AdminDsaSheets: React.FC = () => {
       setSectionModalOpen(false);
       setEditingSection(null);
       await loadSections(selectedSheetId);
-      for (const hierarchySectionId of hierarchyPath) {
-        await loadSubsections(hierarchySectionId, true);
-      }
       if (response.data?.id) {
         selectedSectionIdRef.current = response.data.id;
         setLoadingLinks(true);
@@ -528,7 +503,7 @@ export const AdminDsaSheets: React.FC = () => {
                     <div className="min-w-0"><p className="text-sm font-bold text-slate-900 dark:text-white truncate">{sheet.sheetName}</p><p className="text-[11px] font-mono text-slate-500 truncate">{sheet.sheetCode}</p></div>
                     <div className="flex items-center gap-2"><AdminBadge size="sm" variant={sheet.isActive ? 'success' : 'danger'}>{sheet.isActive ? 'Active' : 'Inactive'}</AdminBadge><ChevronRight className="w-4 h-4 text-slate-400" /></div>
                   </button>
-                  <button type="button" aria-label={`Edit ${sheet.sheetName}`} onClick={() => openEditSheet(sheet)} className="p-2 mr-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"><Pencil className="w-4 h-4" /></button>
+                  <button type="button" aria-label={`Edit ${sheet.sheetName}`} onClick={() => openEditSheetFromList(sheet)} className="p-2 mr-1 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30"><Pencil className="w-4 h-4" /></button>
                 </div>
               ))}
             </div>
@@ -538,7 +513,6 @@ export const AdminDsaSheets: React.FC = () => {
         <AdminCard title="Sections" subtitle={selectedSheet?.sheetName || 'Select a sheet'} icon={<Layers3 className="w-4 h-4" />} action={<Button size="sm" variant="outline" disabled={!selectedSheetId} onClick={openCreateSection} leftIcon={<Plus className="w-3.5 h-3.5" />}>Add</Button>} bodyClassName="p-2">
           {loadingSections ? <AdminListSkeleton /> : sectionsError ? <div className="p-2"><AdminErrorState message={sectionsError} onRetry={() => selectedSheetId && void loadSections(selectedSheetId)} /></div> : sections.length === 0 ? <AdminEmptyState title="No sections" description="Add an ordered top-level section." /> : (
             <div className="space-y-1">
-              {subsectionsError && <div role="alert" className="mb-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-200"><p>{subsectionsError}</p>{selectedSectionId && <Button size="sm" variant="ghost" onClick={() => void loadSubsections(selectedSectionId, true)}>Retry hierarchy</Button>}</div>}
               {visibleSections.map(({ section, depth }) => (
                 <div key={section.id} style={{ marginLeft: `${Math.min(depth, 4) * 12}px` }} className={`group flex items-center gap-2 rounded-xl border ${selectedSectionId === section.id ? 'border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                   <button type="button" aria-pressed={selectedSectionId === section.id} onClick={() => selectSection(section.id)} className="min-w-0 flex-1 flex items-center gap-3 px-3 py-3 text-left">
@@ -551,7 +525,6 @@ export const AdminDsaSheets: React.FC = () => {
                   </div>
                 </div>
               ))}
-              {loadingSubsections && <div className="px-3 py-2"><Skeleton className="h-9 w-full" /></div>}
             </div>
           )}
         </AdminCard>

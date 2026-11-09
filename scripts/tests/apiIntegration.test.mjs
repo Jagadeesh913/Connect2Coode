@@ -97,8 +97,8 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
 
     it('formats DSA learning sheet endpoints with their owning resource IDs', () => {
       assert.equal(API_ENDPOINTS.LEARNING_SHEET.LIST, '/user/learningSheets');
+      assert.equal(API_ENDPOINTS.LEARNING_SHEET.DETAILS(4), '/user/learningSheets/4');
       assert.equal(API_ENDPOINTS.LEARNING_SHEET.SECTIONS(4), '/user/learningSheets/4/sections');
-      assert.equal(API_ENDPOINTS.LEARNING_SHEET.SUBSECTIONS(8), '/user/learningSheet/section/8/subsections');
       assert.equal(API_ENDPOINTS.LEARNING_SHEET.SECTION_QUESTIONS(8), '/user/learningSheet/section/8/questions');
       assert.equal(API_ENDPOINTS.LEARNING_SHEET.ADMIN_SECTION_DELETE(8), '/admin/learningSheet/section/8');
       assert.equal(API_ENDPOINTS.LEARNING_SHEET.ADMIN_QUESTION_DELETE(8, 12), '/admin/learningSheet/section/8/question/12');
@@ -113,7 +113,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       );
     });
 
-    it('sends resource IDs only for DSA save operations in edit mode', async () => {
+    it('uses POST for both create and update with the documented mapping IDs', async () => {
       const originalPost = apiClient.post;
       const calls = [];
       apiClient.post = async (...args) => {
@@ -154,7 +154,20 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
-    it('orders top-level sections and excludes nested sections from the supplied list contract', async () => {
+    it('gets a selected sheet by ID and rejects a mismatched response', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async (path) => {
+        assert.equal(path, '/user/learningSheets/1');
+        return { statusCode: 200, data: { id: 1, sheetCode: 'JAVA-DSA', sheetName: 'Java DSA', description: 'Practice', isActive: true } };
+      };
+      try {
+        assert.equal((await learningSheetService.getSheet(1)).id, 1);
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('orders only sections returned for the selected sheet without requesting a subsection API', async () => {
       const originalGet = apiClient.get;
       apiClient.get = async () => ({
         statusCode: 200,
@@ -166,29 +179,28 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       });
       try {
         const sections = await learningSheetService.getSections(1);
-        assert.deepEqual(sections.map((section) => section.id), [2, 3]);
+        assert.deepEqual(sections.map((section) => section.id), [2, 4, 3]);
       } finally {
         apiClient.get = originalGet;
       }
     });
 
-    it('orders subsections and rejects children that do not belong to the requested parent', async () => {
+    it('rejects question mappings returned for a different section', async () => {
       const originalGet = apiClient.get;
-      let payload = [
-        { id: 5, sheetId: 1, parentSectionId: 3, sectionName: 'Sliding Window', displayOrder: 2, isActive: true },
-        { id: 4, sheetId: 1, parentSectionId: 3, sectionName: 'Prefix Sum', displayOrder: 1, isActive: true },
-      ];
       apiClient.get = async (path) => {
-        assert.equal(path, '/user/learningSheet/section/3/subsections');
-        return { statusCode: 200, data: payload };
+        assert.equal(path, '/user/learningSheet/section/3/questions');
+        return { statusCode: 200, data: [{
+          id: 4,
+          sectionId: 9,
+          displayOrder: 1,
+          isActive: true,
+          question: { id: 13, title: 'Two Sum', description: 'Find two numbers', difficultyId: 1, difficultyName: 'Easy', topicId: 1, topicName: 'Arrays', isOwnProblem: true, isActive: true, companies: [], questionPlatform: 'C2C' },
+        }] };
       };
       try {
-        const subsections = await learningSheetService.getSubsections(3);
-        assert.deepEqual(subsections.map((section) => section.id), [4, 5]);
-        payload = [{ ...payload[0], parentSectionId: 99 }];
         await assert.rejects(
-          () => learningSheetService.getSubsections(3),
-          /Unexpected learning sheet subsections response format/
+          () => learningSheetService.getSectionQuestions(3),
+          /Unexpected learning sheet questions response format/
         );
       } finally {
         apiClient.get = originalGet;

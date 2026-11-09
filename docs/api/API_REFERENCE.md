@@ -1,6 +1,6 @@
 # Connect-2-Code — Developer API Reference Manual
 
-This document is the central, comprehensive developer reference for all APIs in the **Connect-2-Code** platform. Consult this document prior to making any frontend network calls, designing new components, or modifying backend controllers.
+This is a historical direct-probe reference, not the canonical source for active frontend changes. Use [`docs/project/05_api_contracts_and_security.md`](../project/05_api_contracts_and_security.md) and `src/core/api/endpoints.ts` first; where this record conflicts with them (notably company mutations), obtain fresh authenticated evidence before changing an endpoint.
 
 ---
 

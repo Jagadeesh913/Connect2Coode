@@ -11,6 +11,21 @@ export interface Column<T> {
   headerClassName?: string;
 }
 
+/**
+ * API DTOs are untrusted at the rendering boundary.  A plain object is not a
+ * valid React child, so an unexpected nested response must never take down the
+ * entire admin route.  Complex values need an explicit column `cell` renderer.
+ */
+const renderAccessorValue = (value: unknown): React.ReactNode => {
+  if (value === null || value === undefined) return '—';
+  if (React.isValidElement(value)) return value;
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
+    return String(value);
+  }
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  return '—';
+};
+
 interface AdminTableProps<T> {
   columns: Column<T>[];
   data: T[];
@@ -99,7 +114,7 @@ export function AdminTable<T>({
                     {col.cell
                       ? col.cell(row)
                       : col.accessorKey
-                      ? (row[col.accessorKey] as React.ReactNode)
+                      ? renderAccessorValue(row[col.accessorKey])
                       : null}
                   </td>
                 ))}

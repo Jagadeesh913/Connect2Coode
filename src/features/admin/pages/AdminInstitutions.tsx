@@ -512,10 +512,10 @@ export const AdminInstitutions: React.FC = () => {
       </div>
 
       {/* Error State */}
-      {error && institutions.length === 0 && <AdminErrorState message={error} onRetry={fetchInstitutions} />}
+      {!loading && error && institutions.length === 0 && <AdminErrorState message={error} onRetry={fetchInstitutions} />}
 
       {/* Main Table */}
-      {(!error || institutions.length > 0) && (
+      {(!error || institutions.length > 0 || loading) && (
         <div className="space-y-4">
           <AdminTable<InstitutionItem>
             columns={columns}

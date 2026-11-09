@@ -103,15 +103,14 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Service cache coordination**: Redux applies a 30-minute TTL and stale-response ownership. The execution service deduplicates its transport request with the same TTL; forced refresh bypasses it. Successful admin mutations invalidate both caches before the next editor/run lookup. Execution refuses an ID absent from API catalog fields instead of applying a static mapping.
 
 ### 9. `dsaSheetSlice` ([`src/features/dsaSheet/redux/dsaSheetSlice.ts`](../../src/features/dsaSheet/redux/dsaSheetSlice.ts))
-- **Responsibilities**: Learning sheets catalog, selected sheet ID, top-level sections by sheet ID, proposed child sections by parent ID, questions linked by any section/subsection ID, nested accordion expansion, and per-resource loading/error ownership.
+- **Responsibilities**: Learning-sheet catalog, selected sheet ID, sections returned for each sheet, question links by section ID, nested UI expansion derived only from returned `parentSectionId` values, and per-resource loading/error ownership.
 - **Caching Mechanics**:
   - `DSA_SHEET_CACHE_TTL_MS`: 5 minutes.
-  - Granular timestamps: `sheetsFetchedAt`, `sectionsFetchedAt[sheetId]`, `subsectionsFetchedAt[parentId]`, and `questionsFetchedAt[sectionId]`.
+  - Granular timestamps: `sheetsFetchedAt`, `sectionsFetchedAt[sheetId]`, and `questionsFetchedAt[sectionId]`.
   - Seamless navigation: Switching between previously loaded sheets or accordion sections re-renders from memory instantly without layout shift or skeleton flashing.
   - Invalidation & Error Reset: `invalidateDsaSheetCache` and `resetDsaSheetErrors` provide programmatic cache flushes and retry resets.
 - **Superseded Request Cancellation**:
-  - In `DsaSheetPage`, question and subsection reads use independent effects and abort lifecycles, so either response can populate its cache without aborting the other. Request IDs prevent late writes; loading and error maps allow concurrent nested reads.
-  - The subsection read is explicitly unconfirmed backend capability. Its error is scoped to the parent and never clears already valid direct questions.
+  - In `DsaSheetPage`, section-question reads are abortable and request-owned. Nested visual rows are derived only from the documented sections response; no subsection transport request is made.
   - Successful admin sheet, section, association edit/delete operations dispatch `invalidateDsaSheetCache`, preventing an admin from seeing the previous five-minute cached student view after navigation.
 
 ### Persistence Middleware
