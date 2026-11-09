@@ -4,6 +4,7 @@ import type { ApiResponse } from '../core/types/api';
 import type {
   CodeExecutionPayload,
   ExecutionResult,
+  ExecutionVerdict,
   ExecutionTestCaseResult,
   Language,
 } from '../core/types/domain';
@@ -28,6 +29,13 @@ const collectDiagnosticStrings = (...values: unknown[]): string[] => {
   return [...new Set(collected)];
 };
 
+const isVisibleExecutionTestCase = (item: Record<string, unknown>): boolean => {
+  if (item.isHidden === true) return false;
+  if (item.isHidden === false) return true;
+  const type = typeof item.testCaseType === 'string' ? item.testCaseType : '';
+  return /\b(visible|sample|public)\b/i.test(type);
+};
+
 export const normalizeExecutionTestCaseResult = (
   value: unknown,
   index = 0
@@ -35,7 +43,7 @@ export const normalizeExecutionTestCaseResult = (
   const item = value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
     : {};
-  const isHidden = typeof item.isHidden === 'boolean' ? item.isHidden : null;
+  const isVisible = isVisibleExecutionTestCase(item);
   const diagnostics = collectDiagnosticStrings(
     item.errorMessage,
     item.errors,
@@ -49,23 +57,33 @@ export const normalizeExecutionTestCaseResult = (
       ? Number(item.testCaseId)
       : index + 1,
     testCaseType: typeof item.testCaseType === 'string' ? item.testCaseType : 'Test Case',
-    isHidden,
+    isHidden: !isVisible,
     status: typeof item.status === 'string' ? item.status : 'Unknown',
     // Hidden evaluation data is removed at the shared service boundary so no
     // component can accidentally reveal it. The backend must still enforce
     // access control and should not send these values to ordinary users.
-    input: !isHidden && typeof item.input === 'string' ? item.input : undefined,
-    expectedOutput: !isHidden && typeof item.expectedOutput === 'string'
+    input: isVisible && typeof item.input === 'string' ? item.input : undefined,
+    expectedOutput: isVisible && typeof item.expectedOutput === 'string'
       ? item.expectedOutput
       : undefined,
-    actualOutput: !isHidden
+    actualOutput: isVisible
       ? typeof item.actualOutput === 'string'
         ? item.actualOutput
         : typeof item.stdout === 'string'
           ? item.stdout
           : undefined
       : undefined,
-    errorMessage: isHidden ? undefined : diagnostics[0],
+    errorMessage: isVisible ? diagnostics[0] : undefined,
+    executionTime: isMetricValue(item.runtimeMs)
+      ? item.runtimeMs
+      : isMetricValue(item.time)
+        ? item.time
+        : undefined,
+    memoryUsage: isMetricValue(item.memoryMb)
+      ? item.memoryMb
+      : isMetricValue(item.memory)
+        ? item.memory
+        : undefined,
   };
 };
 
@@ -128,6 +146,16 @@ export const isExecutionResultSuccessful = (result: ExecutionResultData): boolea
   result.passedTestCases > 0 &&
   result.failedTestCases === 0 &&
   result.passedTestCases >= result.totalTestCases;
+
+export const getExecutionVerdict = (result: ExecutionResultData): ExecutionVerdict => {
+  if (isExecutionResultSuccessful(result)) return 'accepted';
+  const statuses = result.testCases.map((testCase) => testCase.status.toLowerCase());
+  if (statuses.some((status) => /compil|syntax/.test(status))) return 'compilation-error';
+  if (statuses.some((status) => /runtime|exception|nzec|time limit|memory limit/.test(status))) {
+    return 'runtime-error';
+  }
+  return 'failed';
+};
 
 let cachedLanguages: LanguageDropdownItem[] | null = null;
 let languageFetchPromise: Promise<LanguageDropdownItem[]> | null = null;

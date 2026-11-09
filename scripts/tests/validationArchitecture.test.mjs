@@ -219,7 +219,7 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       );
     });
 
-    it('academicDetailsSchema retains only the established user-info fields', () => {
+    it('academicDetailsSchema supports the verified optional personal-detail fields', () => {
       const parsed = academicDetailsSchema.parse({
         college: 'National Institute of Technology',
         regNumber: 'CS202201',
@@ -227,12 +227,12 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
         passedOutYear: 2024,
         bio: 'Competitive programmer.',
         collegeId: 42,
-        gender: 'MALE',
+        genderId: 102,
         dob: '2002-01-01',
       });
-      assert.equal('collegeId' in parsed, false);
-      assert.equal('gender' in parsed, false);
-      assert.equal('dob' in parsed, false);
+      assert.equal(parsed.collegeId, 42);
+      assert.equal(parsed.genderId, 102);
+      assert.equal(parsed.dob, '2002-01-01');
     });
 
     it('institutionSelectionSchema requires selecting a valid institution', () => {

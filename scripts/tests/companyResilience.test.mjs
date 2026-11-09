@@ -71,7 +71,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
               totalElements: 1,
               totalPages: 1,
               pageNumber: 0,
-              pageSize: 100,
+              pageSize: 24,
             }
           };
         }
@@ -101,7 +101,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
           totalElements: 1,
           totalPages: 1,
           pageNumber: 0,
-          pageSize: 100,
+          pageSize: 24,
         },
       });
 
@@ -196,7 +196,19 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
           statusCode: 200,
           message: 'OK',
           data: {
-            content: [{ id: pageNumber + 1, title: `Problem ${pageNumber + 1}` }],
+            content: [{
+              id: pageNumber + 1,
+              title: `Problem ${pageNumber + 1}`,
+              description: 'Solve the problem.',
+              difficultyId: 2,
+              difficultyName: 'Easy',
+              topicId: 9,
+              topicName: 'Arrays',
+              isOwnProblem: true,
+              isActive: true,
+              companies: [],
+              questionPlatform: null,
+            }],
             totalElements: 3,
             totalPages: 3,
             pageNumber,

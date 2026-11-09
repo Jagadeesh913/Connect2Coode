@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { AdminModal } from '../AdminModal';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import type { CompanyExamSectionItem } from '../../../companies/types/companyExam';
 import { ListTree, Clock, FileText, Award, Hash } from 'lucide-react';
@@ -47,6 +48,8 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ExamSectionFormData>({
     defaultValues: {
@@ -62,6 +65,14 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
       sequenceNumber: 1,
     },
   });
+
+  useEffect(() => {
+    register('sectionTypeId', {
+      validate: (value) => Number(value) > 0 || 'Section classification is required',
+    });
+    register('parentSectionId');
+    register('questionTypeId');
+  }, [register]);
   const {
     items: sectionTypeReferences,
     loading: sectionTypesLoading,
@@ -208,20 +219,21 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           <label htmlFor="exam-section-parent" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Parent Section / Round
           </label>
-          <select
-            id="exam-section-parent"
-            {...register('parentSectionId', {
-              setValueAs: (v) => (v === '' || v === 'null' ? null : Number(v)),
-            })}
-            className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">-- None (Top-Level Assessment Round) --</option>
-            {candidateParents.map((parent) => (
-              <option key={parent.id} value={parent.id}>
-                Round #{parent.sequenceNumber || parent.id}: {parent.sectionName}
-              </option>
-            ))}
-          </select>
+          <C2CSelect
+            value={watch('parentSectionId') !== null && watch('parentSectionId') !== undefined ? String(watch('parentSectionId')) : ''}
+            onChange={(val) => {
+              setValue('parentSectionId', val === '' ? null : Number(val), { shouldValidate: true });
+            }}
+            options={[
+              { value: '', label: '-- None (Top-Level Assessment Round) --' },
+              ...candidateParents.map((parent) => ({
+                value: String(parent.id),
+                label: `Round #${parent.sequenceNumber || parent.id}: ${parent.sectionName}`,
+              })),
+            ]}
+            className="w-full"
+            buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
+          />
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
             Select an existing round to nest this as a sub-section (e.g. SQL inside Technical Assessment).
           </p>
@@ -233,20 +245,22 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
             <label htmlFor="exam-section-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Section Classification
             </label>
-            <select
-              id="exam-section-type"
-              {...register('sectionTypeId', {
-                valueAsNumber: true,
-                validate: (value) => value > 0 || 'Section classification is required',
-              })}
+            <C2CSelect
+              value={watch('sectionTypeId') ? String(watch('sectionTypeId')) : '0'}
+              onChange={(val) => {
+                setValue('sectionTypeId', Number(val), { shouldValidate: true });
+              }}
+              options={[
+                { value: '0', label: '-- Select classification --' },
+                ...sectionTypes.map((item) => ({
+                  value: String(item.id),
+                  label: item.refName,
+                })),
+              ]}
               disabled={sectionTypesLoading || sectionTypes.length === 0}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value={0}>-- Select classification --</option>
-              {sectionTypes.map((item) => (
-                <option key={item.id} value={item.id}>{item.refName}</option>
-              ))}
-            </select>
+              className="w-full"
+              buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
+            />
             <FormFieldError error={errors.sectionTypeId?.message} />
           </div>
 
@@ -254,19 +268,22 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
             <label htmlFor="exam-section-question-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Question Type Focus
             </label>
-            <select
-              id="exam-section-question-type"
-              {...register('questionTypeId', {
-                setValueAs: (v) => (v === '' || v === 'null' ? null : Number(v)),
-              })}
+            <C2CSelect
+              value={watch('questionTypeId') !== null && watch('questionTypeId') !== undefined ? String(watch('questionTypeId')) : ''}
+              onChange={(val) => {
+                setValue('questionTypeId', val === '' ? null : Number(val), { shouldValidate: true });
+              }}
+              options={[
+                { value: '', label: '-- General / Multi-disciplinary --' },
+                ...questionTypes.map((item) => ({
+                  value: String(item.id),
+                  label: item.refName,
+                })),
+              ]}
               disabled={questionTypesLoading}
-              className="w-full px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- General / Multi-disciplinary --</option>
-              {questionTypes.map((item) => (
-                <option key={item.id} value={item.id}>{item.refName}</option>
-              ))}
-            </select>
+              className="w-full"
+              buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
+            />
           </div>
         </div>
 

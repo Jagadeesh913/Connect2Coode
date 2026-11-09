@@ -7,6 +7,7 @@ import { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { adminCompanySchema, AdminCompanyFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { CompanyBrandLogo } from '../../../companies/components/CompanyBrandLogo';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { Building2, Globe } from 'lucide-react';
 
 export type CompanyFormData = AdminCompanyFormData;
@@ -126,22 +127,22 @@ export const CompanyFormModal: React.FC<CompanyFormModalProps> = ({
             <label htmlFor="company-preset" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Autofill from Indexed Companies
             </label>
-            <select
+            <C2CSelect
               id="company-preset"
-              onChange={(e) => {
-                const found = availableCompanies.find((c) => String(c.id) === e.target.value);
+              value=""
+              onChange={(val) => {
+                const found = availableCompanies.find((c) => String(c.id ?? c.name) === val);
                 if (found) handleSelectPreset(found);
               }}
-              defaultValue=""
-              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Choose a company template --</option>
-              {availableCompanies.map((c) => (
-                <option key={c.id ?? c.name} value={c.id ?? ''}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              placeholder="-- Choose a company template --"
+              options={[
+                { value: '', label: '-- Choose a company template --' },
+                ...availableCompanies.map((c) => ({ value: String(c.id ?? c.name), label: c.name })),
+              ]}
+              ariaLabel="Autofill from Indexed Companies"
+              className="w-full"
+              buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
           </div>
         )}
 

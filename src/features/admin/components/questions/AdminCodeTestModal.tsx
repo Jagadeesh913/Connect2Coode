@@ -6,6 +6,7 @@ import Editor from '@monaco-editor/react';
 import '../../../../core/editor/monacoEnvironment';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
@@ -141,8 +142,8 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   const combinedResourcesError = resourcesError || languagesError ||
     (!languagesLoading && languages.length === 0 ? 'No execution languages are configured.' : null);
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newId = Number(e.target.value);
+  const handleLanguageChange = (val: string) => {
+    const newId = Number(val);
     setSelectedLanguageId(newId);
     const found = languages.find((l) => l.id === newId);
     if (found && STARTER_CODES[found.name]) {
@@ -339,18 +340,31 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
               Runtime:
             </span>
-            <select
-              value={selectedLanguageId ?? ''}
+            <C2CSelect
+              value={String(selectedLanguageId ?? '')}
               onChange={handleLanguageChange}
               disabled={isBusy || combinedResourcesLoading || !languages.length}
-              className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              {languages.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              options={languages.map((l) => ({
+                value: String(l.id),
+                label: l.name,
+                icon: (
+                  <i
+                    className={`text-xs ${
+                      l.name?.toLowerCase().includes('python')
+                        ? 'fa-brands fa-python text-blue-500'
+                        : l.name?.toLowerCase().includes('c++') || l.name?.toLowerCase().includes('cpp')
+                        ? 'fa-solid fa-c text-sky-600'
+                        : l.name?.toLowerCase().includes('javascript') || l.name?.toLowerCase().includes('js')
+                        ? 'fa-brands fa-js text-amber-500'
+                        : 'fa-brands fa-java text-orange-500'
+                    }`}
+                  />
+                ),
+              }))}
+              ariaLabel="Runtime Language"
+              className="w-40"
+              buttonClassName="rounded-xl px-3 py-1.5 text-xs font-bold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
           </div>
 
           <button

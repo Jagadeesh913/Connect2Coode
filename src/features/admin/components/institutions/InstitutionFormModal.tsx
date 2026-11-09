@@ -6,6 +6,7 @@ import { AdminModal } from '../AdminModal';
 import type { Institution } from '../../../../core/types/domain';
 import { adminInstitutionSchema, AdminInstitutionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { GraduationCap } from 'lucide-react';
 
 export type InstitutionFormValues = AdminInstitutionFormData;
@@ -177,14 +178,16 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
             <label htmlFor="institution-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Institution Type <span className="text-rose-500">*</span>
             </label>
-            <select
-              id="institution-type"
-              {...register('institutionType')}
-              className="w-full px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
-            >
-              <option value="COLLEGE">College</option>
-              <option value="UNIVERSITY">University</option>
-            </select>
+            <C2CSelect
+              value={watch('institutionType') || 'COLLEGE'}
+              onChange={(val) => setValue('institutionType', val as 'COLLEGE' | 'UNIVERSITY', { shouldValidate: true })}
+              options={[
+                { value: 'COLLEGE', label: 'College' },
+                { value: 'UNIVERSITY', label: 'University' },
+              ]}
+              className="w-full"
+              buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
             <FormFieldError error={errors.institutionType?.message} />
           </div>
         </div>
@@ -214,20 +217,22 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
             <label htmlFor="institution-university-id" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Affiliated Parent University (Optional)
             </label>
-            <select
-              id="institution-university-id"
-              {...register('universityId', {
-                setValueAs: (v) => (v === '' || v === null || isNaN(Number(v)) ? null : Number(v)),
-              })}
-              className="w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- Autonomous / None --</option>
-              {universities.map((uni) => (
-                <option key={uni.id} value={uni.id}>
-                  {uni.name} ({uni.aisheCode})
-                </option>
-              ))}
-            </select>
+            <C2CSelect
+              value={watch('universityId') !== null && watch('universityId') !== undefined ? String(watch('universityId')) : ''}
+              onChange={(val) => {
+                const parsed = val === '' ? null : Number(val);
+                setValue('universityId', parsed, { shouldValidate: true });
+              }}
+              options={[
+                { value: '', label: '-- Autonomous / None --' },
+                ...universities.map((uni) => ({
+                  value: String(uni.id),
+                  label: `${uni.name} (${uni.aisheCode})`,
+                })),
+              ]}
+              className="w-full"
+              buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
             <FormFieldError error={errors.universityId?.message} />
           </div>
         )}

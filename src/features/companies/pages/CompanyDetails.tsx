@@ -23,6 +23,7 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { GraduationCap, Code2 } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
 import { CodingQuestionTable } from '../../problems/components/CodingQuestionTable';
@@ -776,33 +777,25 @@ export const CompanyDetails: React.FC = () => {
 
             {/* Difficulty dropdown */}
             <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
-              {/* Difficulty Dropdown */}
-              <div className="relative flex-1 sm:flex-initial">
-                <select
-                  value={selectedDifficulty}
-                  onChange={(e) => {
-                    setSelectedDifficulty(e.target.value);
-                    setQuestionPage(1);
-                  }}
-                  disabled={difficultiesLoading || Boolean(difficultiesError)}
-                  className="w-full sm:w-auto bg-slate-50 dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 dark:text-slate-200 outline-none hover:border-blue-500 focus:border-blue-500 transition-colors cursor-pointer pr-9 appearance-none shadow-2xs"
-                >
-                  <option value="" className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200">
-                    {difficultiesError ? 'Difficulty unavailable' : 'Difficulty: All'}
-                  </option>
-                  {difficultyReferences.map((difficulty) => (
-                    <option
-                      key={difficulty.id}
-                      value={difficulty.id}
-                      className="bg-white dark:bg-[#0D1322] text-slate-900 dark:text-slate-200"
-                    >
-                      {difficulty.refName}
-                    </option>
-                  ))}
-                </select>
-                <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
-              </div>
-
+              <C2CSelect
+                value={selectedDifficulty}
+                onChange={(val) => {
+                  setSelectedDifficulty(val);
+                  setQuestionPage(1);
+                }}
+                disabled={difficultiesLoading || Boolean(difficultiesError)}
+                options={[
+                  { value: '', label: difficultiesError ? 'Difficulty unavailable' : 'Difficulty: All' },
+                  ...difficultyReferences.map((difficulty) => ({
+                    value: String(difficulty.id), // value={difficulty.id}
+                    label: difficulty.refName,
+                  })),
+                ]}
+                align="right"
+                ariaLabel="Filter questions by difficulty"
+                className="w-full sm:w-44 shrink-0"
+                buttonClassName="rounded-xl px-4 py-2.5 text-xs sm:text-sm font-semibold border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-[#111A2E] text-slate-900 dark:text-slate-200 hover:border-blue-500 focus:border-blue-500"
+              />
             </div>
 
           </div>

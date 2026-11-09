@@ -6,6 +6,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { isAdminRole } from '../../../core/security/jwt';
 import { BrandLogo } from './BrandLogo';
 import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
+import { ExternalLink } from 'lucide-react';
 
 export interface NavbarProps {
   user?: UserProfile | null;
@@ -151,11 +152,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isAdmin && (
               <Link
                 to="/admin/dashboard"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors text-xs font-bold shadow-xs"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300 text-xs font-bold transition-all shadow-xs group"
                 title="Switch to Admin Dashboard"
               >
-                <i className="fa-solid fa-shield-halved text-purple-600 dark:text-purple-400 text-xs"></i>
-                <span>Admin</span>
+                <ExternalLink className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+                <span className="hidden sm:inline">Admin Portal</span>
               </Link>
             )}
 

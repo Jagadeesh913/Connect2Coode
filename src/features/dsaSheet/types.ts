@@ -1,3 +1,5 @@
+import type { QuestionCompanySummary, QuestionPlatformSummary } from '../../core/types/domain';
+
 export interface DsaSheet {
   id: number;
   sheetCode: string;
@@ -25,8 +27,8 @@ export interface DsaSheetQuestionSummary {
   topicName: string;
   isOwnProblem: boolean;
   isActive: boolean;
-  companies: string[];
-  questionPlatform: string;
+  companies: QuestionCompanySummary[];
+  questionPlatform: QuestionPlatformSummary | null;
 }
 
 export interface DsaSheetQuestionLink {

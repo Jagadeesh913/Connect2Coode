@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { QuestionPayload, QuestionHint, QuestionTestCase } from '../../../../services/questionService';
 import type { CompanyItem } from '../../../../services/admin/adminCompanyService';
 import { toast } from '@/shared/notifications/toast';
@@ -350,8 +351,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     }
   }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, getValues, setValue]);
 
-  const handleDifficultySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedCode = e.target.value;
+  const handleDifficultySelect = (selectedCode: string) => {
     const match = difficulties.find((d) => d.refCode === selectedCode);
     if (match) {
       setValue('difficultyRefGroupCode', match.refGroupCode || 'DIFF');
@@ -360,8 +360,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     }
   };
 
-  const handleTopicSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedCode = e.target.value;
+  const handleTopicSelect = (selectedCode: string) => {
     const match = topics.find((t) => t.refCode === selectedCode);
     if (match) {
       setValue('topicRefGroupCode', match.refGroupCode || 'TOPIC');
@@ -370,8 +369,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     }
   };
 
-  const handleQpfSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedCode = e.target.value;
+  const handleQpfSelect = (selectedCode: string) => {
     const match = qpfs.find((q) => q.refCode === selectedCode);
     if (match) {
       setValue('qpfRefGroupCode', match.refGroupCode || 'QPF');
@@ -396,14 +394,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     });
   };
 
-  const handleSelectCompanyFromDropdown = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
+  const handleSelectCompanyFromDropdown = (val: string) => {
     if (!val) return;
     const match = allCompanies.find((c) => String(c.id) === val || c.name.toLowerCase() === val.toLowerCase());
     if (match && !selectedCompanies.some((c) => (c.id && c.id === match.id) || c.name.toLowerCase() === match.name.toLowerCase())) {
       setSelectedCompanies((prev) => [...prev, match]);
     }
-    e.target.value = '';
   };
 
   const handleRemoveCompany = (companyName: string) => {
@@ -659,19 +655,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                 <label htmlFor="question-difficulty" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Difficulty <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <C2CSelect
                   id="question-difficulty"
                   value={watch('difficultyRefCode') || ''}
                   onChange={handleDifficultySelect}
-                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Difficulty</option>
-                  {difficulties.map((d) => (
-                    <option key={d.id} value={d.refCode}>
-                      {d.refName}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Difficulty"
+                  options={difficulties.map((d) => ({ value: d.refCode, label: d.refName }))}
+                  ariaLabel="Difficulty"
+                  className="w-full"
+                  buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
                 <FormFieldError error={errors.difficultyRefCode?.message} />
               </div>
 
@@ -679,19 +672,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                 <label htmlFor="question-topic" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Category / Topic <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <C2CSelect
                   id="question-topic"
                   value={watch('topicRefCode') || ''}
                   onChange={handleTopicSelect}
-                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Category</option>
-                  {topics.map((t) => (
-                    <option key={t.id} value={t.refCode}>
-                      {t.refName}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Category"
+                  options={topics.map((t) => ({ value: t.refCode, label: t.refName }))}
+                  ariaLabel="Category / Topic"
+                  className="w-full"
+                  buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
                 <FormFieldError error={errors.topicRefCode?.message} />
               </div>
 
@@ -699,19 +689,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                 <label htmlFor="question-platform" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Platform Origin <span className="text-rose-500">*</span>
                 </label>
-                <select
+                <C2CSelect
                   id="question-platform"
                   value={watch('qpfRefCode') || ''}
                   onChange={handleQpfSelect}
-                  className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Select Platform</option>
-                  {qpfs.map((q) => (
-                    <option key={q.id} value={q.refCode}>
-                      {q.refName}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Platform"
+                  options={qpfs.map((q) => ({ value: q.refCode, label: q.refName }))}
+                  ariaLabel="Platform Origin"
+                  className="w-full"
+                  buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
                 <FormFieldError error={errors.qpfRefCode?.message} />
               </div>
             </div>
@@ -755,19 +742,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                 <label htmlFor="question-company" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Target Hiring Companies
                 </label>
-                <select
+                <C2CSelect
                   id="question-company"
+                  value=""
                   onChange={handleSelectCompanyFromDropdown}
-                  defaultValue=""
-                  className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">+ Associate Company</option>
-                  {allCompanies.map((c) => (
-                    <option key={c.id ?? c.name} value={c.id ?? ''}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="+ Associate Company"
+                  options={allCompanies.map((c) => ({ value: String(c.id ?? c.name), label: c.name }))}
+                  ariaLabel="Associate Company"
+                  className="w-48"
+                  buttonClassName="rounded-xl px-3 py-1.5 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                />
               </div>
 
               {selectedCompanies.length === 0 ? (
@@ -920,22 +904,16 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                         >
                           Type:
                         </label>
-                        <select
+                        <C2CSelect
                           id={`tc-type-${idx}`}
-                          aria-label={`Test Case #${idx + 1} Type`}
+                          ariaLabel={`Test Case #${idx + 1} Type`}
                           value={tc.typeRefCode || ''}
-                          onChange={(e) => handleTestCaseChange(idx, 'typeRefCode', e.target.value)}
-                          className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        >
-                          {testCaseTypes.map((t) => (
-                            <option key={t.id || t.refCode} value={t.refCode}>
-                              {t.refName || t.refCode}
-                            </option>
-                          ))}
-                          {testCaseTypes.length === 0 && (
-                            <option value="">No API test case types available</option>
-                          )}
-                        </select>
+                          onChange={(val) => handleTestCaseChange(idx, 'typeRefCode', val)}
+                          options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName || t.refCode }))}
+                          placeholder="Select Type"
+                          className="w-36"
+                          buttonClassName="rounded-xl px-2.5 py-1.5 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                        />
                       </div>
 
                       {/* Hidden Case Toggle */}

@@ -16,6 +16,11 @@ import type {
 
 export type CompanyItem = Company;
 
+// The observed /company/list contract returns 24 records per page. Keep the
+// catalog selector on that supported request shape instead of requesting an
+// unverified oversized page that can fail independently of the page UI.
+const COMPANY_LIST_PAGE_SIZE = 24;
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -205,16 +210,17 @@ export const companyService = {
    */
   async getAllCompanies(signal?: AbortSignal): Promise<ApiResponse<Company[]>> {
     const firstPage = await this.getCompaniesPaginated(
-      { pageNumber: 0, pageSize: 100, sortBy: 'name', sortDirection: 'ASC' },
+      { pageNumber: 0, pageSize: COMPANY_LIST_PAGE_SIZE, sortBy: 'name', sortDirection: 'ASC' },
       signal
     );
     const pages: PaginatedData<CompanyItem>[] = [firstPage.data];
     const totalPages = Math.max(1, Number(firstPage.data.totalPages) || 1);
+    const pageSize = Math.max(1, Number(firstPage.data.pageSize) || COMPANY_LIST_PAGE_SIZE);
 
     for (let pageNumber = 1; pageNumber < totalPages; pageNumber += 1) {
       signal?.throwIfAborted();
       const response = await this.getCompaniesPaginated(
-        { pageNumber, pageSize: 100, sortBy: 'name', sortDirection: 'ASC' },
+        { pageNumber, pageSize, sortBy: 'name', sortDirection: 'ASC' },
         signal
       );
       pages.push(response.data);

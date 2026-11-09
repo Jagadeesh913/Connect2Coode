@@ -12,6 +12,7 @@ import { openAuthModal } from '../../auth/redux/authSlice';
 import { fetchLanguages } from '../../languages/redux/languageSlice';
 import {
   executionService,
+  getExecutionVerdict,
   isExecutionResultSuccessful,
   LanguageDropdownItem,
   ExecutionResultData,
@@ -39,6 +40,7 @@ import { getInternalEditorClipboardAction } from '../utils/internalEditorClipboa
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
 import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
+import './ProblemDetails.css';
 
 interface QuestionTestCase {
   id?: number;
@@ -145,7 +147,13 @@ export const ProblemDetails: React.FC = () => {
   const [codeByLang, setCodeByLang] = useState<Record<number, string>>({});
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState<boolean>(false);
-  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'problem' | 'editor'>('problem');
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'problem' | 'editor' | 'tests'>('editor');
+  const [problemPanelWidth, setProblemPanelWidth] = useState(350);
+  const [consolePanelHeight, setConsolePanelHeight] = useState(260);
+  const [draggingSplitter, setDraggingSplitter] = useState<'problem' | 'console' | null>(null);
+  const layoutRef = useRef<HTMLElement>(null);
+  const editorWorkspaceRef = useRef<HTMLDivElement>(null);
+  const splitterPointerRef = useRef<{ kind: 'problem' | 'console'; pointerId: number } | null>(null);
 
   // Native Fullscreen Toggle with safe browser fallback
   const toggleFullscreen = useCallback(async () => {
@@ -212,7 +220,7 @@ export const ProblemDetails: React.FC = () => {
   const [consoleHeight, setConsoleHeight] = useState<'normal' | 'collapsed' | 'expanded'>('normal');
 
   // Active Tabs
-  const [leftTab, setLeftTab] = useState<'description' | 'submissions' | 'companies' | 'hints'>('description');
+  const [leftTab, setLeftTab] = useState<'description' | 'testcases' | 'submissions' | 'companies' | 'hints'>('description');
   const [bottomTab, setBottomTab] = useState<'testcases' | 'custom' | 'results'>('testcases');
   const [customInput, setCustomInput] = useState<string>('');
   const resultsPanelRef = useRef<HTMLDivElement>(null);
@@ -645,7 +653,10 @@ export const ProblemDetails: React.FC = () => {
         toast.error(`${result.failedTestCases} sample case(s) failed`);
       }
       setExecutionResult(result);
-      setSelectedTestCaseIdx(0);
+      const firstVisibleFailureIndex = result.testCases.findIndex(
+        (testCase) => !testCase.isHidden && String(testCase.status).toLowerCase() !== 'passed'
+      );
+      setSelectedTestCaseIdx(firstVisibleFailureIndex >= 0 ? firstVisibleFailureIndex : 0);
     } catch (err: unknown) {
       if (controller.signal.aborted) return;
       const msg = getActionableErrorMessage(err, 'We could not run your code. Please try again.');
@@ -715,6 +726,10 @@ export const ProblemDetails: React.FC = () => {
         toast.error(`Submission: ${result.failedTestCases || 1} test case(s) failed`);
       }
       setExecutionResult(result);
+      const firstVisibleFailureIndex = result.testCases.findIndex(
+        (testCase) => !testCase.isHidden && String(testCase.status).toLowerCase() !== 'passed'
+      );
+      setSelectedTestCaseIdx(firstVisibleFailureIndex >= 0 ? firstVisibleFailureIndex : 0);
 
       // The submission endpoint owns history; refetch it instead of synthesizing a client record.
       setSubmissionsRetry((attempt) => attempt + 1);
@@ -805,6 +820,83 @@ export const ProblemDetails: React.FC = () => {
     }
   }, [sampleTestCases.length, selectedTestCaseIdx]);
 
+  const clampProblemPanelWidth = useCallback((value: number) => {
+    const availableWidth = layoutRef.current?.clientWidth ?? window.innerWidth;
+    return Math.round(Math.min(Math.max(value, 270), Math.max(270, availableWidth - 308)));
+  }, []);
+
+  const clampConsolePanelHeight = useCallback((value: number) => {
+    const availableHeight = editorWorkspaceRef.current?.clientHeight ?? window.innerHeight;
+    const minimumEditorHeight = availableHeight < 480 ? 90 : 150;
+    const maximumHeight = Math.max(120, Math.min(availableHeight * 0.68, availableHeight - minimumEditorHeight - 64));
+    return Math.round(Math.min(Math.max(value, 120), maximumHeight));
+  }, []);
+
+  const handleSplitterPointerDown = useCallback(
+    (kind: 'problem' | 'console', event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      splitterPointerRef.current = { kind, pointerId: event.pointerId };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      setDraggingSplitter(kind);
+      if (kind === 'console') setConsoleHeight('normal');
+    },
+    []
+  );
+
+  const handleSplitterPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const action = splitterPointerRef.current;
+      if (!action || action.pointerId !== event.pointerId) return;
+      if (action.kind === 'problem') {
+        const bounds = layoutRef.current?.getBoundingClientRect();
+        if (bounds) setProblemPanelWidth(clampProblemPanelWidth(event.clientX - bounds.left - 4));
+        return;
+      }
+      const bounds = editorWorkspaceRef.current?.getBoundingClientRect();
+      if (bounds) setConsolePanelHeight(clampConsolePanelHeight(bounds.bottom - event.clientY - 4));
+    },
+    [clampConsolePanelHeight, clampProblemPanelWidth]
+  );
+
+  const finishSplitterDrag = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const action = splitterPointerRef.current;
+    if (!action || action.pointerId !== event.pointerId) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    splitterPointerRef.current = null;
+    setDraggingSplitter(null);
+  }, []);
+
+  const handleSplitterKeyDown = useCallback(
+    (kind: 'problem' | 'console', event: React.KeyboardEvent<HTMLDivElement>) => {
+      const amount = event.shiftKey ? 40 : 16;
+      if (kind === 'problem' && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        event.preventDefault();
+        setProblemPanelWidth((value) =>
+          clampProblemPanelWidth(value + (event.key === 'ArrowRight' ? amount : -amount))
+        );
+      }
+      if (kind === 'console' && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        event.preventDefault();
+        setConsoleHeight('normal');
+        setConsolePanelHeight((value) =>
+          clampConsolePanelHeight(value + (event.key === 'ArrowUp' ? amount : -amount))
+        );
+      }
+      if (event.key === 'Home') {
+        event.preventDefault();
+        if (kind === 'problem') setProblemPanelWidth(clampProblemPanelWidth(350));
+        else {
+          setConsoleHeight('normal');
+          setConsolePanelHeight(clampConsolePanelHeight(260));
+        }
+      }
+    },
+    [clampConsolePanelHeight, clampProblemPanelWidth]
+  );
+
   if (!isProblemLoadedForRoute && (loadingProblem || !problemError)) {
     return (
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex flex-col gap-6 font-sans">
@@ -868,139 +960,105 @@ export const ProblemDetails: React.FC = () => {
     );
   }
 
-  const activeSampleCase = sampleTestCases[selectedTestCaseIdx];
   const activeRunCase = executionResult?.testCases?.[selectedTestCaseIdx];
+  const executionVerdict = executionResult ? getExecutionVerdict(executionResult) : null;
+  const executionVerdictLabel = executionVerdict === 'compilation-error'
+    ? 'Compilation error'
+    : executionVerdict === 'runtime-error'
+      ? 'Runtime error'
+      : executionVerdict === 'accepted'
+        ? 'Accepted'
+        : 'Wrong answer';
 
   return (
     <div
       ref={workspaceRef}
-      className={`relative w-full flex-1 flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 min-h-screen ${
+      className={`c2c-problem-page relative w-full flex-1 flex flex-col bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200 ${
         isFullscreen
-          ? 'fixed inset-0 z-[999] w-screen h-screen overflow-y-auto bg-[#FBFBFD] dark:bg-[#070A13] p-3 sm:p-5'
-          : 'overflow-x-hidden pb-16'
+          ? 'fixed inset-0 z-[999] w-screen !h-screen bg-[#FBFBFD] dark:bg-[#070A13]'
+          : ''
       }`}
       aria-label="Secure coding assessment workspace"
+      aria-description="Clipboard, context-menu, drag/drop, printing, source-view, and screen-capture shortcuts are restricted; Developer Tools remain available."
     >
-      {/* Ambient glowing blobs matching Home page */}
-      <div className="hidden dark:block fixed top-20 -left-48 w-96 h-[500px] bg-purple-600/20 rounded-full blur-[120px] pointer-events-none -z-10" />
-      <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
-      <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
-
-      {/* Coding workspaces use the full available desktop width while retaining page gutters. */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6 flex flex-col flex-1 min-h-0">
-        {/* 1. TOP NAVBAR / WORKSPACE TOOLBAR (Matching Reference Image 5) */}
-      <header className="flex flex-wrap items-center justify-between gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 mb-4 bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs">
-        
-        {/* Left: Back button & Breadcrumbs */}
-        <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
-          <Link
-            to="/practice"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 px-2.5 sm:px-3.5 py-1.5 rounded-full transition-colors shadow-2xs whitespace-nowrap"
-            title="Back to Problems"
-          >
-            <i className="fa-solid fa-arrow-left text-[11px]"></i>
-            <span><span className="hidden sm:inline">Back to </span>Problems</span>
-          </Link>
-
-          <span className="text-slate-300 dark:text-slate-700 hidden md:inline">|</span>
-
-          {/* Breadcrumb Hierarchy */}
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 hidden md:flex min-w-0">
-            {(problem?.topicRefName || problem?.topic) && (
-              <>
-                <span className="truncate">{problem.topicRefName || problem.topic}</span>
-                <i className="fa-solid fa-chevron-right text-[9px] text-slate-400 shrink-0"></i>
-              </>
-            )}
-            <span className="font-bold text-slate-900 dark:text-white truncate max-w-xs">
-              {problem?.title || ''}
-            </span>
-          </div>
-        </div>
-
-        {/* Right: Previous / Next Problem Quick Buttons */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <span
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300"
-            title="Clipboard, context-menu, drag/drop, printing, source-view and screen-capture shortcuts are restricted in this workspace; Developer Tools remain available"
-          >
-            <i className="fa-solid fa-shield-halved" aria-hidden="true"></i>
-            Integrity mode
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              const currentNum = Number(problem?.id);
-              if (currentNum > 1) {
-                navigate(`/problems/${currentNum - 1}`);
-              } else {
-                navigate('/practice');
-              }
-            }}
-            className="px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <i className="fa-solid fa-chevron-left text-[10px]"></i>
-            <span className="hidden sm:inline">Previous</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              const currentNum = Number(problem?.id);
-              if (currentNum) {
-                navigate(`/problems/${currentNum + 1}`);
-              } else {
-                navigate('/practice');
-              }
-            }}
-            className="px-2.5 sm:px-3.5 py-1.5 rounded-full text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
-          >
-            <span className="hidden sm:inline">Next</span>
-            <i className="fa-solid fa-chevron-right text-[10px]"></i>
-          </button>
-        </div>
-      </header>
-
-      {/* Mobile Tab Switcher (< lg) */}
-      <div className="lg:hidden flex items-center p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl mb-4 w-full">
+      <div className="c2c-problem-shell flex-1">
+      <div className="lg:hidden flex items-stretch bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 w-full" role="tablist" aria-label="Workspace views">
         <button
           type="button"
           onClick={() => setMobileWorkspaceTab('problem')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          role="tab"
+          aria-selected={mobileWorkspaceTab === 'problem'}
+          className={`flex-1 border-b-2 py-2 px-2 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
             mobileWorkspaceTab === 'problem'
-              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-slate-600 dark:text-slate-400'
           }`}
         >
           <i className="fa-solid fa-file-lines text-xs"></i>
-          <span>Problem Details</span>
+          <span>Description</span>
         </button>
         <button
           type="button"
           onClick={() => setMobileWorkspaceTab('editor')}
-          className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+          role="tab"
+          aria-selected={mobileWorkspaceTab === 'editor'}
+          className={`flex-1 border-b-2 py-2 px-2 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
             mobileWorkspaceTab === 'editor'
-              ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
-              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-slate-600 dark:text-slate-400'
           }`}
         >
           <i className="fa-solid fa-code text-xs"></i>
-          <span>Code & Console</span>
+          <span>Editor</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobileWorkspaceTab === 'tests'}
+          onClick={() => {
+            setLeftTab('testcases');
+            setMobileWorkspaceTab('tests');
+          }}
+          className={`flex-1 border-b-2 py-2 px-2 text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer ${
+            mobileWorkspaceTab === 'tests'
+              ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+              : 'border-transparent text-slate-600 dark:text-slate-400'
+          }`}
+        >
+          <i className="fa-regular fa-square-check text-xs"></i>
+          <span>Test cases</span>
         </button>
       </div>
 
-      {/* 2. MAIN WORKSPACE (2-COLUMN SPLIT PANE) */}
-      <main className="grid grid-cols-1 lg:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.35fr)] gap-4 flex-1 items-start lg:items-stretch w-full lg:h-[calc(100vh-9.5rem)] lg:min-h-[680px] lg:max-h-[920px] min-h-0">
+      <main
+        ref={layoutRef}
+        className="c2c-problem-layout"
+        data-mobile-view={mobileWorkspaceTab}
+        data-left-tab={leftTab}
+        data-bottom-tab={bottomTab}
+        style={{ '--problem-panel-width': `${problemPanelWidth}px` } as React.CSSProperties}
+      >
         
         {/* ========================================================
             LEFT COLUMN: PROBLEM SPECIFICATION & DETAILS TABS (5 COLS)
            ======================================================== */}
-        <div className={`${mobileWorkspaceTab === 'problem' ? 'flex' : 'hidden'} lg:flex flex-col bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs h-[560px] sm:h-[680px] lg:h-full overflow-hidden w-full min-h-0`}>
+        <aside className="c2c-problem-panel flex flex-col bg-white dark:bg-[#0F172A] border-r border-slate-200 dark:border-slate-800 overflow-hidden w-full h-full" aria-label="Problem details">
           
           {/* Tab Bar: Description | Submissions | Companies | Hints */}
-          <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-3 py-2 overflow-x-auto no-scrollbar gap-1.5 shrink-0">
+          <div className="flex items-center border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-2.5 py-2 overflow-x-auto no-scrollbar gap-1.5 shrink-0">
+            <Link
+              to="/practice"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-blue-600 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-blue-400"
+              aria-label="Back to all problems"
+              title="Back to all problems"
+            >
+              <i className="fa-solid fa-arrow-left text-xs" aria-hidden="true"></i>
+            </Link>
             <button
-              onClick={() => setLeftTab('description')}
+              onClick={() => {
+                setLeftTab('description');
+                setMobileWorkspaceTab('problem');
+              }}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
                 leftTab === 'description'
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-2xs border border-slate-200 dark:border-slate-700 font-bold'
@@ -1009,6 +1067,24 @@ export const ProblemDetails: React.FC = () => {
             >
               <i className="fa-solid fa-file-lines text-xs text-blue-600 dark:text-blue-400"></i>
               <span>Description</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLeftTab('testcases');
+                setMobileWorkspaceTab('tests');
+              }}
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg border transition-colors ${
+                leftTab === 'testcases'
+                  ? 'border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/70 dark:bg-blue-950/40 dark:text-blue-400'
+                  : 'border-transparent text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+              }`}
+              aria-label="Test cases"
+              title="Test cases"
+              aria-pressed={leftTab === 'testcases'}
+            >
+              <i className="fa-regular fa-square-check text-xs" aria-hidden="true"></i>
             </button>
 
             <button
@@ -1060,7 +1136,7 @@ export const ProblemDetails: React.FC = () => {
           </div>
 
           {/* Left Panel Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+          <div className="c2c-problem-scroll flex-1 overflow-y-auto p-5 space-y-6 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
             
             {/* Header: Title, Badges & Bookmark */}
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
@@ -1203,6 +1279,75 @@ export const ProblemDetails: React.FC = () => {
                   </div>
                 )}
               </div>
+            )}
+
+            {leftTab === 'testcases' && (
+              <section className="space-y-3" aria-label="Public test cases">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">Test cases</h3>
+                    <p className="mt-0.5 font-mono text-[10px] uppercase tracking-wider text-slate-500">
+                      {sampleTestCases.length} public sample{sampleTestCases.length === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBottomTab(executionResult || executionError ? 'results' : 'custom');
+                      setMobileWorkspaceTab('editor');
+                    }}
+                    className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-bold text-blue-600 hover:bg-blue-50 dark:border-slate-700 dark:text-blue-400 dark:hover:bg-blue-950/30"
+                  >
+                    {executionResult || executionError ? 'View results' : 'Custom input'}
+                  </button>
+                </div>
+                {sampleTestCases.length > 0 ? (
+                  <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                    {sampleTestCases.map((testCase, index) => {
+                      const isOpen = selectedTestCaseIdx === index;
+                      return (
+                        <div key={testCase.id ?? testCase.testCaseId ?? index} className="border-b border-slate-200 last:border-b-0 dark:border-slate-800">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedTestCaseIdx(isOpen ? -1 : index)}
+                            className={`flex min-h-12 w-full items-center justify-between gap-3 px-4 text-left text-xs font-bold transition-colors ${
+                              isOpen
+                                ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-[#0F172A] dark:text-slate-300 dark:hover:bg-slate-900'
+                            }`}
+                            aria-expanded={isOpen}
+                            aria-controls={`problem-test-case-${index}`}
+                          >
+                            <span>Case {index + 1}</span>
+                            <i className={`fa-solid fa-chevron-${isOpen ? 'up' : 'down'} text-[10px] text-slate-400`} aria-hidden="true"></i>
+                          </button>
+                          {isOpen && (
+                            <div id={`problem-test-case-${index}`} className="space-y-4 border-t border-slate-200 bg-slate-50/70 px-4 py-4 font-mono text-xs dark:border-slate-800 dark:bg-slate-900/50">
+                              <div>
+                                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Input</div>
+                                <pre className="whitespace-pre-wrap break-words text-slate-800 dark:text-slate-200">{testCase.input || 'No input'}</pre>
+                              </div>
+                              <div className="border-t border-slate-200 pt-3 dark:border-slate-800">
+                                <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Expected output</div>
+                                <pre className="whitespace-pre-wrap break-words font-semibold text-emerald-600 dark:text-emerald-400">{testCase.expectedOutput}</pre>
+                              </div>
+                              {testCase.explanation && (
+                                <div className="border-t border-slate-200 pt-3 font-sans text-xs leading-relaxed text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                                  {testCase.explanation}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/50 dark:text-slate-400">
+                    No public test cases were returned. Hidden cases remain available only to the submission evaluator.
+                  </p>
+                )}
+              </section>
             )}
 
             {/* 2. SUBMISSIONS TAB */}
@@ -1369,15 +1514,63 @@ export const ProblemDetails: React.FC = () => {
             )}
 
           </div>
+          <nav className="flex h-12 shrink-0 items-center justify-between border-t border-slate-200 px-4 text-xs font-bold dark:border-slate-800" aria-label="Problem navigation">
+            <button
+              type="button"
+              onClick={() => {
+                const currentNum = Number(problem?.id);
+                navigate(currentNum > 1 ? `/problems/${currentNum - 1}` : '/practice');
+              }}
+              className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
+            >
+              <i className="fa-solid fa-arrow-left" aria-hidden="true"></i> Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const currentNum = Number(problem?.id);
+                navigate(currentNum ? `/problems/${currentNum + 1}` : '/practice');
+              }}
+              className="inline-flex items-center gap-2 text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400"
+            >
+              Next <i className="fa-solid fa-arrow-right" aria-hidden="true"></i>
+            </button>
+          </nav>
+        </aside>
+
+        <div
+          className="c2c-splitter c2c-splitter-vertical"
+          role="separator"
+          aria-label="Resize problem and editor panels"
+          aria-orientation="vertical"
+          aria-valuemin={270}
+          aria-valuemax={Math.max(270, (layoutRef.current?.clientWidth ?? 658) - 308)}
+          aria-valuenow={problemPanelWidth}
+          tabIndex={0}
+          data-dragging={draggingSplitter === 'problem'}
+          onPointerDown={(event) => handleSplitterPointerDown('problem', event)}
+          onPointerMove={handleSplitterPointerMove}
+          onPointerUp={finishSplitterDrag}
+          onPointerCancel={finishSplitterDrag}
+          onLostPointerCapture={finishSplitterDrag}
+          onDoubleClick={() => setProblemPanelWidth(clampProblemPanelWidth(350))}
+          onKeyDown={(event) => handleSplitterKeyDown('problem', event)}
+          title="Drag to resize problem and editor panels; double-click to reset"
+        >
+          <span className="c2c-splitter-grip-vertical" aria-hidden="true"></span>
         </div>
 
         {/* ========================================================
             RIGHT COLUMN: MONACO CODE EDITOR & INTERACTIVE TESTBENCH (7 COLS)
            ======================================================== */}
-        <div className={`${mobileWorkspaceTab === 'editor' ? 'flex' : 'hidden'} lg:flex flex-col gap-4 min-w-0 w-full lg:h-full min-h-0`}>
+        <div
+          ref={editorWorkspaceRef}
+          className="c2c-editor-workspace"
+          style={{ '--console-panel-height': `${consolePanelHeight}px` } as React.CSSProperties}
+        >
           
           {/* EDITOR CARD CONTAINER */}
-          <div className="bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden flex flex-col w-full lg:flex-1 lg:min-h-[280px]">
+          <div className="c2c-editor-card bg-white dark:bg-[#0F172A] border-b border-slate-200 dark:border-slate-800 w-full">
             
             {/* Editor Action Bar (Matching Reference Image 5) */}
             <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2.5 bg-slate-50/70 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
@@ -1395,7 +1588,26 @@ export const ProblemDetails: React.FC = () => {
                     disabled={isExecuting || languages.length === 0}
                     placeholder={loadingLanguages ? 'Loading languages…' : 'No languages available'}
                     ariaLabel="Programming language"
-                    options={languages.map((language) => ({ value: language.id, label: language.name }))}
+                    options={languages.map((language) => {
+                      const norm = language.name?.toLowerCase() || '';
+                      return {
+                        value: language.id,
+                        label: language.name,
+                        icon: (
+                          <i
+                            className={`text-xs ${
+                              norm.includes('python')
+                                ? 'fa-brands fa-python text-blue-500'
+                                : norm.includes('c++') || norm.includes('cpp')
+                                ? 'fa-solid fa-c text-sky-600'
+                                : norm.includes('javascript') || norm.includes('js')
+                                ? 'fa-brands fa-js text-amber-500'
+                                : 'fa-brands fa-java text-orange-500'
+                            }`}
+                          />
+                        ),
+                      };
+                    })}
                     buttonClassName="pl-8 pr-3"
                     leading={selectedLanguage ? <i className={`text-xs ${
                     monacoLang === 'python'
@@ -1468,7 +1680,7 @@ export const ProblemDetails: React.FC = () => {
               onCopyCapture={(event) => event.preventDefault()}
               onCutCapture={(event) => event.preventDefault()}
               onPasteCapture={(event) => event.preventDefault()}
-              className={`w-full bg-white dark:bg-[#0F172A] transition-all duration-300 h-[400px] lg:h-auto lg:flex-1 lg:min-h-[260px] ${consoleHeight === 'expanded' ? 'sm:h-[280px]' : consoleHeight === 'collapsed' ? 'sm:h-[620px]' : 'sm:h-[400px]'}`}
+              className="w-full min-h-0 flex-1 bg-white dark:bg-[#0F172A]"
             >
               {loadingLanguages && languages.length === 0 ? (
                 <div role="status" aria-label="Loading code editor" className="h-full p-5 space-y-3">
@@ -1519,10 +1731,39 @@ export const ProblemDetails: React.FC = () => {
             </div>
           </div>
 
+          <div
+            className="c2c-splitter c2c-splitter-horizontal"
+            role="separator"
+            aria-label="Resize editor and console panels"
+            aria-orientation="horizontal"
+            aria-valuemin={120}
+            aria-valuemax={Math.max(120, Math.round((editorWorkspaceRef.current?.clientHeight ?? 500) * 0.68))}
+            aria-valuenow={consolePanelHeight}
+            tabIndex={0}
+            data-dragging={draggingSplitter === 'console'}
+            onPointerDown={(event) => handleSplitterPointerDown('console', event)}
+            onPointerMove={handleSplitterPointerMove}
+            onPointerUp={finishSplitterDrag}
+            onPointerCancel={finishSplitterDrag}
+            onLostPointerCapture={finishSplitterDrag}
+            onDoubleClick={() => {
+              setConsoleHeight('normal');
+              setConsolePanelHeight(clampConsolePanelHeight(260));
+            }}
+            onKeyDown={(event) => handleSplitterKeyDown('console', event)}
+            title="Drag to resize editor and console panels; double-click to reset"
+          >
+            <span className="c2c-splitter-grip-horizontal" aria-hidden="true"></span>
+          </div>
+
           {/* ========================================================
               BOTTOM RESULTS & INTERACTIVE CONSOLE (Matching Reference Image 5)
              ======================================================== */}
-          <div className={`bg-white dark:bg-[#0F172A] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs flex flex-col transition-all duration-300 overflow-hidden shrink-0 ${consoleHeight === 'collapsed' ? 'h-[48px]' : consoleHeight === 'expanded' ? 'h-[500px] lg:h-[60%]' : 'h-[380px] lg:h-[42%]'}`}>
+          <section
+            className="c2c-console-dock bg-white dark:bg-[#0F172A]"
+            data-size={consoleHeight}
+            aria-label="Test cases and execution results"
+          >
             
             {/* Console Header Bar */}
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 px-4 py-2.5 flex-wrap gap-2 shrink-0">
@@ -1622,7 +1863,7 @@ export const ProblemDetails: React.FC = () => {
 
             {/* Console Body */}
             {consoleHeight !== 'collapsed' && (
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="c2c-console-scroll flex-1 overflow-y-auto p-4">
                 
                 {/* 1. TEST CASES TAB (Matching Reference Image 5) */}
                 {bottomTab === 'testcases' && (
@@ -1643,52 +1884,45 @@ export const ProblemDetails: React.FC = () => {
                     </div>
 
                     {sampleTestCases.length > 0 ? (
-                      <>
-                        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5" role="tablist" aria-label="Sample test cases">
-                        {sampleTestCases.map((_, i) => (
-                          <button
-                            key={i}
-                            type="button"
-                            role="tab"
-                            aria-selected={selectedTestCaseIdx === i}
-                            onClick={() => setSelectedTestCaseIdx(i)}
-                            className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                              selectedTestCaseIdx === i
-                                ? 'bg-blue-600 text-white shadow-sm'
-                                : 'bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white border border-slate-200 dark:border-slate-800'
-                            }`}
-                          >
-                            <span className={`flex h-5 w-5 items-center justify-center rounded-md text-[10px] ${selectedTestCaseIdx === i ? 'bg-white/20' : 'bg-slate-200 dark:bg-slate-800'}`}>{i + 1}</span>
-                            Case {i + 1}
-                          </button>
-                        ))}
-                        </div>
-
-                        {activeSampleCase && (
-                          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 font-mono text-xs">
-                            <section className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/60">
-                              <div className="mb-2 flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                <i className="fa-solid fa-arrow-right-to-bracket text-blue-500" aria-hidden="true"></i>
-                                Input
-                              </div>
-                              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-200 bg-white p-3 text-slate-800 dark:border-slate-800 dark:bg-[#0B1120] dark:text-slate-200">{activeSampleCase.input || 'No input'}</pre>
-                            </section>
-                            <section className="min-w-0 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/15">
-                              <div className="mb-2 flex items-center gap-2 font-sans text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                                <i className="fa-solid fa-bullseye" aria-hidden="true"></i>
-                                Expected output
-                              </div>
-                              <pre className="max-h-32 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-200 bg-white p-3 font-semibold text-slate-900 dark:border-emerald-900/60 dark:bg-[#0B1120] dark:text-white">{activeSampleCase.expectedOutput}</pre>
-                            </section>
-                            {activeSampleCase.explanation && (
-                              <div className="xl:col-span-2 rounded-xl border border-slate-200 bg-white px-3.5 py-3 font-sans text-xs leading-relaxed text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
-                                <span className="mr-2 font-bold text-slate-900 dark:text-white">Why:</span>
-                                {activeSampleCase.explanation}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </>
+                      <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800">
+                        {sampleTestCases.map((testCase, index) => {
+                          const isOpen = selectedTestCaseIdx === index;
+                          return (
+                            <div key={testCase.id ?? testCase.testCaseId ?? index} className="border-b border-slate-200 last:border-b-0 dark:border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedTestCaseIdx(isOpen ? -1 : index)}
+                                className={`flex min-h-11 w-full items-center justify-between px-4 text-left text-xs font-bold ${
+                                  isOpen
+                                    ? 'bg-slate-100 text-slate-900 dark:bg-slate-800 dark:text-white'
+                                    : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-[#0F172A] dark:text-slate-300 dark:hover:bg-slate-900'
+                                }`}
+                                aria-expanded={isOpen}
+                                aria-controls={`dock-test-case-${index}`}
+                              >
+                                <span>Case {index + 1}</span>
+                              </button>
+                              {isOpen && (
+                                <div id={`dock-test-case-${index}`} className="grid gap-3 border-t border-slate-200 bg-slate-50/70 p-4 font-mono text-xs dark:border-slate-800 dark:bg-slate-900/50 xl:grid-cols-2">
+                                  <div className="min-w-0">
+                                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Input</div>
+                                    <pre className="whitespace-pre-wrap break-words text-slate-800 dark:text-slate-200">{testCase.input || 'No input'}</pre>
+                                  </div>
+                                  <div className="min-w-0 border-t border-slate-200 pt-3 dark:border-slate-800 xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
+                                    <div className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Expected output</div>
+                                    <pre className="whitespace-pre-wrap break-words font-semibold text-emerald-600 dark:text-emerald-400">{testCase.expectedOutput}</pre>
+                                  </div>
+                                  {testCase.explanation && (
+                                    <p className="border-t border-slate-200 pt-3 font-sans text-xs leading-relaxed text-slate-600 dark:border-slate-800 dark:text-slate-300 xl:col-span-2">
+                                      {testCase.explanation}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="flex min-h-36 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center dark:border-slate-700 dark:bg-slate-900/40">
                         <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
@@ -1840,7 +2074,7 @@ export const ProblemDetails: React.FC = () => {
                                   }`}
                                 >
                                   <span className={`w-2 h-2 rounded-full ${isPassed ? 'bg-emerald-400' : 'bg-rose-500'}`}></span>
-                                  <span>Case {idx + 1}</span>
+                                  <span>{tc.isHidden ? 'Private case' : `Sample ${idx + 1}`}</span>
                                 </button>
                               );
                             })}
@@ -1850,7 +2084,7 @@ export const ProblemDetails: React.FC = () => {
                         {activeRunCase && (
                           <div className="p-4 bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3 font-mono text-xs">
                             <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
-                              <span className="text-slate-500">Case {selectedTestCaseIdx + 1}</span>
+                              <span className="text-slate-500">{activeRunCase.isHidden ? 'Private evaluation' : `Sample case ${selectedTestCaseIdx + 1}`}</span>
                               <span
                                 className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
                                   String(activeRunCase.status).toLowerCase() === 'passed'
@@ -1862,6 +2096,11 @@ export const ProblemDetails: React.FC = () => {
                               </span>
                             </div>
 
+                            {activeRunCase.isHidden ? (
+                              <p className="rounded-xl border border-slate-200 bg-white p-3 font-sans text-xs leading-relaxed text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
+                                This private evaluation contributes to your verdict. Its input, output, and diagnostics are not displayed.
+                              </p>
+                            ) : <>
                             {activeRunCase.input && (
                               <div>
                                 <span className="text-slate-500 block mb-1 text-[11px]">Input:</span>
@@ -1903,6 +2142,13 @@ export const ProblemDetails: React.FC = () => {
                                 </pre>
                               </div>
                             )}
+                            </>}
+                            {(activeRunCase.executionTime !== undefined || activeRunCase.memoryUsage !== undefined) && (
+                              <div className="grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 text-[11px] dark:border-slate-800">
+                                <span className="text-slate-500">Time <strong className="ml-1 text-slate-800 dark:text-slate-200">{activeRunCase.executionTime ?? 'Not reported'}</strong></span>
+                                <span className="text-slate-500">Memory <strong className="ml-1 text-slate-800 dark:text-slate-200">{activeRunCase.memoryUsage ?? 'Not reported'}</strong></span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1918,7 +2164,7 @@ export const ProblemDetails: React.FC = () => {
                             </div>
                             <div>
                               <h3 className={`text-lg font-extrabold tracking-tight ${isExecutionResultSuccessful(executionResult) ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
-                                {isExecutionResultSuccessful(executionResult) ? 'Accepted' : 'Wrong answer'}
+                                {executionVerdictLabel}
                               </h3>
                               <p className="text-[11px] text-slate-600 dark:text-slate-400">
                                 {isExecutionResultSuccessful(executionResult)
@@ -1974,6 +2220,51 @@ export const ProblemDetails: React.FC = () => {
                             </div>
                           </dl>
                         </div>
+
+                        {executionResult.testCases.length > 0 && (
+                          <div className="border-t border-slate-200 px-4 py-4 dark:border-slate-800">
+                            <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                              Evaluation details
+                            </h4>
+                            <div className="mt-3 space-y-2">
+                              {executionResult.testCases.map((testCase, index) => {
+                                const didPass = String(testCase.status).toLowerCase() === 'passed';
+                                const hasMetrics = testCase.executionTime !== undefined || testCase.memoryUsage !== undefined;
+                                return (
+                                  <article
+                                    key={testCase.testCaseId}
+                                    className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-800 dark:bg-slate-900/50"
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                        {testCase.isHidden ? 'Private evaluation' : `Sample case ${index + 1}`}
+                                      </span>
+                                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${didPass ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300' : 'bg-rose-500/10 text-rose-700 dark:text-rose-300'}`}>
+                                        {testCase.status}
+                                      </span>
+                                    </div>
+                                    {hasMetrics && (
+                                      <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                        {testCase.executionTime !== undefined && <>Time: <strong className="font-mono text-slate-700 dark:text-slate-200">{testCase.executionTime}</strong></>}
+                                        {testCase.executionTime !== undefined && testCase.memoryUsage !== undefined && <span aria-hidden="true"> · </span>}
+                                        {testCase.memoryUsage !== undefined && <>Memory: <strong className="font-mono text-slate-700 dark:text-slate-200">{testCase.memoryUsage}</strong></>}
+                                      </p>
+                                    )}
+                                    {testCase.isHidden ? (
+                                      <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                        Private case details are intentionally unavailable.
+                                      </p>
+                                    ) : testCase.errorMessage ? (
+                                      <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-rose-200 bg-rose-50 p-2 text-[11px] leading-relaxed text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
+                                        {testCase.errorMessage}
+                                      </pre>
+                                    ) : null}
+                                  </article>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </section>
                     )}
 
@@ -1983,7 +2274,7 @@ export const ProblemDetails: React.FC = () => {
               </div>
             )}
 
-          </div>
+          </section>
 
         </div>
 

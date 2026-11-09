@@ -127,8 +127,8 @@ export const CompanyCircleBadge: React.FC<CompanyCircleBadgeProps> = ({
   sizeClassName = 'w-7 h-7',
   loading = 'lazy',
 }) => (
-  <div
-    className={`${sizeClassName} rounded-full bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 p-1 flex items-center justify-center shrink-0 shadow-2xs hover:scale-105 hover:z-20 hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden ${className}`}
+  <span
+    className={`${sizeClassName} inline-flex items-center justify-center shrink-0 overflow-hidden rounded-full bg-transparent align-middle transition-transform duration-200 hover:scale-105 hover:z-20 ${className}`}
     title={name}
     role="img"
     aria-label={name ? `${name} badge` : 'Company badge'}
@@ -141,7 +141,7 @@ export const CompanyCircleBadge: React.FC<CompanyCircleBadgeProps> = ({
       loading={loading}
       alt={name ? `${name} icon` : 'Company icon'}
     />
-  </div>
+  </span>
 );
 
 export default CompanyBrandLogo;

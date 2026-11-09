@@ -17,6 +17,7 @@ import { hydrateProgress } from '../../progress/redux/progressSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { ProfilePageSkeleton } from '../../../shared/components/ui/Skeleton';
 import type { AcademicDetailsFormData } from '../../../core/validation';
+import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 
 // Lucide Icons
 import {
@@ -31,6 +32,38 @@ import {
   Pencil,
 } from 'lucide-react';
 
+interface ActivityCell {
+  key: string;
+  label: string;
+  attempts: number;
+}
+
+const buildActivityCells = (attempts: Array<{ submittedDate?: string }>): ActivityCell[] => {
+  const counts = new Map<string, number>();
+  attempts.forEach(({ submittedDate }) => {
+    if (!submittedDate) return;
+    const date = new Date(submittedDate);
+    if (Number.isNaN(date.getTime())) return;
+    const key = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const firstDay = new Date(today);
+  firstDay.setDate(today.getDate() - 181);
+  return Array.from({ length: 182 }, (_, offset) => {
+    const date = new Date(firstDay);
+    date.setDate(firstDay.getDate() + offset);
+    const key = [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+    return {
+      key,
+      attempts: counts.get(key) || 0,
+      label: date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }),
+    };
+  });
+};
+
 export const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
 
@@ -44,6 +77,7 @@ export const UserProfilePage: React.FC = () => {
     userInfoError: academicError,
   } = useAppSelector((state) => state.profile);
   const authUser = useAppSelector((state) => state.auth.user);
+  const { items: genderReferences } = useReferenceGroup('GENDER');
   // Modals state
   const [isAcademicModalOpen, setIsAcademicModalOpen] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
@@ -160,6 +194,14 @@ export const UserProfilePage: React.FC = () => {
     mutationPendingRef.current = true;
     setSubmitting(true);
     try {
+      const selectedGenderId = data.genderId ?? null;
+      const gender = selectedGenderId
+        ? genderReferences.find((reference) => reference.id === selectedGenderId) ||
+          (userInfo?.gender?.id === selectedGenderId ? userInfo.gender : null)
+        : null;
+      if (selectedGenderId && !gender) {
+        throw new Error('The selected gender is no longer available. Refresh the page and try again.');
+      }
       const payload: SaveUserInfoPayload = {
         id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
         userId: Number(effectiveUserId),
@@ -167,7 +209,10 @@ export const UserProfilePage: React.FC = () => {
         joinedYear: Number(data.joinedYear),
         passedOutYear: Number(data.passedOutYear),
         college: (data.college || '').trim(),
+        collegeId: data.collegeId ?? null,
         bio: (data.bio || '').trim(),
+        gender,
+        dob: data.dob?.trim() || null,
       };
 
       // Direct unwrap: any backend error throws directly into catch block
@@ -178,7 +223,7 @@ export const UserProfilePage: React.FC = () => {
         })
       ).unwrap();
 
-      toast.success('Academic details saved successfully.');
+      toast.success('Profile details saved successfully.');
       setIsAcademicModalOpen(false);
     } catch (err: any) {
       const errorMsg = getActionableErrorMessage(
@@ -221,7 +266,9 @@ export const UserProfilePage: React.FC = () => {
     profile?.fullName ||
     (profile?.firstName
       ? `${profile.firstName} ${profile.lastName || ''}`.trim()
-      : authUser?.fullName || (authUser as any)?.username || 'User');
+      : userInfo?.firstName
+        ? `${userInfo.firstName} ${userInfo.lastName || ''}`.trim()
+        : authUser?.fullName || (authUser as any)?.username || 'User');
 
   const email = profile?.email || authUser?.email || '';
 
@@ -245,6 +292,17 @@ export const UserProfilePage: React.FC = () => {
   const joinedYear = userInfo?.joinedYear;
   const passedOutYear = userInfo?.passedOutYear;
   const bio = userInfo?.bio || '';
+  const genderName = userInfo?.gender?.refName || '';
+  const dateOfBirth = userInfo?.dob || '';
+  const activityCells = useMemo(() => buildActivityCells(attemptedItems), [attemptedItems]);
+  const genderOptions = useMemo(() => {
+    const byId = new Map<number, typeof genderReferences[number]>();
+    if (userInfo?.gender) byId.set(userInfo.gender.id, userInfo.gender);
+    genderReferences.forEach((gender) => {
+      if (gender.isActive) byId.set(gender.id, gender);
+    });
+    return [...byId.values()];
+  }, [genderReferences, userInfo?.gender]);
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   if (!isAuthenticated) {
@@ -390,6 +448,49 @@ export const UserProfilePage: React.FC = () => {
           </div>
         </div>
 
+        <section className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-5 sm:p-6 shadow-xs">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">Practice activity</h2>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Your recorded practice attempts over the last 26 weeks.</p>
+            </div>
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+              {attemptedItems.length} {attemptedItems.length === 1 ? 'recorded attempt' : 'recorded attempts'}
+            </span>
+          </div>
+          <div
+            className="mt-5 grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-1"
+            style={{ gridTemplateColumns: `repeat(${Math.ceil(activityCells.length / 7)}, minmax(0, 1fr))` }}
+            aria-label="Practice activity heat map"
+          >
+            {activityCells.map((cell) => {
+              const tone = cell.attempts === 0
+                ? 'bg-slate-100 dark:bg-slate-800'
+                : cell.attempts === 1
+                  ? 'bg-emerald-200 dark:bg-emerald-800'
+                  : cell.attempts === 2
+                    ? 'bg-emerald-400 dark:bg-emerald-600'
+                    : 'bg-emerald-600 dark:bg-emerald-400';
+              return (
+                <span
+                  key={cell.key}
+                  title={`${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`}
+                  aria-label={`${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`}
+                  className={`h-3.5 min-w-3.5 rounded-[3px] ${tone}`}
+                />
+              );
+            })}
+          </div>
+          <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-slate-500 dark:text-slate-400" aria-hidden="true">
+            <span>Less</span>
+            <i className="h-3 w-3 rounded-[3px] bg-slate-100 dark:bg-slate-800" />
+            <i className="h-3 w-3 rounded-[3px] bg-emerald-200 dark:bg-emerald-800" />
+            <i className="h-3 w-3 rounded-[3px] bg-emerald-400 dark:bg-emerald-600" />
+            <i className="h-3 w-3 rounded-[3px] bg-emerald-600 dark:bg-emerald-400" />
+            <span>More</span>
+          </div>
+        </section>
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
           {/* User-info API details */}
           <div
@@ -404,7 +505,7 @@ export const UserProfilePage: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Academic Details
+                    Profile details
                   </h2>
                 </div>
               </div>
@@ -418,7 +519,7 @@ export const UserProfilePage: React.FC = () => {
               </button>
             </div>
 
-            {/* Key-Value Rows (Only real fields in /userInfo/{userId}) */}
+            {/* API-backed user-info rows */}
             <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-100 dark:divide-white/5">
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
                 <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Registration Number</span>
@@ -442,6 +543,18 @@ export const UserProfilePage: React.FC = () => {
                 <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Graduation Year</span>
                 <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
                   {passedOutYear || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Gender</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
+                  {genderName || '—'}
+                </span>
+              </div>
+              <div className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+                <span className="text-slate-500 dark:text-slate-400 sm:w-2/5 shrink-0">Date of birth</span>
+                <span className="text-slate-900 dark:text-slate-100 font-medium flex-1 text-left min-w-0">
+                  {dateOfBirth || '—'}
                 </span>
               </div>
               <div className="py-2.5 flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-2">
@@ -508,6 +621,7 @@ export const UserProfilePage: React.FC = () => {
         onSubmit={handleSaveAcademic}
         initialData={userInfo}
         defaultCollege={userInfo?.college || ''}
+        genderOptions={genderOptions}
         submitting={submitting}
       />
 

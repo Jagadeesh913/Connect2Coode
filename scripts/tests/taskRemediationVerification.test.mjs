@@ -40,8 +40,19 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
       topicName: 'Arrays',
       isOwnProblem: true,
       isActive: true,
-      companies: ['Cognizant', 'Accenture', 'Tech Mahindra', 'HCLTech', 'Capgemini'],
-      questionPlatform: 'AON Assessment Platform',
+      companies: [
+        { id: 5, name: 'Cognizant', logo: 'https://example.com/cognizant.png', website: 'https://www.cognizant.com', isActive: true },
+        { id: 4, name: 'Accenture', logo: '', website: '', isActive: false },
+      ],
+      questionPlatform: {
+        id: 22,
+        refGroupCode: 'QPF',
+        refGroupName: null,
+        refCode: 'AON',
+        refName: 'AON Assessment Platform',
+        isActive: true,
+        logoUrl: 'https://example.com/aon.png',
+      },
     };
 
     const mapped = mapProblemDto(rawQuestion4);
@@ -49,10 +60,13 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     assert.equal(mapped.title, 'Find Sum of Array Elements');
     assert.equal(mapped.difficulty, 'Basic');
     assert.equal(mapped.topic, 'Arrays');
-    assert.equal(mapped.companies.length, 5);
+    assert.deepEqual(mapped.companies, ['Cognizant', 'Accenture']);
+    assert.equal(mapped.companyDetails?.[0].id, 5);
     assert.equal(mapped.description, 'Calculate the sum of all elements present in the given integer array.');
     assert.equal(mapped.qpfRefName, 'AON Assessment Platform');
     assert.equal(mapped.questionPlatform, 'AON Assessment Platform');
+    assert.equal(mapped.qpfRefCode, 'AON');
+    assert.equal(mapped.platformLogoUrl, 'https://example.com/aon.png');
     assert.equal(mapped.examPlatform, undefined);
   });
 
@@ -245,6 +259,14 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     const adminMcqsSource = fs.readFileSync('src/features/admin/pages/AdminMcqs.tsx', 'utf-8');
 
     assert.match(adminQuestionsSource, /handleEditClick[\s\S]*getQuestionById\(question\.id/);
+    assert.match(adminQuestionsSource, /useState<QuestionListItem\[]>\(\[\]\)/);
+    assert.doesNotMatch(adminQuestionsSource, /finalPlatform|Optimistically update local questions state/);
+    const questionPayloadSource = adminQuestionsSource.slice(
+      adminQuestionsSource.indexOf('const questionPayload: QuestionPayload'),
+      adminQuestionsSource.indexOf('const res = await adminQuestionService.saveOrUpdateQuestion')
+    );
+    assert.doesNotMatch(questionPayloadSource, /questionPlatform:/);
+    assert.match(questionPayloadSource, /qpfRefCode: formData\.qpfRefCode/);
     assert.match(adminQuestionsSource, /Question saved, but its test cases were not attached/);
     assert.doesNotMatch(adminQuestionsSource, /Backend rejected test case attachment/);
     assert.match(adminMcqsSource, /Unable to load complete MCQ data for editing/);
@@ -319,9 +341,12 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     // ProblemService degraded object check
     assert.match(problemServiceSource, /Number\(\(data as Record<string, unknown>\)\.id\) === numericId/);
 
-    // ProfileSettings accepts only the established user-info DTO boundary.
+    // ProfileSettings consumes the current server-owned profile DTO boundary.
     assert.doesNotMatch(profileSettingsSource, /EditPersonalInfoModal|personalInfoInitialData/);
-    assert.doesNotMatch(profileSettingsSource, /userInfo\?\.(?:collegeId|collegeName|gender|dob)/);
+    assert.match(profileSettingsSource, /collegeId:\s*data\.collegeId/);
+    assert.match(profileSettingsSource, /userInfo\?\.gender/);
+    assert.match(profileSettingsSource, /userInfo\?\.dob/);
+    assert.match(profileSettingsSource, /buildActivityCells/);
     assert.match(profileSettingsSource, /defaultCollege=\{userInfo\?\.college \|\| ''\}/);
     assert.match(profileSettingsSource, /useEffect\(\(\) => \{\s*void dispatch\(fetchUserProfile\(\)\);\s*if \(effectiveUserId\)/);
   });

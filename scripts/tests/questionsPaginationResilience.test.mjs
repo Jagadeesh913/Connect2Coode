@@ -36,6 +36,28 @@ const request = {
   pageRequest: { pageNumber: 2, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
 };
 
+const questionListItem = (id = 1) => ({
+  id,
+  title: `Question ${id}`,
+  description: 'Solve the problem.',
+  difficultyId: 2,
+  difficultyName: 'Easy',
+  topicId: 9,
+  topicName: 'Arrays',
+  isOwnProblem: true,
+  isActive: true,
+  companies: [{ id: 1, name: 'TCS', logo: '', website: '', isActive: true }],
+  questionPlatform: {
+    id: 24,
+    refGroupCode: 'QPF',
+    refGroupName: null,
+    refCode: 'LEETCODE',
+    refName: 'LeetCode',
+    isActive: true,
+    logoUrl: 'https://example.com/leetcode.png',
+  },
+});
+
 describe('Questions API pagination contract', () => {
   it('preserves pagination metadata returned by the API', async () => {
     const originalPost = apiClient.post;
@@ -44,7 +66,7 @@ describe('Questions API pagination contract', () => {
         statusCode: 200,
         message: 'Questions Fetched Successfully',
         data: {
-          content: Array.from({ length: 10 }, (_, index) => ({ id: index + 21 })),
+          content: Array.from({ length: 10 }, (_, index) => questionListItem(index + 21)),
           totalElements: 49,
           totalPages: 5,
           number: 2,
@@ -107,6 +129,29 @@ describe('Questions API pagination contract', () => {
       await assert.rejects(
         () => adminQuestionService.getQuestions(request),
         /Unexpected questions page number metadata/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('rejects legacy flat platform and company rows instead of fabricating list aliases', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: {
+          content: [{ ...questionListItem(), companies: ['TCS'], questionPlatform: 'LeetCode' }],
+          number: 0,
+          size: 10,
+          totalElements: 1,
+          totalPages: 1,
+        },
+      });
+      await assert.rejects(
+        () => adminQuestionService.getQuestions(request),
+        /Unexpected questions list item format/
       );
     } finally {
       apiClient.post = originalPost;

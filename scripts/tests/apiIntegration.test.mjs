@@ -33,6 +33,7 @@ const {
   normalizeExecutionResult,
   normalizeExecutionTestCaseResult,
   isExecutionResultSuccessful,
+  getExecutionVerdict,
   MAX_SOURCE_CODE_LENGTH,
   MAX_CUSTOM_INPUT_LENGTH,
 } = await import('../../src/services/executionService.ts');
@@ -194,7 +195,11 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
           sectionId: 9,
           displayOrder: 1,
           isActive: true,
-          question: { id: 13, title: 'Two Sum', description: 'Find two numbers', difficultyId: 1, difficultyName: 'Easy', topicId: 1, topicName: 'Arrays', isOwnProblem: true, isActive: true, companies: [], questionPlatform: 'C2C' },
+          question: {
+            id: 13, title: 'Two Sum', description: 'Find two numbers', difficultyId: 1, difficultyName: 'Easy', topicId: 1, topicName: 'Arrays', isOwnProblem: true, isActive: true,
+            companies: [],
+            questionPlatform: null,
+          },
         }] };
       };
       try {
@@ -202,6 +207,39 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
           () => learningSheetService.getSectionQuestions(3),
           /Unexpected learning sheet questions response format/
         );
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
+    it('accepts structured question summaries returned for a section', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async (path) => {
+        assert.equal(path, '/user/learningSheet/section/3/questions');
+        return { statusCode: 200, data: [{
+          id: 4,
+          sectionId: 3,
+          displayOrder: 1,
+          isActive: true,
+          question: {
+            id: 13,
+            title: 'Two Sum',
+            description: 'Find two numbers',
+            difficultyId: 1,
+            difficultyName: 'Easy',
+            topicId: 1,
+            topicName: 'Arrays',
+            isOwnProblem: true,
+            isActive: true,
+            companies: [{ id: 5, name: 'Cognizant', logo: 'https://example.com/cognizant.png', website: 'https://www.cognizant.com', isActive: true }],
+            questionPlatform: { id: 24, refGroupCode: 'QPF', refGroupName: null, refCode: 'LEETCODE', refName: 'LeetCode', isActive: true, logoUrl: 'https://example.com/leetcode.png' },
+          },
+        }] };
+      };
+      try {
+        const links = await learningSheetService.getSectionQuestions(3);
+        assert.equal(links[0].question.questionPlatform?.refName, 'LeetCode');
+        assert.equal(links[0].question.companies[0].name, 'Cognizant');
       } finally {
         apiClient.get = originalGet;
       }
@@ -553,7 +591,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       const normalized = normalizeExecutionResult({
         passedTestCases: '1',
         failedTestCases: 0,
-        testCases: [{ status: 'Passed', actualOutput: '42' }],
+        testCases: [{ testCaseType: 'Visible Sample Test Case', isHidden: null, status: 'Passed', actualOutput: '42' }],
       });
 
       assert.deepEqual(normalized, {
@@ -570,13 +608,15 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
         diagnostics: [],
         testCases: [{
           testCaseId: 1,
-          testCaseType: 'Test Case',
-          isHidden: null,
+          testCaseType: 'Visible Sample Test Case',
+          isHidden: false,
           status: 'Passed',
           input: undefined,
           expectedOutput: undefined,
           actualOutput: '42',
           errorMessage: undefined,
+          executionTime: undefined,
+          memoryUsage: undefined,
         }],
       });
     });
@@ -617,6 +657,7 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       ]);
       assert.equal(normalized.testCases[0].actualOutput, 'visible output');
       assert.equal(normalized.testCases[0].errorMessage, 'case runtime diagnostic');
+      assert.equal(normalized.testCases[0].isHidden, false);
     });
 
     it('retains units only for explicitly unit-named legacy execution fields', () => {
@@ -791,6 +832,50 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       assert.equal(directlyNormalized.input, undefined);
       assert.equal(directlyNormalized.expectedOutput, undefined);
       assert.equal(directlyNormalized.actualOutput, undefined);
+    });
+
+    it('uses testCaseType to protect private cases when the backend leaves isHidden null', () => {
+      const normalized = normalizeExecutionResult({
+        totalTestCases: 2,
+        passedTestCases: 0,
+        failedTestCases: 2,
+        testCases: [
+          {
+            testCaseId: 23,
+            testCaseType: 'Visible Sample Test Case',
+            isHidden: null,
+            status: 'Runtime Error (NZEC)',
+            input: '3\\n7 8 9',
+            expectedOutput: '9 8 7',
+            errors: 'Traceback from visible case',
+            time: '0.028',
+            memory: 3244,
+          },
+          {
+            testCaseId: 63,
+            testCaseType: 'Mandatory Test Case',
+            isHidden: null,
+            status: 'Runtime Error (NZEC)',
+            input: 'secret input',
+            expectedOutput: 'secret expected output',
+            errors: 'Traceback from private case',
+            time: '0.023',
+            memory: 3272,
+          },
+        ],
+      });
+
+      assert.equal(normalized.testCases[0].isHidden, false);
+      assert.equal(normalized.testCases[0].errorMessage, 'Traceback from visible case');
+      assert.equal(normalized.testCases[0].executionTime, '0.028');
+      assert.equal(normalized.testCases[0].memoryUsage, 3244);
+      assert.equal(normalized.testCases[1].isHidden, true);
+      assert.equal(normalized.testCases[1].input, undefined);
+      assert.equal(normalized.testCases[1].expectedOutput, undefined);
+      assert.equal(normalized.testCases[1].errorMessage, undefined);
+      assert.equal(normalized.testCases[1].executionTime, '0.023');
+      assert.equal(normalized.testCases[1].memoryUsage, 3272);
+      assert.equal(getExecutionVerdict(normalized), 'runtime-error');
     });
   });
 });

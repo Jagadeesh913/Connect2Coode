@@ -52,6 +52,24 @@ export interface Company {
   }>;
 }
 
+export interface QuestionPlatformSummary {
+  id: number;
+  refGroupCode: string;
+  refGroupName: string | null;
+  refCode: string;
+  refName: string;
+  isActive: boolean;
+  logoUrl: string | null;
+}
+
+export interface QuestionCompanySummary {
+  id: number;
+  name: string;
+  logo: string;
+  website: string;
+  isActive: boolean;
+}
+
 export interface Problem {
   id: string;
   questionId?: string | number;
@@ -63,6 +81,7 @@ export interface Problem {
   topic: string;
   topicId?: number;
   companies: string[];
+  companyDetails?: Company[];
   acceptanceRate: string;
   isSolved: boolean;
   isBookmarked: boolean;
@@ -80,6 +99,7 @@ export interface Problem {
   qpfRefCode?: string;
   qpfRefName?: string;
   questionPlatform?: string;
+  platformLogoUrl?: string | null;
   platformName?: string;
   examPlatform?: string;
   questionHints?: QuestionHint[];
@@ -157,18 +177,14 @@ export interface QuestionListItem {
   id: number;
   title: string;
   description: string;
-  difficultyId?: number;
-  difficultyName?: string;
-  topicId?: number;
-  topicName?: string;
-  qpfId?: number;
-  qpfRefCode?: string;
-  qpfRefName?: string;
-  questionPlatform?: string;
-  platformName?: string;
-  companies?: Array<string | { id?: number; name?: string }>;
-  isOwnProblem?: boolean;
-  isActive?: boolean;
+  difficultyId: number;
+  difficultyName: string;
+  topicId: number;
+  topicName: string;
+  companies: QuestionCompanySummary[];
+  questionPlatform: QuestionPlatformSummary | null;
+  isOwnProblem: boolean;
+  isActive: boolean;
 }
 
 export interface PageRequest {
@@ -210,11 +226,17 @@ export interface AdminLanguage {
 export interface UserInfoData {
   id?: number | null;
   userId?: number | string;
-  regNumber: string;
-  joinedYear: number;
-  passedOutYear: number;
-  college: string;
-  bio: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  regNumber?: string | null;
+  joinedYear?: number | null;
+  passedOutYear?: number | null;
+  /** The API has returned both `college` and `collegeName`; services normalize both to this field. */
+  college?: string | null;
+  collegeId?: number | null;
+  bio?: string | null;
+  gender?: ReferenceItem | null;
+  dob?: string | null;
 }
 
 export interface SaveUserInfoPayload {
@@ -224,7 +246,10 @@ export interface SaveUserInfoPayload {
   joinedYear: number;
   passedOutYear: number;
   college: string;
+  collegeId?: number | null;
   bio: string;
+  gender?: ReferenceItem | null;
+  dob?: string | null;
 }
 
 export interface UserProfile {
@@ -256,6 +281,8 @@ export interface ExecutionTestCaseResult {
   expectedOutput?: string;
   actualOutput?: string;
   errorMessage?: string;
+  executionTime?: number | string;
+  memoryUsage?: number | string;
 }
 
 export interface ExecutionResult {
@@ -272,6 +299,8 @@ export interface ExecutionResult {
   diagnostics: string[];
   testCases: ExecutionTestCaseResult[];
 }
+
+export type ExecutionVerdict = 'accepted' | 'compilation-error' | 'runtime-error' | 'failed';
 
 /**
  * Institution Management Domain Models

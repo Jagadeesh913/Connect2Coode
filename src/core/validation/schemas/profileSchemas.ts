@@ -7,7 +7,8 @@ import {
 const currentYear = new Date().getFullYear();
 
 /**
- * The verified /userInfo DTO contains only these editable fields.
+ * The verified /userInfo DTO supports academic details plus optional personal
+ * fields returned by the profile service.
  * Cross-field rule: passedOutYear must be greater than or equal to joinedYear.
  */
 export const academicDetailsSchema = z
@@ -24,7 +25,14 @@ export const academicDetailsSchema = z
       .min(1990, 'Graduation year cannot be earlier than 1990')
       .max(currentYear + 10, 'Graduation year cannot exceed 10 years in the future'),
     college: requiredTextRule('College or university name', 2),
+    collegeId: z.number().int().positive().nullable().optional(),
     bio: z.string().trim().max(500, 'Bio cannot exceed 500 characters').optional().or(z.literal('')),
+    genderId: z.number().int().positive().nullable().optional(),
+    dob: z
+      .string()
+      .trim()
+      .regex(/^$|^\d{4}-\d{2}-\d{2}$/, 'Date of birth must use YYYY-MM-DD.')
+      .optional(),
   })
   .refine((data) => data.passedOutYear >= data.joinedYear, {
     message: 'Graduation year cannot be earlier than joined year.',

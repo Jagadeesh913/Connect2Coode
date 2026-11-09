@@ -2,6 +2,7 @@ import { RequestStatus } from '../../../../shared/components/ui/RequestStatus';
 import React, { useState, useEffect, useRef } from 'react';
 import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { QuestionPayload, QuestionTestCase } from '../../../../services/questionService';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { toast } from '@/shared/notifications/toast';
@@ -319,25 +320,17 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                     </label>
 
                     {/* Test Case Type */}
-                    <label htmlFor={`test-case-type-${idx}`} className="sr-only">
-                      Test case {idx + 1} type
-                    </label>
-                    <select
+                    <C2CSelect
                       id={`test-case-type-${idx}`}
                       value={tc.typeRefCode || ''}
-                      onChange={(e) => handleChange(idx, 'typeRefCode', e.target.value)}
+                      onChange={(val) => handleChange(idx, 'typeRefCode', val)}
                       disabled={testCaseTypes.length === 0}
-                      className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                    >
-                      {testCaseTypes.map((t) => (
-                        <option key={t.id} value={t.refCode}>
-                          {t.refName}
-                        </option>
-                      ))}
-                      {testCaseTypes.length === 0 && (
-                        <option value="">No API test case types available</option>
-                      )}
-                    </select>
+                      options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName }))}
+                      placeholder={testCaseTypes.length === 0 ? 'No API types available' : 'Select Type'}
+                      ariaLabel={`Test case ${idx + 1} type`}
+                      className="w-36"
+                      buttonClassName="rounded-xl px-2.5 py-1.5 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                    />
 
                     {/* Remove button */}
                     {testCases.length > 1 && (

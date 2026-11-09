@@ -33,13 +33,13 @@ describe('reference library management contract', () => {
     assert.match(service, /response\.data\.some\(\(item\) => !isReferenceItem\(item, normalizedGroupCode\)\)/);
   });
 
-  it('preserves API-owned QPF logo metadata for the shared coding-question list', async () => {
+  it('renders API-owned QPF logo metadata without a duplicate reference-library request', async () => {
     const types = read('src/core/types/domain.ts');
     const table = read('src/features/problems/components/CodingQuestionTable.tsx');
-    assert.match(types, /logoUrl\?: string \| null/);
-    assert.match(table, /useReferenceGroup\('QPF'\)/);
+    assert.match(types, /platformLogoUrl\?: string \| null/);
+    assert.doesNotMatch(table, /useReferenceGroup\('QPF'\)/);
     assert.match(table, /getSafeRemoteImageUrl\(logoUrl\)/);
-    assert.match(table, /platform\.logoUrl/);
+    assert.match(table, /question\.platformLogoUrl/);
     assert.doesNotMatch(table, /<span className="truncate max-w-\[130px\]">\{label\}<\/span>/);
   });
 

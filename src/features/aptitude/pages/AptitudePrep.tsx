@@ -17,6 +17,7 @@ import { openAuthModal } from '../../auth/redux/authSlice';
 import { Check, Lock, X } from 'lucide-react';
 import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { fetchCompanies } from '../../companies/redux/companySlice';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 
 export type AptitudeItem = McqQuestion;
 
@@ -1376,23 +1377,24 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
               </form>
 
               {/* Sort Dropdown */}
-              <div className="relative shrink-0 w-full sm:w-auto">
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    beginQuestionTransition();
-                    setSortBy(e.target.value as any);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full sm:w-auto appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-2.5 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
-                >
-                  <option value="default" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Sort by</option>
-                  <option value="diff-asc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty: Easy to Hard</option>
-                  <option value="diff-desc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Difficulty: Hard to Easy</option>
-                  <option value="title-asc" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">Title: A-Z</option>
-                </select>
-                <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-              </div>
+              <C2CSelect
+                value={sortBy}
+                onChange={(val) => {
+                  beginQuestionTransition();
+                  setSortBy(val as any);
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: 'default', label: 'Sort by' },
+                  { value: 'diff-asc', label: 'Difficulty: Easy to Hard' },
+                  { value: 'diff-desc', label: 'Difficulty: Hard to Easy' },
+                  { value: 'title-asc', label: 'Title: A-Z' },
+                ]}
+                align="right"
+                ariaLabel="Sort questions"
+                className="w-full sm:w-52 shrink-0"
+                buttonClassName="rounded-2xl py-2.5 px-4 text-xs sm:text-sm font-semibold border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0D1322] text-slate-700 dark:text-slate-300 hover:border-blue-500/50 focus:border-blue-500"
+              />
             </div>
 
             {/* Active Filter Pills Bar */}

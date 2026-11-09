@@ -182,7 +182,9 @@ describe('shared UX interaction contracts', () => {
     assert.doesNotMatch(list, /filteredCompanies\.slice/);
     assert.match(list, /scrollIntoView/);
     assert.match(list, /role="group"/);
-    assert.match(list, /<Link[\s\S]*?View Recruitment Exams/);
+    assert.match(list, /<Link[\s\S]*?Explore Hiring Rounds/);
+    assert.doesNotMatch(list, /Recruitment Prep/);
+    assert.doesNotMatch(list, /watermark/);
 
     const details = await readSource('src/features/companies/pages/CompanyDetails.tsx');
     const skeletonGuard = details.indexOf('isDetailsLoading && !company');
@@ -191,7 +193,7 @@ describe('shared UX interaction contracts', () => {
     assert.match(details, /getCompanyProblemsPaginated\(/);
     assert.match(details, /searchText: debouncedQuestionSearch/);
     assert.match(details, /difficultyReferences\.map\(\(difficulty\) =>/);
-    assert.match(details, /value=\{difficulty\.id\}/);
+    assert.match(details, /(?:value=\{difficulty\.id\}|value:\s*(?:String\()?difficulty\.id)/);
     assert.doesNotMatch(details, /<option value="Easy"/);
     assert.equal(
       (details.match(/pageNumber: questionPage - 1/g) || []).length,
@@ -300,7 +302,10 @@ describe('shared UX interaction contracts', () => {
     );
     assert.doesNotMatch(source, /profile\.(?:regNumber|collegeName|institutionId|joinedYear|graduationYear|passedOutYear|bio|dob)/);
     assert.match(source, /bio: \(data\.bio \|\| ''\)\.trim\(\)/);
-    assert.doesNotMatch(source, /userInfo\?\.(?:gender|dob|collegeId|collegeName)/);
+    assert.match(source, /userInfo\?\.gender/);
+    assert.match(source, /userInfo\?\.dob/);
+    assert.match(source, /buildActivityCells/);
+    assert.match(source, /Practice activity/);
     assert.doesNotMatch(source, /EditPersonalInfoModal/);
     assert.match(source, /const fullName\s*=/);
     assert.match(source, /authUser\?\.fullName/);
@@ -456,6 +461,25 @@ describe('shared UX interaction contracts', () => {
     assert.match(app, /zIndex: 60/);
     assert.match(styles, /--c2c-navbar-height: 4rem/);
     assert.match(styles, /@media \(min-width: 640px\)[\s\S]*?--c2c-navbar-height: 5rem/);
+  });
+
+  it('keeps the problem workspace viewport-locked with accessible resizable internal panes', async () => {
+    const workspace = await readSource('src/features/problems/pages/ProblemDetails.tsx');
+    const workspaceStyles = await readSource('src/features/problems/pages/ProblemDetails.css');
+    const mainLayout = await readSource('src/layouts/MainLayout.tsx');
+
+    assert.match(workspace, /role="separator"[\s\S]*?aria-orientation="vertical"/);
+    assert.match(workspace, /role="separator"[\s\S]*?aria-orientation="horizontal"/);
+    assert.match(workspace, /setPointerCapture/);
+    assert.match(workspace, /handleSplitterKeyDown/);
+    assert.match(workspace, /data-mobile-view=\{mobileWorkspaceTab\}/);
+    assert.match(workspace, /'problem' \| 'editor' \| 'tests'/);
+    assert.match(workspace, /aria-expanded=\{isOpen\}/);
+    assert.match(workspaceStyles, /height: calc\(100dvh - 4rem\)/);
+    assert.match(workspaceStyles, /scrollbar-width: none/);
+    assert.match(workspaceStyles, /@media \(max-width: 1023px\)/);
+    assert.match(mainLayout, /isProblemWorkspace \? 'h-screen overflow-hidden'/);
+    assert.match(mainLayout, /\{!isProblemWorkspace && <Footer \/>\}/);
   });
 });
 

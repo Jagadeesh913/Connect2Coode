@@ -15,7 +15,6 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { openAuthModal } from '../../auth/redux/authSlice';
 import { isBookmarkItem, toggleBookmarkItem } from '../../bookmarks/redux/bookmarkSlice';
-import { fetchCompanies } from '../../companies/redux/companySlice';
 import { CodingQuestionTable, type CodingQuestionListItem } from '../../problems/components/CodingQuestionTable';
 import { DsaSheetHeroBanner } from '../components/DsaSheetHeroBanner';
 import {
@@ -34,7 +33,6 @@ export const DsaSheetPage: React.FC = () => {
   const { isAuthenticated, loading: authLoading } = useAppSelector((state) => state.auth);
   const solvedByProblemId = useAppSelector((state) => state.progress.solvedByProblemId);
   const { bookmarks } = useAppSelector((state) => state.bookmarks);
-  const companies = useAppSelector((state) => state.companies.companies);
   const {
     sheets,
     selectedSheetId,
@@ -80,12 +78,6 @@ export const DsaSheetPage: React.FC = () => {
         promise.abort();
       };
     }
-  }, [dispatch, isAuthenticated]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    const request = dispatch(fetchCompanies());
-    return () => request.abort();
   }, [dispatch, isAuthenticated]);
 
   useEffect(() => {
@@ -211,7 +203,7 @@ export const DsaSheetPage: React.FC = () => {
     const questions = questionsBySection[sectionId] ?? [];
     const filteredQuestions = normalizedSearch
       ? questions.filter(({ question }) =>
-          [question.title, question.topicName, question.difficultyName, ...question.companies]
+          [question.title, question.topicName, question.difficultyName, ...question.companies.map((company) => company.name)]
             .some((value) => value.toLowerCase().includes(normalizedSearch)))
       : questions;
     const questionRows = filteredQuestions.map(({ question }) => ({
@@ -222,14 +214,18 @@ export const DsaSheetPage: React.FC = () => {
           difficulty: question.difficultyName,
           topic: question.topicName,
           category: question.topicName,
-          companies: question.companies,
-          questionPlatform: question.questionPlatform,
+          companies: question.companies.map((company) => company.name),
+          companyDetails: question.companies,
+          questionPlatform: question.questionPlatform?.refName,
+          qpfRefGroupCode: question.questionPlatform?.refGroupCode,
+          qpfRefCode: question.questionPlatform?.refCode,
+          qpfRefName: question.questionPlatform?.refName,
+          platformLogoUrl: question.questionPlatform?.logoUrl,
     }));
 
     return (
       <CodingQuestionTable
         questions={questionRows}
-        companies={companies}
         loading={Boolean(loadingQuestionSectionIds[sectionId] || loadingQuestionSectionId === sectionId)}
         error={questionErrors[sectionId] ?? null}
         onRetry={() => requestNode(sectionId, true)}

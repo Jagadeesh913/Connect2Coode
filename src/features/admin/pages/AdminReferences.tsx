@@ -23,6 +23,7 @@ import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { adminReferenceService } from '../../../services/admin/adminReferenceService';
 import { referenceService } from '../../../services/referenceService';
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import { FormFieldError } from '../../../shared/components/ui/FormFieldError';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { AdminBadge } from '../components/AdminBadge';
@@ -284,16 +285,17 @@ export const AdminReferences: React.FC = () => {
 
       <div className="rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-white dark:bg-[#0D1322] p-4 sm:p-5">
         <label htmlFor="reference-group" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Reference group</label>
-        <select
+        <C2CSelect
           id="reference-group"
           value={selectedGroup}
-          onChange={(event) => setSelectedGroup(event.target.value)}
+          onChange={setSelectedGroup}
           disabled={groupsLoading || groupCodes.length === 0}
-          className="w-full sm:max-w-md rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white disabled:opacity-60"
-        >
-          {groupCodes.length === 0 && <option value="">No groups available</option>}
-          {groupCodes.map((code) => <option key={code} value={code}>{code}</option>)}
-        </select>
+          placeholder={groupCodes.length === 0 ? 'No groups available' : 'Select reference group'}
+          options={groupCodes.map((code) => ({ value: code, label: code }))}
+          ariaLabel="Reference group"
+          className="w-full sm:max-w-md"
+          buttonClassName="rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-sm text-slate-900 dark:text-white"
+        />
         <RequestStatus pending={groupsLoading} error={groupsError} onRetry={() => void loadGroups()} label="Loading reference groups…" />
       </div>
 

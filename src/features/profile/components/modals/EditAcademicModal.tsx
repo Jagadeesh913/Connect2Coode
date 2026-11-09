@@ -2,12 +2,13 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
-import type { UserInfoData } from '../../../../core/types/domain';
+import type { ReferenceItem, UserInfoData } from '../../../../core/types/domain';
 import { academicDetailsSchema, AcademicDetailsFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { InstitutionAutocomplete } from '../../../institutions/components/InstitutionAutocomplete';
 import { GraduationCap, Hash, Calendar, FileText, X, Loader2 } from 'lucide-react';
 import { useAccessibleDialog } from '../../../../shared/hooks/useAccessibleDialog';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 
 export type AcademicFormData = AcademicDetailsFormData;
 
@@ -16,6 +17,7 @@ interface EditAcademicModalProps {
   onClose: () => void;
   onSubmit: (data: AcademicDetailsFormData) => Promise<void>;
   initialData?: UserInfoData | null;
+  genderOptions?: ReferenceItem[];
   defaultCollege?: string;
   defaultDegree?: string;
   defaultBranch?: string;
@@ -27,6 +29,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  genderOptions = [],
   defaultCollege = '',
   submitting = false,
 }) => {
@@ -50,12 +53,15 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
       joinedYear: initialData?.joinedYear ? Number(initialData.joinedYear) : currentYear - 2,
       passedOutYear: initialData?.passedOutYear ? Number(initialData.passedOutYear) : currentYear + 2,
       college: initialData?.college || defaultCollege || '',
+      collegeId: initialData?.collegeId ?? null,
       bio: initialData?.bio || '',
+      genderId: initialData?.gender?.id ?? null,
+      dob: initialData?.dob || '',
     },
   });
 
-  const watchedJoinedYear = Number(watch('joinedYear')) || currentYear - 2;
-  const watchedPassedOutYear = Number(watch('passedOutYear')) || currentYear + 2;
+  const watchedJoinedYear: number = Number(watch('joinedYear') ?? currentYear - 2);
+  const watchedPassedOutYear: number = Number(watch('passedOutYear') ?? currentYear + 2);
   const watchedBio = watch('bio') || '';
 
   // Generate Year Options
@@ -92,7 +98,10 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
         joinedYear: initialData?.joinedYear ? Number(initialData.joinedYear) : currentYear - 2,
         passedOutYear: initialData?.passedOutYear ? Number(initialData.passedOutYear) : currentYear + 2,
         college: initialData?.college || defaultCollege || '',
+        collegeId: initialData?.collegeId ?? null,
         bio: initialData?.bio || '',
+        genderId: initialData?.gender?.id ?? null,
+        dob: initialData?.dob || '',
       });
     }
   }, [isOpen, initialData, defaultCollege, reset, currentYear]);
@@ -115,10 +124,10 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
             </div>
             <div>
               <h3 id="edit-academic-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
-                Edit Academic Details
+                Edit Profile Details
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Update your registration number, institution, and batch years.
+                Update your academic and personal details.
               </p>
             </div>
           </div>
@@ -171,11 +180,54 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
               error={errors.college?.message}
               onChange={(val) => {
                 setValue('college', val, { shouldValidate: true, shouldDirty: true });
+                setValue('collegeId', null, { shouldDirty: true });
               }}
               onSelectOption={(opt) => {
                 setValue('college', opt.name, { shouldValidate: true, shouldDirty: true });
+                setValue('collegeId', Number(opt.id), { shouldDirty: true });
               }}
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="profile-gender-select" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
+                Gender
+              </label>
+              <C2CSelect
+                id="profile-gender-select"
+                value={watch('genderId') ?? ''}
+                onChange={(value) => setValue('genderId', value ? Number(value) : null, { shouldDirty: true })}
+                options={[
+                  { value: '', label: 'Prefer not to say' },
+                  ...genderOptions.map((gender) => ({ value: gender.id, label: gender.refName })),
+                ]}
+                placeholder="Select gender"
+                ariaLabel="Gender"
+                className="w-full"
+                buttonClassName="rounded-xl py-2.5 pl-3 pr-3 text-xs bg-slate-50 dark:bg-neutral-950 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20"
+              />
+              <FormFieldError id="profile-gender-error" error={errors.genderId?.message} />
+            </div>
+            <div>
+              <label htmlFor="profile-date-of-birth" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
+                Date of birth
+              </label>
+              <input
+                id="profile-date-of-birth"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                aria-invalid={Boolean(errors.dob)}
+                aria-describedby={errors.dob ? 'profile-date-of-birth-error' : undefined}
+                {...register('dob')}
+                className={`w-full px-3 py-2.5 bg-slate-50 dark:bg-neutral-950 border ${
+                  errors.dob
+                    ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                    : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50'
+                } rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none transition-colors`}
+              />
+              <FormFieldError id="profile-date-of-birth-error" error={errors.dob?.message} />
+            </div>
           </div>
 
           {/* Joined Year and Passed Out Year Dropdowns */}
@@ -185,31 +237,19 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
               <label htmlFor="academic-joined-year-select" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                 Joined Year <span className="text-rose-500">*</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <select
-                  id="academic-joined-year-select"
-                  aria-invalid={Boolean(errors.joinedYear)}
-                  aria-describedby={errors.joinedYear ? 'academic-joined-year-error' : undefined}
-                  {...register('joinedYear', { valueAsNumber: true })}
-                  className={`w-full appearance-none pl-9 pr-8 py-2.5 bg-slate-50 dark:bg-neutral-950 border ${
-                    errors.joinedYear
-                      ? 'border-rose-500 focus:border-rose-500'
-                      : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 focus:border-blue-500'
-                  } rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none transition-colors cursor-pointer`}
-                >
-                  {joinedYearOptions.map((year) => (
-                    <option key={year} value={year} className="bg-white dark:bg-neutral-900 text-slate-900 dark:text-white">
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                  ▼
-                </div>
-              </div>
+              <C2CSelect
+                id="academic-joined-year-select"
+                value={watchedJoinedYear}
+                onChange={(val) => setValue('joinedYear', Number(val), { shouldValidate: true })}
+                options={joinedYearOptions.map((year) => ({ value: year, label: String(year) }))}
+                placeholder="Select Joined Year"
+                ariaLabel="Joined year"
+                className="w-full"
+                buttonClassName={`rounded-xl py-2.5 pl-3 pr-3 text-xs bg-slate-50 dark:bg-neutral-950 ${
+                  errors.joinedYear ? 'border-rose-500' : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                }`}
+                leading={<Calendar className="w-4 h-4 text-slate-400" />}
+              />
               <FormFieldError id="academic-joined-year-error" error={errors.joinedYear?.message} />
             </div>
 
@@ -218,31 +258,19 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
               <label htmlFor="academic-passed-year-select" className="block text-xs font-semibold text-slate-700 dark:text-gray-300 mb-1">
                 Graduation Year <span className="text-rose-500">*</span>
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <select
-                  id="academic-passed-year-select"
-                  aria-invalid={Boolean(errors.passedOutYear)}
-                  aria-describedby={errors.passedOutYear ? 'academic-passed-year-error' : undefined}
-                  {...register('passedOutYear', { valueAsNumber: true })}
-                  className={`w-full appearance-none pl-9 pr-8 py-2.5 bg-slate-50 dark:bg-neutral-950 border ${
-                    errors.passedOutYear
-                      ? 'border-rose-500 focus:border-rose-500'
-                      : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 focus:border-blue-500'
-                  } rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none transition-colors cursor-pointer`}
-                >
-                  {passedOutYearOptions.map((year) => (
-                    <option key={year} value={year} className="bg-white dark:bg-neutral-900 text-slate-900 dark:text-white">
-                      {year}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400 text-xs">
-                  ▼
-                </div>
-              </div>
+              <C2CSelect
+                id="academic-passed-year-select"
+                value={watchedPassedOutYear}
+                onChange={(val) => setValue('passedOutYear', Number(val), { shouldValidate: true })}
+                options={passedOutYearOptions.map((year) => ({ value: year, label: String(year) }))}
+                placeholder="Select Graduation Year"
+                ariaLabel="Graduation year"
+                className="w-full"
+                buttonClassName={`rounded-xl py-2.5 pl-3 pr-3 text-xs bg-slate-50 dark:bg-neutral-950 ${
+                  errors.passedOutYear ? 'border-rose-500' : 'border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                }`}
+                leading={<Calendar className="w-4 h-4 text-slate-400" />}
+              />
               <FormFieldError id="academic-passed-year-error" error={errors.passedOutYear?.message} />
             </div>
           </div>
@@ -299,7 +327,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
                   <span>Saving...</span>
                 </>
               ) : (
-                <span>Save Academic Info</span>
+                <span>Save Profile Details</span>
               )}
             </button>
           </div>

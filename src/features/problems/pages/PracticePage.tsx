@@ -13,6 +13,7 @@ import { toast } from '@/shared/notifications/toast';
 import { Lock } from 'lucide-react';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PracticeHeroBanner } from '../components/PracticeHeroBanner';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 
 const EMPTY_REFERENCES: ReferenceItem[] = [];
 const EMPTY_COMPANIES: CompanyItem[] = [];
@@ -634,30 +635,20 @@ export const PracticePage: React.FC = () => {
 
           {/* Page size is part of the canonical server request. */}
           <div className="flex items-center gap-2.5 w-full lg:w-auto flex-wrap sm:flex-nowrap shrink-0">
-            <div className="relative flex-1 sm:flex-initial shrink-0 min-w-[115px]">
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  updatePracticeParams({ limit: e.target.value, page: '1' });
-                }}
-                className="w-full appearance-none bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-2xl pl-4 pr-10 py-3 text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 focus:outline-none hover:border-blue-500/50 focus:border-blue-500 transition-colors cursor-pointer shadow-2xs"
-                aria-label="Problems per page"
-              >
-                <option value="10" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  10 / page
-                </option>
-                <option value="25" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  25 / page
-                </option>
-                <option value="50" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  50 / page
-                </option>
-                <option value="100" className="bg-white dark:bg-[#0D1322] text-slate-800 dark:text-slate-200">
-                  100 / page
-                </option>
-              </select>
-              <i className="fa-solid fa-chevron-down absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none"></i>
-            </div>
+            <C2CSelect
+              value={pageSize}
+              onChange={(val) => {
+                updatePracticeParams({ limit: val, page: '1' });
+              }}
+              options={ALLOWED_PAGE_SIZES.map((size) => ({
+                value: String(size),
+                label: `${size} / page`,
+              }))}
+              align="right"
+              ariaLabel="Problems per page"
+              className="w-full sm:w-32 shrink-0"
+              buttonClassName="rounded-2xl py-3 px-4 text-xs sm:text-sm font-semibold border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0D1322] text-slate-700 dark:text-slate-300 hover:border-blue-500/50 focus:border-blue-500"
+            />
           </div>
         </div>
 

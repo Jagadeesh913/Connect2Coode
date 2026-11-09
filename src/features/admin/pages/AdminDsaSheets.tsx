@@ -23,6 +23,7 @@ import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog';
 import { Skeleton } from '../../../shared/components/ui/Skeleton';
 import { AdminBadge } from '../components/AdminBadge';
 import { AdminCard } from '../components/AdminCard';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import { AdminEmptyState } from '../components/AdminEmptyState';
 import { AdminErrorState } from '../components/AdminErrorState';
 import { AdminModal } from '../components/AdminModal';
@@ -557,13 +558,66 @@ export const AdminDsaSheets: React.FC = () => {
       </AdminModal>
 
       <AdminModal isOpen={sectionModalOpen} onClose={closeSectionModal} title={editingSection ? 'Edit section' : 'Add section'} subtitle={selectedSheet?.sheetName} icon={<Layers3 className="w-5 h-5" />} footer={<><Button variant="ghost" onClick={closeSectionModal}>Cancel</Button><Button isLoading={submitting} onClick={saveSection}>{editingSection ? 'Save changes' : 'Create section'}</Button></>}>
-        <form onSubmit={saveSection} className="space-y-4"><div><label htmlFor="section-parent" className={labelClass}>Parent section</label><select id="section-parent" {...sectionForm.register('parentSectionId', { setValueAs: (value) => value === '' ? null : Number(value) })} className={fieldClass}><option value="">Top-level section</option>{parentOptions.map(({ section, depth }) => <option key={section.id} value={section.id}>{'— '.repeat(depth)}{section.sectionName}</option>)}</select><p className="mt-1 text-xs text-slate-500">Choose a parent to create a subsection. Parent and child remain in this sheet.</p></div><div><label htmlFor="section-name" className={labelClass}>Section name</label><input id="section-name" {...sectionForm.register('sectionName')} className={fieldClass} placeholder="Arrays" />{sectionForm.formState.errors.sectionName && <p className={errorClass}>{sectionForm.formState.errors.sectionName.message}</p>}</div><div><label htmlFor="section-display-order" className={labelClass}>Display order</label><input id="section-display-order" type="number" {...sectionForm.register('displayOrder', { valueAsNumber: true })} className={fieldClass} />{sectionForm.formState.errors.displayOrder && <p className={errorClass}>{sectionForm.formState.errors.displayOrder.message}</p>}</div><label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" {...sectionForm.register('isActive')} className="w-4 h-4" /> Active and visible</label></form>
+        <form onSubmit={saveSection} className="space-y-4">
+          <div>
+            <label htmlFor="section-parent" className={labelClass}>Parent section</label>
+            <C2CSelect
+              id="section-parent"
+              value={sectionForm.watch('parentSectionId') ?? ''}
+              onChange={(val) => sectionForm.setValue('parentSectionId', val === '' ? null : Number(val))}
+              options={[
+                { value: '', label: 'Top-level section' },
+                ...parentOptions.map(({ section, depth }) => ({
+                  value: String(section.id),
+                  label: `${'— '.repeat(depth)}${section.sectionName}`,
+                })),
+              ]}
+              ariaLabel="Parent section"
+              className="w-full"
+              buttonClassName={fieldClass}
+            />
+            <p className="mt-1 text-xs text-slate-500">Choose a parent to create a subsection. Parent and child remain in this sheet.</p>
+          </div>
+          <div><label htmlFor="section-name" className={labelClass}>Section name</label><input id="section-name" {...sectionForm.register('sectionName')} className={fieldClass} placeholder="Arrays" />{sectionForm.formState.errors.sectionName && <p className={errorClass}>{sectionForm.formState.errors.sectionName.message}</p>}</div>
+          <div><label htmlFor="section-display-order" className={labelClass}>Display order</label><input id="section-display-order" type="number" {...sectionForm.register('displayOrder', { valueAsNumber: true })} className={fieldClass} />{sectionForm.formState.errors.displayOrder && <p className={errorClass}>{sectionForm.formState.errors.displayOrder.message}</p>}</div>
+          <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" {...sectionForm.register('isActive')} className="w-4 h-4" /> Active and visible</label>
+        </form>
       </AdminModal>
 
       <AdminModal isOpen={linkModalOpen} onClose={closeLinkModal} title={editingLink ? 'Edit linked question' : 'Link a question'} subtitle={selectedSection?.sectionName} icon={<Link2 className="w-5 h-5" />} maxWidth="2xl" footer={<><Button variant="ghost" onClick={closeLinkModal}>Cancel</Button><Button isLoading={submitting} onClick={saveQuestionLink}>{editingLink ? 'Save changes' : 'Link question'}</Button></>}>
         <form onSubmit={saveQuestionLink} className="space-y-4">
           <div><label htmlFor="link-question-search" className={labelClass}>Search question bank</label><div className="flex gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input id="link-question-search" value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} className={`${fieldClass} pl-9`} placeholder="Title, topic or difficulty" /></div><Button type="button" variant="outline" isLoading={loadingQuestionOptions} onClick={() => void loadQuestionOptions(questionSearch)}>Search</Button></div></div>
-          <div><label htmlFor="link-question-id" className={labelClass}>Question</label>{loadingQuestionOptions ? <Skeleton className="h-11 w-full rounded-xl" /> : <select id="link-question-id" {...linkForm.register('questionId', { valueAsNumber: true })} className={fieldClass}><option value={0}>Select a problem</option>{editingLink && !availableQuestionOptions.some((question) => question.id === editingLink.question.id) && <option value={editingLink.question.id}>#{editingLink.question.id} · {editingLink.question.title} · {editingLink.question.difficultyName || 'Unknown'}</option>}{availableQuestionOptions.map((question) => <option key={question.id} value={question.id}>#{question.id} · {question.title} · {question.difficultyName || 'Unknown'}</option>)}</select>}{linkForm.formState.errors.questionId && <p className={errorClass}>{linkForm.formState.errors.questionId.message}</p>}</div>
+          <div>
+            <label htmlFor="link-question-id" className={labelClass}>Question</label>
+            {loadingQuestionOptions ? (
+              <Skeleton className="h-11 w-full rounded-xl" />
+            ) : (
+              <C2CSelect
+                id="link-question-id"
+                value={linkForm.watch('questionId') || 0}
+                onChange={(val) => linkForm.setValue('questionId', Number(val), { shouldValidate: true })}
+                options={[
+                  { value: 0, label: 'Select a problem' },
+                  ...(editingLink && !availableQuestionOptions.some((question) => question.id === editingLink.question.id)
+                    ? [{
+                        value: editingLink.question.id,
+                        label: `#${editingLink.question.id} · ${editingLink.question.title} · ${editingLink.question.difficultyName || 'Unknown'}`,
+                      }]
+                    : []),
+                  ...availableQuestionOptions.map((question) => ({
+                    value: question.id,
+                    label: `#${question.id} · ${question.title} · ${question.difficultyName || 'Unknown'}`,
+                  })),
+                ]}
+                ariaLabel="Question"
+                className="w-full"
+                buttonClassName={fieldClass}
+              />
+            )}
+            {linkForm.formState.errors.questionId && (
+              <p className={errorClass}>{linkForm.formState.errors.questionId.message}</p>
+            )}
+          </div>
           <div><label htmlFor="link-display-order" className={labelClass}>Display order</label><input id="link-display-order" type="number" {...linkForm.register('displayOrder', { valueAsNumber: true })} className={fieldClass} />{linkForm.formState.errors.displayOrder && <p className={errorClass}>{linkForm.formState.errors.displayOrder.message}</p>}</div>
           <label className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" {...linkForm.register('isActive')} className="w-4 h-4" /> Active and visible</label>
         </form>

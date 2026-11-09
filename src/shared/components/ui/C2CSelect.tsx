@@ -4,6 +4,7 @@ export interface C2CSelectOption {
   value: string | number;
   label: string;
   disabled?: boolean;
+  icon?: React.ReactNode;
 }
 
 interface C2CSelectProps {
@@ -15,8 +16,11 @@ interface C2CSelectProps {
   busy?: boolean;
   placeholder?: string;
   ariaLabel?: string;
+  'aria-label'?: string;
   className?: string;
   buttonClassName?: string;
+  menuClassName?: string;
+  align?: 'left' | 'right';
   leading?: React.ReactNode;
 }
 
@@ -34,10 +38,14 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
   busy = false,
   placeholder = 'Select an option',
   ariaLabel,
+  'aria-label': ariaLabelProp,
   className = '',
   buttonClassName = '',
+  menuClassName = '',
+  align = 'left',
   leading,
 }) => {
+  const resolvedAriaLabel = ariaLabelProp || ariaLabel;
   const generatedId = useId();
   const listboxId = `${id || generatedId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -77,13 +85,19 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
     }
   };
 
+  const hasCustomRounding = buttonClassName.includes('rounded-');
+  const hasCustomBg = buttonClassName.includes('bg-');
+  const hasCustomBorder = buttonClassName.includes('border-');
+  const hasCustomPadding = buttonClassName.includes('py-') || buttonClassName.includes('p-');
+  const hasCustomWidth = className.includes('min-w-') || className.includes('w-');
+
   return (
-    <div ref={rootRef} className={`relative inline-flex min-w-36 ${className}`}>
+    <div ref={rootRef} className={`relative inline-flex ${hasCustomWidth ? '' : 'min-w-36'} ${className}`}>
       <button
         id={id}
         type="button"
         disabled={disabled || busy || options.length === 0}
-        aria-label={ariaLabel}
+        aria-label={resolvedAriaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
@@ -96,19 +110,38 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
           }
           if (event.key === 'Escape') setOpen(false);
         }}
-        className={`flex w-full items-center gap-2 rounded-full border border-slate-200 bg-white py-1.5 pl-3 pr-3 text-left text-xs font-medium text-slate-900 shadow-2xs transition-colors hover:border-blue-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:hover:border-blue-500 ${buttonClassName}`}
+        className={`flex w-full items-center gap-2 text-left text-xs font-semibold shadow-2xs transition-colors hover:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:border-blue-500 ${
+          hasCustomBorder ? '' : 'border border-slate-200 dark:border-slate-700'
+        } ${
+          hasCustomPadding ? '' : 'py-1.5 pl-3 pr-3'
+        } ${
+          hasCustomRounding ? '' : 'rounded-full'
+        } ${
+          hasCustomBg ? '' : 'bg-white dark:bg-slate-800'
+        } text-slate-800 dark:text-slate-200 ${buttonClassName}`}
       >
-        {leading && <span aria-hidden="true" className="shrink-0">{leading}</span>}
+        {leading ? (
+          <span aria-hidden="true" className="shrink-0">{leading}</span>
+        ) : selected?.icon ? (
+          <span aria-hidden="true" className="shrink-0">{selected.icon}</span>
+        ) : null}
         <span className="min-w-0 flex-1 truncate">{selected?.label || placeholder}</span>
-        <i aria-hidden="true" className={`fa-solid fa-chevron-down shrink-0 text-[10px] text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <i
+          aria-hidden="true"
+          className={`fa-solid fa-chevron-down shrink-0 text-[10px] text-slate-400 transition-transform duration-200 ${
+            open ? 'rotate-180 text-blue-500' : ''
+          }`}
+        />
       </button>
 
       {open && (
         <div
           id={listboxId}
           role="listbox"
-          aria-label={ariaLabel || placeholder}
-          className="absolute left-0 top-[calc(100%+0.5rem)] z-50 max-h-64 min-w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl ring-1 ring-slate-900/5 dark:border-slate-700 dark:bg-[#0D1322] dark:ring-black/30"
+          aria-label={resolvedAriaLabel || placeholder}
+          className={`absolute ${
+            align === 'right' ? 'right-0' : 'left-0'
+          } top-[calc(100%+0.5rem)] z-50 max-h-64 min-w-full overflow-y-auto rounded-xl border border-slate-200/90 bg-white p-1.5 shadow-xl ring-1 ring-slate-900/5 dark:border-slate-800 dark:bg-[#0D1322] dark:ring-black/40 ${menuClassName}`}
         >
           {options.map((option, index) => {
             const isSelected = String(option.value) === String(value ?? '');
@@ -128,10 +161,19 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
                   if (event.key === 'End') { event.preventDefault(); [...optionRefs.current].reverse().find((element) => element && !element.disabled)?.focus(); }
                   if (event.key === 'Escape') { event.preventDefault(); setOpen(false); document.getElementById(id || generatedId)?.focus(); }
                 }}
-                className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${isSelected ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'}`}
+                className={`group flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer ${
+                  isSelected
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 font-semibold'
+                    : 'text-slate-700 hover:bg-slate-100/80 dark:text-slate-200 dark:hover:bg-slate-800/80'
+                }`}
               >
-                <span className="truncate">{option.label}</span>
-                {isSelected && <i aria-hidden="true" className="fa-solid fa-check text-xs" />}
+                <div className="flex items-center gap-2 min-w-0">
+                  {option.icon && <span aria-hidden="true" className="shrink-0">{option.icon}</span>}
+                  <span className="truncate">{option.label}</span>
+                </div>
+                {isSelected && (
+                  <i aria-hidden="true" className="fa-solid fa-check text-[11px] text-blue-600 dark:text-blue-400 shrink-0" />
+                )}
               </button>
             );
           })}

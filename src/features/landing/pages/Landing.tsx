@@ -6,7 +6,31 @@ import { Login } from '../../auth/pages/Login';
 import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
+import { C2CSelect, type C2CSelectOption } from '../../../shared/components/ui/C2CSelect';
 import { toast } from '@/shared/notifications/toast';
+
+const DEMO_LANGUAGES: C2CSelectOption[] = [
+  {
+    value: 'Java',
+    label: 'Java',
+    icon: <i className="fa-brands fa-java text-orange-500 text-xs" />,
+  },
+  {
+    value: 'Python',
+    label: 'Python',
+    icon: <i className="fa-brands fa-python text-blue-500 text-xs" />,
+  },
+  {
+    value: 'C++',
+    label: 'C++',
+    icon: <i className="fa-solid fa-code text-sky-500 text-xs" />,
+  },
+  {
+    value: 'JavaScript',
+    label: 'JavaScript',
+    icon: <i className="fa-brands fa-js text-amber-500 text-xs" />,
+  },
+];
 
 export const Landing: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -366,7 +390,7 @@ export const Landing: React.FC = () => {
           <div className="lg:col-span-6 xl:col-span-7 relative flex items-end justify-center lg:justify-end self-end w-full">
             {/* Dark Theme Hero Illustration */}
             <img
-              src="/hero_illustration_dark.png"
+              src="/hero_illustration_dark_4k.png"
               alt="Connect2Code Student Preparation Ecosystem"
               className="hidden dark:block w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none drop-shadow-2xl"
             />
@@ -821,19 +845,16 @@ export const Landing: React.FC = () => {
                 </div>
 
                 {/* Language Selector */}
-                <div className="relative inline-flex items-center">
-                  <select
-                    value={demoSelectedLang}
-                    onChange={(e) => setDemoSelectedLang(e.target.value)}
-                    className="appearance-none text-xs font-semibold bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl pl-3 pr-8 py-1.5 text-slate-700 dark:text-slate-200 focus:outline-none focus:border-blue-500 cursor-pointer shadow-2xs transition-colors"
-                  >
-                    <option value="Java" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">Java</option>
-                    <option value="Python" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">Python</option>
-                    <option value="C++" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">C++</option>
-                    <option value="JavaScript" className="bg-white dark:bg-neutral-900 text-slate-800 dark:text-slate-200">JavaScript</option>
-                  </select>
-                  <i className="fa-solid fa-chevron-down text-[10px] text-slate-400 absolute right-2.5 pointer-events-none" />
-                </div>
+                <C2CSelect
+                  id="landingDemoLangSelect"
+                  value={demoSelectedLang}
+                  onChange={setDemoSelectedLang}
+                  options={DEMO_LANGUAGES}
+                  align="right"
+                  ariaLabel="Programming language"
+                  className="w-36"
+                  buttonClassName="rounded-xl py-1.5 px-3 text-xs font-semibold bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                />
               </div>
 
               {/* Prompt description */}

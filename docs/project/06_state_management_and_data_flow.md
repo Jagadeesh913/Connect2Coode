@@ -82,9 +82,9 @@ export const useAppStore = useStore.withTypes<AppStore>();
 - **Auth transitions**: A same-user refresh preserves the current bookmark state and freshness timestamp. An identity-changing login, refresh, or authenticated-session replacement clears protected state before the new account can render it.
 
 ### 6. `profileSlice` ([`src/features/profile/redux/profileSlice.ts`](../../src/features/profile/redux/profileSlice.ts))
-- **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` details (`regNumber`, `joinedYear`, `passedOutYear`, `college`, `bio`). Activity metrics belong to `progressSlice`.
+- **Responsibilities**: Session-derived immutable identity and `/userInfo/{userId}` details (`regNumber`, `joinedYear`, `passedOutYear`, normalized `college`/`collegeName`, `collegeId`, `bio`, optional `gender`, and optional `dob`). Activity metrics and the profile activity heat map belong to `progressSlice`.
 - **Persistence boundary**: Academic records are server-derived and held only in Redux/component memory for the active session. `ProfileSettings` no longer caches them in `localStorage`.
-- **API-field boundary**: `ProfileSettings` exposes only fields represented by the authenticated identity or `/userInfo/{userId}` contracts. Academic and editable personal values never fall back to legacy fields on the identity object. The unsupported email-notification and interface-language controls were removed rather than persisted locally. Global theme behavior remains owned by `ThemeProvider`, which uses the authenticated `/{userId}/getTheme` and `/{userId}/theme/{isDarkTheme}` contract.
+- **API-field boundary**: `ProfileSettings` exposes only fields represented by the authenticated identity or `/userInfo/{userId}` contracts. Academic and editable personal values never fall back to legacy fields on the identity object. Gender options are API-owned `GENDER` references, and the heat map derives only from timestamped attempted-question records. The unsupported email-notification and interface-language controls were removed rather than persisted locally. Global theme behavior remains owned by `ThemeProvider`, which uses the authenticated `/{userId}/getTheme` and `/{userId}/theme/{isDarkTheme}` contract.
 - **Single source of truth**: `ProfileSettings` renders academic data directly from the slice rather than maintaining a second component copy.
 - **Nullable identity cache**: `profileFetched` distinguishes an API-confirmed `null` identity result from the not-yet-requested state, preventing route remounts from repeating the same read and allowing the page to leave its initial skeleton.
 - **Refresh continuity**: A validated refresh carries identity and role. Reapplying the same user preserves `/userInfo` caches; an explicit different user clears them. Session identity remains read-only because no profile-identity mutation contract is available.
@@ -110,7 +110,7 @@ export const useAppStore = useStore.withTypes<AppStore>();
   - Seamless navigation: Switching between previously loaded sheets or accordion sections re-renders from memory instantly without layout shift or skeleton flashing.
   - Invalidation & Error Reset: `invalidateDsaSheetCache` and `resetDsaSheetErrors` provide programmatic cache flushes and retry resets.
 - **Superseded Request Cancellation**:
-  - In `DsaSheetPage`, section-question reads are abortable and request-owned. Nested visual rows are derived only from the documented sections response; no subsection transport request is made.
+  - In `DsaSheetPage`, section-question reads are abortable and request-owned. The strict link boundary accepts API-owned structured company/platform summaries and adapts them directly to the shared question table; no duplicate company-catalog or subsection transport request is made.
   - Successful admin sheet, section, association edit/delete operations dispatch `invalidateDsaSheetCache`, preventing an admin from seeing the previous five-minute cached student view after navigation.
 
 ### Persistence Middleware

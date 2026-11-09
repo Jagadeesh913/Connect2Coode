@@ -71,16 +71,6 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Stay Updated / Newsletter */}
-          <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Stay Updated
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              Newsletter registration is coming soon. We will only show a signup form after a verified subscription service is available.
-            </p>
-          </div>
-
         </div>
 
         {/* Bottom Bar: Copyright & Tagline */}

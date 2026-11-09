@@ -1,6 +1,7 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
+import type { QuestionCompanySummary, QuestionPlatformSummary } from '../core/types/domain';
 import type {
   DsaSheet,
   DsaSheetQuestionLink,
@@ -31,20 +32,39 @@ const isSection = (value: unknown): value is DsaSheetSection =>
   typeof value.displayOrder === 'number' &&
   typeof value.isActive === 'boolean';
 
+const isQuestionCompany = (value: unknown): value is QuestionCompanySummary =>
+  isRecord(value) &&
+  isPositiveId(value.id) &&
+  typeof value.name === 'string' &&
+  typeof value.logo === 'string' &&
+  typeof value.website === 'string' &&
+  typeof value.isActive === 'boolean';
+
+const isQuestionPlatform = (value: unknown): value is QuestionPlatformSummary | null =>
+  value === null ||
+  (isRecord(value) &&
+    isPositiveId(value.id) &&
+    typeof value.refGroupCode === 'string' &&
+    (value.refGroupName === null || typeof value.refGroupName === 'string') &&
+    typeof value.refCode === 'string' &&
+    typeof value.refName === 'string' &&
+    typeof value.isActive === 'boolean' &&
+    (value.logoUrl === null || typeof value.logoUrl === 'string'));
+
 const isQuestion = (value: unknown): value is DsaSheetQuestionSummary =>
   isRecord(value) &&
   isPositiveId(value.id) &&
   typeof value.title === 'string' &&
   typeof value.description === 'string' &&
-  typeof value.difficultyId === 'number' &&
+  isPositiveId(value.difficultyId) &&
   typeof value.difficultyName === 'string' &&
-  typeof value.topicId === 'number' &&
+  isPositiveId(value.topicId) &&
   typeof value.topicName === 'string' &&
   typeof value.isOwnProblem === 'boolean' &&
   typeof value.isActive === 'boolean' &&
-  typeof value.questionPlatform === 'string' &&
+  isQuestionPlatform(value.questionPlatform) &&
   Array.isArray(value.companies) &&
-  value.companies.every((company) => typeof company === 'string');
+  value.companies.every(isQuestionCompany);
 
 const isQuestionLink = (value: unknown): value is DsaSheetQuestionLink =>
   isRecord(value) &&

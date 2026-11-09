@@ -6,6 +6,7 @@ import Editor from '@monaco-editor/react';
 import '../../../../core/editor/monacoEnvironment';
 import { AdminCard } from '../AdminCard';
 import { AdminBadge } from '../AdminBadge';
+import { C2CSelect } from '../../../../shared/components/ui/C2CSelect';
 import { adminQuestionService } from '../../../../services/admin/adminQuestionService';
 import { ExecutionResultData, isExecutionResultSuccessful } from '../../../../services/executionService';
 import { useTheme } from '../../../../shared/context/ThemeContext';
@@ -460,14 +461,14 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
     }
   };
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newId = Number(e.target.value);
+  const handleLanguageChange = (val: string) => {
+    const newId = Number(val);
     setSelectedLanguageId(newId);
     setResult(null);
   };
 
-  const handleQuestionSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const qId = Number(e.target.value);
+  const handleQuestionSelectChange = (val: string) => {
+    const qId = Number(val);
     if (!qId || isNaN(qId)) return;
     selectQuestionId(qId);
     setManualQuestionId(String(qId));
@@ -733,25 +734,23 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
                   <RefreshCw className={`w-3 h-3 ${combinedResourcesLoading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
-              <select
+              <C2CSelect
                 id="dashboard-question-select"
-                value={selectedQuestionId ?? ''}
+                value={selectedQuestionId ? String(selectedQuestionId) : ''}
                 onChange={handleQuestionSelectChange}
                 disabled={isBusy || combinedResourcesLoading || filteredQuestions.length === 0}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                {filteredQuestions.map((q) => {
+                placeholder={filteredQuestions.length === 0 ? 'No matching questions found' : 'Select a question'}
+                options={filteredQuestions.map((q) => {
                   const diff = q.difficulty || q.difficultyRefName;
-                  return (
-                    <option key={q.id} value={q.id}>
-                      #{q.id} - {q.title} {diff ? `[${diff}]` : ''}
-                    </option>
-                  );
+                  return {
+                    value: String(q.id),
+                    label: `#${q.id} - ${q.title} ${diff ? `[${diff}]` : ''}`,
+                  };
                 })}
-                {filteredQuestions.length === 0 && (
-                  <option value="">No matching questions found</option>
-                )}
-              </select>
+                ariaLabel="Select Question"
+                className="w-full"
+                buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
               {questionPage + 1 < questionTotalPages &&
                 (questionPageSearch === null
                   ? !searchFilter.trim()
@@ -792,19 +791,32 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
               <label htmlFor="dashboard-runtime" className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Runtime
               </label>
-              <select
+              <C2CSelect
                 id="dashboard-runtime"
-                value={selectedLanguageId ?? ''}
+                value={selectedLanguageId ? String(selectedLanguageId) : ''}
                 onChange={handleLanguageChange}
                 disabled={isBusy || combinedResourcesLoading || !languages.length}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                {languages.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+                options={languages.map((l) => ({
+                  value: String(l.id),
+                  label: l.name,
+                  icon: (
+                    <i
+                      className={`text-xs ${
+                        l.name?.toLowerCase().includes('python')
+                          ? 'fa-brands fa-python text-blue-500'
+                          : l.name?.toLowerCase().includes('c++') || l.name?.toLowerCase().includes('cpp')
+                          ? 'fa-solid fa-c text-sky-600'
+                          : l.name?.toLowerCase().includes('javascript') || l.name?.toLowerCase().includes('js')
+                          ? 'fa-brands fa-js text-amber-500'
+                          : 'fa-brands fa-java text-orange-500'
+                      }`}
+                    />
+                  ),
+                }))}
+                ariaLabel="Compiler Runtime"
+                className="w-full"
+                buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
             </div>
           </div>
 

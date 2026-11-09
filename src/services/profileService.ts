@@ -2,7 +2,7 @@ import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
 import { tokenStorage } from '../core/security/tokenStorage';
 import type { ApiResponse } from '../core/types/api';
-import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../core/types/domain';
+import type { ReferenceItem, UserProfile, UserInfoData, SaveUserInfoPayload } from '../core/types/domain';
 
 export type UserProfileData = UserProfile;
 
@@ -23,6 +23,54 @@ const requireThemePreference = (data: unknown): ThemePreferenceResponse => {
   return { isDarkTheme: (data as ThemePreferenceResponse).isDarkTheme };
 };
 
+const optionalText = (value: unknown, field: string): string | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') throw new Error(`Unexpected user profile ${field} format`);
+  return value;
+};
+
+const optionalYear = (value: unknown, field: string): number | null => {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'number' || !Number.isInteger(value)) {
+    throw new Error(`Unexpected user profile ${field} format`);
+  }
+  return value;
+};
+
+const optionalPositiveId = (value: unknown, field: string): number | null => {
+  if (value === undefined || value === null || value === '') return null;
+  const numericValue = Number(value);
+  if (!Number.isSafeInteger(numericValue) || numericValue < 1) {
+    throw new Error(`Unexpected user profile ${field} format`);
+  }
+  return numericValue;
+};
+
+const normalizeGender = (value: unknown): ReferenceItem | null => {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Unexpected user profile gender format');
+  }
+  const gender = value as Record<string, unknown>;
+  const id = optionalPositiveId(gender.id, 'gender ID');
+  if (
+    id === null ||
+    typeof gender.refGroupCode !== 'string' ||
+    typeof gender.refCode !== 'string' ||
+    typeof gender.refName !== 'string' ||
+    typeof gender.isActive !== 'boolean'
+  ) {
+    throw new Error('Unexpected user profile gender format');
+  }
+  return {
+    id,
+    refGroupCode: gender.refGroupCode,
+    refCode: gender.refCode,
+    refName: gender.refName,
+    isActive: gender.isActive,
+  };
+};
+
 const requireUserInfo = (data: unknown, requestedUserId: string | number): UserInfoData => {
   const normalizedRequestedUserId = Number(requestedUserId);
   if (!Number.isSafeInteger(normalizedRequestedUserId) || normalizedRequestedUserId < 1) {
@@ -32,33 +80,27 @@ const requireUserInfo = (data: unknown, requestedUserId: string | number): UserI
     throw new Error('Unexpected user profile response format');
   }
   const value = data as Record<string, unknown>;
-  const id = value.id;
-  const userId = value.userId;
-  const regNumber = value.regNumber;
-  const joinedYear = value.joinedYear;
-  const passedOutYear = value.passedOutYear;
-  const college = value.college;
-  const bio = value.bio;
+  const id = optionalPositiveId(value.id, 'ID');
+  const userId = optionalPositiveId(value.userId, 'user ID');
+  const college = optionalText(value.college ?? value.collegeName, 'college');
   if (
-    (id !== undefined && (typeof id !== 'number' || !Number.isSafeInteger(id) || id < 1)) ||
-    (userId !== undefined && (typeof userId !== 'number' || !Number.isSafeInteger(userId) || userId < 1)) ||
-    (typeof userId === 'number' && userId !== normalizedRequestedUserId) ||
-    typeof regNumber !== 'string' ||
-    !Number.isInteger(joinedYear) ||
-    !Number.isInteger(passedOutYear) ||
-    typeof college !== 'string' ||
-    typeof bio !== 'string'
+    (userId !== null && userId !== normalizedRequestedUserId)
   ) {
     throw new Error('Unexpected user profile response format');
   }
   return {
-    id: typeof id === 'number' ? id : null,
-    userId: typeof userId === 'number' ? userId : normalizedRequestedUserId,
-    regNumber,
-    joinedYear: joinedYear as number,
-    passedOutYear: passedOutYear as number,
-    college: college as string,
-    bio: bio as string,
+    id,
+    userId: userId ?? normalizedRequestedUserId,
+    firstName: optionalText(value.firstName, 'first name'),
+    lastName: optionalText(value.lastName, 'last name'),
+    regNumber: optionalText(value.regNumber, 'registration number'),
+    joinedYear: optionalYear(value.joinedYear, 'joined year'),
+    passedOutYear: optionalYear(value.passedOutYear, 'passed-out year'),
+    college,
+    collegeId: optionalPositiveId(value.collegeId, 'college ID'),
+    bio: optionalText(value.bio, 'bio'),
+    gender: normalizeGender(value.gender),
+    dob: optionalText(value.dob, 'date of birth'),
   };
 };
 
@@ -132,6 +174,9 @@ export const profileService = {
       passedOutYear: Number(payload.passedOutYear),
       college: payload.college,
       bio: payload.bio,
+      ...(payload.collegeId !== undefined ? { collegeId: payload.collegeId } : {}),
+      ...(payload.gender ? { gender: payload.gender } : {}),
+      ...(payload.dob !== undefined ? { dob: payload.dob } : {}),
     };
     const res: ApiResponse<unknown> = await apiClient.post(
       API_ENDPOINTS.USER.USER_INFO(userId),

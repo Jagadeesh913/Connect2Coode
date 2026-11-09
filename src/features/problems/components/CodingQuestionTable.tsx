@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import type { Company, Problem } from '../../../core/types/domain';
 import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
 import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
-import { useReferenceGroup } from '../../references/hooks/useReferenceGroup';
 import { TableRowSkeleton } from '../../../shared/components/ui/Skeleton';
 
 export type CodingQuestionListItem = Pick<
@@ -16,11 +15,13 @@ export type CodingQuestionListItem = Pick<
   | 'topic'
   | 'category'
   | 'companies'
+  | 'companyDetails'
   | 'questionPlatform'
   | 'qpfRefName'
   | 'qpfRefCode'
   | 'examPlatform'
   | 'platformName'
+  | 'platformLogoUrl'
 >;
 
 interface CodingQuestionTableProps<T extends CodingQuestionListItem> {
@@ -46,9 +47,6 @@ const difficultyNumberColor = (difficulty: string): string => {
   if (normalized.includes('basic') || normalized.includes('school')) return 'text-sky-500 dark:text-sky-400 font-bold';
   return 'text-slate-500 dark:text-slate-400 font-bold';
 };
-
-const normalizePlatformKey = (value: string | undefined): string =>
-  (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 const PlatformBadge: React.FC<{ question: CodingQuestionListItem; logoUrl?: string | null }> = ({ question, logoUrl }) => {
   const raw = question.questionPlatform || question.qpfRefName || question.examPlatform || question.platformName || question.qpfRefCode;
@@ -113,32 +111,6 @@ export const CodingQuestionTable = <T extends CodingQuestionListItem>({
     });
     return map;
   }, [companies]);
-  const { items: questionPlatforms } = useReferenceGroup('QPF');
-  const platformLogoByKey = useMemo(() => {
-    const logos = new Map<string, string | null | undefined>();
-    questionPlatforms.forEach((platform) => {
-      const logo = platform.logoUrl;
-      logos.set(normalizePlatformKey(platform.refCode), logo);
-      logos.set(normalizePlatformKey(platform.refName), logo);
-    });
-    return logos;
-  }, [questionPlatforms]);
-
-  const getPlatformLogo = (question: CodingQuestionListItem): string | null | undefined => {
-    const candidates = [
-      question.qpfRefCode,
-      question.qpfRefName,
-      question.questionPlatform,
-      question.examPlatform,
-      question.platformName,
-    ];
-    for (const candidate of candidates) {
-      const logo = platformLogoByKey.get(normalizePlatformKey(candidate));
-      if (logo !== undefined) return logo;
-    }
-    return undefined;
-  };
-
   return (
     <div className="bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
       <div className="overflow-x-auto overflow-y-hidden scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
@@ -170,10 +142,10 @@ export const CodingQuestionTable = <T extends CodingQuestionListItem>({
                 <tr key={question.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                   <td className={`py-3 px-4 text-center font-mono text-xs font-semibold shrink-0 ${difficultyNumberColor(question.difficulty || '')}`} title={`Question ID: ${questionId} • Difficulty: ${question.difficulty || 'Unknown'}`}>{questionId}</td>
                   <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm"><Link to={getQuestionPath(question)} className="inline-block leading-snug transition-colors hover:text-blue-600 dark:hover:text-blue-400">{question.title}</Link></td>
-                  <td className="py-3 px-4"><PlatformBadge question={question} logoUrl={getPlatformLogo(question)} /></td>
-                  <td className="py-3 px-4 whitespace-nowrap">{question.companies.length ? <div className="flex items-center gap-1.5 flex-nowrap" title={question.companies.length > 2 ? `Companies: ${question.companies.join(', ')}` : undefined}>{question.companies.slice(0, 2).map((name, index) => { const company = companyMap.get(name.toLowerCase().trim()); return <CompanyCircleBadge key={`${name}-${index}`} name={name} logo={company?.logo} website={company?.website} />; })}</div> : <span className="text-slate-400 text-xs">—</span>}</td>
+                  <td className="py-3 px-4"><PlatformBadge question={question} logoUrl={question.platformLogoUrl} /></td>
+                  <td className="py-3 px-4 whitespace-nowrap">{question.companies.length ? <div className="flex items-center gap-1.5 flex-nowrap" title={question.companies.length > 2 ? `Companies: ${question.companies.join(', ')}` : undefined}>{question.companies.slice(0, 2).map((name, index) => { const company = question.companyDetails?.find((item) => item.name.toLowerCase().trim() === name.toLowerCase().trim()) || companyMap.get(name.toLowerCase().trim()); return <CompanyCircleBadge key={`${name}-${index}`} name={name} logo={company?.logo} website={company?.website} />; })}</div> : <span className="text-slate-400 text-xs">—</span>}</td>
                   <td className="py-3 px-2 text-center">{onBookmark && <button type="button" onClick={(event) => onBookmark(question, event)} aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark problem'} className={`rounded-md p-1 transition-colors ${bookmarked ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><i className={`fa-${bookmarked ? 'solid' : 'regular'} fa-bookmark text-xs`} /></button>}</td>
-                  <td className="py-3 px-4 text-right">{solved ? <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1 text-xs font-bold text-emerald-600 no-underline shadow-2xs transition-colors hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50"><i className="fa-solid fa-check text-[9px]" /><span>Solved</span></Link> : <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1 text-xs font-bold text-blue-600 no-underline shadow-2xs transition-colors hover:bg-blue-50 dark:border-blue-800/60 dark:text-blue-400 dark:hover:bg-blue-950/50"><span>Solve</span><i className="fa-solid fa-arrow-right text-[9px]" /></Link>}</td>
+                  <td className="py-3 px-4 text-right">{solved ? <Link to={getQuestionPath(question)} className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1 text-xs font-bold text-emerald-600 no-underline shadow-2xs transition-colors hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50"><span>Solved</span></Link> : <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1 text-xs font-bold text-blue-600 no-underline shadow-2xs transition-colors hover:bg-blue-50 dark:border-blue-800/60 dark:text-blue-400 dark:hover:bg-blue-950/50"><span>Solve</span><i className="fa-solid fa-arrow-right text-[9px]" /></Link>}</td>
                 </tr>
               );
             })}

@@ -1,4 +1,4 @@
-import type { Problem, QuestionTestCase, QuestionHint } from '../types/domain';
+import type { Company, Problem, QuestionPlatformSummary, QuestionTestCase, QuestionHint } from '../types/domain';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../features/admin/utils/testCaseUtils';
 
 export type ProblemDto = {
@@ -17,8 +17,8 @@ export type ProblemDto = {
   topicRefCode?: string;
   isOwnProblem?: boolean;
   isActive?: boolean;
-  companies?: Array<string | { name?: string }>;
-  questionPlatform?: string;
+  companies?: Array<string | Company>;
+  questionPlatform?: string | QuestionPlatformSummary | null;
   platformName?: string;
   examPlatform?: string;
   qpfRefGroupCode?: string;
@@ -54,6 +54,15 @@ const readCompanies = (companies: ProblemDto['companies']): string[] =>
         .filter(Boolean)
     : [];
 
+const readCompanyDetails = (companies: ProblemDto['companies']): Company[] | undefined => {
+  if (!Array.isArray(companies)) return undefined;
+  const details = companies.filter(
+    (company): company is Company =>
+      Boolean(company) && typeof company === 'object' && typeof company.name === 'string'
+  );
+  return details.length > 0 ? details : undefined;
+};
+
 export const mapProblemDto = (value: ProblemDto): Problem => {
   const id = value.id === undefined || value.id === null ? '' : String(value.id);
   const questionId =
@@ -74,8 +83,14 @@ export const mapProblemDto = (value: ProblemDto): Problem => {
       : typeof value.topicRefName === 'string'
       ? value.topicRefName
       : '';
+  const platformSummary =
+    value.questionPlatform && typeof value.questionPlatform === 'object'
+      ? value.questionPlatform
+      : null;
   const questionPlatform =
-    typeof value.questionPlatform === 'string'
+    platformSummary
+      ? platformSummary.refName
+      : typeof value.questionPlatform === 'string'
       ? value.questionPlatform
       : typeof value.platformName === 'string'
       ? value.platformName
@@ -120,14 +135,16 @@ export const mapProblemDto = (value: ProblemDto): Problem => {
     topicRefName: typeof value.topicRefName === 'string' ? value.topicRefName : undefined,
     topicRefCode: typeof value.topicRefCode === 'string' ? value.topicRefCode : undefined,
     companies: readCompanies(value.companies),
+    companyDetails: readCompanyDetails(value.companies),
     acceptanceRate: value.acceptanceRate ? String(value.acceptanceRate) : '—',
     isSolved: Boolean(value.isSolved),
     isBookmarked: Boolean(value.isBookmarked),
     isOwnProblem: value.isOwnProblem,
     questionPlatform,
     qpfRefName: questionPlatform,
-    qpfRefCode: typeof value.qpfRefCode === 'string' ? value.qpfRefCode : undefined,
-    qpfRefGroupCode: typeof value.qpfRefGroupCode === 'string' ? value.qpfRefGroupCode : undefined,
+    qpfRefCode: platformSummary?.refCode || (typeof value.qpfRefCode === 'string' ? value.qpfRefCode : undefined),
+    qpfRefGroupCode: platformSummary?.refGroupCode || (typeof value.qpfRefGroupCode === 'string' ? value.qpfRefGroupCode : undefined),
+    platformLogoUrl: platformSummary?.logoUrl,
     examPlatform: typeof value.examPlatform === 'string' ? value.examPlatform : undefined,
     leetCodeUrl: typeof value.leetCodeUrl === 'string' ? value.leetCodeUrl : undefined,
     gfgUrl: typeof value.gfgUrl === 'string' ? value.gfgUrl : undefined,

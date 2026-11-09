@@ -1,4 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -11,7 +12,9 @@ import { TestCaseModal } from '../components/questions/TestCaseModal';
 import { AdminCodeTestModal } from '../components/questions/AdminCodeTestModal';
 import { QuestionPayload, QuestionTestCase } from '../../../services/questionService';
 import { adminQuestionService } from '../../../services/admin/adminQuestionService';
+import type { QuestionListItem } from '../../../core/types/domain';
 import { adminCompanyService, type CompanyItem } from '../../../services/admin/adminCompanyService';
+import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
 import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
@@ -30,7 +33,7 @@ import { invalidateProblemCache } from '../../problems/redux/problemSlice';
 
 export const AdminQuestions: React.FC = () => {
   const dispatch = useAppDispatch();
-  const [questions, setQuestions] = useState<QuestionPayload[]>([]);
+  const [questions, setQuestions] = useState<QuestionListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -157,21 +160,7 @@ export const AdminQuestions: React.FC = () => {
         throw new Error('Unexpected question list response format');
       }
 
-      const contentList: QuestionPayload[] = (
-        pageData.content
-      ).map((item: any) => {
-        const finalCompanies = item.companies;
-        const finalPlatform = item.questionPlatform || item.qpfRefName || item.platformName;
-        const finalPlatformCode = item.qpfRefCode;
-
-        return {
-          ...item,
-          companies: finalCompanies,
-          questionPlatform: finalPlatform,
-          qpfRefName: finalPlatform,
-          qpfRefCode: finalPlatformCode,
-        };
-      });
+      const contentList = pageData.content;
 
       const total = typeof pageData?.totalElements === 'number'
         ? pageData.totalElements
@@ -208,7 +197,7 @@ export const AdminQuestions: React.FC = () => {
     };
   }, [fetchQuestions]);
 
-  const handleInspect = async (questionOrId: QuestionPayload | string | number) => {
+  const handleInspect = async (questionOrId: QuestionListItem | string | number) => {
     const qId = typeof questionOrId === 'object' ? questionOrId.id : questionOrId;
     if (!qId) return;
     detailAbortRef.current?.abort();
@@ -239,7 +228,7 @@ export const AdminQuestions: React.FC = () => {
     }
   };
 
-  const handleEditClick = async (question: QuestionPayload) => {
+  const handleEditClick = async (question: QuestionListItem) => {
     if (!question.id) return;
     detailAbortRef.current?.abort();
     const controller = new AbortController();
@@ -267,7 +256,7 @@ export const AdminQuestions: React.FC = () => {
     }
   };
 
-  const handleManageTestCases = async (question: QuestionPayload) => {
+  const handleManageTestCases = async (question: QuestionListItem) => {
     if (!question.id) return;
     detailAbortRef.current?.abort();
     const controller = new AbortController();
@@ -403,7 +392,6 @@ export const AdminQuestions: React.FC = () => {
         qpfRefGroupCode: formData.qpfRefGroupCode || 'QPF',
         qpfRefCode: formData.qpfRefCode,
         qpfRefName: platformName,
-        questionPlatform: platformName,
         leetCodeUrl: formData.leetCodeUrl ? formData.leetCodeUrl.trim() : '',
         gfgUrl: formData.gfgUrl ? formData.gfgUrl.trim() : '',
         hackerRankUrl: formData.hackerRankUrl ? formData.hackerRankUrl.trim() : '',
@@ -417,42 +405,6 @@ export const AdminQuestions: React.FC = () => {
       const res = await adminQuestionService.saveOrUpdateQuestion(questionPayload);
       const savedQuestion = res.data;
       const targetQuestionId = savedQuestion?.id || questionId;
-
-      if (targetQuestionId) {
-        // Optimistically update local questions state
-        setQuestions((prev) =>
-          prev.map((q) => {
-            if (q.id === targetQuestionId) {
-              return {
-                ...q,
-                ...formData,
-                id: targetQuestionId,
-                companies: formData.companies || [],
-                questionPlatform: platformName,
-                qpfRefName: platformName,
-                qpfRefCode: formData.qpfRefCode,
-              };
-            }
-            return q;
-          })
-        );
-
-        if (selectedQuestion?.id === targetQuestionId) {
-          setSelectedQuestion((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ...formData,
-                  id: targetQuestionId,
-                  companies: formData.companies || [],
-                  questionPlatform: platformName,
-                  qpfRefName: platformName,
-                  qpfRefCode: formData.qpfRefCode,
-                }
-              : prev
-          );
-        }
-      }
 
       // Attach test cases if provided
       if (targetQuestionId && Array.isArray(formData.testCases) && formData.testCases.length > 0) {
@@ -524,17 +476,12 @@ export const AdminQuestions: React.FC = () => {
     return 'text-slate-500 dark:text-slate-400 font-bold';
   };
 
-  const columns: Column<QuestionPayload>[] = [
+  const columns: Column<QuestionListItem>[] = [
     {
       header: '#',
       className: 'w-16 text-center font-mono font-semibold shrink-0',
-      cell: (row: any) => {
-        const diff =
-          row.difficultyRefName ||
-          row.difficultyName ||
-          row.difficulty ||
-          row.difficultyRefCode ||
-          '';
+      cell: (row) => {
+        const diff = row.difficultyName;
         const colorClass = getDifficultyNumberColor(diff);
         return (
           <span
@@ -549,15 +496,9 @@ export const AdminQuestions: React.FC = () => {
     {
       header: 'Problem Title',
       className: 'min-w-[260px]',
-      cell: (row: any) => {
-        const platform =
-          row.questionPlatform ||
-          row.qpfRefName ||
-          row.platformName ||
-          row.examPlatform ||
-          row.platform ||
-          (row.isOwnProblem ? 'Custom In-House' : 'Connect 2 Code');
-        const isInactive = row.isActive === false || row.isActive === 0 || row.isActive === 'false' || (row.status && String(row.status).toLowerCase() === 'inactive');
+      cell: (row) => {
+        const platform = row.questionPlatform?.refName || 'Unspecified';
+        const isInactive = !row.isActive;
         return (
           <div
             className={`flex flex-col min-w-0 transition-colors ${
@@ -586,13 +527,8 @@ export const AdminQuestions: React.FC = () => {
     {
       header: 'Category / Topic',
       className: 'w-36',
-      cell: (row: any) => {
-        const topic =
-          row.topicRefName ||
-          row.topicName ||
-          row.category ||
-          row.topic ||
-          'General';
+      cell: (row) => {
+        const topic = row.topicName;
         return (
           <AdminBadge variant="primary" size="sm">
             {topic}
@@ -603,27 +539,23 @@ export const AdminQuestions: React.FC = () => {
     {
       header: 'Hiring Partners',
       className: 'min-w-[140px] hidden lg:table-cell',
-      cell: (row: any) => {
-        const companyList = Array.isArray(row.companies)
-          ? row.companies
-              .map((c: any) =>
-                typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c)
-              )
-              .filter(Boolean)
-          : [];
+      cell: (row) => {
+        const companyList = row.companies;
         if (companyList.length === 0) {
           return <span className="text-slate-400 text-xs italic">None</span>;
         }
         return (
-          <div className="flex items-center gap-1 flex-wrap">
-            {companyList.slice(0, 2).map((name: string, i: number) => (
-              <span
-                key={i}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 text-[10px] font-semibold"
-              >
-                {name}
-              </span>
-            ))}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {companyList.slice(0, 2).map((company) => {
+              return (
+                <CompanyCircleBadge
+                  key={company.id}
+                  name={company.name}
+                  logo={company?.logo}
+                  website={company?.website}
+                />
+              );
+            })}
             {companyList.length > 2 && (
               <span className="text-[10px] text-slate-400 font-mono">
                 +{companyList.length - 2}
@@ -669,7 +601,7 @@ export const AdminQuestions: React.FC = () => {
                 setTargetQuestionForTestCode({
                   id: row.id,
                   title: row.title,
-                  difficultyRefName: row.difficultyRefName,
+                  difficultyRefName: row.difficultyName,
                 });
                 setIsTestCodeOpen(true);
               }
@@ -740,76 +672,73 @@ export const AdminQuestions: React.FC = () => {
         {/* Dropdowns */}
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
           {/* Difficulty */}
-          <select
-            aria-label="Filter questions by difficulty"
+          <C2CSelect
             value={selectedDifficulty}
-            disabled={difficultyQuery.loading || (difficulties.length === 0 && Boolean(difficultyQuery.error))}
-            onChange={(e) => {
-              setSelectedDifficulty(e.target.value);
+            onChange={(val) => {
+              setSelectedDifficulty(val);
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Difficulties</option>
-            {difficulties.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.refName}
-              </option>
-            ))}
-          </select>
+            disabled={difficultyQuery.loading || (difficulties.length === 0 && Boolean(difficultyQuery.error))}
+            options={[
+              { value: '', label: 'All Difficulties' },
+              ...difficulties.map((d) => ({ value: String(d.id), label: d.refName })),
+            ]}
+            aria-label="Filter questions by difficulty"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Topic */}
-          <select
-            aria-label="Filter questions by topic"
+          <C2CSelect
             value={selectedTopic}
-            disabled={topicQuery.loading || (topics.length === 0 && Boolean(topicQuery.error))}
-            onChange={(e) => {
-              setSelectedTopic(e.target.value);
+            onChange={(val) => {
+              setSelectedTopic(val);
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Categories</option>
-            {topics.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.refName}
-              </option>
-            ))}
-          </select>
+            disabled={topicQuery.loading || (topics.length === 0 && Boolean(topicQuery.error))}
+            options={[
+              { value: '', label: 'All Categories' },
+              ...topics.map((t) => ({ value: String(t.id), label: t.refName })),
+            ]}
+            aria-label="Filter questions by topic"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Company */}
-          <select
-            aria-label="Filter questions by company"
+          <C2CSelect
             value={selectedCompany}
-            disabled={companiesLoading || (companies.length === 0 && Boolean(companiesError))}
-            onChange={(e) => {
-              setSelectedCompany(e.target.value);
+            onChange={(val) => {
+              setSelectedCompany(val);
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Companies</option>
-            {companies.map((c) => (
-              <option key={c.id ?? c.name} value={c.id ?? ''}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            disabled={companiesLoading || (companies.length === 0 && Boolean(companiesError))}
+            options={[
+              { value: '', label: 'All Companies' },
+              ...companies.map((c) => ({ value: String(c.id ?? ''), label: c.name })),
+            ]}
+            aria-label="Filter questions by company"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Page Size */}
-          <select
-            aria-label="Questions per page"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
+          <C2CSelect
+            value={String(pageSize)}
+            onChange={(val) => {
+              setPageSize(Number(val));
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="10">10 / page</option>
-            <option value="20">20 / page</option>
-            <option value="50">50 / page</option>
-          </select>
+            options={[
+              { value: '10', label: '10 / page' },
+              { value: '20', label: '20 / page' },
+              { value: '50', label: '50 / page' },
+            ]}
+            align="right"
+            ariaLabel="Questions per page"
+            className="w-full sm:w-32"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
         </div>
       </div>
 
@@ -819,7 +748,7 @@ export const AdminQuestions: React.FC = () => {
       {/* Questions Table */}
       {(!error || questions.length > 0 || loading) && (
         <div className="space-y-4">
-          <AdminTable<QuestionPayload>
+          <AdminTable<QuestionListItem>
             columns={columns}
             data={questions}
             loading={loading}

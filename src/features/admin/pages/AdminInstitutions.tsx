@@ -1,4 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -459,18 +460,21 @@ export const AdminInstitutions: React.FC = () => {
         {/* Filters Grid */}
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
           {/* Type Filter */}
-          <select
+          <C2CSelect
             value={typeFilter}
-            onChange={(e) => {
-              setTypeFilter(e.target.value as any);
+            onChange={(val) => {
+              setTypeFilter(val as any);
               setPage(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Types</option>
-            <option value="COLLEGE">Colleges</option>
-            <option value="UNIVERSITY">Universities</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'All Types' },
+              { value: 'COLLEGE', label: 'Colleges' },
+              { value: 'UNIVERSITY', label: 'Universities' },
+            ]}
+            ariaLabel="Filter institutions by type"
+            className="w-full sm:w-36"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* State Filter */}
           <input
@@ -482,32 +486,39 @@ export const AdminInstitutions: React.FC = () => {
           />
 
           {/* Status Filter */}
-          <select
+          <C2CSelect
             value={activeFilter}
-            onChange={(e) => {
-              setActiveFilter(e.target.value as any);
+            onChange={(val) => {
+              setActiveFilter(val as any);
               setPage(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="ALL">All Status</option>
-            <option value="ACTIVE">Active Only</option>
-            <option value="INACTIVE">Inactive Only</option>
-          </select>
+            options={[
+              { value: 'ALL', label: 'All Status' },
+              { value: 'ACTIVE', label: 'Active Only' },
+              { value: 'INACTIVE', label: 'Inactive Only' },
+            ]}
+            ariaLabel="Filter institutions by status"
+            className="w-full sm:w-36"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Page Size */}
-          <select
-            value={size}
-            onChange={(e) => {
-              setSize(Number(e.target.value));
+          <C2CSelect
+            value={String(size)}
+            onChange={(val) => {
+              setSize(Number(val));
               setPage(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="10">10 / page</option>
-            <option value="20">20 / page</option>
-            <option value="50">50 / page</option>
-          </select>
+            options={[
+              { value: '10', label: '10 / page' },
+              { value: '20', label: '20 / page' },
+              { value: '50', label: '50 / page' },
+            ]}
+            align="right"
+            ariaLabel="Institutions per page"
+            className="w-full sm:w-32"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
         </div>
       </div>
 

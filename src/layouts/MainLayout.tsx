@@ -54,13 +54,13 @@ export const MainLayout: React.FC = () => {
     location.pathname.startsWith('/settings');
 
   return (
-    <div className="min-h-screen flex flex-col relative m-0 p-0 overflow-x-hidden bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
+    <div className={`${isProblemWorkspace ? 'h-screen overflow-hidden' : 'min-h-screen overflow-x-hidden'} flex flex-col relative m-0 p-0 bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200`}>
       {/* Top Navbar */}
       <Navbar user={user} onLogout={handleLogout} />
 
       {/* Main Content View (Full-width clean layout container) */}
       <main
-        className={`flex-1 mx-auto w-full ${
+        className={`flex-1 min-h-0 mx-auto w-full ${
           isProblemWorkspace
             ? 'w-full p-0'
             : isFullWidthPage
@@ -72,7 +72,7 @@ export const MainLayout: React.FC = () => {
       </main>
 
       {/* Shared Footer */}
-      <Footer />
+      {!isProblemWorkspace && <Footer />}
 
       {/* Global Floating GFG Auth Modal Overlay */}
       {showModal && (

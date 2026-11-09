@@ -1,4 +1,5 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
+import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, Column } from '../components/AdminTable';
@@ -710,58 +711,57 @@ export const AdminMcqs: React.FC = () => {
         {/* Dropdowns */}
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
           {/* Subject Filter */}
-          <select
+          <C2CSelect
             id="admin-mcq-subject-filter"
-            aria-label="Filter MCQs by subject"
             value={selectedSubject}
-            onChange={(e) => {
-              setSelectedSubject(e.target.value);
+            onChange={(val) => {
+              setSelectedSubject(val);
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Subjects</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.refCode}>
-                {s.refName}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'All Subjects' },
+              ...subjects.map((s) => ({ value: s.refCode, label: s.refName })),
+            ]}
+            ariaLabel="Filter MCQs by subject"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Difficulty Filter */}
-          <select
+          <C2CSelect
             id="admin-mcq-difficulty-filter"
-            aria-label="Filter MCQs by difficulty"
             value={selectedDifficulty}
-            onChange={(e) => {
-              setSelectedDifficulty(e.target.value);
+            onChange={(val) => {
+              setSelectedDifficulty(val);
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">All Difficulties</option>
-            {difficulties.map((d) => (
-              <option key={d.id} value={d.refCode}>
-                {d.refName}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: '', label: 'All Difficulties' },
+              ...difficulties.map((d) => ({ value: d.refCode, label: d.refName })),
+            ]}
+            ariaLabel="Filter MCQs by difficulty"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
 
           {/* Page Size */}
-          <select
+          <C2CSelect
             id="admin-mcq-page-size"
-            aria-label="MCQ rows per page"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value));
+            value={String(pageSize)}
+            onChange={(val) => {
+              setPageSize(Number(val));
               setPageNumber(0);
             }}
-            className="w-full sm:w-auto px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="10">10 / page</option>
-            <option value="20">20 / page</option>
-            <option value="50">50 / page</option>
-          </select>
+            options={[
+              { value: '10', label: '10 / page' },
+              { value: '20', label: '20 / page' },
+              { value: '50', label: '50 / page' },
+            ]}
+            align="right"
+            ariaLabel="MCQ rows per page"
+            className="w-full sm:w-32"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
         </div>
       </div>
 
@@ -986,54 +986,45 @@ export const AdminMcqs: React.FC = () => {
               <label htmlFor="admin-mcq-subject" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Subject <span className="text-rose-500">*</span>
               </label>
-              <select
+              <C2CSelect
                 id="admin-mcq-subject"
                 value={formSubjectRefCode}
-                onChange={(e) => setFormSubjectRefCode(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.refCode}>
-                    {s.refName}
-                  </option>
-                ))}
-              </select>
+                onChange={setFormSubjectRefCode}
+                options={subjects.map((s) => ({ value: s.refCode, label: s.refName }))}
+                ariaLabel="Subject"
+                className="w-full"
+                buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="admin-mcq-topic" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Topic <span className="text-rose-500">*</span>
               </label>
-              <select
+              <C2CSelect
                 id="admin-mcq-topic"
                 value={formTopicRefCode}
-                onChange={(e) => setFormTopicRefCode(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                {subjectTopics.map((t) => (
-                  <option key={t.id || t.refCode} value={t.refCode}>
-                    {t.refName}
-                  </option>
-                ))}
-              </select>
+                onChange={setFormTopicRefCode}
+                options={subjectTopics.map((t) => ({ value: t.refCode, label: t.refName }))}
+                ariaLabel="Topic"
+                className="w-full"
+                buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="admin-mcq-difficulty" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                 Difficulty <span className="text-rose-500">*</span>
               </label>
-              <select
+              <C2CSelect
                 id="admin-mcq-difficulty"
                 value={formDifficultyRefCode}
-                onChange={(e) => setFormDifficultyRefCode(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                {difficulties.map((d) => (
-                  <option key={d.id} value={d.refCode}>
-                    {d.refName}
-                  </option>
-                ))}
-              </select>
+                onChange={setFormDifficultyRefCode}
+                options={difficulties.map((d) => ({ value: d.refCode, label: d.refName }))}
+                ariaLabel="Difficulty"
+                className="w-full"
+                buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+              />
             </div>
           </div>
 
@@ -1042,19 +1033,18 @@ export const AdminMcqs: React.FC = () => {
             <label htmlFor="admin-mcq-company" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
               Associate Hiring Company (Optional)
             </label>
-            <select
+            <C2CSelect
               id="admin-mcq-company"
               value={formCompanyId}
-              onChange={(e) => setFormCompanyId(e.target.value)}
-              className="w-full px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- None (General Practice) --</option>
-              {companies.map((c) => (
-                <option key={c.id ?? c.name} value={c.id ?? ''}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onChange={setFormCompanyId}
+              options={[
+                { value: '', label: '-- None (General Practice) --' },
+                ...companies.map((c) => ({ value: String(c.id ?? ''), label: c.name })),
+              ]}
+              ariaLabel="Associate Hiring Company"
+              className="w-full"
+              buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+            />
           </div>
 
           {/* Question Text */}

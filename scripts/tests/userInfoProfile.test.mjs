@@ -128,6 +128,39 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.bio, 'Java developer and coding enthusiast');
     });
 
+    it('normalizes the current collegeName and personal-detail response fields', async () => {
+      apiClient.get = async () => ({
+        statusCode: 200,
+        message: 'User profile fetched successfully',
+        data: {
+          id: 1,
+          userId: 89,
+          firstName: 'connecttocodetechsolutions',
+          lastName: null,
+          regNumber: '192G1A0497',
+          joinedYear: 2024,
+          passedOutYear: 2028,
+          collegeName: 'Anantha Lakshmi Institute of Technology & Sciences',
+          collegeId: 2250,
+          bio: 'just for test',
+          gender: {
+            id: 102,
+            refGroupCode: 'GENDER',
+            refCode: 'MALE',
+            refName: 'Male',
+            isActive: true,
+          },
+          dob: '2002-01-14',
+        },
+      });
+
+      const res = await profileService.getUserInfo(89);
+      assert.equal(res.data.college, 'Anantha Lakshmi Institute of Technology & Sciences');
+      assert.equal(res.data.collegeId, 2250);
+      assert.equal(res.data.gender.refName, 'Male');
+      assert.equal(res.data.dob, '2002-01-14');
+    });
+
     it('scopes a valid profile response to the requested user when userId is omitted', async () => {
       apiClient.get = async () => ({
         statusCode: 200,
@@ -262,6 +295,39 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.id, 1);
       assert.equal(res.data.college, 'Anantha Lakshmi Institute of Technology & Sciences');
     });
+
+    it('preserves selected college and personal-detail fields for the current save contract', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (_url, payload) => {
+        capturedPayload = payload;
+        return {
+          statusCode: 200,
+          data: {
+            ...payload,
+            id: 1,
+            collegeName: payload.college,
+          },
+        };
+      };
+
+      await profileService.saveUserInfo(89, {
+        id: null,
+        userId: 89,
+        regNumber: '192G1A0497',
+        joinedYear: 2024,
+        passedOutYear: 2028,
+        college: 'Anantha Lakshmi Institute of Technology & Sciences',
+        collegeId: 2250,
+        bio: 'just for test',
+        gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
+        dob: '2002-01-14',
+      });
+
+      assert.equal(capturedPayload.collegeId, 2250);
+      assert.deepEqual(capturedPayload.gender, { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true });
+      assert.equal(capturedPayload.dob, '2002-01-14');
+      assert.equal(capturedPayload.jwtToken, undefined);
+    });
   });
 
   describe('Business-only payloads across authenticated API services', () => {
@@ -391,8 +457,10 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
   describe('company catalog pagination', () => {
     it('loads and de-duplicates every backend page for global client filters', async () => {
       const requestedPages = [];
+      const requestedPageSizes = [];
       apiClient.post = async (_url, payload) => {
         requestedPages.push(payload.pageNumber);
+        requestedPageSizes.push(payload.pageSize);
         return {
           statusCode: 200,
           data: {
@@ -400,7 +468,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
               ? [{ id: 1, name: 'Alpha' }, { id: 2, name: 'Beta' }]
               : [{ id: 2, name: 'Beta' }, { id: 3, name: 'Gamma' }],
             pageNumber: payload.pageNumber,
-            pageSize: 100,
+            pageSize: 24,
             totalElements: 3,
             totalPages: 2,
           },
@@ -409,6 +477,7 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
 
       const response = await companyService.getAllCompanies();
       assert.deepEqual(requestedPages, [0, 1]);
+      assert.deepEqual(requestedPageSizes, [24, 24]);
       assert.deepEqual(response.data.map((company) => company.name), ['Alpha', 'Beta', 'Gamma']);
     });
 

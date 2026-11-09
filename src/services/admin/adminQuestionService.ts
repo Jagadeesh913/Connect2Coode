@@ -23,6 +23,43 @@ export type QuestionPayload = Question;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+const isPositiveInteger = (value: unknown): value is number =>
+  Number.isInteger(value) && (value as number) > 0;
+
+const isQuestionCompany = (value: unknown): boolean =>
+  isRecord(value) &&
+  isPositiveInteger(value.id) &&
+  typeof value.name === 'string' &&
+  typeof value.logo === 'string' &&
+  typeof value.website === 'string' &&
+  typeof value.isActive === 'boolean';
+
+const isQuestionPlatform = (value: unknown): boolean =>
+  value === null ||
+  (isRecord(value) &&
+    isPositiveInteger(value.id) &&
+    typeof value.refGroupCode === 'string' &&
+    (value.refGroupName === null || typeof value.refGroupName === 'string') &&
+    typeof value.refCode === 'string' &&
+    typeof value.refName === 'string' &&
+    typeof value.isActive === 'boolean' &&
+    (value.logoUrl === null || typeof value.logoUrl === 'string'));
+
+const isQuestionListItem = (value: unknown): value is DomainQuestionListItem =>
+  isRecord(value) &&
+  isPositiveInteger(value.id) &&
+  typeof value.title === 'string' &&
+  typeof value.description === 'string' &&
+  isPositiveInteger(value.difficultyId) &&
+  typeof value.difficultyName === 'string' &&
+  isPositiveInteger(value.topicId) &&
+  typeof value.topicName === 'string' &&
+  typeof value.isOwnProblem === 'boolean' &&
+  typeof value.isActive === 'boolean' &&
+  Array.isArray(value.companies) &&
+  value.companies.every(isQuestionCompany) &&
+  isQuestionPlatform(value.questionPlatform);
+
 const requirePageInteger = (
   primary: unknown,
   alias: unknown,
@@ -55,11 +92,13 @@ export async function fetchQuestionPage(
   if (!isRecord(data) || !Array.isArray(data.content)) {
     throw new Error('Unexpected questions response format');
   }
-
   const pageNumber = requirePageInteger(data.pageNumber, data.number, 'page number', 0);
   const pageSize = requirePageInteger(data.pageSize, data.size, 'page size', 1);
   const totalElements = requirePageInteger(data.totalElements, undefined, 'total elements', 0);
   const totalPages = requirePageInteger(data.totalPages, undefined, 'total pages', 0);
+  if (!data.content.every(isQuestionListItem)) {
+    throw new Error('Unexpected questions list item format');
+  }
 
   response.data = {
     ...(data as unknown as PaginatedQuestionResponse),

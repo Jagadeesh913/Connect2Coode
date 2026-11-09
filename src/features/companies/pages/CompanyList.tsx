@@ -16,7 +16,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Lock,
-  Layers,
 } from 'lucide-react';
 
 export const CompanyList: React.FC = () => {
@@ -191,17 +190,6 @@ export const CompanyList: React.FC = () => {
                   onClick={() => navigate(`/companies/${companyTargetId}`)}
                   className="group relative bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 hover:border-blue-500/60 dark:hover:border-blue-500/60 rounded-2xl p-5 min-h-[230px] shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between overflow-hidden cursor-pointer"
                 >
-                  {/* Faint Background Watermark Logo Silhouette */}
-                  <div className="absolute -right-3 -top-3 w-32 h-32 opacity-[0.06] dark:opacity-[0.07] text-slate-900 dark:text-white pointer-events-none select-none overflow-hidden flex items-center justify-center">
-                    <CompanyBrandLogo
-                      name={company.name}
-                      logo={company.logo || undefined}
-                      website={company.website || undefined}
-                      className="w-full h-full"
-                      watermark
-                    />
-                  </div>
-
                   <div>
                     {/* Top Row: Authentic Brand Logo + Website Link */}
                     <div className="flex items-center justify-between relative z-10 mb-3">
@@ -240,27 +228,22 @@ export const CompanyList: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Badges: Active & Industry */}
-                    <div className="mt-3 flex items-center gap-2 flex-wrap relative z-10">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-800/70">
-                        <Layers className="w-3 h-3" />
-                        Recruitment Prep
-                      </span>
-                      {company.industry && (
+                    {company.industry && (
+                      <div className="mt-3 relative z-10">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                           {company.industry}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Primary CTA Button: View Recruitment Exams */}
+                  {/* Primary CTA Button */}
                   <div className="mt-5 relative z-10">
                     <Link
                       to={`/companies/${companyTargetId}`}
                       className="w-full py-2.5 px-4 rounded-xl bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white dark:bg-blue-950/50 dark:hover:bg-blue-600 dark:text-blue-300 dark:hover:text-white border border-blue-200/80 dark:border-blue-800/80 font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all duration-150 shadow-2xs group/btn"
                     >
-                      <span>View Recruitment Exams</span>
+                      <span>Explore Hiring Rounds</span>
                       <ArrowRight className="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" />
                     </Link>
                   </div>
