@@ -6,9 +6,11 @@ import type {
   ExecutionResult,
   PageRequest,
   Question,
+  QuestionCompanySummary,
   QuestionListItem as DomainQuestionListItem,
   QuestionListRequest,
   QuestionPage,
+  QuestionPlatformSummary,
   QuestionTestCase,
 } from '../../core/types/domain';
 import { executionService } from '../executionService';
@@ -23,42 +25,158 @@ export type QuestionPayload = Question;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
-const isPositiveInteger = (value: unknown): value is number =>
-  Number.isInteger(value) && (value as number) > 0;
+/**
+ * Resiliently normalizes a raw backend question list row into a strongly-typed
+ * domain QuestionListItem. Accommodates real Spring Boot API variations including
+ * nullable descriptions, nullable company logos/websites, string company arrays,
+ * and string/null question platforms without dropping valid catalog rows.
+ */
+export const normalizeQuestionListItem = (value: unknown): DomainQuestionListItem | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
 
-const isQuestionCompany = (value: unknown): boolean =>
-  isRecord(value) &&
-  isPositiveInteger(value.id) &&
-  typeof value.name === 'string' &&
-  typeof value.logo === 'string' &&
-  typeof value.website === 'string' &&
-  typeof value.isActive === 'boolean';
+  const rawId = value.id ?? value.questionId;
+  const id = typeof rawId === 'number' ? rawId : Number(rawId);
+  if (!Number.isInteger(id) || id <= 0) {
+    return null;
+  }
 
-const isQuestionPlatform = (value: unknown): boolean =>
-  value === null ||
-  (isRecord(value) &&
-    isPositiveInteger(value.id) &&
-    typeof value.refGroupCode === 'string' &&
-    (value.refGroupName === null || typeof value.refGroupName === 'string') &&
-    typeof value.refCode === 'string' &&
-    typeof value.refName === 'string' &&
-    typeof value.isActive === 'boolean' &&
-    (value.logoUrl === null || typeof value.logoUrl === 'string'));
+  const rawTitle = value.title;
+  if (typeof rawTitle !== 'string' || !rawTitle.trim()) {
+    return null;
+  }
 
-const isQuestionListItem = (value: unknown): value is DomainQuestionListItem =>
-  isRecord(value) &&
-  isPositiveInteger(value.id) &&
-  typeof value.title === 'string' &&
-  typeof value.description === 'string' &&
-  isPositiveInteger(value.difficultyId) &&
-  typeof value.difficultyName === 'string' &&
-  isPositiveInteger(value.topicId) &&
-  typeof value.topicName === 'string' &&
-  typeof value.isOwnProblem === 'boolean' &&
-  typeof value.isActive === 'boolean' &&
-  Array.isArray(value.companies) &&
-  value.companies.every(isQuestionCompany) &&
-  isQuestionPlatform(value.questionPlatform);
+  const description = typeof value.description === 'string' ? value.description : '';
+
+  const rawDiffId = value.difficultyId;
+  const difficultyId =
+    typeof rawDiffId === 'number' && Number.isInteger(rawDiffId) && rawDiffId > 0
+      ? rawDiffId
+      : 0;
+  const difficultyName =
+    typeof value.difficultyName === 'string' && value.difficultyName
+      ? value.difficultyName
+      : typeof value.difficultyRefName === 'string' && value.difficultyRefName
+      ? value.difficultyRefName
+      : typeof value.difficulty === 'string' && value.difficulty
+      ? value.difficulty
+      : '';
+
+  const rawTopicId = value.topicId;
+  const topicId =
+    typeof rawTopicId === 'number' && Number.isInteger(rawTopicId) && rawTopicId > 0
+      ? rawTopicId
+      : 0;
+  const topicName =
+    typeof value.topicName === 'string' && value.topicName
+      ? value.topicName
+      : typeof value.topicRefName === 'string' && value.topicRefName
+      ? value.topicRefName
+      : typeof value.topic === 'string' && value.topic
+      ? value.topic
+      : '';
+
+  const isOwnProblem = typeof value.isOwnProblem === 'boolean' ? value.isOwnProblem : true;
+  const isActive = typeof value.isActive === 'boolean' ? value.isActive : true;
+
+  const companies: QuestionCompanySummary[] = [];
+  if (Array.isArray(value.companies)) {
+    for (let i = 0; i < value.companies.length; i++) {
+      const comp = value.companies[i];
+      if (typeof comp === 'string' && comp.trim()) {
+        companies.push({
+          id: i + 1,
+          name: comp.trim(),
+          logo: '',
+          website: '',
+          isActive: true,
+        });
+      } else if (isRecord(comp)) {
+        const compId =
+          typeof comp.id === 'number' && Number.isInteger(comp.id) && comp.id > 0
+            ? comp.id
+            : i + 1;
+        const compName = typeof comp.name === 'string' ? comp.name.trim() : '';
+        if (compName) {
+          companies.push({
+            id: compId,
+            name: compName,
+            logo: typeof comp.logo === 'string' ? comp.logo : '',
+            website: typeof comp.website === 'string' ? comp.website : '',
+            isActive: typeof comp.isActive === 'boolean' ? comp.isActive : true,
+          });
+        }
+      }
+    }
+  }
+
+  let questionPlatform: QuestionPlatformSummary | null = null;
+  const rawPlatform =
+    value.questionPlatform ?? value.platform ?? value.examPlatform ?? value.platformName;
+  if (rawPlatform && typeof rawPlatform === 'object' && !Array.isArray(rawPlatform)) {
+    const p = rawPlatform as Record<string, unknown>;
+    const pId = typeof p.id === 'number' && Number.isInteger(p.id) && p.id > 0 ? p.id : 0;
+    const pRefName =
+      typeof p.refName === 'string'
+        ? p.refName
+        : typeof p.name === 'string'
+        ? p.name
+        : '';
+    const pRefCode =
+      typeof p.refCode === 'string'
+        ? p.refCode
+        : pRefName
+        ? pRefName.toUpperCase()
+        : '';
+    const pRefGroupCode =
+      typeof p.refGroupCode === 'string' ? p.refGroupCode : 'QPF';
+    const pRefGroupName =
+      typeof p.refGroupName === 'string' ? p.refGroupName : null;
+    const pLogoUrl = typeof p.logoUrl === 'string' ? p.logoUrl : null;
+    const pIsActive = typeof p.isActive === 'boolean' ? p.isActive : true;
+
+    if (pRefName || pRefCode) {
+      questionPlatform = {
+        id: pId,
+        refGroupCode: pRefGroupCode,
+        refGroupName: pRefGroupName,
+        refCode: pRefCode,
+        refName: pRefName,
+        isActive: pIsActive,
+        logoUrl: pLogoUrl,
+      };
+    }
+  } else if (typeof rawPlatform === 'string' && rawPlatform.trim()) {
+    const trimmed = rawPlatform.trim();
+    questionPlatform = {
+      id: 0,
+      refGroupCode: 'QPF',
+      refGroupName: null,
+      refCode: trimmed.toUpperCase(),
+      refName: trimmed,
+      isActive: true,
+      logoUrl: null,
+    };
+  }
+
+  return {
+    id,
+    title: rawTitle.trim(),
+    description,
+    difficultyId,
+    difficultyName,
+    topicId,
+    topicName,
+    companies,
+    questionPlatform,
+    isOwnProblem,
+    isActive,
+  };
+};
+
+export const isQuestionListItem = (value: unknown): value is DomainQuestionListItem =>
+  normalizeQuestionListItem(value) !== null;
 
 const requirePageInteger = (
   primary: unknown,
@@ -96,12 +214,19 @@ export async function fetchQuestionPage(
   const pageSize = requirePageInteger(data.pageSize, data.size, 'page size', 1);
   const totalElements = requirePageInteger(data.totalElements, undefined, 'total elements', 0);
   const totalPages = requirePageInteger(data.totalPages, undefined, 'total pages', 0);
-  if (!data.content.every(isQuestionListItem)) {
-    throw new Error('Unexpected questions list item format');
+
+  const normalizedContent: DomainQuestionListItem[] = [];
+  for (const item of data.content) {
+    const normalized = normalizeQuestionListItem(item);
+    if (!normalized) {
+      throw new Error('Unexpected questions list item format');
+    }
+    normalizedContent.push(normalized);
   }
 
   response.data = {
     ...(data as unknown as PaginatedQuestionResponse),
+    content: normalizedContent,
     number: pageNumber,
     size: pageSize,
     pageNumber,

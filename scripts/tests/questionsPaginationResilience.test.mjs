@@ -135,14 +135,14 @@ describe('Questions API pagination contract', () => {
     }
   });
 
-  it('rejects legacy flat platform and company rows instead of fabricating list aliases', async () => {
+  it('rejects malformed question items missing identity or title', async () => {
     const originalPost = apiClient.post;
     try {
       apiClient.post = async () => ({
         statusCode: 200,
         message: 'OK',
         data: {
-          content: [{ ...questionListItem(), companies: ['TCS'], questionPlatform: 'LeetCode' }],
+          content: [{ invalid: true }],
           number: 0,
           size: 10,
           totalElements: 1,
@@ -153,6 +153,56 @@ describe('Questions API pagination contract', () => {
         () => adminQuestionService.getQuestions(request),
         /Unexpected questions list item format/
       );
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('normalizes production question items with nullable fields and string summaries', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: {
+          content: [
+            {
+              id: 1,
+              title: 'Two Sum',
+              description: null,
+              difficultyId: null,
+              difficultyRefName: 'Easy',
+              topicId: null,
+              topicRefName: 'Arrays',
+              companies: ['TCS', { id: 2, name: 'Amazon', logo: null, website: null, isActive: true }],
+              questionPlatform: 'LeetCode',
+              isOwnProblem: null,
+              isActive: null,
+            },
+          ],
+          number: 0,
+          size: 10,
+          totalElements: 1,
+          totalPages: 1,
+        },
+      });
+      const response = await adminQuestionService.getQuestions(request);
+      assert.equal(response.data.content.length, 1);
+      const item = response.data.content[0];
+      assert.equal(item.id, 1);
+      assert.equal(item.title, 'Two Sum');
+      assert.equal(item.description, '');
+      assert.equal(item.difficultyName, 'Easy');
+      assert.equal(item.topicName, 'Arrays');
+      assert.equal(item.companies.length, 2);
+      assert.equal(item.companies[0].name, 'TCS');
+      assert.equal(item.companies[0].logo, '');
+      assert.equal(item.companies[1].name, 'Amazon');
+      assert.equal(item.companies[1].website, '');
+      assert.equal(item.questionPlatform?.refName, 'LeetCode');
+      assert.equal(item.questionPlatform?.refCode, 'LEETCODE');
+      assert.equal(item.isOwnProblem, true);
+      assert.equal(item.isActive, true);
     } finally {
       apiClient.post = originalPost;
     }

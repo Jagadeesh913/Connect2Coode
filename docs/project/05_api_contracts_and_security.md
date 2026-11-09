@@ -185,7 +185,7 @@ The following fields were captured from the configured production API using supp
 | `GET /referenceLibrary/refGroupCode/list` | Array of reference group-code strings |
 | `POST /referenceLibrary` | `id`, `refGroupCode`, `refCode`, `refName`, `isActive` (`refGroupName` is accepted on create but omitted from the observed response) |
 | `POST /mcq`, `GET /mcq/{id}` | Question: `subjectGroupCode`, `subjectRefCode`, `subjectRefName`, `topic*`, `difficulty*`, `companyName`, `companyId`, `question`, `explanation`, `isActive`, `options`, `id`; option: `id`, `optionLabel`, `optionText`, `isCorrect` |
-| `POST /questions` | `id`, `title`, `description`, `difficultyId`, `difficultyName`, `topicId`, `topicName`, `isOwnProblem`, `isActive`; `companies[]` contains `{ id, name, logo, website, isActive }`; nullable `questionPlatform` contains `{ id, refGroupCode, refGroupName, refCode, refName, isActive, logoUrl }` |
+| `POST /questions` | `id`, `title`, `description` (nullable), `difficultyId`, `difficultyName` (or reference aliases), `topicId`, `topicName`, `isOwnProblem`, `isActive`; `companies[]` contains `{ id, name, logo, website, isActive }` (with nullable `logo`/`website`) or company name strings; nullable `questionPlatform` contains `{ id, refGroupCode, refGroupName, refCode, refName, isActive, logoUrl }` or string platform name. Service layer normalizes rows into strongly-typed `QuestionListItem` records. |
 | `GET /users/{id}/questions/bookmarks` | `questionId`, `title`, `difficulty` |
 | `GET /{id}/getSubmiteedQuestionIds` | `questionId`, `questionName`, `difficultyLevel`, `submittedDate` |
 | `GET /{id}/getAPttemptedQuestionIds` | `questionId`, `title`, `difficulty`, `submittedDate` |
