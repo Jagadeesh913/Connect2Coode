@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
+import { ChevronDown, Check } from 'lucide-react';
 
 export interface C2CSelectOption {
   value: string | number;
@@ -126,9 +127,9 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
           <span aria-hidden="true" className="shrink-0">{selected.icon}</span>
         ) : null}
         <span className="min-w-0 flex-1 truncate">{selected?.label || placeholder}</span>
-        <i
+        <ChevronDown
           aria-hidden="true"
-          className={`fa-solid fa-chevron-down shrink-0 text-[10px] text-slate-400 transition-transform duration-200 ${
+          className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
             open ? 'rotate-180 text-blue-500' : ''
           }`}
         />
@@ -172,7 +173,7 @@ export const C2CSelect: React.FC<C2CSelectProps> = ({
                   <span className="truncate">{option.label}</span>
                 </div>
                 {isSelected && (
-                  <i aria-hidden="true" className="fa-solid fa-check text-[11px] text-blue-600 dark:text-blue-400 shrink-0" />
+                  <Check aria-hidden="true" className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
                 )}
               </button>
             );

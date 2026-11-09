@@ -52,11 +52,29 @@ export const normalizeExecutionTestCaseResult = (
     item.message
   );
 
+  const name =
+    typeof item.name === 'string' && item.name.trim()
+      ? item.name.trim()
+      : undefined;
+  const testCaseName =
+    typeof item.testCaseName === 'string' && item.testCaseName.trim()
+      ? item.testCaseName.trim()
+      : undefined;
+  const typeRefName =
+    typeof item.typeRefName === 'string' && item.typeRefName.trim()
+      ? item.typeRefName.trim()
+      : undefined;
+
   return {
     testCaseId: Number.isFinite(Number(item.testCaseId))
       ? Number(item.testCaseId)
-      : index + 1,
+      : Number.isFinite(Number(item.id))
+        ? Number(item.id)
+        : index + 1,
     testCaseType: typeof item.testCaseType === 'string' ? item.testCaseType : 'Test Case',
+    ...(name !== undefined ? { name } : {}),
+    ...(testCaseName !== undefined ? { testCaseName } : {}),
+    ...(typeRefName !== undefined ? { typeRefName } : {}),
     isHidden: !isVisible,
     status: typeof item.status === 'string' ? item.status : 'Unknown',
     // Hidden evaluation data is removed at the shared service boundary so no

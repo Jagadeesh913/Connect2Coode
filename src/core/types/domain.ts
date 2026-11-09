@@ -136,6 +136,8 @@ export interface QuestionHint {
 export interface QuestionTestCase {
   id?: number;
   questionId?: number;
+  name?: string;
+  testCaseName?: string;
   input: string;
   expectedOutput: string;
   explanation: string;
@@ -275,6 +277,9 @@ export interface CodeExecutionPayload {
 export interface ExecutionTestCaseResult {
   testCaseId: number;
   testCaseType: string;
+  name?: string;
+  testCaseName?: string;
+  typeRefName?: string;
   isHidden?: boolean | null;
   status: 'Passed' | 'Failed' | 'Compilation Error' | string;
   input?: string;

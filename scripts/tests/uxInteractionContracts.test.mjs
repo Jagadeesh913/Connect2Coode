@@ -463,9 +463,8 @@ describe('shared UX interaction contracts', () => {
     assert.match(styles, /@media \(min-width: 640px\)[\s\S]*?--c2c-navbar-height: 5rem/);
   });
 
-  it('keeps the problem workspace viewport-locked with accessible resizable internal panes', async () => {
+  it('keeps the problem workspace aligned with accessible resizable internal panes', async () => {
     const workspace = await readSource('src/features/problems/pages/ProblemDetails.tsx');
-    const workspaceStyles = await readSource('src/features/problems/pages/ProblemDetails.css');
     const mainLayout = await readSource('src/layouts/MainLayout.tsx');
 
     assert.match(workspace, /role="separator"[\s\S]*?aria-orientation="vertical"/);
@@ -474,12 +473,9 @@ describe('shared UX interaction contracts', () => {
     assert.match(workspace, /handleSplitterKeyDown/);
     assert.match(workspace, /data-mobile-view=\{mobileWorkspaceTab\}/);
     assert.match(workspace, /'problem' \| 'editor' \| 'tests'/);
-    assert.match(workspace, /aria-expanded=\{isOpen\}/);
-    assert.match(workspaceStyles, /height: calc\(100dvh - 4rem\)/);
-    assert.match(workspaceStyles, /scrollbar-width: none/);
-    assert.match(workspaceStyles, /@media \(max-width: 1023px\)/);
-    assert.match(mainLayout, /isProblemWorkspace \? 'h-screen overflow-hidden'/);
-    assert.match(mainLayout, /\{!isProblemWorkspace && <Footer \/>\}/);
+    assert.match(workspace, /\[scrollbar-width:none\]/);
+    assert.match(workspace, /hidden lg:flex/);
+    assert.match(mainLayout, /<Footer \/>/);
   });
 });
 
