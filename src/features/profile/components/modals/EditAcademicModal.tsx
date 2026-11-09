@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
-import type { UserInfoData } from '../../../../core/types/domain';
+import type { ReferenceItem, UserInfoData } from '../../../../core/types/domain';
 import { academicDetailsSchema, AcademicDetailsFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { InstitutionAutocomplete } from '../../../institutions/components/InstitutionAutocomplete';
@@ -17,6 +17,7 @@ interface EditAcademicModalProps {
   onClose: () => void;
   onSubmit: (data: AcademicDetailsFormData) => Promise<void>;
   initialData?: UserInfoData | null;
+  genderOptions?: ReferenceItem[];
   defaultCollege?: string;
   defaultDegree?: string;
   defaultBranch?: string;
@@ -28,6 +29,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
   onClose,
   onSubmit,
   initialData,
+  genderOptions: _genderOptions = [],
   defaultCollege = '',
   submitting = false,
 }) => {

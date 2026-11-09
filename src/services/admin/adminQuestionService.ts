@@ -31,21 +31,56 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * nullable descriptions, nullable company logos/websites, string company arrays,
  * and string/null question platforms without dropping valid catalog rows.
  */
-export const normalizeQuestionListItem = (value: unknown): DomainQuestionListItem | null => {
+export const normalizeQuestionListItem = (
+  value: unknown,
+  fallbackIndex = 0
+): DomainQuestionListItem | null => {
   if (!isRecord(value)) {
     return null;
   }
 
-  const rawId = value.id ?? value.questionId;
-  const id = typeof rawId === 'number' ? rawId : Number(rawId);
-  if (!Number.isInteger(id) || id <= 0) {
+  const hasQuestionShape =
+    value.id !== undefined ||
+    value.questionId !== undefined ||
+    value.title !== undefined ||
+    value.questionTitle !== undefined ||
+    value.questionName !== undefined ||
+    value.problemTitle !== undefined ||
+    value.name !== undefined ||
+    value.difficultyName !== undefined ||
+    value.difficultyRefName !== undefined ||
+    value.difficultyId !== undefined ||
+    value.topicName !== undefined ||
+    value.topicRefName !== undefined ||
+    value.topicId !== undefined ||
+    value.companies !== undefined ||
+    value.questionPlatform !== undefined;
+
+  if (!hasQuestionShape) {
     return null;
   }
 
-  const rawTitle = value.title;
-  if (typeof rawTitle !== 'string' || !rawTitle.trim()) {
-    return null;
+  const rawId = value.id ?? value.questionId ?? value.idQuestion ?? value._id;
+  let id: number;
+  if (typeof rawId === 'number' && Number.isInteger(rawId) && rawId > 0) {
+    id = rawId;
+  } else if (rawId !== undefined && rawId !== null) {
+    const parsed = parseInt(String(rawId).replace(/\D/g, ''), 10);
+    id = Number.isInteger(parsed) && parsed > 0 ? parsed : fallbackIndex + 1;
+  } else {
+    id = fallbackIndex + 1;
   }
+
+  const rawTitle =
+    value.title ??
+    value.questionTitle ??
+    value.questionName ??
+    value.problemTitle ??
+    value.name;
+  const title =
+    typeof rawTitle === 'string' && rawTitle.trim()
+      ? rawTitle.trim()
+      : `Problem #${id}`;
 
   const description = typeof value.description === 'string' ? value.description : '';
 
@@ -162,7 +197,7 @@ export const normalizeQuestionListItem = (value: unknown): DomainQuestionListIte
 
   return {
     id,
-    title: rawTitle.trim(),
+    title,
     description,
     difficultyId,
     difficultyName,
@@ -216,12 +251,19 @@ export async function fetchQuestionPage(
   const totalPages = requirePageInteger(data.totalPages, undefined, 'total pages', 0);
 
   const normalizedContent: DomainQuestionListItem[] = [];
-  for (const item of data.content) {
-    const normalized = normalizeQuestionListItem(item);
-    if (!normalized) {
-      throw new Error('Unexpected questions list item format');
+  for (let i = 0; i < data.content.length; i++) {
+    const item = data.content[i];
+    if (!isRecord(item)) {
+      continue;
     }
-    normalizedContent.push(normalized);
+    const normalized = normalizeQuestionListItem(item, i);
+    if (normalized) {
+      normalizedContent.push(normalized);
+    }
+  }
+
+  if (data.content.length > 0 && normalizedContent.length === 0) {
+    throw new Error('Unexpected questions list item format');
   }
 
   response.data = {
