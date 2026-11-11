@@ -1,30 +1,22 @@
 import React from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../app/hooks';
-import { logoutUser, closeAuthModal } from '../features/auth/redux/authSlice';
+import { closeAuthModal } from '../features/auth/redux/authSlice';
+import { executeAppLogout } from '../features/auth/utils/logoutHelper';
 import { Navbar } from '../shared/components/ui/Navbar';
 import { Footer } from '../shared/components/ui/Footer';
 import { Login } from '../features/auth/pages/Login';
-import { toast } from '@/shared/notifications/toast';
 
 export const MainLayout: React.FC = () => {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const location = useLocation();
 
   const { user, isAuthModalOpen } = useAppSelector((state) => state.auth);
   const isProblemWorkspace = location.pathname.startsWith('/problems/');
   const showModal = isAuthModalOpen;
 
-  const handleLogout = async () => {
-    const request = dispatch(logoutUser());
-    navigate('/', { replace: true });
-    const result = await request;
-    if (logoutUser.fulfilled.match(result)) {
-      toast.success('Logged out successfully');
-    } else {
-      toast.error('Signed out locally, but server logout could not be confirmed.');
-    }
+  const handleLogout = () => {
+    void executeAppLogout(dispatch);
   };
 
   // Preserve user navigation context on modal close

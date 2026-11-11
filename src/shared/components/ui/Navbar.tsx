@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { logoutUser, openAuthModal, type UserProfile } from '../../../features/auth/redux/authSlice';
+import { openAuthModal, type UserProfile } from '../../../features/auth/redux/authSlice';
+import { executeAppLogout } from '../../../features/auth/utils/logoutHelper';
 import { useTheme } from '../../context/ThemeContext';
 import { isAdminRole } from '../../../core/security/jwt';
 import { BrandLogo } from './BrandLogo';
@@ -71,8 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (onLogout) {
       onLogout();
     } else {
-      dispatch(logoutUser());
-      navigate('/', { replace: true });
+      void executeAppLogout(dispatch);
     }
   };
 

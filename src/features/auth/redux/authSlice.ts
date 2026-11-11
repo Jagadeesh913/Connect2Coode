@@ -265,6 +265,7 @@ const authSlice = createSlice({
           state.token = null;
           state.status = 'UNAUTHENTICATED';
           state.isAuthenticated = false;
+          state.isAuthModalOpen = false;
           state.loading = false;
           state.error = null;
         }

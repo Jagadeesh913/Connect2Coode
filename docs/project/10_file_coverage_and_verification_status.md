@@ -165,6 +165,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/Login.tsx` | Unified authentication modal (Login, Signup, ForgotPassword OTP) | `PARTIALLY VERIFIED` | Submit-only Zod validation with native validation disabled, role-based redirect, duplicate-action guards, shared accessible modal lifecycle, and an opaque modal backdrop that hides the underlying navbar boundary; final browser verification is pending. |
 | `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Exchanges only the HttpOnly cookie, sends a credential-free popup signal, uses response role, and displays only safe errors. |
 | `redux/authSlice.ts` | Auth Redux slice | `RUNTIME-VERIFIED` | Distinguishes loading, authenticated, recoverable startup failure, and unauthenticated states. |
+| `utils/logoutHelper.ts` | Centralized production logout executor | `VERIFIED` | Sweeps memory, readable cookies, and session state before performing a clean top-level `window.location.replace('/')` redirect to prevent unmount race conditions and stuck error boundaries. |
 
 ### B. Problems Feature (`src/features/problems/`)
 | File Path | Role | Status | Notes |

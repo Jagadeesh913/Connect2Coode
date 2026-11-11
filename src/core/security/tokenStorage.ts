@@ -73,6 +73,38 @@ function removeLegacyCookie(name: string): void {
   } catch {}
 }
 
+/**
+ * Removes all readable browser cookies across all known path and domain combinations.
+ * HttpOnly refresh cookies are exclusively owned and cleared by the backend
+ * through Set-Cookie on POST /api/v1/auth/logout.
+ */
+export function clearAllReadableCookies(): void {
+  if (typeof document === 'undefined') return;
+  try {
+    const rawCookies = document.cookie ? document.cookie.split(';') : [];
+    for (const cookieStr of rawCookies) {
+      const eqPos = cookieStr.indexOf('=');
+      const name = (eqPos > -1 ? cookieStr.substring(0, eqPos) : cookieStr).trim();
+      if (name && !name.toLowerCase().includes('refresh')) {
+        removeLegacyCookie(name);
+      }
+    }
+  } catch {}
+
+  // Explicitly sweep known token and user keys regardless of document.cookie readability
+  for (const key of ACCESS_TOKEN_COOKIE_KEYS) {
+    removeLegacyCookie(key);
+  }
+  for (const key of USER_COOKIE_KEYS) {
+    removeLegacyCookie(key);
+  }
+  // Common session/auth cookie keys (HttpOnly refresh token is preserved for backend contract)
+  const extraKeys = ['jwt', 'sessionId', 'JSESSIONID', 'auth', 'c2c_session'];
+  for (const key of extraKeys) {
+    removeLegacyCookie(key);
+  }
+}
+
 function removeLegacyBrowserStorage(key: string): void {
   const stores: Array<Storage | null> = [];
   try {
@@ -96,12 +128,11 @@ function removeLegacyBrowserStorage(key: string): void {
 }
 
 function purgeLegacyReadableSession(): void {
+  clearAllReadableCookies();
   for (const key of ACCESS_TOKEN_COOKIE_KEYS) {
-    removeLegacyCookie(key);
     removeLegacyBrowserStorage(key);
   }
   for (const key of USER_COOKIE_KEYS) {
-    removeLegacyCookie(key);
     removeLegacyBrowserStorage(key);
   }
 }
@@ -143,7 +174,12 @@ export const tokenStorage = {
     sessionEpoch += 1;
     inMemoryAccessToken = null;
     inMemoryUser = null;
+    clearAllReadableCookies();
     purgeLegacyReadableSession();
+    try {
+      sessionStorage.removeItem('post_auth_redirect');
+      sessionStorage.removeItem('c2c_auth_session_event');
+    } catch {}
     if (options.broadcast !== false) {
       publishAuthSessionEvent('session-cleared');
     }

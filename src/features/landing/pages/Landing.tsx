@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { closeAuthModal, logoutUser } from '../../auth/redux/authSlice';
+import { closeAuthModal } from '../../auth/redux/authSlice';
+import { executeAppLogout, LOGOUT_NOTICE_KEY } from '../../auth/utils/logoutHelper';
 import { Login } from '../../auth/pages/Login';
 import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
@@ -37,16 +38,19 @@ export const Landing: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthModalOpen, user } = useAppSelector((state) => state.auth);
 
-  const handleLogout = async () => {
-    const request = dispatch(logoutUser());
-    navigate('/', { replace: true });
-    const result = await request;
-    if (logoutUser.fulfilled.match(result)) {
-      toast.success('Logged out successfully');
-    } else {
-      toast.error('Signed out locally, but server logout could not be confirmed.');
-    }
+  const handleLogout = () => {
+    void executeAppLogout(dispatch);
   };
+
+  // Surface confirmed logout notification if redirected from hard app logout
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(LOGOUT_NOTICE_KEY) === '1') {
+        sessionStorage.removeItem(LOGOUT_NOTICE_KEY);
+        toast.success('Logged out successfully');
+      }
+    } catch {}
+  }, []);
 
   // Interactive FAQ State (first item open by default matching reference)
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);

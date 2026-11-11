@@ -310,3 +310,15 @@
 - **Runtime draft isolation**: Admin code drafts are keyed by question and language in memory, preventing source from one problem/runtime from leaking into another execution action.
 - **Delete transport boundary**: Reference hard-delete accepts both a successful API envelope with `data: null` and an HTTP 204 with no response body. Any non-null body remains a contract error.
 - **Mutation evidence boundary**: Production create/update/test-case-save/hard-delete operations were not executed, so those persistent actions remain `PARTIALLY VERIFIED` rather than claimed as live-proven.
+
+### Decision 32: Production Logout Lifecycle, Full Cookie Sweeper, and RouteErrorBoundary Recovery (2026-11-11)
+
+- **Root Cause Analysis**:
+  1. *Unmount Lifecycle Collisions*: Triggering client-side `navigate('/')` while dispatching `logoutUser()` caused in-flight protected requests and deep component trees (e.g. Monaco editor, Admin tables) to re-render in an unauthenticated state (`user: null`) mid-navigation. If any unmounting component or hook rejected, React Router caught the exception in `RouteErrorBoundary`.
+  2. *Error Boundary Trapping*: In `RouteErrorBoundary`, "Back to Home" and "Return home" were rendered as client-side `<Link to="/">` components. Inside a top-level error boundary, React Router's router state latches on error; client-side navigation to `/` failed to clear the boundary, keeping the user stuck on the HTTP 500 error screen.
+  3. *Cookie Residuals*: Previous cleanup only removed specific static token keys (`accessToken`, `token`, `jwt`), leaving arbitrary cookies or session keys untouched.
+- **Architectural Resolution**:
+  1. *Centralized Logout Helper*: Created [`src/features/auth/utils/logoutHelper.ts`](../../src/features/auth/utils/logoutHelper.ts) (`executeAppLogout`). It purges in-memory credentials, sweeps all readable browser cookies, cleans `sessionStorage`, sets a transient `c2c_logout_notice` flag, and executes `window.location.replace('/')`. This guarantees a clean browser reset where all components cleanly remount from scratch.
+  2. *Full Cookie Sweeper*: Implemented `clearAllReadableCookies()` in `tokenStorage.ts` to parse `document.cookie` dynamically and expire every readable cookie across all path and domain combinations (while preserving backend-owned HttpOnly refresh cookies for server-side revocation).
+  3. *Post-Logout Notification*: On fresh `/` mount, `Landing.tsx` detects `c2c_logout_notice`, cleans the flag, and displays the standard "Logged out successfully" toast.
+  4. *RouteErrorBoundary Hard Reset*: Replaced client-side `<Link>` tags in `RouteErrorBoundary.tsx` with top-level `window.location.href = '/'` handlers, ensuring "Back to Home" and "Return home" cleanly escape any latching router error.

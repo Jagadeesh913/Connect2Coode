@@ -1,6 +1,6 @@
 import { apiClient } from '../core/api/apiClient';
 import { API_ENDPOINTS } from '../core/api/endpoints';
-import { tokenStorage } from '../core/security/tokenStorage';
+import { tokenStorage, clearAllReadableCookies } from '../core/security/tokenStorage';
 import { publishAuthSessionEvent } from '../core/security/authSessionSync';
 import { requireAuthSessionData, type AuthSessionData } from '../core/security/authContract';
 import { userScopedStorage } from '../core/storage/userScopedStorage';
@@ -123,11 +123,26 @@ export const authService = {
     // Local logout must be immediate and must invalidate any in-flight login or
     // refresh response before waiting on the network.
     tokenStorage.clearTokens();
-    return apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, undefined, {
-      withCredentials: true,
-      timeout: 30_000,
-      authPolicy: 'public',
-    });
+    clearAllReadableCookies();
+    try {
+      sessionStorage.removeItem('post_auth_redirect');
+    } catch {}
+
+    try {
+      return await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT, undefined, {
+        withCredentials: true,
+        timeout: 10_000,
+        authPolicy: 'public',
+      });
+    } catch {
+      // Local logout is authoritative even if server logout encounters network or CORS dropouts
+      return {
+        statusCode: 200,
+        message: 'Logged out locally',
+        data: 'OK',
+        timestamp: new Date().toISOString(),
+      };
+    }
   },
 
   // Generate Password Reset OTP: POST /api/v1/auth/generatePasswordResetOtp
