@@ -97,6 +97,7 @@ const requireUserInfo = (data: unknown, requestedUserId: string | number): UserI
     joinedYear: optionalYear(value.joinedYear, 'joined year'),
     passedOutYear: optionalYear(value.passedOutYear, 'passed-out year'),
     college,
+    collegeName: optionalText(value.collegeName ?? value.college, 'college name'),
     collegeId: optionalPositiveId(value.collegeId, 'college ID'),
     bio: optionalText(value.bio, 'bio'),
     gender: normalizeGender(value.gender),
@@ -166,7 +167,7 @@ export const profileService = {
     if (!Number.isSafeInteger(normalizedUserId) || normalizedUserId < 1) {
       throw new Error('A valid user ID is required to manage profile details.');
     }
-    const requestPayload = {
+    const requestPayload: Record<string, unknown> = {
       id: payload.id !== undefined && payload.id !== null ? Number(payload.id) : null,
       userId: normalizedUserId,
       regNumber: payload.regNumber,
@@ -174,8 +175,11 @@ export const profileService = {
       passedOutYear: Number(payload.passedOutYear),
       college: payload.college,
       bio: payload.bio,
+      ...(payload.firstName !== undefined ? { firstName: payload.firstName } : {}),
+      ...(payload.lastName !== undefined ? { lastName: payload.lastName } : {}),
       ...(payload.collegeId !== undefined ? { collegeId: payload.collegeId } : {}),
-      ...(payload.gender ? { gender: payload.gender } : {}),
+      ...(payload.collegeName !== undefined ? { collegeName: payload.collegeName } : {}),
+      ...(payload.gender !== undefined ? { gender: payload.gender } : {}),
       ...(payload.dob !== undefined ? { dob: payload.dob } : {}),
     };
     const res: ApiResponse<unknown> = await apiClient.post(

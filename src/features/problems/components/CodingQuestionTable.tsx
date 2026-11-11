@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import type { Company, Problem } from '../../../core/types/domain';
 import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
@@ -48,46 +48,70 @@ const difficultyNumberColor = (difficulty: string): string => {
   return 'text-slate-500 dark:text-slate-400 font-bold';
 };
 
-const PlatformBadge: React.FC<{ question: CodingQuestionListItem; logoUrl?: string | null }> = ({ question, logoUrl }) => {
-  const raw = question.questionPlatform || question.qpfRefName || question.examPlatform || question.platformName || question.qpfRefCode;
-  const normalized = (raw || 'Unspecified').toLowerCase();
-  const safeLogoUrl = getSafeRemoteImageUrl(logoUrl);
-  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
-  let className = 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200/80 dark:border-blue-800/60';
-  let label = raw || 'Unspecified';
-  let icon = 'fa-solid fa-laptop-code';
+const normalizePlatform = (raw?: string | null): { name: string; website?: string } | null => {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  const lower = trimmed.toLowerCase();
+  if (!trimmed || lower === 'unspecified' || lower === 'none' || lower === 'null') return null;
 
-  if (normalized.includes('leetcode')) {
-    className = 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/80 dark:border-amber-800/60';
-    label = 'LeetCode';
-    icon = 'fa-solid fa-code';
-  } else if (normalized.includes('hackerrank')) {
-    className = 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200/80 dark:border-emerald-800/60';
-    label = 'HackerRank';
-    icon = 'fa-solid fa-code';
-  } else if (normalized.includes('geeks') || normalized.includes('gfg')) {
-    className = 'bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-200/80 dark:border-green-800/60';
-    label = 'GeeksforGeeks';
-    icon = 'fa-solid fa-code';
-  } else if (normalized.includes('tcs') || normalized.includes('ion')) {
-    className = 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200/80 dark:border-indigo-800/60';
-    label = 'TCS iON';
-  } else if (normalized.includes('aon')) {
-    className = 'bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200/80 dark:border-sky-800/60';
-    label = 'AON';
-    icon = 'fa-solid fa-shield-halved';
-  } else if (normalized.includes('mettl')) {
-    className = 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60';
-    label = 'Mettl';
-    icon = 'fa-solid fa-laptop-file';
-  } else if (normalized.includes('connect')) {
-    label = 'Connect 2 Code';
-    icon = 'fa-solid fa-code';
+  if (lower.includes('leetcode')) {
+    return { name: 'LeetCode', website: 'https://leetcode.com' };
+  }
+  if (lower.includes('hackerrank')) {
+    return { name: 'HackerRank', website: 'https://hackerrank.com' };
+  }
+  if (lower.includes('geeks') || lower.includes('gfg')) {
+    return { name: 'GeeksforGeeks', website: 'https://geeksforgeeks.org' };
+  }
+  if (lower.includes('codechef')) {
+    return { name: 'CodeChef', website: 'https://codechef.com' };
+  }
+  if (lower.includes('tcs') || lower.includes('ion')) {
+    return { name: 'TCS iON', website: 'https://learning.tcsionhub.in' };
+  }
+  if (lower.includes('aon')) {
+    return { name: 'AON', website: 'https://assessment.aon.com' };
+  }
+  if (lower.includes('mettl')) {
+    return { name: 'Mettl', website: 'https://mettl.com' };
+  }
+  if (lower.includes('connect')) {
+    return { name: 'Connect 2 Code', website: 'https://connect2code.in' };
   }
 
-  const renderLogo = Boolean(safeLogoUrl && failedLogoUrl !== safeLogoUrl);
-  return <span title={label} className={`inline-flex h-7 w-9 items-center justify-center rounded-md border ${className}`}><span className="sr-only">{label}</span>{renderLogo ? <img src={safeLogoUrl!} alt="" className="h-5 max-w-6 object-contain" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailedLogoUrl(safeLogoUrl)} /> : <i aria-hidden="true" className={`${icon} text-[11px]`} />}</span>;
+  return { name: trimmed };
 };
+
+export const PlatformCircleBadge: React.FC<{ question: CodingQuestionListItem; logoUrl?: string | null }> = ({ question, logoUrl }) => {
+  const raw =
+    question.questionPlatform ||
+    question.qpfRefName ||
+    question.examPlatform ||
+    question.platformName ||
+    question.qpfRefCode;
+
+  const platform = normalizePlatform(raw);
+  if (!platform) {
+    return <span className="text-slate-400 text-xs">—</span>;
+  }
+
+  const safeLogoUrl =
+    getSafeRemoteImageUrl(logoUrl) ||
+    getSafeRemoteImageUrl(question.platformLogoUrl) ||
+    undefined;
+
+  return (
+    <div className="flex items-center gap-1.5 flex-nowrap" title={`Platform: ${platform.name}`}>
+      <CompanyCircleBadge
+        name={platform.name}
+        logo={safeLogoUrl}
+        website={platform.website}
+      />
+    </div>
+  );
+};
+
+export const PlatformBadge = PlatformCircleBadge;
 
 export const CodingQuestionTable = <T extends CodingQuestionListItem>({
   questions,
@@ -142,7 +166,7 @@ export const CodingQuestionTable = <T extends CodingQuestionListItem>({
                 <tr key={question.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                   <td className={`py-3 px-4 text-center font-mono text-xs font-semibold shrink-0 ${difficultyNumberColor(question.difficulty || '')}`} title={`Question ID: ${questionId} • Difficulty: ${question.difficulty || 'Unknown'}`}>{questionId}</td>
                   <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm"><Link to={getQuestionPath(question)} className="inline-block leading-snug transition-colors hover:text-blue-600 dark:hover:text-blue-400">{question.title}</Link></td>
-                  <td className="py-3 px-4"><PlatformBadge question={question} logoUrl={question.platformLogoUrl} /></td>
+                  <td className="py-3 px-4 whitespace-nowrap"><PlatformCircleBadge question={question} logoUrl={question.platformLogoUrl} /></td>
                   <td className="py-3 px-4 whitespace-nowrap">{question.companies.length ? <div className="flex items-center gap-1.5 flex-nowrap" title={question.companies.length > 2 ? `Companies: ${question.companies.join(', ')}` : undefined}>{question.companies.slice(0, 2).map((name, index) => { const company = question.companyDetails?.find((item) => item.name.toLowerCase().trim() === name.toLowerCase().trim()) || companyMap.get(name.toLowerCase().trim()); return <CompanyCircleBadge key={`${name}-${index}`} name={name} logo={company?.logo} website={company?.website} />; })}</div> : <span className="text-slate-400 text-xs">—</span>}</td>
                   <td className="py-3 px-2 text-center">{onBookmark && <button type="button" onClick={(event) => onBookmark(question, event)} aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark problem'} className={`rounded-md p-1 transition-colors ${bookmarked ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><i className={`fa-${bookmarked ? 'solid' : 'regular'} fa-bookmark text-xs`} /></button>}</td>
                   <td className="py-3 px-4 text-right">{solved ? <Link to={getQuestionPath(question)} className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1 text-xs font-bold text-emerald-600 no-underline shadow-2xs transition-colors hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50"><span>Solved</span></Link> : <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1 text-xs font-bold text-blue-600 no-underline shadow-2xs transition-colors hover:bg-blue-50 dark:border-blue-800/60 dark:text-blue-400 dark:hover:bg-blue-950/50"><span>Solve</span><i className="fa-solid fa-arrow-right text-[9px]" /></Link>}</td>

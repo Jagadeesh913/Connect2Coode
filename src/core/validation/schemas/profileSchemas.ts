@@ -13,6 +13,8 @@ const currentYear = new Date().getFullYear();
  */
 export const academicDetailsSchema = z
   .object({
+    firstName: z.string().trim().max(50, 'First name cannot exceed 50 characters').optional().or(z.literal('')),
+    lastName: z.string().trim().max(50, 'Last name cannot exceed 50 characters').optional().or(z.literal('')),
     regNumber: requiredTextRule('Registration number', 1),
     joinedYear: z.coerce
       .number({ error: 'Please select a valid joined year' })

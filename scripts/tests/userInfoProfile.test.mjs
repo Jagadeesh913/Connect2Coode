@@ -328,6 +328,48 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(capturedPayload.dob, '2002-01-14');
       assert.equal(capturedPayload.jwtToken, undefined);
     });
+
+    it('transmits updated personal and academic fields including firstName and lastName', async () => {
+      let capturedPayload = null;
+      apiClient.post = async (_url, payload) => {
+        capturedPayload = payload;
+        return {
+          statusCode: 200,
+          message: 'User profile saved successfully',
+          data: {
+            ...payload,
+            id: 4,
+            collegeName: payload.college,
+          },
+        };
+      };
+
+      await profileService.saveUserInfo(1, {
+        id: 4,
+        userId: 1,
+        firstName: 'Uday',
+        lastName: 'Kumar',
+        regNumber: '231FA07084',
+        joinedYear: 2023,
+        passedOutYear: 2027,
+        college: 'Master (Vignan) Degree College',
+        collegeName: 'Master (Vignan) Degree College',
+        collegeId: 27955,
+        bio: 'Passionate developer exploring Connect2Code',
+        gender: { id: 102, refGroupCode: 'GENDER', refCode: 'MALE', refName: 'Male', isActive: true },
+        dob: '2002-05-15',
+      });
+
+      assert.equal(capturedPayload.userId, 1);
+      assert.equal(capturedPayload.firstName, 'Uday');
+      assert.equal(capturedPayload.lastName, 'Kumar');
+      assert.equal(capturedPayload.regNumber, '231FA07084');
+      assert.equal(capturedPayload.college, 'Master (Vignan) Degree College');
+      assert.equal(capturedPayload.collegeName, 'Master (Vignan) Degree College');
+      assert.equal(capturedPayload.collegeId, 27955);
+      assert.equal(capturedPayload.dob, '2002-05-15');
+      assert.equal(capturedPayload.gender?.id, 102);
+    });
   });
 
   describe('Business-only payloads across authenticated API services', () => {

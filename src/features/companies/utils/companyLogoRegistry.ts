@@ -619,6 +619,7 @@ export const ADDITIONAL_LOCAL_ASSETS: Readonly<Record<string, string>> = {
   'capital-one': '/companies/capital-one.png',
   citadel: '/companies/citadel.png',
   citrix: '/companies/citrix.svg',
+  codechef: '/companies-codechef.avif',
   cohesity: '/companies/cohesity.svg',
   coursera: '/companies/coursera.png',
   'cruise-automation': '/companies/cruise-automation.png',

@@ -3,7 +3,6 @@ import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { AppRouterLayout } from '../layouts/AppRouterLayout';
-import { AuthLayout } from '../layouts/AuthLayout';
 import { ProtectedRoute } from '../core/guards/ProtectedRoute';
 import { GuestRoute } from '../core/guards/GuestRoute';
 import { AdminRoute } from '../core/guards/AdminRoute';
@@ -11,11 +10,6 @@ import { AdminLayout } from '../features/admin/components/AdminLayout';
 import { PageLoading } from '../shared/components/ui/PageLoading';
 import { AuthenticatedFeatureGate } from '../features/auth/components/AuthenticatedFeatureGate';
 import { RouteErrorBoundary } from '../shared/components/errors/RouteErrorBoundary';
-
-// Static imports for Auth (already shared via MainLayout)
-import { Login } from '../features/auth/pages/Login';
-import { Signup } from '../features/auth/pages/Signup';
-import { ForgotPassword } from '../features/auth/pages/ForgotPassword';
 
 // Lazy-loaded Pages for Production Code Splitting
 const Landing = lazy(() => import('../features/landing/pages/Landing').then(({ Landing }) => ({ default: Landing })));
@@ -95,14 +89,9 @@ const appRoutes = [
   {
     element: <GuestRoute />,
     children: [
-      {
-        element: <AuthLayout />,
-        children: [
-          { path: '/login', element: <Login /> },
-          { path: '/signup', element: <Signup /> },
-          { path: '/forgot-password', element: <ForgotPassword /> },
-        ],
-      },
+      { path: '/login', element: <Navigate to="/" replace /> },
+      { path: '/signup', element: <Navigate to="/" replace /> },
+      { path: '/forgot-password', element: <Navigate to="/" replace /> },
     ],
   },
   {

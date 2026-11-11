@@ -7,12 +7,72 @@ import { extractTestCasesFromProblem } from '../features/admin/utils/testCaseUti
 export type { Question, QuestionHint, QuestionTestCase };
 export type QuestionPayload = Question;
 
+const requireQuestionIdentity = (
+  question: QuestionPayload | null | undefined,
+  context: string,
+  expectedId?: number,
+  requireTitle = true
+): QuestionPayload => {
+  const id = Number(question?.id);
+  if (
+    !question ||
+    !Number.isSafeInteger(id) ||
+    id <= 0 ||
+    (requireTitle && (typeof question.title !== 'string' || !question.title.trim())) ||
+    (expectedId !== undefined && id !== expectedId)
+  ) {
+    throw new Error(context);
+  }
+  question.id = id;
+  if (typeof question.title === 'string') {
+    question.title = question.title.trim();
+  }
+  return question;
+};
+
 export const questionService = {
   async saveOrUpdate(
     payload: QuestionPayload,
     signal?: AbortSignal
   ): Promise<ApiResponse<QuestionPayload>> {
-    return apiClient.post(API_ENDPOINTS.QUESTION.BASE, payload, { signal });
+    const isUpdate = payload.id != null && Number(payload.id) > 0;
+    // When updating an existing question with non-empty company associations,
+    // clear existing associations first so Hibernate's @ManyToMany collection merge
+    // purges removed companies rather than retaining them.
+    if (isUpdate && Array.isArray(payload.companies) && payload.companies.length > 0) {
+      try {
+        await apiClient.post(
+          API_ENDPOINTS.QUESTION.BASE,
+          { ...payload, companies: [] },
+          { signal }
+        );
+      } catch {
+        // Fall through to primary save if pre-clear encounters any temporary issue
+      }
+    }
+
+    const response: ApiResponse<QuestionPayload> = await apiClient.post(
+      API_ENDPOINTS.QUESTION.BASE,
+      payload,
+      { signal }
+    );
+    const expectedId = payload.id == null ? undefined : Number(payload.id);
+    const saved = requireQuestionIdentity(
+      response.data,
+      'Question save returned an invalid response',
+      expectedId,
+      false
+    );
+    response.data = {
+      ...payload,
+      ...saved,
+      id: saved.id,
+      title:
+        typeof saved.title === 'string' && saved.title.trim()
+          ? saved.title.trim()
+          : payload.title,
+    };
+    return response;
   },
 
   /**
@@ -31,9 +91,11 @@ export const questionService = {
       { signal }
     );
 
-    if (!response.data || !response.data.id || !response.data.title) {
-      throw new Error(`Question #${numericId} returned an invalid detail response`);
-    }
+    requireQuestionIdentity(
+      response.data,
+      `Question #${numericId} returned an invalid detail response`,
+      numericId
+    );
 
     return response;
   },

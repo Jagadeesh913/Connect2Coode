@@ -31,10 +31,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * nullable descriptions, nullable company logos/websites, string company arrays,
  * and string/null question platforms without dropping valid catalog rows.
  */
-export const normalizeQuestionListItem = (
-  value: unknown,
-  fallbackIndex = 0
-): DomainQuestionListItem | null => {
+export const normalizeQuestionListItem = (value: unknown): DomainQuestionListItem | null => {
   if (!isRecord(value)) {
     return null;
   }
@@ -61,14 +58,14 @@ export const normalizeQuestionListItem = (
   }
 
   const rawId = value.id ?? value.questionId ?? value.idQuestion ?? value._id;
-  let id: number;
-  if (typeof rawId === 'number' && Number.isInteger(rawId) && rawId > 0) {
-    id = rawId;
-  } else if (rawId !== undefined && rawId !== null) {
-    const parsed = parseInt(String(rawId).replace(/\D/g, ''), 10);
-    id = Number.isInteger(parsed) && parsed > 0 ? parsed : fallbackIndex + 1;
-  } else {
-    id = fallbackIndex + 1;
+  const id =
+    typeof rawId === 'number'
+      ? rawId
+      : typeof rawId === 'string' && rawId.trim()
+      ? Number(rawId)
+      : Number.NaN;
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return null;
   }
 
   const rawTitle =
@@ -77,10 +74,10 @@ export const normalizeQuestionListItem = (
     value.questionName ??
     value.problemTitle ??
     value.name;
-  const title =
-    typeof rawTitle === 'string' && rawTitle.trim()
-      ? rawTitle.trim()
-      : `Problem #${id}`;
+  if (typeof rawTitle !== 'string' || !rawTitle.trim()) {
+    return null;
+  }
+  const title = rawTitle.trim();
 
   const description = typeof value.description === 'string' ? value.description : '';
 
@@ -254,15 +251,15 @@ export async function fetchQuestionPage(
   for (let i = 0; i < data.content.length; i++) {
     const item = data.content[i];
     if (!isRecord(item)) {
-      continue;
+      throw new Error('Unexpected questions list item format');
     }
-    const normalized = normalizeQuestionListItem(item, i);
+    const normalized = normalizeQuestionListItem(item);
     if (normalized) {
       normalizedContent.push(normalized);
     }
   }
 
-  if (data.content.length > 0 && normalizedContent.length === 0) {
+  if (normalizedContent.length !== data.content.length) {
     throw new Error('Unexpected questions list item format');
   }
 

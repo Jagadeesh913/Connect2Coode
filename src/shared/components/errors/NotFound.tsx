@@ -12,7 +12,8 @@ import {
   Terminal,
 } from 'lucide-react';
 import { BrandLogo } from '../ui/BrandLogo';
-import { useAppSelector } from '../../../app/hooks';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { openAuthModal } from '../../../features/auth/redux/authSlice';
 
 interface NotFoundProps {
   embedded?: boolean;
@@ -26,6 +27,7 @@ export const NotFound: React.FC<NotFoundProps> = ({
   description,
 }) => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
 
   const defaultDescription =
@@ -117,13 +119,14 @@ export const NotFound: React.FC<NotFoundProps> = ({
         </button>
 
         {!isAuthenticated && (
-          <Link
-            to="/login"
+          <button
+            type="button"
+            onClick={() => dispatch(openAuthModal({ mode: 'login' }))}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-bold text-sm transition-all cursor-pointer"
           >
             <LogIn className="w-4 h-4" />
             <span>Sign In</span>
-          </Link>
+          </button>
         )}
       </div>
 

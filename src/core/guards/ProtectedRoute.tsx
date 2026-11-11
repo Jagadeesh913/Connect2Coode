@@ -31,7 +31,7 @@ export const ProtectedRoute: React.FC = () => {
         sessionStorage.setItem('post_auth_redirect', fullPath);
       }
     } catch {}
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   return <Outlet />;

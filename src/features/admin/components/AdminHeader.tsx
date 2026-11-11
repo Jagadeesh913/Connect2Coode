@@ -40,7 +40,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({ onToggleMobileSidebar 
   const handleLogout = () => {
     setIsProfileOpen(false);
     dispatch(logoutUser());
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
   };
 
   const displayName =

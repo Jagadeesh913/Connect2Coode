@@ -1,57 +1,147 @@
-import { AlertTriangle, Home, RotateCcw } from 'lucide-react';
+import React from 'react';
+import {
+  AlertTriangle,
+  Compass,
+  Home,
+  RotateCcw,
+  Code2,
+  Layers,
+  Building2,
+  BookOpen,
+} from 'lucide-react';
 import { Link, isRouteErrorResponse, useRouteError } from 'react-router-dom';
 import { BrandLogo } from '../ui/BrandLogo';
 
 /**
  * React Router owns errors raised while matching or rendering routes, so those
  * errors bypass a conventional component error boundary. This route-level
- * boundary deliberately keeps implementation details out of the UI.
+ * boundary delivers a high-craft recovery screen aligned with Connect 2 Code's
+ * design system, colors, and typography, while deliberately keeping raw
+ * implementation details out of the UI.
  */
-export const RouteErrorBoundary = () => {
+export const RouteErrorBoundary: React.FC = () => {
   const error = useRouteError();
   const notFound = isRouteErrorResponse(error) && error.status === 404;
 
   return (
-    <main className="min-h-screen bg-[var(--bg-page)] px-4 py-8 text-[var(--text-primary)] sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-xl flex-col justify-center">
-        <BrandLogo size="md" className="mb-10" />
+    <div className="min-h-screen w-full bg-[var(--bg-page)] text-[var(--text-primary)] flex flex-col justify-between font-sans relative overflow-hidden transition-colors duration-200">
+      {/* Ambient background glows */}
+      <div className="fixed top-12 -left-48 w-96 h-[400px] bg-rose-500/10 dark:bg-rose-600/15 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed bottom-12 -right-48 w-96 h-[400px] bg-indigo-600/10 dark:bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none -z-10" />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/5 dark:bg-blue-600/10 rounded-full blur-[160px] pointer-events-none -z-10" />
+
+      {/* Top Header */}
+      <header className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between shrink-0 relative z-10">
+        <BrandLogo size="md" />
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-neutral-800/60 transition-all cursor-pointer"
+        >
+          <Home className="w-4 h-4" />
+          <span>Back to Home</span>
+        </Link>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="w-full max-w-xl mx-auto px-4 py-8 sm:py-12 my-auto relative z-10 flex flex-col items-center">
         <section
           role="alert"
-          className="rounded-3xl border border-[var(--border-primary)] bg-[var(--bg-surface)] p-6 shadow-xl shadow-slate-950/5 sm:p-8 dark:shadow-black/20"
+          className="w-full rounded-3xl border border-slate-200/90 dark:border-white/10 bg-white/95 dark:bg-[#0D1322]/95 backdrop-blur-xl p-8 sm:p-10 text-center shadow-2xl shadow-slate-900/5 dark:shadow-black/50 relative overflow-hidden"
         >
-          <div className="mb-5 inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
-            <AlertTriangle aria-hidden="true" className="h-5 w-5" />
+          {/* Subtle gradient hairline top accent */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-rose-500 via-amber-500 to-indigo-500 opacity-90" />
+
+          {/* Animated Status Pill */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold mb-6 shadow-2xs">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
+            <span className="font-mono tracking-wide">
+              {notFound ? 'HTTP 404 · PAGE NOT FOUND' : 'HTTP 500 · TEMPORARY APPLICATION ISSUE'}
+            </span>
           </div>
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {notFound ? 'Page unavailable' : 'Temporary application issue'}
-          </p>
-          <h1 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">
+
+          {/* Hero Icon Badge */}
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-rose-500/10 via-amber-500/10 to-indigo-500/10 border border-rose-200/80 dark:border-rose-900/60 text-rose-500 dark:text-rose-400 shadow-md ring-8 ring-rose-500/5 dark:ring-rose-500/10">
+            {notFound ? (
+              <Compass className="w-8 h-8 text-indigo-500 animate-spin" style={{ animationDuration: '10s' }} />
+            ) : (
+              <AlertTriangle className="w-8 h-8" />
+            )}
+          </div>
+
+          {/* Title & Description */}
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-3">
             {notFound ? 'This page could not be found.' : 'We could not load this page.'}
           </h1>
-          <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
+          <p className="text-sm sm:text-base text-slate-600 dark:text-slate-400 max-w-md mx-auto leading-relaxed mb-8">
             {notFound
-              ? 'The address may be incorrect, or the page may have moved.'
-              : 'Your data is safe. Please retry, or return to the dashboard and continue working.'}
+              ? 'The address may be incorrect, or the page may have been moved to a new route.'
+              : 'Your data is safe. Please retry, or return to the platform dashboard and continue working.'}
           </p>
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+
+          {/* Primary Action Buttons */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 active:scale-[0.98] text-white font-bold text-sm shadow-md shadow-blue-600/25 transition-all cursor-pointer"
             >
-              <RotateCcw aria-hidden="true" className="h-4 w-4" />
-              Try again
+              <RotateCcw className="w-4 h-4" />
+              <span>Try again</span>
             </button>
             <Link
               to="/"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-primary)] px-4 py-2.5 text-sm font-bold text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-surface-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-neutral-800/80 text-slate-700 dark:text-slate-300 font-semibold text-sm transition-all cursor-pointer"
             >
-              <Home aria-hidden="true" className="h-4 w-4" />
-              Return home
+              <Home className="w-4 h-4" />
+              <span>Return home</span>
             </Link>
           </div>
+
+          {/* Quick Navigation Strip */}
+          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-neutral-800/80">
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+              Explore Available Tracks
+            </p>
+            <div className="flex items-center justify-center gap-2 flex-wrap text-xs">
+              <Link
+                to="/practice"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-neutral-800/60 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-slate-600 dark:text-slate-400 font-medium transition-colors"
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Practice Arena</span>
+              </Link>
+              <Link
+                to="/dsa-sheet"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-neutral-800/60 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-slate-600 dark:text-slate-400 font-medium transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>DSA Sheets</span>
+              </Link>
+              <Link
+                to="/companies"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-neutral-800/60 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-slate-600 dark:text-slate-400 font-medium transition-colors"
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Companies</span>
+              </Link>
+              <Link
+                to="/aptitude"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-neutral-800/60 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-950/40 dark:hover:text-blue-400 text-slate-600 dark:text-slate-400 font-medium transition-colors"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Aptitude</span>
+              </Link>
+            </div>
+          </div>
         </section>
-      </div>
-    </main>
+      </main>
+
+      {/* Footer */}
+      <footer className="w-full py-6 text-center text-xs text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-800/80 shrink-0 relative z-10">
+        © 2026 Connect 2 Code. Code Together, Connect Forever.
+      </footer>
+    </div>
   );
 };
+
+export default RouteErrorBoundary;

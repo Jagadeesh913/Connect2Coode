@@ -220,7 +220,7 @@ export const AdminQuestions: React.FC = () => {
         constraints: detailedData.constraints || extractConstraintsFromDescription(detailedData.description),
       });
     } catch (err: any) {
-      if (requestId !== detailRequestId.current) return;
+      if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       setIsDetailsOpen(false);
       toast.error(getActionableErrorMessage(err, 'Failed to load question statement.'));
     } finally {
@@ -298,6 +298,7 @@ export const AdminQuestions: React.FC = () => {
     setSubmitting(true);
     try {
       const questionId = formData.id ? Number(formData.id) : undefined;
+      const isCreate = !questionId;
       const matchedQpf = qpfs.find(
         (q) =>
           (formData.qpfRefCode && q.refCode.toUpperCase() === formData.qpfRefCode.toUpperCase()) ||
@@ -404,7 +405,19 @@ export const AdminQuestions: React.FC = () => {
 
       const res = await adminQuestionService.saveOrUpdateQuestion(questionPayload);
       const savedQuestion = res.data;
-      const targetQuestionId = savedQuestion?.id || questionId;
+      const targetQuestionId = savedQuestion.id;
+      dispatch(invalidateProblemCache());
+
+      // The question mutation is committed before the separate test-case call.
+      // Transition a create form to the returned identity immediately so a
+      // test-case retry updates the saved record instead of creating a duplicate.
+      setSelectedQuestion({
+        ...questionPayload,
+        ...savedQuestion,
+        id: targetQuestionId,
+        companies: resolvedCompanies,
+        testCases: formData.testCases || [],
+      });
 
       // Attach test cases if provided
       if (targetQuestionId && Array.isArray(formData.testCases) && formData.testCases.length > 0) {
@@ -434,8 +447,6 @@ export const AdminQuestions: React.FC = () => {
         }
       }
 
-      dispatch(invalidateProblemCache());
-      const isCreate = !formData.id;
       toast.success(formData.id ? 'Question updated successfully!' : 'Question published successfully!');
       setIsFormOpen(false);
 
@@ -499,6 +510,7 @@ export const AdminQuestions: React.FC = () => {
       cell: (row) => {
         const platform = row.questionPlatform?.refName || 'Unspecified';
         const isInactive = !row.isActive;
+        const platformLogo = row.questionPlatform?.logoUrl;
         return (
           <div
             className={`flex flex-col min-w-0 transition-colors ${
@@ -517,10 +529,35 @@ export const AdminQuestions: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
-              Platform: {platform}
-            </span>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
+              {platformLogo && (
+                <img
+                  src={platformLogo}
+                  alt=""
+                  className="w-3.5 h-3.5 object-contain shrink-0"
+                />
+              )}
+              <span>Platform: {platform}</span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              <span className={row.isOwnProblem !== false ? 'text-blue-500 dark:text-blue-400 font-semibold' : 'text-amber-500 dark:text-amber-400 font-semibold'}>
+                {row.isOwnProblem !== false ? 'Native' : 'External'}
+              </span>
+            </div>
           </div>
+        );
+      },
+    },
+    {
+      header: 'Difficulty',
+      className: 'w-28',
+      cell: (row) => {
+        const diff = row.difficultyName;
+        const d = (diff || '').toLowerCase();
+        const variant = d.includes('easy') ? 'easy' : d.includes('med') ? 'medium' : d.includes('hard') ? 'hard' : 'neutral';
+        return (
+          <AdminBadge variant={variant} size="sm">
+            {diff || 'Unknown'}
+          </AdminBadge>
         );
       },
     },
@@ -663,7 +700,10 @@ export const AdminQuestions: React.FC = () => {
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPageNumber(0);
+            }}
             placeholder="Search problems by title..."
             className="w-full pl-10 pr-4 py-2 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />

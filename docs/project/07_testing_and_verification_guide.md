@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Last verified baseline**: 376 tests passed, 0 failed on commit `afd62865` on 2026-11-05. The current Phase 1 remediation tree requires a new full run before its results can be recorded.
+- **Last verified baseline**: 417 tests passed, 0 failed on the current working tree on 2026-11-11.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -13,6 +13,7 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 
 | Suite File | Scope & Tested Contracts | Tests Count |
 | :--- | :--- | :---: |
+| [`adminQuestionUiContracts.test.mjs`](../../scripts/tests/adminQuestionUiContracts.test.mjs) | Admin question modal escape/retry behavior, saved-identity/cache transition before non-atomic test-case attachment, search pagination reset, truthful company-association controls, and question/language-scoped runtime drafts. | 6 |
 | [`apiClient.test.mjs`](../../scripts/tests/apiClient.test.mjs) | Base URL normalization, deployment safeguards, bearer-only authentication payload sanitization across JSON/form encodings, and bodyless DELETE behavior. | 22 |
 | [`apiIntegration.test.mjs`](../../scripts/tests/apiIntegration.test.mjs) | Endpoint formats, strict list validation, structured DSA question-link summaries, language mapping, execution verdict/diagnostic normalization, `isHidden: null` private-case masking, per-case metrics, payload bounds, unit-safe metrics, and truthful admin system labels. | 34 |
 | [`assessmentIntegrity.test.mjs`](../../scripts/tests/assessmentIntegrity.test.mjs) | Global assessment shortcut restrictions and editor-local clipboard routing while preserving typing, undo, and Run/Submit shortcuts. | 3 |
@@ -28,15 +29,16 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`mcqCorrectOption.test.mjs`](../../scripts/tests/mcqCorrectOption.test.mjs) | Option-level `isCorrect: true/false`, stale-field rejection, list-without-options detail fetching, reuse of complete list rows, and aptitude category parsing. | 9 |
 | [`metadataAndBranding.test.mjs`](../../scripts/tests/metadataAndBranding.test.mjs) | Default head-tag uniqueness, icon/manifest dimensions, complete route metadata coverage, indexing policy, centralized title ownership, and dynamic detail overrides. | 6 |
 | [`metadataCrawler.test.mjs`](../../scripts/tests/metadataCrawler.test.mjs) | Server-rendered crawler document escaping and uniqueness, absolute canonical origin policy, private-route noindex behavior, dynamic API identity rejection, and Vercel crawler/private-route routing configuration. | 6 |
+| [`monacoBundling.test.mjs`](../../scripts/tests/monacoBundling.test.mjs) | Same-origin lazy Monaco bundling and worker/CSP ownership. | 1 |
 | [`problemExecution.test.mjs`](../../scripts/tests/problemExecution.test.mjs) | Java class renaming (`Solution` -> `Main`), result normalization, language ID/reference-ID resolution, editor/compiler diagnostics, and hook cancellation lifecycle. | 17 |
 | [`problemSliceAbortRecovery.test.mjs`](../../scripts/tests/problemSliceAbortRecovery.test.mjs) | Request ownership, abort recovery, cache retention, Strict Mode remount behavior. | 14 |
-| [`questionsPaginationResilience.test.mjs`](../../scripts/tests/questionsPaginationResilience.test.mjs) | Real pagination metadata, one-request failure propagation, production-grade question item normalization (nullable fields, company/platform summaries), malformed-response rejection, and problem-service propagation. | 9 |
-| [`referenceLibraryManagement.test.mjs`](../../scripts/tests/referenceLibraryManagement.test.mjs) | Central reference endpoints, strict DTO validation, direct list-owned platform logos without a duplicate QPF request, admin-only mutations, shared taxonomy state, dynamic exam taxonomy, transport ownership guards, semantic save naming, hard-delete confirmation, and guarded routing. | 13 |
+| [`questionsPaginationResilience.test.mjs`](../../scripts/tests/questionsPaginationResilience.test.mjs) | Real pagination metadata, strict row identity/title, mixed-page rejection, detail/save identity checks, production-grade optional-field normalization, and problem-service propagation. | 12 |
+| [`referenceLibraryManagement.test.mjs`](../../scripts/tests/referenceLibraryManagement.test.mjs) | Central reference endpoints, strict DTO validation, direct list-owned platform logos without a duplicate QPF request, admin-only mutations, shared taxonomy state, dynamic exam taxonomy, transport ownership guards, semantic save naming, envelope/bodyless-204 hard-delete success, hard-delete confirmation, and guarded routing. | 14 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, generation-owned pagination, ref-synchronized manual selection, per-question/language draft restoration, and stable initial MCQ requests. | 14 |
-| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, and all-page company loading. | 21 |
+| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, and all-page company loading. | 22 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
 | [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, shared API-backed coding-question listing, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, viewport-locked responsive problem splitters, responsive toast placement, and deployment-header contracts. | 30 |
-| **Current declared total** | **All 25 test files** | **409 tests; latest full run passed (409/409) on 2026-11-09.** |
+| **Current declared total** | **All 25 test files** | **418 tests; latest full run passed (418/418) on 2026-11-11.** |
 
 ---
 

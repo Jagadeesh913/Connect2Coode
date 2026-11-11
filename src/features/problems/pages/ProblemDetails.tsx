@@ -67,6 +67,7 @@ import {
   Send,
 } from 'lucide-react';
 import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
+import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
 
 interface QuestionTestCase {
   id?: number;
@@ -238,7 +239,7 @@ export const ProblemDetails: React.FC = () => {
   const [executionResult, setExecutionResult] = useState<ExecutionResultData | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [selectedTestCaseIdx, setSelectedTestCaseIdx] = useState<number>(0);
-  const [expandedSampleIdx, setExpandedSampleIdx] = useState<number>(0);
+  const [expandedSampleIdx, setExpandedSampleIdx] = useState<number>(-1);
   const [expandedResultIdx, setExpandedResultIdx] = useState<number>(-1);
 
   // Console layout state: 'normal' | 'collapsed' | 'expanded'
@@ -984,14 +985,20 @@ export const ProblemDetails: React.FC = () => {
         : 'Wrong Answer';
 
   return (
-    <div className="w-full h-full flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans overflow-hidden p-0 m-0">
-      {/* Centered Workspace Container flush with navbar and viewport bottom */}
+    <div
+      className={
+        isFullscreen
+          ? 'fixed inset-0 z-[999] w-screen h-screen bg-[#FBFBFD] dark:bg-[#0B1017] flex flex-col overflow-hidden'
+          : 'w-full h-full flex flex-col items-center bg-[#FBFBFD] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans overflow-hidden px-4 sm:px-6 lg:px-8 py-3 sm:py-4'
+      }
+    >
+      {/* Centered Workspace Container matching Practice and Companies layout sizing */}
       <div
         ref={workspaceRef}
         className={
           isFullscreen
-            ? 'fixed inset-0 z-[999] w-screen h-screen bg-[#FBFBFD] dark:bg-[#0B1017] flex flex-col overflow-hidden'
-            : 'w-full max-w-7xl mx-auto h-full flex flex-col overflow-hidden border-x border-slate-200 dark:border-[#202834] bg-white dark:bg-[#0B1017]'
+            ? 'w-full h-full flex flex-col overflow-hidden bg-[#FBFBFD] dark:bg-[#0B1017]'
+            : 'w-full max-w-7xl mx-auto h-full flex flex-col overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-[#0D1322] shadow-sm'
         }
         aria-label="Secure coding assessment workspace"
         aria-description="Clipboard, context-menu, drag/drop, printing, source-view, and screen-capture shortcuts are restricted; Developer Tools remain available."
@@ -1203,8 +1210,13 @@ export const ProblemDetails: React.FC = () => {
                     {(problem?.questionPlatform || problem?.qpfRefName || problem?.examPlatform) && (
                       <>
                         <span className="text-slate-400 dark:text-slate-600 font-bold">·</span>
-                        <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                          {String(problem.questionPlatform || problem.qpfRefName || problem.examPlatform)}
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400">
+                          <CompanyCircleBadge
+                            name={String(problem.questionPlatform || problem.qpfRefName || problem.examPlatform)}
+                            logo={problem.platformLogoUrl || undefined}
+                            sizeClassName="w-4 h-4"
+                          />
+                          <span>{String(problem.questionPlatform || problem.qpfRefName || problem.examPlatform)}</span>
                         </span>
                       </>
                     )}
@@ -1425,15 +1437,26 @@ export const ProblemDetails: React.FC = () => {
                     </div>
                     {problem?.companies && problem.companies.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2">
-                        {problem.companies.map((c, idx) => (
-                          <div
-                            key={idx}
-                            className="p-2.5 bg-slate-50 dark:bg-[#1C2530] border border-slate-200 dark:border-[#303B49] rounded-lg flex items-center gap-2 font-mono text-xs text-slate-800 dark:text-slate-200"
-                          >
-                            <Building2 className="h-3.5 w-3.5 text-slate-400" />
-                            <span className="font-semibold">{String(c)}</span>
-                          </div>
-                        ))}
+                        {problem.companies.map((c, idx) => {
+                          const companyName = String(c);
+                          const detail = problem.companyDetails?.find(
+                            (item) => item.name.toLowerCase().trim() === companyName.toLowerCase().trim()
+                          );
+                          return (
+                            <div
+                              key={idx}
+                              className="p-2.5 bg-slate-50 dark:bg-[#1C2530] border border-slate-200 dark:border-[#303B49] rounded-lg flex items-center gap-2.5 font-mono text-xs text-slate-800 dark:text-slate-200 transition-colors hover:border-slate-300 dark:hover:border-slate-700"
+                            >
+                              <CompanyCircleBadge
+                                name={companyName}
+                                logo={detail?.logo}
+                                website={detail?.website}
+                                sizeClassName="w-4 h-4"
+                              />
+                              <span className="font-semibold">{companyName}</span>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
                       <p className="text-xs text-slate-400 font-mono p-4 text-center">No company associations recorded.</p>
@@ -1502,7 +1525,7 @@ export const ProblemDetails: React.FC = () => {
 
             {/* Vertical Splitter Resizer */}
             <div
-              className="hidden lg:flex w-2 shrink-0 cursor-col-resize items-center justify-center bg-slate-100 dark:bg-[#101720] hover:bg-blue-100 dark:hover:bg-[#293144] text-slate-400 hover:text-blue-600 dark:hover:text-[#B39AFC] transition-colors border-x border-slate-200 dark:border-[#27313b] touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-10"
+              className="hidden lg:flex w-2 shrink-0 cursor-col-resize items-center justify-center bg-slate-100 dark:bg-[#101720] hover:bg-blue-100 dark:hover:bg-[#293144] text-slate-400 hover:text-blue-600 dark:hover:text-[#B39AFC] transition-colors border-x border-slate-200 dark:border-slate-800 touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-10"
               role="separator"
               aria-label="Resize problem and editor panels"
               aria-orientation="vertical"
@@ -1674,7 +1697,7 @@ export const ProblemDetails: React.FC = () => {
               {/* Horizontal Splitter Resizer between Editor and Console */}
               {leftTab !== 'testcases' && (
                 <div
-                  className="h-2 w-full shrink-0 cursor-row-resize flex items-center justify-center bg-slate-100 dark:bg-[#101720] hover:bg-blue-100 dark:hover:bg-[#293144] text-slate-400 hover:text-blue-600 dark:hover:text-[#B39AFC] transition-colors border-y border-slate-200 dark:border-[#2C3542] touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-10"
+                  className="h-2 w-full shrink-0 cursor-row-resize flex items-center justify-center bg-slate-100 dark:bg-[#101720] hover:bg-blue-100 dark:hover:bg-[#293144] text-slate-400 hover:text-blue-600 dark:hover:text-[#B39AFC] transition-colors border-y border-slate-200 dark:border-slate-800 touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 z-10"
                   role="separator"
                   aria-label="Resize editor and console panels"
                   aria-orientation="horizontal"

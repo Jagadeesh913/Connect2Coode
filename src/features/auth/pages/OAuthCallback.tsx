@@ -123,11 +123,11 @@ export const OAuthCallback: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/login', { replace: true })}
+            onClick={() => navigate('/', { replace: true })}
             className="w-full py-2.5 px-4 bg-white/10 hover:bg-white/20 border border-white/10 text-white font-medium text-sm rounded-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return to Login</span>
+            <span>Return to Home</span>
           </button>
         </div>
       </div>

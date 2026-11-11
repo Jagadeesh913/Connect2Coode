@@ -12,7 +12,7 @@ import { toast } from '@/shared/notifications/toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../utils/testCaseUtils';
-import { Code2, Building2, Plus, Trash2, X } from 'lucide-react';
+import { Code2, Building2, Plus, Trash2, X, Calendar, Globe } from 'lucide-react';
 import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 import type { ReferenceItem } from '../../../../core/types/domain';
 
@@ -402,8 +402,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     }
   };
 
-  const handleRemoveCompany = (companyName: string) => {
-    setSelectedCompanies(selectedCompanies.filter((c) => c.name.toLowerCase() !== companyName.toLowerCase()));
+  const handleRemoveCompany = (company: CompanyItem) => {
+    setSelectedCompanies((current) => current.filter((candidate) =>
+      candidate.name.toLowerCase() !== company.name.toLowerCase()
+    ));
   };
 
   const handleAddTestCase = () => {
@@ -544,9 +546,10 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       ...data,
       isOwnProblem: isOwn,
       isActive: finalIsActive,
-      askedDate: isOwn && data.askedDate && data.askedDate.trim() !== '' ? data.askedDate.trim() : null,
-      leetCodeUrl: !isOwn && data.leetCodeUrl ? data.leetCodeUrl.trim() : '',
-      gfgUrl: !isOwn && data.gfgUrl ? data.gfgUrl.trim() : '',
+      askedDate: data.askedDate && data.askedDate.trim() !== '' ? data.askedDate.trim() : null,
+      leetCodeUrl: data.leetCodeUrl ? data.leetCodeUrl.trim() : '',
+      gfgUrl: data.gfgUrl ? data.gfgUrl.trim() : '',
+      hackerRankUrl: data.hackerRankUrl ? data.hackerRankUrl.trim() : '',
       questionHints: hints
         .filter((h) => h.hintText.trim() !== '')
         .map((h, idx) => ({
@@ -770,8 +773,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                       <button
                         type="button"
                         aria-label={`Remove ${c.name} company association`}
-                        onClick={() => handleRemoveCompany(c.name)}
-                        className="text-purple-400 hover:text-purple-700 dark:hover:text-purple-100 ml-1 cursor-pointer"
+                        title={`Remove ${c.name}`}
+                        onClick={() => handleRemoveCompany(c)}
+                        className="text-purple-400 hover:text-purple-700 dark:hover:text-purple-100 ml-1 cursor-pointer transition-colors"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -822,34 +826,93 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
               ))}
             </div>
 
-            {/* Configuration Toggles */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  {...register('isOwnProblem')}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                />
-                <span>Internal Native Problem</span>
-              </label>
+            {/* External Challenge & Platform URLs */}
+            <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300">
+                <Globe className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                <span>External Challenge &amp; Platform URLs (Optional)</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                Link this problem to corresponding problem statements on external coding platforms.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label htmlFor="question-leetcode-url" className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                    LeetCode URL
+                  </label>
+                  <input
+                    id="question-leetcode-url"
+                    type="url"
+                    {...register('leetCodeUrl')}
+                    placeholder="https://leetcode.com/problems/..."
+                    className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  />
+                  <FormFieldError error={errors.leetCodeUrl?.message} />
+                </div>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
-                <input
-                  type="checkbox"
-                  {...register('isActive')}
-                  className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
-                />
-                <span>Active &amp; Published</span>
-              </label>
+                <div className="space-y-1">
+                  <label htmlFor="question-gfg-url" className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                    GeeksforGeeks URL
+                  </label>
+                  <input
+                    id="question-gfg-url"
+                    type="url"
+                    {...register('gfgUrl')}
+                    placeholder="https://www.geeksforgeeks.org/..."
+                    className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  />
+                  <FormFieldError error={errors.gfgUrl?.message} />
+                </div>
 
-              <div>
-                <label htmlFor="question-asked-date" className="sr-only">Asked date</label>
-                <input
-                  id="question-asked-date"
-                  type="date"
-                  {...register('askedDate')}
-                  className="w-full px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                />
+                <div className="space-y-1">
+                  <label htmlFor="question-hackerrank-url" className="block text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                    HackerRank URL
+                  </label>
+                  <input
+                    id="question-hackerrank-url"
+                    type="url"
+                    {...register('hackerRankUrl')}
+                    placeholder="https://www.hackerrank.com/challenges/..."
+                    className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  />
+                  <FormFieldError error={errors.hackerRankUrl?.message} />
+                </div>
+              </div>
+            </div>
+
+            {/* Configuration Toggles & Interview Date */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800/80 rounded-2xl space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    {...register('isOwnProblem')}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  />
+                  <span>Internal Native Problem</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  <input
+                    type="checkbox"
+                    {...register('isActive')}
+                    className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                  />
+                  <span>Active &amp; Published</span>
+                </label>
+
+                <div className="space-y-1">
+                  <label htmlFor="question-asked-date" className="flex items-center gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-400">
+                    <Calendar className="w-3 h-3 text-slate-400" />
+                    <span>Interview Asked Date</span>
+                  </label>
+                  <input
+                    id="question-asked-date"
+                    type="date"
+                    {...register('askedDate')}
+                    className="w-full px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                  />
+                </div>
               </div>
             </div>
           </div>

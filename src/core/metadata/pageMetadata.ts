@@ -200,6 +200,11 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
       'Manage structured DSA sheets, sections, and linked questions.',
       '/admin/dsa-sheets'
     ),
+    '/admin/references': privatePage(
+      'Manage Reference Library',
+      'Manage API-owned taxonomy groups and reference codes.',
+      '/admin/references'
+    ),
     '/500': privatePage(
       'Server Error',
       'Connect2Code encountered an unexpected server error.',

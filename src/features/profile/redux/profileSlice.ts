@@ -204,6 +204,16 @@ const profileSlice = createSlice({
         state.userInfoRequestId = null;
         state.activeUserInfoUserId = action.meta.arg.userId;
         state.userInfo = action.payload;
+        if (state.profile && (action.payload.firstName || action.payload.lastName)) {
+          const nextFirst = action.payload.firstName ?? state.profile.firstName;
+          const nextLast = action.payload.lastName ?? state.profile.lastName;
+          state.profile = {
+            ...state.profile,
+            firstName: nextFirst,
+            lastName: nextLast,
+            fullName: `${nextFirst || ''} ${nextLast || ''}`.trim() || state.profile.fullName,
+          };
+        }
       })
       .addCase(saveUserInfoThunk.rejected, (state, action) => {
         if (state.userInfoRequestId !== action.meta.requestId) return;

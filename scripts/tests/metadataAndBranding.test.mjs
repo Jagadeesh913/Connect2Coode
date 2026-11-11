@@ -75,7 +75,7 @@ test('central route metadata covers public, authenticated, admin, error, and dyn
     '/logical', '/verbal', '/pseudocode', '/progress', '/roadmaps', '/interviews',
     '/dashboard', '/bookmarks', '/profile', '/settings', '/admin', '/admin/dashboard',
     '/admin/questions', '/admin/mcqs', '/admin/companies', '/admin/languages',
-    '/admin/institutions', '/admin/dsa-sheets', '/500',
+    '/admin/institutions', '/admin/dsa-sheets', '/admin/references', '/500',
   ];
 
   exactPaths.forEach((path) => {

@@ -58,6 +58,7 @@ export const AdminReferences: React.FC = () => {
     handleSubmit,
     reset,
     setError,
+    watch,
     formState: { errors },
   } = useForm<z.input<typeof adminReferenceItemSchema>, unknown, AdminReferenceItemFormData>({
     resolver: zodResolver(adminReferenceItemSchema),
@@ -66,6 +67,7 @@ export const AdminReferences: React.FC = () => {
       refGroupName: '',
       refCode: '',
       refName: '',
+      logoUrl: '',
       isActive: true,
     },
   });
@@ -105,11 +107,13 @@ export const AdminReferences: React.FC = () => {
 
   const openCreate = () => {
     setEditingItem(null);
+    const existingGroupItem = items.find((i) => i.refGroupName?.trim());
     reset({
       refGroupCode: selectedGroup,
-      refGroupName: '',
+      refGroupName: existingGroupItem?.refGroupName || '',
       refCode: '',
       refName: '',
+      logoUrl: '',
       isActive: true,
     });
     setModalOpen(true);
@@ -120,9 +124,10 @@ export const AdminReferences: React.FC = () => {
     reset({
       id: item.id,
       refGroupCode: item.refGroupCode,
-      refGroupName: '',
+      refGroupName: item.refGroupName || '',
       refCode: item.refCode,
       refName: item.refName,
+      logoUrl: item.logoUrl || '',
       isActive: item.isActive,
     });
     setModalOpen(true);
@@ -146,9 +151,10 @@ export const AdminReferences: React.FC = () => {
     const refCode = data.refCode.trim();
     const refName = data.refName.trim();
     const refGroupName = data.refGroupName?.trim() || '';
+    const logoUrl = data.logoUrl?.trim() || null;
 
-    if (!editingItem && !refGroupName) {
-      setError('refGroupName', { type: 'required', message: 'Reference group name is required when creating a record.' });
+    if (!refGroupName) {
+      setError('refGroupName', { type: 'required', message: 'Reference group name is required.' });
       return;
     }
 
@@ -159,9 +165,11 @@ export const AdminReferences: React.FC = () => {
         const payload: UpdateReferenceItemRequest = {
           id: editingItem.id,
           refGroupCode,
+          refGroupName,
           refCode,
           refName,
           isActive: data.isActive,
+          logoUrl,
         };
         await adminReferenceService.save(payload);
         toast.success(`${refCode} updated successfully.`);
@@ -172,6 +180,7 @@ export const AdminReferences: React.FC = () => {
           refCode,
           refName,
           isActive: data.isActive,
+          logoUrl,
         };
         await adminReferenceService.save(payload);
         toast.success(`${refCode} created successfully.`);
@@ -215,6 +224,25 @@ export const AdminReferences: React.FC = () => {
       cell: (item) => <span>#{item.id}</span>,
     },
     {
+      header: 'Logo',
+      className: 'w-16 text-center',
+      cell: (item) =>
+        item.logoUrl ? (
+          <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 flex items-center justify-center overflow-hidden mx-auto">
+            <img
+              src={item.logoUrl}
+              alt={`${item.refName} logo`}
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          <span className="text-[11px] text-slate-400 italic">None</span>
+        ),
+    },
+    {
       header: 'Reference Code',
       className: 'min-w-[180px]',
       cell: (item) => (
@@ -222,6 +250,15 @@ export const AdminReferences: React.FC = () => {
           <span className="font-bold text-slate-900 dark:text-white">{item.refCode}</span>
           <span className="text-[10px] text-slate-400 font-mono">{item.refGroupCode}</span>
         </div>
+      ),
+    },
+    {
+      header: 'Group Name',
+      className: 'min-w-[160px]',
+      cell: (item) => (
+        <span className="text-xs text-slate-700 dark:text-slate-300">
+          {item.refGroupName || <span className="text-slate-400 italic">Unspecified</span>}
+        </span>
       ),
     },
     { header: 'Display Name', accessorKey: 'refName', className: 'min-w-[180px]' },
@@ -326,25 +363,48 @@ export const AdminReferences: React.FC = () => {
         <form id="reference-item-form" onSubmit={handleSubmit(saveItem)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold mb-1.5" htmlFor="refGroupCode">Group code</label>
-            <input id="refGroupCode" {...register('refGroupCode')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5" placeholder="e.g. DIFF" />
+            <input id="refGroupCode" {...register('refGroupCode')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white" placeholder="e.g. DIFF" />
             <FormFieldError error={errors.refGroupCode?.message} />
           </div>
-          {!editingItem && (
-            <div>
-              <label className="block text-xs font-semibold mb-1.5" htmlFor="refGroupName">Group name</label>
-              <input id="refGroupName" {...register('refGroupName')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5" placeholder="e.g. Difficulty" />
-              <FormFieldError error={errors.refGroupName?.message} />
-            </div>
-          )}
+          <div>
+            <label className="block text-xs font-semibold mb-1.5" htmlFor="refGroupName">Group name <span className="text-rose-500">*</span></label>
+            <input id="refGroupName" {...register('refGroupName')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white" placeholder="e.g. Difficulty Levels" />
+            <FormFieldError error={errors.refGroupName?.message} />
+          </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" htmlFor="refCode">Reference code</label>
-            <input id="refCode" {...register('refCode')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5" placeholder="e.g. EASY" />
+            <input id="refCode" {...register('refCode')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white" placeholder="e.g. EASY" />
             <FormFieldError error={errors.refCode?.message} />
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1.5" htmlFor="refName">Display name</label>
-            <input id="refName" {...register('refName')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5" placeholder="e.g. Easy" />
+            <input id="refName" {...register('refName')} className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white" placeholder="e.g. Easy" />
             <FormFieldError error={errors.refName?.message} />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold mb-1.5" htmlFor="logoUrl">Logo image URL (Optional)</label>
+            <div className="flex items-center gap-3">
+              <input
+                id="logoUrl"
+                type="url"
+                {...register('logoUrl')}
+                className="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                placeholder="https://example.com/logo.png"
+              />
+              {watch('logoUrl') && (
+                <div className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                  <img
+                    src={watch('logoUrl') || ''}
+                    alt="Logo preview"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.opacity = '0.3';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <FormFieldError error={errors.logoUrl?.message} />
           </div>
           <label className="sm:col-span-2 flex items-center gap-2 text-sm font-semibold">
             <input type="checkbox" {...register('isActive')} className="h-4 w-4 rounded border-slate-300" /> Active

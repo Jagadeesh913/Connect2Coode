@@ -94,6 +94,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   );
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
   const [sourceCode, setSourceCode] = useState<string>('');
+  const codeDraftsRef = useRef<Record<string, string>>({});
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [result, setResult] = useState<ExecutionResultData | null>(null);
@@ -129,14 +130,15 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   }, [dispatch, resourcesRetry, isOpen, question?.id]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    setSelectedLanguageId((previous) =>
-      languages.some((language) => language.id === previous)
-        ? previous
-        : languages[0]?.id ?? null
-    );
-    setSourceCode((code) => code || STARTER_CODES[languages[0]?.name] || '');
-  }, [isOpen, languages]);
+    if (!isOpen || !question?.id || languages.length === 0) return;
+    const nextLanguageId = languages.some((language) => language.id === selectedLanguageId)
+      ? selectedLanguageId as number
+      : languages[0].id;
+    const language = languages.find((item) => item.id === nextLanguageId) || languages[0];
+    const draftKey = `${question.id}_${nextLanguageId}`;
+    setSelectedLanguageId(nextLanguageId);
+    setSourceCode(codeDraftsRef.current[draftKey] ?? STARTER_CODES[language.name] ?? '');
+  }, [isOpen, languages, question?.id, selectedLanguageId]);
 
   const combinedResourcesLoading = resourcesLoading || languagesLoading;
   const combinedResourcesError = resourcesError || languagesError ||
@@ -146,13 +148,15 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
     const newId = Number(val);
     setSelectedLanguageId(newId);
     const found = languages.find((l) => l.id === newId);
-    if (found && STARTER_CODES[found.name]) {
-      setSourceCode(STARTER_CODES[found.name]);
-    }
+    const draftKey = `${question?.id ?? 'unknown'}_${newId}`;
+    setSourceCode(codeDraftsRef.current[draftKey] ?? (found ? STARTER_CODES[found.name] : '') ?? '');
     setResult(null);
   };
 
   const selectedLangObj = languages.find((l) => l.id === selectedLanguageId) || languages[0];
+  const activeDraftKey = question?.id && selectedLanguageId !== null
+    ? `${question.id}_${selectedLanguageId}`
+    : null;
   const monacoLang =
     selectedLangObj?.name?.toLowerCase() === 'c++'
       ? 'cpp'
@@ -370,7 +374,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
           <button
             onClick={() => {
               if (selectedLangObj && STARTER_CODES[selectedLangObj.name]) {
-                setSourceCode(STARTER_CODES[selectedLangObj.name]);
+                const boilerplate = STARTER_CODES[selectedLangObj.name];
+                setSourceCode(boilerplate);
+                if (activeDraftKey) {
+                  codeDraftsRef.current = { ...codeDraftsRef.current, [activeDraftKey]: boilerplate };
+                }
               }
             }}
             className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
@@ -389,7 +397,13 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
             height="100%"
             language={monacoLang}
             value={sourceCode}
-            onChange={(val) => setSourceCode(val || '')}
+            onChange={(val) => {
+              const nextCode = val || '';
+              setSourceCode(nextCode);
+              if (activeDraftKey) {
+                codeDraftsRef.current = { ...codeDraftsRef.current, [activeDraftKey]: nextCode };
+              }
+            }}
             theme={theme === 'dark' ? 'vs-dark' : 'light'}
             options={{
               minimap: { enabled: false },

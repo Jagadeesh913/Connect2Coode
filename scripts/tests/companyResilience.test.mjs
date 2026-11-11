@@ -260,7 +260,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         capturedUrl = url;
         capturedPayload = payload;
         capturedConfig = config;
-        return { statusCode: 200, message: 'Saved', data: payload };
+        return { statusCode: 200, message: 'Saved', data: { ...payload, id: 91 } };
       };
 
       try {
@@ -270,6 +270,7 @@ describe('BATCH 5 AUDIT REMEDIATION TEST SUITE: Editorial & Service Resilience',
         assert.equal(capturedUrl, '/question');
         assert.deepEqual(capturedPayload, payload);
         assert.equal(capturedConfig.signal, controller.signal);
+        assert.equal(res.data.id, 91);
         assert.equal(res.data.title, 'New Problem');
       } finally {
         apiClient.post = originalPost;

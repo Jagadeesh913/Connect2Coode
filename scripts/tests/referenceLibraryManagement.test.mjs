@@ -41,6 +41,8 @@ describe('reference library management contract', () => {
     assert.match(table, /getSafeRemoteImageUrl\(logoUrl\)/);
     assert.match(table, /question\.platformLogoUrl/);
     assert.doesNotMatch(table, /<span className="truncate max-w-\[130px\]">\{label\}<\/span>/);
+    assert.match(table, /PlatformCircleBadge/);
+    assert.match(table, /<CompanyCircleBadge/);
   });
 
   it('keeps reads shared while isolating mutations in an admin service', () => {
@@ -52,6 +54,15 @@ describe('reference library management contract', () => {
     assert.match(adminService, /async save/);
     assert.match(adminService, /async hardDelete/);
     assert.doesNotMatch(adminService, /async create|async update|\{ data: \{\} \}/);
+  });
+
+  it('accepts both API-envelope and bodyless 204 hard-delete success responses', () => {
+    const adminService = read('src/services/admin/adminReferenceService.ts');
+    assert.match(adminService, /ApiResponse<null> \| undefined/);
+    assert.match(adminService, /response !== undefined && response\.data !== null/);
+    assert.match(adminService, /Promise<void>/);
+    assert.match(adminService, /Number\.isSafeInteger\(item\.id\)/);
+    assert.match(adminService, /item\.refCode\.trim\(\)\.length === 0/);
   });
 
   it('keeps every admin MCQ mutation out of the user-facing MCQ service', () => {
@@ -121,14 +132,15 @@ describe('reference library management contract', () => {
     assert.doesNotMatch(filterType, /institutionType|isActive/);
   });
 
-  it('uses distinct create and update payloads from the observed backend contract', () => {
+  it('uses authoritative create and update payloads from the verified backend contract', () => {
     const types = read('src/core/types/domain.ts');
     const page = read('src/features/admin/pages/AdminReferences.tsx');
     assert.match(types, /interface CreateReferenceItemRequest[\s\S]*refGroupName: string/);
     assert.match(types, /interface UpdateReferenceItemRequest[\s\S]*id: number/);
-    const updateType = types.match(/interface UpdateReferenceItemRequest \{([\s\S]*?)\n\}/)?.[1] || '';
-    assert.doesNotMatch(updateType, /refGroupName/);
-    assert.match(page, /if \(!editingItem && !refGroupName\)/);
+    assert.match(types, /interface UpdateReferenceItemRequest[\s\S]*refGroupName: string/);
+    assert.match(types, /interface CreateReferenceItemRequest[\s\S]*logoUrl\?: string \| null/);
+    assert.match(types, /interface UpdateReferenceItemRequest[\s\S]*logoUrl\?: string \| null/);
+    assert.match(page, /if \(!refGroupName\)/);
     assert.equal((page.match(/await adminReferenceService\.save\(payload\)/g) || []).length, 2);
   });
 

@@ -3,6 +3,7 @@ import type { ApiPage } from './api';
 export interface ReferenceItem {
   id: number;
   refGroupCode: string;
+  refGroupName?: string | null;
   refCode: string;
   refName: string;
   isActive: boolean;
@@ -16,14 +17,17 @@ export interface CreateReferenceItemRequest {
   refCode: string;
   refName: string;
   isActive: boolean;
+  logoUrl?: string | null;
 }
 
 export interface UpdateReferenceItemRequest {
   id: number;
   refGroupCode: string;
+  refGroupName: string;
   refCode: string;
   refName: string;
   isActive: boolean;
+  logoUrl?: string | null;
 }
 
 export type SaveReferenceItemRequest =
@@ -162,7 +166,7 @@ export interface Question {
   qpfRefGroupCode: string;
   qpfRefCode: string;
   qpfRefName: string;
-  questionPlatform?: string;
+  questionPlatform?: string | QuestionPlatformSummary | null;
   platformName?: string;
   questionHints: QuestionHint[];
   companies?: Company[] | any[];
@@ -235,6 +239,7 @@ export interface UserInfoData {
   passedOutYear?: number | null;
   /** The API has returned both `college` and `collegeName`; services normalize both to this field. */
   college?: string | null;
+  collegeName?: string | null;
   collegeId?: number | null;
   bio?: string | null;
   gender?: ReferenceItem | null;
@@ -244,10 +249,13 @@ export interface UserInfoData {
 export interface SaveUserInfoPayload {
   id?: number | null;
   userId: number;
+  firstName?: string | null;
+  lastName?: string | null;
   regNumber: string;
   joinedYear: number;
   passedOutYear: number;
   college: string;
+  collegeName?: string | null;
   collegeId?: number | null;
   bio: string;
   gender?: ReferenceItem | null;

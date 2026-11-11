@@ -58,7 +58,7 @@ Connect-2-code/
 │   │   ├── references/           # Dynamic taxonomy groups (DIFF, TOPIC, QPF)
 │   │   ├── roadmaps/             # Engineering preparation roadmaps
 │   │   └── settings/             # Application settings & appearance
-│   ├── layouts/                  # AppRouterLayout.tsx, AuthLayout.tsx, MainLayout.tsx
+│   ├── layouts/                  # AppRouterLayout.tsx, MainLayout.tsx
 │   ├── routes/                   # appRoutes.tsx (createBrowserRouter definition)
 │   ├── services/                 # Frontend service layer mediating between UI and API
 │   │   ├── admin/                # Admin-specific service implementations

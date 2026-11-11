@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { AdminModal } from '../AdminModal';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
@@ -85,14 +85,22 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     error: questionTypesError,
     retry: retryQuestionTypes,
   } = useReferenceGroup('QUESTION TYPE', isOpen);
-  const sectionTypes = initialData?.sectionType &&
-    !sectionTypeReferences.some((item) => item.id === initialData.sectionType.id)
-    ? [initialData.sectionType, ...sectionTypeReferences]
-    : sectionTypeReferences;
-  const questionTypes = initialData?.questionType &&
-    !questionTypeReferences.some((item) => item.id === initialData.questionType?.id)
-    ? [initialData.questionType, ...questionTypeReferences]
-    : questionTypeReferences;
+  const sectionTypes = useMemo(
+    () =>
+      initialData?.sectionType &&
+      !sectionTypeReferences.some((item) => item.id === initialData.sectionType.id)
+        ? [initialData.sectionType, ...sectionTypeReferences]
+        : sectionTypeReferences,
+    [initialData?.sectionType, sectionTypeReferences]
+  );
+  const questionTypes = useMemo(
+    () =>
+      initialData?.questionType &&
+      !questionTypeReferences.some((item) => item.id === initialData.questionType?.id)
+        ? [initialData.questionType, ...questionTypeReferences]
+        : questionTypeReferences,
+    [initialData?.questionType, questionTypeReferences]
+  );
 
   useEffect(() => {
     if (initialData) {
@@ -138,10 +146,23 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
     });
   };
 
-  // Filter root sections eligible to be parents (cannot be itself)
+  // Filter root sections eligible to be parents (must be top-level rounds and cannot be itself)
   const candidateParents = existingSections.filter(
-    (s) => !initialData?.id || s.id !== initialData.id
+    (s) => (!initialData?.id || s.id !== initialData.id) && !s.parentSectionId
   );
+
+  // Smart auto-selection: If classification is unset (0), automatically select ROUND for top-level or SECTION for nested
+  useEffect(() => {
+    if (sectionTypes.length === 0) return;
+    const currentSectionTypeId = watch('sectionTypeId');
+    if (currentSectionTypeId && currentSectionTypeId !== 0) return;
+    const parentId = watch('parentSectionId');
+    const targetCode = parentId ? 'SECTION' : 'ROUND';
+    const match = sectionTypes.find((item) => item.refCode?.toUpperCase() === targetCode);
+    if (match) {
+      setValue('sectionTypeId', match.id, { shouldValidate: true });
+    }
+  }, [sectionTypes, setValue, watch]);
 
   return (
     <AdminModal
@@ -219,71 +240,143 @@ export const ExamSectionFormModal: React.FC<ExamSectionFormModalProps> = ({
           <label htmlFor="exam-section-parent" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
             Parent Section / Round
           </label>
-          <C2CSelect
-            value={watch('parentSectionId') !== null && watch('parentSectionId') !== undefined ? String(watch('parentSectionId')) : ''}
-            onChange={(val) => {
-              setValue('parentSectionId', val === '' ? null : Number(val), { shouldValidate: true });
-            }}
-            options={[
-              { value: '', label: '-- None (Top-Level Assessment Round) --' },
-              ...candidateParents.map((parent) => ({
-                value: String(parent.id),
-                label: `Round #${parent.sequenceNumber || parent.id}: ${parent.sectionName}`,
-              })),
-            ]}
-            className="w-full"
-            buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
-          />
+          {candidateParents.length === 0 ? (
+            <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 text-xs">
+              <span className="font-semibold text-slate-700 dark:text-slate-300">
+                -- None (Top-Level Assessment Round) --
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300">
+                Initial Round
+              </span>
+            </div>
+          ) : (
+            <C2CSelect
+              id="exam-section-parent"
+              value={watch('parentSectionId') !== null && watch('parentSectionId') !== undefined ? String(watch('parentSectionId')) : ''}
+              onChange={(val) => {
+                const nextParentId = val === '' ? null : Number(val);
+                setValue('parentSectionId', nextParentId, { shouldValidate: true });
+                if (nextParentId) {
+                  const sectionItem = sectionTypes.find((item) => item.refCode?.toUpperCase() === 'SECTION');
+                  if (sectionItem) setValue('sectionTypeId', sectionItem.id, { shouldValidate: true });
+                } else {
+                  const roundItem = sectionTypes.find((item) => item.refCode?.toUpperCase() === 'ROUND');
+                  if (roundItem) setValue('sectionTypeId', roundItem.id, { shouldValidate: true });
+                }
+              }}
+              options={[
+                { value: '', label: '-- None (Top-Level Assessment Round) --' },
+                ...candidateParents.map((parent) => ({
+                  value: String(parent.id),
+                  label: `Round #${parent.sequenceNumber || parent.id}: ${parent.sectionName}`,
+                })),
+              ]}
+              className="w-full"
+              buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
+            />
+          )}
           <p className="text-[11px] text-slate-500 dark:text-slate-400">
-            Select an existing round to nest this as a sub-section (e.g. SQL inside Technical Assessment).
+            {candidateParents.length === 0
+              ? 'No previous rounds exist in this exam yet. This entry will be created as a top-level assessment round.'
+              : 'Select an existing round to nest this as a sub-section (e.g. SQL inside Technical Assessment).'}
           </p>
         </div>
 
         {/* Section Type & Question Type */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label htmlFor="exam-section-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-              Section Classification
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="exam-section-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Section Classification <span className="text-rose-500">*</span>
+              </label>
+              {sectionTypesError && (
+                <button
+                  type="button"
+                  onClick={() => void retrySectionTypes()}
+                  className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  Retry loading
+                </button>
+              )}
+            </div>
             <C2CSelect
+              id="exam-section-type"
               value={watch('sectionTypeId') ? String(watch('sectionTypeId')) : '0'}
               onChange={(val) => {
                 setValue('sectionTypeId', Number(val), { shouldValidate: true });
               }}
               options={[
-                { value: '0', label: '-- Select classification --' },
+                {
+                  value: '0',
+                  label: sectionTypesLoading
+                    ? 'Loading classifications...'
+                    : sectionTypesError
+                    ? 'Failed to load options (click Retry)'
+                    : '-- Select classification --',
+                },
                 ...sectionTypes.map((item) => ({
                   value: String(item.id),
                   label: item.refName,
                 })),
               ]}
               disabled={sectionTypesLoading || sectionTypes.length === 0}
+              busy={sectionTypesLoading}
               className="w-full"
               buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
             />
+            {sectionTypesError && (
+              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
+                {sectionTypesError}
+              </p>
+            )}
             <FormFieldError error={errors.sectionTypeId?.message} />
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="exam-section-question-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-              Question Type Focus
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="exam-section-question-type" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                Question Type Focus
+              </label>
+              {questionTypesError && (
+                <button
+                  type="button"
+                  onClick={() => void retryQuestionTypes()}
+                  className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  Retry loading
+                </button>
+              )}
+            </div>
             <C2CSelect
+              id="exam-section-question-type"
               value={watch('questionTypeId') !== null && watch('questionTypeId') !== undefined ? String(watch('questionTypeId')) : ''}
               onChange={(val) => {
                 setValue('questionTypeId', val === '' ? null : Number(val), { shouldValidate: true });
               }}
               options={[
-                { value: '', label: '-- General / Multi-disciplinary --' },
+                {
+                  value: '',
+                  label: questionTypesLoading
+                    ? 'Loading question types...'
+                    : questionTypesError
+                    ? 'Failed to load types (click Retry)'
+                    : '-- General / Multi-disciplinary --',
+                },
                 ...questionTypes.map((item) => ({
                   value: String(item.id),
                   label: item.refName,
                 })),
               ]}
               disabled={questionTypesLoading}
+              busy={questionTypesLoading}
               className="w-full"
               buttonClassName="w-full justify-between px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/80 text-slate-900 dark:text-white"
             />
+            {questionTypesError && (
+              <p className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
+                {questionTypesError}
+              </p>
+            )}
           </div>
         </div>
 

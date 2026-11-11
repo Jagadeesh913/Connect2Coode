@@ -41,9 +41,9 @@ graph TD
 | :--- | :--- | :--- | :--- | :--- |
 | `/` | `Landing` | Public | None | None |
 | `/oauth/callback` | `OAuthCallback` | Public | None | Processes Google OAuth tokens |
-| `/login` | `Login` | Guest Only | `AuthLayout` | `GuestRoute` (redirects to `/practice` if authed) |
-| `/signup` | `Signup` | Guest Only | `AuthLayout` | `GuestRoute` |
-| `/forgot-password` | `ForgotPassword` | Guest Only | `AuthLayout` | `GuestRoute` |
+| `/login` | Redirect -> `/` | Guest Only | N/A | `GuestRoute` (redirects to `/practice` if authed, or `/` for guests) |
+| `/signup` | Redirect -> `/` | Guest Only | N/A | `GuestRoute` (redirects to `/practice` if authed, or `/` for guests) |
+| `/forgot-password` | Redirect -> `/` | Guest Only | N/A | `GuestRoute` (redirects to `/practice` if authed, or `/` for guests) |
 | `/practice` | `PracticePage` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; signed-out users see the shared sign-in state |
 | `/dsa-sheet` | `DsaSheetPage` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; signed-out users see the shared sign-in state |
 | `/problems/:slug` | `ProblemDetails` | Authenticated Content | `MainLayout` | `AuthenticatedFeatureGate`; Monaco workspace is not mounted while signed out |
@@ -97,10 +97,10 @@ The application distinguishes between two primary user roles:
 
 | Guard Component | Location | Logic & Gating Rules | Failure Redirect |
 | :--- | :--- | :--- | :--- |
-| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Waits for startup restoration, then trusts validated Redux authentication state. Saves the attempted destination in `sessionStorage.getItem('post_auth_redirect')`. JWT contents are never decoded. | Redirects to `/login` only after confirmed unauthentication |
+| **`ProtectedRoute`** | [`src/core/guards/ProtectedRoute.tsx`](../../src/core/guards/ProtectedRoute.tsx) | Waits for startup restoration, then trusts validated Redux authentication state. Saves the attempted destination in `sessionStorage.getItem('post_auth_redirect')`. JWT contents are never decoded. | Redirects to `/` after confirmed unauthentication |
 | **`AuthenticatedFeatureGate`** | [`src/features/auth/components/AuthenticatedFeatureGate.tsx`](../../src/features/auth/components/AuthenticatedFeatureGate.tsx) | Waits for startup restoration and keeps the API-owning learning page unmounted until authentication succeeds. Signed-out visitors receive the shared `EmptyState` sign-in UI; temporary failures receive `SessionRecoveryState`. | Inline sign-in prompt; no redirect and no feature API effects while signed out |
 | **`GuestRoute`** | [`src/core/guards/GuestRoute.tsx`](../../src/core/guards/GuestRoute.tsx) | Waits for startup refresh, then uses the backend response `role` to select `/admin/dashboard` or `/practice`. JWT claims are not decoded for routing. If startup recovery is interrupted, the guest gate offers retry plus an explicit **Sign in instead** path so a transient/CSRF/CORS failure cannot permanently hide the login form. | Redirects to `/practice` or `/admin/dashboard` |
-| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Requires authenticated Redux state and an exact `ADMIN`/`ROLE_ADMIN` value supplied by the latest login/refresh response. Backend authorization remains authoritative. | Non-admin users -> `/practice`<br>Unauthenticated -> `/login` |
+| **`AdminRoute`** | [`src/core/guards/AdminRoute.tsx`](../../src/core/guards/AdminRoute.tsx) | Requires authenticated Redux state and an exact `ADMIN`/`ROLE_ADMIN` value supplied by the latest login/refresh response. Backend authorization remains authoritative. | Non-admin users -> `/practice`<br>Unauthenticated -> `/` |
 
 All guard types keep protected/guest decisions closed during `LOADING`. A temporary startup refresh failure enters `RECOVERY_REQUIRED` and renders a safe retry screen; it does not automatically infer that the cookie is invalid or reveal protected route content. On guest-only routes, the user may explicitly choose **Sign in instead**, which clears stale client access/profile memory, advances the stale-response epoch, and allows account replacement without touching the backend-owned HttpOnly cookie or pretending the failed refresh proved server logout. Refresh HTTP 401 alone automatically transitions to `UNAUTHENTICATED`. The cookie-backed `/auth/refresh` remains the required startup session check; the feature gate prevents catalog, reference, company, sheet, aptitude, and problem-detail requests until a session is authenticated.
 

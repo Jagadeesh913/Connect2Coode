@@ -28,7 +28,7 @@ export const AdminRoute: React.FC = () => {
 
   // 2. Check Authentication Status
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/" state={{ from: location }} replace />;
   }
 
   // 3. Route presentation follows the role returned by login/refresh.

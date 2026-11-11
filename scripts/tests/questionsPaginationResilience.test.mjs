@@ -26,6 +26,7 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 
 const { adminQuestionService } = await import('../../src/services/admin/adminQuestionService.ts');
 const { problemService } = await import('../../src/services/problemService.ts');
+const { questionService } = await import('../../src/services/questionService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 
 const request = {
@@ -154,6 +155,80 @@ describe('Questions API pagination contract', () => {
         /Unexpected questions list item format/
       );
     } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('never fabricates question identities or titles from partial catalog rows', async () => {
+    const originalPost = apiClient.post;
+    try {
+      for (const content of [
+        [{ title: 'Missing ID', difficultyName: 'Easy' }],
+        [{ id: 8, difficultyName: 'Easy' }],
+      ]) {
+        apiClient.post = async () => ({
+          statusCode: 200,
+          message: 'OK',
+          data: { content, number: 0, size: 10, totalElements: 1, totalPages: 1 },
+        });
+        await assert.rejects(
+          () => adminQuestionService.getQuestions(request),
+          /Unexpected questions list item format/
+        );
+      }
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('rejects a mixed valid and malformed page instead of hiding rows behind server totals', async () => {
+    const originalPost = apiClient.post;
+    try {
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: {
+          content: [questionListItem(1), { id: 2, difficultyName: 'Easy' }],
+          number: 0,
+          size: 10,
+          totalElements: 2,
+          totalPages: 1,
+        },
+      });
+      await assert.rejects(
+        () => adminQuestionService.getQuestions(request),
+        /Unexpected questions list item format/
+      );
+    } finally {
+      apiClient.post = originalPost;
+    }
+  });
+
+  it('rejects mismatched detail identities and invalid save responses', async () => {
+    const originalGet = apiClient.get;
+    const originalPost = apiClient.post;
+    try {
+      apiClient.get = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: { id: 9, title: 'Wrong question' },
+      });
+      await assert.rejects(
+        () => questionService.getById(8),
+        /Question #8 returned an invalid detail response/
+      );
+
+      apiClient.post = async () => ({
+        statusCode: 200,
+        message: 'OK',
+        data: { title: 'Missing saved identity' },
+      });
+      await assert.rejects(
+        () => questionService.saveOrUpdate({ id: undefined, title: 'New question' }),
+        /Question save returned an invalid response/
+      );
+    } finally {
+      apiClient.get = originalGet;
       apiClient.post = originalPost;
     }
   });

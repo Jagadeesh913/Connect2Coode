@@ -39,7 +39,7 @@ export const Landing: React.FC = () => {
 
   const handleLogout = async () => {
     const request = dispatch(logoutUser());
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
     const result = await request;
     if (logoutUser.fulfilled.match(result)) {
       toast.success('Logged out successfully');

@@ -208,17 +208,21 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     if (mutationPendingRef.current) return;
     mutationPendingRef.current = true;
     setSubmitting(true);
-    const payload: QuestionTestCase[] = testCases.map((tc, idx) => ({
-      id: tc.id,
-      questionId: Number(questionId),
-      input: tc.input.trim(),
-      expectedOutput: tc.expectedOutput.trim(),
-      explanation: tc.explanation ? tc.explanation.trim() : '',
-      isHidden: tc.isHidden === true,
-      displayOrder: idx + 1,
-      typeRefGroupCode: 'TESTCASETYPE',
-      typeRefCode: tc.typeRefCode,
-    }));
+    const payload: QuestionTestCase[] = testCases.map((tc, idx) => {
+      const matched = testCaseTypes.find((t) => t.refCode === tc.typeRefCode);
+      return {
+        id: tc.id,
+        questionId: Number(questionId),
+        input: tc.input.trim(),
+        expectedOutput: tc.expectedOutput.trim(),
+        explanation: tc.explanation ? tc.explanation.trim() : '',
+        isHidden: tc.isHidden === true,
+        displayOrder: idx + 1,
+        typeRefGroupCode: 'TESTCASETYPE',
+        typeRefCode: tc.typeRefCode,
+        typeRefName: matched?.refName || tc.typeRefName || '',
+      };
+    });
 
     try {
       await adminQuestionService.addTestCases(questionId, payload);

@@ -13,13 +13,12 @@ export const MainLayout: React.FC = () => {
   const location = useLocation();
 
   const { user, isAuthModalOpen } = useAppSelector((state) => state.auth);
-  const isAuthRoute = location.pathname === '/login' || location.pathname === '/signup';
   const isProblemWorkspace = location.pathname.startsWith('/problems/');
-  const showModal = isAuthModalOpen || isAuthRoute;
+  const showModal = isAuthModalOpen;
 
   const handleLogout = async () => {
     const request = dispatch(logoutUser());
-    navigate('/login', { replace: true });
+    navigate('/', { replace: true });
     const result = await request;
     if (logoutUser.fulfilled.match(result)) {
       toast.success('Logged out successfully');
@@ -28,12 +27,9 @@ export const MainLayout: React.FC = () => {
     }
   };
 
-  // Preserve user navigation context on modal close: return to Home if cancelled
+  // Preserve user navigation context on modal close
   const handleCloseModal = () => {
     dispatch(closeAuthModal());
-    if (isAuthRoute) {
-      navigate('/');
-    }
   };
 
   const isFullWidthPage =

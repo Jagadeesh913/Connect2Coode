@@ -124,9 +124,10 @@ export type AdminLanguageFormData = z.infer<typeof adminLanguageSchema>;
 export const adminReferenceItemSchema = z.object({
   id: z.number().int().positive().optional(),
   refGroupCode: requiredTextRule('Reference group code', 1).max(80),
-  refGroupName: z.string().trim().max(120).optional(),
+  refGroupName: requiredTextRule('Reference group name', 1).max(120),
   refCode: requiredTextRule('Reference code', 1).max(80),
   refName: requiredTextRule('Reference name', 1).max(160),
+  logoUrl: optionalUrlRule('Logo URL', true),
   isActive: z.boolean().default(true),
 });
 

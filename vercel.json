@@ -34,6 +34,12 @@
     { "source": "/500", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }] }
   ],
   "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "connect2code.in" }],
+      "destination": "https://www.connect2code.in/:path*",
+      "permanent": true
+    },
     { "source": "/problems", "destination": "/practice", "permanent": true },
     { "source": "/company-patterns", "destination": "/companies", "permanent": true },
     { "source": "/progress", "destination": "/aptitude", "permanent": true },

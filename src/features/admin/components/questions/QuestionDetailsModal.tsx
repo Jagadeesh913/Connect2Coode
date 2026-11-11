@@ -11,6 +11,8 @@ import {
   Calendar,
   Layers,
   FileText,
+  ExternalLink,
+  Globe,
 } from 'lucide-react';
 
 interface QuestionDetailsModalProps {
@@ -50,6 +52,18 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
   };
 
   const formattedAskedDate = formatAskedDate(question?.askedDate);
+  const platformSummary =
+    typeof question?.questionPlatform === 'object' && question.questionPlatform !== null
+      ? question.questionPlatform
+      : null;
+  const platformLogo = platformSummary?.logoUrl;
+  const platformDisplayName =
+    question?.qpfRefName ||
+    platformSummary?.refName ||
+    (typeof question?.questionPlatform === 'string' ? question.questionPlatform : '') ||
+    (question as any)?.platformName ||
+    (question as any)?.platform ||
+    '';
 
   return (
     <AdminModal
@@ -128,17 +142,25 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
               </AdminBadge>
             )}
 
-            {(question.qpfRefName ||
-              (question as any).questionPlatform ||
-              (question as any).platformName ||
-              (question as any).platform) && (
-              <AdminBadge variant="neutral" size="sm">
-                Platform: {question.qpfRefName ||
-                  (question as any).questionPlatform ||
-                  (question as any).platformName ||
-                  (question as any).platform}
-              </AdminBadge>
+            {platformDisplayName && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-[11px] font-semibold">
+                {platformLogo && (
+                  <img
+                    src={platformLogo}
+                    alt=""
+                    className="w-3.5 h-3.5 object-contain"
+                  />
+                )}
+                <span>Platform: {platformDisplayName}</span>
+              </span>
             )}
+
+            <AdminBadge
+              variant={question.isOwnProblem !== false ? 'primary' : 'neutral'}
+              size="sm"
+            >
+              {question.isOwnProblem !== false ? 'Internal Native' : 'External Platform'}
+            </AdminBadge>
 
             <AdminBadge
               variant={question.isActive !== false ? 'success' : 'neutral'}
@@ -154,6 +176,51 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
               </span>
             )}
           </div>
+
+          {/* External Reference / Challenge Links */}
+          {(question.leetCodeUrl || question.gfgUrl || question.hackerRankUrl) && (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                <Globe className="w-3.5 h-3.5 text-blue-600" />
+                <span>External Challenge Links</span>
+              </div>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                {question.leetCodeUrl && (
+                  <a
+                    href={question.leetCodeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-semibold text-xs hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors"
+                  >
+                    <span>LeetCode</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                {question.gfgUrl && (
+                  <a
+                    href={question.gfgUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
+                  >
+                    <span>GeeksforGeeks</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+                {question.hackerRankUrl && (
+                  <a
+                    href={question.hackerRankUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 font-semibold text-xs hover:bg-green-100 dark:hover:bg-green-900/60 transition-colors"
+                  >
+                    <span>HackerRank</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Problem Statement */}
           <div className="space-y-1.5">
@@ -218,9 +285,16 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                     className="p-3 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800/80 rounded-xl space-y-1.5 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-800 dark:text-slate-200">
-                        Case #{idx + 1}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">
+                          Case #{idx + 1}
+                        </span>
+                        {(tc.typeRefName || tc.typeRefCode) && (
+                          <AdminBadge variant="primary" size="sm">
+                            {tc.typeRefName || tc.typeRefCode}
+                          </AdminBadge>
+                        )}
+                      </div>
                       <AdminBadge
                         variant={tc.isHidden ? 'neutral' : 'success'}
                         size="sm"

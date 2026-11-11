@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import { referenceService } from '../../../services/referenceService';
 import type { ReferenceItem } from '../../../core/types/domain';
+import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
 
 export interface ReferenceState {
   groups: Record<string, ReferenceItem[]>;
@@ -47,7 +48,7 @@ export const fetchReferenceGroup = createAsyncThunk<
       if (signal.aborted) throw error;
       return rejectWithValue({
         groupCode,
-        message: error?.message || 'Failed to load reference data',
+        message: getActionableErrorMessage(error, 'Failed to load reference data'),
       });
     }
   },

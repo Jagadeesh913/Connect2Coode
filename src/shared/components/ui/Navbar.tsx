@@ -72,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       onLogout();
     } else {
       dispatch(logoutUser());
-      navigate('/login', { replace: true });
+      navigate('/', { replace: true });
     }
   };
 

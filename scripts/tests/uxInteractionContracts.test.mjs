@@ -310,8 +310,10 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /const fullName\s*=/);
     assert.match(source, /authUser\?\.fullName/);
     assert.match(source, /defaultCollege=\{userInfo\?\.college \|\| ''\}/);
-    assert.match(source, /Account Security/);
-    assert.match(source, /generatePasswordResetOtpThunk/);
+    assert.doesNotMatch(source, /Account Security/);
+    assert.doesNotMatch(source, /generatePasswordResetOtpThunk/);
+    assert.doesNotMatch(source, /Evaluation Accuracy/i);
+    assert.match(source, /C2CSelect/);
     assert.match(source, /saveUserInfoThunk/);
     assert.match(themeSource, /const loadScopedThemePreference = \(\): ThemePreference =>/);
     assert.match(themeSource, /userScopedStorage\.getItem\('theme_pref'\)/);

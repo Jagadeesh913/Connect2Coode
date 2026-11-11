@@ -221,6 +221,8 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
 
     it('academicDetailsSchema supports the verified optional personal-detail fields', () => {
       const parsed = academicDetailsSchema.parse({
+        firstName: 'Uday',
+        lastName: 'Kumar',
         college: 'National Institute of Technology',
         regNumber: 'CS202201',
         joinedYear: 2020,
@@ -230,6 +232,8 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
         genderId: 102,
         dob: '2002-01-01',
       });
+      assert.equal(parsed.firstName, 'Uday');
+      assert.equal(parsed.lastName, 'Kumar');
       assert.equal(parsed.collegeId, 42);
       assert.equal(parsed.genderId, 102);
       assert.equal(parsed.dob, '2002-01-01');
