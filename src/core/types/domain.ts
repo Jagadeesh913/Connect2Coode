@@ -157,6 +157,8 @@ export interface Question {
   title: string;
   description: string;
   constraints?: string;
+  timeLimit?: number;
+  memoryLimit?: number;
   difficultyRefGroupCode: string;
   difficultyRefCode: string;
   difficultyRefName: string;

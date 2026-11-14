@@ -66,6 +66,12 @@ export const adminQuestionSchema = z.object({
   title: requiredTextRule('Title', 3),
   description: requiredTextRule('Description', 10),
   constraints: z.string().trim().optional(),
+  timeLimit: z.coerce
+    .number({ error: 'Time limit must be a number.' })
+    .positive('Time limit must be greater than 0.'),
+  memoryLimit: z.coerce
+    .number({ error: 'Memory limit must be a number.' })
+    .positive('Memory limit must be greater than 0.'),
   difficultyRefGroupCode: z.string().default('DIFF'),
   difficultyRefCode: z.string().min(1, 'Difficulty is required.'),
   difficultyRefName: z.string().min(1, 'Difficulty name is required.'),

@@ -37,6 +37,8 @@ interface CodingQuestionTableProps<T extends CodingQuestionListItem> {
   isBookmarked?: (question: T) => boolean;
   onBookmark?: (question: T, event: React.MouseEvent<HTMLButtonElement>) => void;
   getQuestionPath?: (question: T) => string;
+  renderTitle?: (question: T) => React.ReactNode;
+  renderAction?: (question: T) => React.ReactNode;
 }
 
 const difficultyNumberColor = (difficulty: string): string => {
@@ -126,6 +128,8 @@ export const CodingQuestionTable = <T extends CodingQuestionListItem>({
   isBookmarked = () => false,
   onBookmark,
   getQuestionPath = (question) => `/problems/${question.slug || question.id}`,
+  renderTitle,
+  renderAction,
 }: CodingQuestionTableProps<T>) => {
   const companyMap = useMemo(() => {
     const map = new Map<string, Company>();
@@ -165,11 +169,11 @@ export const CodingQuestionTable = <T extends CodingQuestionListItem>({
               return (
                 <tr key={question.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                   <td className={`py-3 px-4 text-center font-mono text-xs font-semibold shrink-0 ${difficultyNumberColor(question.difficulty || '')}`} title={`Question ID: ${questionId} • Difficulty: ${question.difficulty || 'Unknown'}`}>{questionId}</td>
-                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm"><Link to={getQuestionPath(question)} className="inline-block leading-snug transition-colors hover:text-blue-600 dark:hover:text-blue-400">{question.title}</Link></td>
+                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-white min-w-[200px] text-sm">{renderTitle ? renderTitle(question) : <Link to={getQuestionPath(question)} className="inline-block leading-snug transition-colors hover:text-blue-600 dark:hover:text-blue-400">{question.title}</Link>}</td>
                   <td className="py-3 px-4 whitespace-nowrap"><PlatformCircleBadge question={question} logoUrl={question.platformLogoUrl} /></td>
                   <td className="py-3 px-4 whitespace-nowrap">{question.companies.length ? <div className="flex items-center gap-1.5 flex-nowrap" title={question.companies.length > 2 ? `Companies: ${question.companies.join(', ')}` : undefined}>{question.companies.slice(0, 2).map((name, index) => { const company = question.companyDetails?.find((item) => item.name.toLowerCase().trim() === name.toLowerCase().trim()) || companyMap.get(name.toLowerCase().trim()); return <CompanyCircleBadge key={`${name}-${index}`} name={name} logo={company?.logo} website={company?.website} />; })}</div> : <span className="text-slate-400 text-xs">—</span>}</td>
                   <td className="py-3 px-2 text-center">{onBookmark && <button type="button" onClick={(event) => onBookmark(question, event)} aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark problem'} className={`rounded-md p-1 transition-colors ${bookmarked ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200'}`}><i className={`fa-${bookmarked ? 'solid' : 'regular'} fa-bookmark text-xs`} /></button>}</td>
-                  <td className="py-3 px-4 text-right">{solved ? <Link to={getQuestionPath(question)} className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1 text-xs font-bold text-emerald-600 no-underline shadow-2xs transition-colors hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50"><span>Solved</span></Link> : <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1 text-xs font-bold text-blue-600 no-underline shadow-2xs transition-colors hover:bg-blue-50 dark:border-blue-800/60 dark:text-blue-400 dark:hover:bg-blue-950/50"><span>Solve</span><i className="fa-solid fa-arrow-right text-[9px]" /></Link>}</td>
+                  <td className="py-3 px-4 text-right">{renderAction ? renderAction(question) : solved ? <Link to={getQuestionPath(question)} className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-1 text-xs font-bold text-emerald-600 no-underline shadow-2xs transition-colors hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:hover:bg-emerald-900/50"><span>Solved</span></Link> : <Link to={getQuestionPath(question)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 px-3 py-1 text-xs font-bold text-blue-600 no-underline shadow-2xs transition-colors hover:bg-blue-50 dark:border-blue-800/60 dark:text-blue-400 dark:hover:bg-blue-950/50"><span>Solve</span><i className="fa-solid fa-arrow-right text-[9px]" /></Link>}</td>
                 </tr>
               );
             })}

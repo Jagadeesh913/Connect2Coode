@@ -383,6 +383,16 @@ export const UserProfilePage: React.FC = () => {
   const genderName = userInfo?.gender?.refName || '';
   const dateOfBirth = userInfo?.dob || '';
   const activityCells = useMemo(() => buildActivityCells(attemptedItems), [attemptedItems]);
+  const activitySummary = useMemo(() => {
+    return activityCells.reduce(
+      (summary, cell) => ({
+        totalAttempts: summary.totalAttempts + cell.attempts,
+        activeDays: summary.activeDays + (cell.attempts > 0 ? 1 : 0),
+        peakAttempts: Math.max(summary.peakAttempts, cell.attempts),
+      }),
+      { totalAttempts: 0, activeDays: 0, peakAttempts: 0 }
+    );
+  }, [activityCells]);
 
   const genderOptions = useMemo(() => {
     const byId = new Map<number, typeof genderReferences[number]>();
@@ -781,59 +791,140 @@ export const UserProfilePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Practice Activity 26-Week Heatmap */}
-            <section className="bg-white dark:bg-neutral-900 rounded-3xl border border-slate-200/80 dark:border-white/10 p-6 sm:p-7 shadow-xs">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
-                    Practice activity
-                  </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Your recorded practice attempts over the last 26 weeks.
-                  </p>
+            {/* Connect2Code activity signal */}
+            <section className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-white shadow-xs dark:border-white/10 dark:bg-neutral-900">
+              <div className="grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+                <aside className="relative overflow-hidden bg-[#111429] p-5 text-white sm:p-6 lg:min-h-[24rem]">
+                  <div className="pointer-events-none absolute -right-14 -top-12 h-44 w-44 rounded-full bg-violet-500/30 blur-3xl" />
+                  <div className="pointer-events-none absolute -bottom-16 -left-12 h-40 w-40 rounded-full bg-blue-500/25 blur-3xl" />
+                  <img
+                    src="/logo-mark-transparent.png"
+                    alt=""
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -right-8 top-16 h-36 w-36 rotate-12 object-contain opacity-[0.07]"
+                  />
+
+                  <div className="relative flex h-full flex-col">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.18em] text-violet-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-violet-300 shadow-[0_0_10px_rgba(196,181,253,0.9)]" />
+                        Practice signal
+                      </div>
+                      <h2 className="mt-4 max-w-48 text-xl font-extrabold leading-tight">
+                        Build your trail, one mark at a time.
+                      </h2>
+                      <p className="mt-2 max-w-48 text-xs leading-relaxed text-slate-300">
+                        A 26-week view of your recorded coding attempts.
+                      </p>
+                    </div>
+
+                    <div className="mt-5 grid grid-cols-3 gap-2 lg:mt-auto lg:grid-cols-1" aria-label="Activity summary">
+                      {[
+                        { label: 'Attempts', value: activitySummary.totalAttempts, accent: 'text-violet-200' },
+                        { label: 'Active days', value: activitySummary.activeDays, accent: 'text-blue-200' },
+                        { label: 'Best day', value: activitySummary.peakAttempts, accent: 'text-fuchsia-200' },
+                      ].map((metric) => (
+                        <div
+                          key={metric.label}
+                          className="rounded-2xl border border-white/10 bg-white/[0.07] px-3 py-2.5 backdrop-blur-sm lg:flex lg:items-center lg:justify-between"
+                        >
+                          <span className={`block text-xl font-black leading-none ${metric.accent}`}>
+                            {metric.value}
+                          </span>
+                          <span className="mt-1 block text-[9px] font-bold uppercase tracking-wider text-slate-400 lg:mt-0">
+                            {metric.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </aside>
+
+                <div className="min-w-0 p-5 sm:p-6 lg:p-7">
+                  <div className="flex flex-col justify-between gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-end dark:border-white/10">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
+                        26-week activity trail
+                      </span>
+                      <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {activityCells[0]?.label} — {activityCells[activityCells.length - 1]?.label}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg ring-1 ring-blue-400/70 dark:ring-blue-300/60">
+                        <img src="/logo-mark-transparent.png" alt="" aria-hidden="true" className="h-[18px] w-[18px] object-contain" />
+                      </span>
+                      Today
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex gap-3">
+                    <div className="hidden w-7 shrink-0 grid-rows-7 gap-1.5 text-[9px] font-semibold text-slate-400 sm:grid" aria-hidden="true">
+                      <span />
+                      <span className="self-center">Mon</span>
+                      <span />
+                      <span className="self-center">Wed</span>
+                      <span />
+                      <span className="self-center">Fri</span>
+                      <span />
+                    </div>
+
+                    <div
+                      className="grid min-w-0 flex-1 grid-flow-col grid-rows-7 gap-1.5 overflow-x-auto rounded-2xl bg-slate-50 p-3 pb-4 [scrollbar-color:theme(colors.violet.300)_transparent] dark:bg-black/20"
+                      style={{ gridTemplateColumns: `repeat(${Math.ceil(activityCells.length / 7)}, minmax(1.25rem, 1fr))` }}
+                      aria-label="Connect2Code practice activity heat map"
+                    >
+                      {activityCells.map((cell, index) => {
+                        const markTone =
+                          cell.attempts === 0
+                            ? 'opacity-[0.12] grayscale dark:opacity-[0.18]'
+                            : cell.attempts === 1
+                            ? 'opacity-55'
+                            : cell.attempts === 2
+                            ? 'opacity-80 drop-shadow-[0_1px_2px_rgba(124,58,237,0.28)]'
+                            : 'opacity-100 drop-shadow-[0_2px_4px_rgba(124,58,237,0.38)]';
+                        const activityLabel = `${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`;
+                        const isToday = index === activityCells.length - 1;
+                        return (
+                          <span
+                            key={cell.key}
+                            title={activityLabel}
+                            aria-label={activityLabel}
+                            tabIndex={cell.attempts > 0 ? 0 : -1}
+                            className={`relative flex h-5 min-w-5 items-center justify-center rounded-md outline-hidden transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-neutral-900 ${
+                              isToday ? 'ring-1 ring-blue-400/70 dark:ring-blue-300/60' : ''
+                            }`}
+                          >
+                            <img
+                              src="/logo-mark-transparent.png"
+                              alt=""
+                              aria-hidden="true"
+                              loading="lazy"
+                              decoding="async"
+                              className={`h-[18px] w-[18px] object-contain transition-all ${markTone}`}
+                            />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex flex-col gap-2 text-[10px] text-slate-500 sm:flex-row sm:items-center sm:justify-between dark:text-slate-400">
+                    <span>Focus an active mark to read its date and attempt count.</span>
+                    <div className="flex items-center gap-2" aria-hidden="true">
+                      <span>Low</span>
+                      {['opacity-[0.12] grayscale', 'opacity-55', 'opacity-80', 'opacity-100'].map((tone) => (
+                        <img
+                          key={tone}
+                          src="/logo-mark-transparent.png"
+                          alt=""
+                          className={`h-4 w-4 object-contain ${tone}`}
+                        />
+                      ))}
+                      <span>High</span>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  {attemptedItems.length} {attemptedItems.length === 1 ? 'attempt' : 'attempts'} recorded
-                </span>
-              </div>
-
-              {/* Heatmap Grid */}
-              <div
-                className="mt-5 grid grid-flow-col grid-rows-7 gap-1 overflow-x-auto pb-1"
-                style={{ gridTemplateColumns: `repeat(${Math.ceil(activityCells.length / 7)}, minmax(0, 1fr))` }}
-                aria-label="Practice activity heat map"
-              >
-                {activityCells.map((cell) => {
-                  const tone =
-                    cell.attempts === 0
-                      ? 'bg-slate-100 dark:bg-neutral-800'
-                      : cell.attempts === 1
-                      ? 'bg-emerald-200 dark:bg-emerald-800'
-                      : cell.attempts === 2
-                      ? 'bg-emerald-400 dark:bg-emerald-600'
-                      : 'bg-emerald-600 dark:bg-emerald-400';
-                  return (
-                    <span
-                      key={cell.key}
-                      title={`${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`}
-                      aria-label={`${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`}
-                      className={`h-3.5 min-w-3.5 rounded-[3px] ${tone}`}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Heatmap Legend */}
-              <div
-                className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-slate-400"
-                aria-hidden="true"
-              >
-                <span>Less</span>
-                <i className="h-3 w-3 rounded-[3px] bg-slate-100 dark:bg-neutral-800" />
-                <i className="h-3 w-3 rounded-[3px] bg-emerald-200 dark:bg-emerald-800" />
-                <i className="h-3 w-3 rounded-[3px] bg-emerald-400 dark:bg-emerald-600" />
-                <i className="h-3 w-3 rounded-[3px] bg-emerald-600 dark:bg-emerald-400" />
-                <span>More</span>
               </div>
             </section>
 

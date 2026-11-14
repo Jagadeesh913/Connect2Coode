@@ -1,10 +1,8 @@
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AdminPageHeader } from '../components/AdminPageHeader';
-import { AdminTable, Column } from '../components/AdminTable';
 import { AdminBadge } from '../components/AdminBadge';
-import { AdminErrorState } from '../components/AdminErrorState';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { QuestionFormModal, QuestionFormData } from '../components/questions/QuestionFormModal';
 import { QuestionDetailsModal } from '../components/questions/QuestionDetailsModal';
@@ -14,7 +12,10 @@ import { QuestionPayload, QuestionTestCase } from '../../../services/questionSer
 import { adminQuestionService } from '../../../services/admin/adminQuestionService';
 import type { QuestionListItem } from '../../../core/types/domain';
 import { adminCompanyService, type CompanyItem } from '../../../services/admin/adminCompanyService';
-import { CompanyCircleBadge } from '../../companies/components/CompanyBrandLogo';
+import {
+  CodingQuestionTable,
+  type CodingQuestionListItem,
+} from '../../problems/components/CodingQuestionTable';
 import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
 import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../utils/testCaseUtils';
@@ -384,6 +385,8 @@ export const AdminQuestions: React.FC = () => {
         title: formData.title.trim(),
         description: formData.description.trim(),
         constraints: formData.constraints ? formData.constraints.trim() : '',
+        timeLimit: formData.timeLimit,
+        memoryLimit: formData.memoryLimit,
         difficultyRefGroupCode: formData.difficultyRefGroupCode || 'DIFF',
         difficultyRefCode: formData.difficultyRefCode,
         difficultyRefName: formData.difficultyRefName,
@@ -469,189 +472,79 @@ export const AdminQuestions: React.FC = () => {
     }
   };
 
-  const getDifficultyNumberColor = (difficulty?: string | null) => {
-    if (!difficulty) return 'text-slate-400 dark:text-slate-500';
-    const d = difficulty.toLowerCase().trim();
-    if (d.includes('easy')) {
-      return 'text-emerald-600 dark:text-emerald-400 font-bold';
-    }
-    if (d.includes('medium') || d.includes('med')) {
-      return 'text-amber-500 dark:text-orange-400 font-bold';
-    }
-    if (d.includes('hard')) {
-      return 'text-rose-600 dark:text-rose-400 font-bold';
-    }
-    if (d.includes('basic') || d.includes('school')) {
-      return 'text-sky-500 dark:text-sky-400 font-bold';
-    }
-    return 'text-slate-500 dark:text-slate-400 font-bold';
-  };
+  const adminQuestionRows = useMemo<Array<CodingQuestionListItem & { source: QuestionListItem }>>(
+    () =>
+      questions.map((question) => ({
+        id: String(question.id),
+        questionId: question.id,
+        slug: String(question.id),
+        title: question.title,
+        difficulty: question.difficultyName,
+        topic: question.topicName,
+        category: question.topicName,
+        companies: question.companies.map((company) => company.name),
+        companyDetails: question.companies,
+        questionPlatform: question.questionPlatform?.refName,
+        qpfRefCode: question.questionPlatform?.refCode,
+        qpfRefName: question.questionPlatform?.refName,
+        platformLogoUrl: question.questionPlatform?.logoUrl,
+        source: question,
+      })),
+    [questions]
+  );
 
-  const columns: Column<QuestionListItem>[] = [
-    {
-      header: '#',
-      className: 'w-16 text-center font-mono font-semibold shrink-0',
-      cell: (row) => {
-        const diff = row.difficultyName;
-        const colorClass = getDifficultyNumberColor(diff);
-        return (
-          <span
-            className={`font-mono text-xs font-semibold ${colorClass}`}
-            title={`Question ID: ${row.id} • Difficulty: ${diff || 'Unknown'}`}
-          >
-            #{row.id}
-          </span>
-        );
-      },
-    },
-    {
-      header: 'Problem Title',
-      className: 'min-w-[260px]',
-      cell: (row) => {
-        const platform = row.questionPlatform?.refName || 'Unspecified';
-        const isInactive = !row.isActive;
-        const platformLogo = row.questionPlatform?.logoUrl;
-        return (
-          <div
-            className={`flex flex-col min-w-0 transition-colors ${
-              isInactive
-                ? 'p-2 rounded-xl border border-rose-400/80 dark:border-rose-500/70 bg-rose-50/40 dark:bg-rose-950/20'
-                : ''
-            }`}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold text-slate-900 dark:text-white truncate" title={row.title}>
-                {row.title}
-              </span>
-              {isInactive && (
-                <span className="shrink-0 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700">
-                  Inactive
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate mt-0.5">
-              {platformLogo && (
-                <img
-                  src={platformLogo}
-                  alt=""
-                  className="w-3.5 h-3.5 object-contain shrink-0"
-                />
-              )}
-              <span>Platform: {platform}</span>
-              <span className="text-slate-300 dark:text-slate-700">•</span>
-              <span className={row.isOwnProblem !== false ? 'text-blue-500 dark:text-blue-400 font-semibold' : 'text-amber-500 dark:text-amber-400 font-semibold'}>
-                {row.isOwnProblem !== false ? 'Native' : 'External'}
-              </span>
-            </div>
-          </div>
-        );
-      },
-    },
-    {
-      header: 'Difficulty',
-      className: 'w-28',
-      cell: (row) => {
-        const diff = row.difficultyName;
-        const d = (diff || '').toLowerCase();
-        const variant = d.includes('easy') ? 'easy' : d.includes('med') ? 'medium' : d.includes('hard') ? 'hard' : 'neutral';
-        return (
-          <AdminBadge variant={variant} size="sm">
-            {diff || 'Unknown'}
-          </AdminBadge>
-        );
-      },
-    },
-    {
-      header: 'Category / Topic',
-      className: 'w-36',
-      cell: (row) => {
-        const topic = row.topicName;
-        return (
-          <AdminBadge variant="primary" size="sm">
-            {topic}
-          </AdminBadge>
-        );
-      },
-    },
-    {
-      header: 'Hiring Partners',
-      className: 'min-w-[140px] hidden lg:table-cell',
-      cell: (row) => {
-        const companyList = row.companies;
-        if (companyList.length === 0) {
-          return <span className="text-slate-400 text-xs italic">None</span>;
-        }
-        return (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {companyList.slice(0, 2).map((company) => {
-              return (
-                <CompanyCircleBadge
-                  key={company.id}
-                  name={company.name}
-                  logo={company?.logo}
-                  website={company?.website}
-                />
-              );
-            })}
-            {companyList.length > 2 && (
-              <span className="text-[10px] text-slate-400 font-mono">
-                +{companyList.length - 2}
-              </span>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      header: 'Actions',
-      className: 'w-36 text-right',
-      cell: (row) => (
-        <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <button
-            onClick={() => handleInspect(row)}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
-            title="Inspect Details"
-          >
-            <Eye className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleEditClick(row)}
-            disabled={editingQuestionId !== null}
-            aria-label={editingQuestionId === row.id ? `Loading question ${row.id} for editing` : `Edit question ${row.id}`}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer"
-            title="Edit Problem"
-          >
-            {editingQuestionId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            onClick={() => handleManageTestCases(row)}
-            disabled={editingQuestionId !== null || loadingTestCasesId !== null}
-            aria-label={loadingTestCasesId === row.id ? `Loading test cases for question ${row.id}` : `Manage test cases for question ${row.id}`}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
-            title="Manage Test Cases"
-          >
-            {loadingTestCasesId === row.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
-          </button>
-          <button
-            onClick={() => {
-              if (row.id) {
-                setTargetQuestionForTestCode({
-                  id: row.id,
-                  title: row.title,
-                  difficultyRefName: row.difficultyName,
-                });
-                setIsTestCodeOpen(true);
-              }
-            }}
-            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600 hover:border-purple-400 transition-colors shadow-2xs cursor-pointer"
-            title="Run Code Sandbox"
-          >
-            <Terminal className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
+  const renderAdminActions = (row: CodingQuestionListItem & { source: QuestionListItem }) => {
+    const question = row.source;
+    return (
+      <div className="flex min-w-[132px] items-center justify-end gap-1.5" onClick={(event) => event.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => void handleInspect(question)}
+          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-blue-600 hover:border-blue-400 transition-colors shadow-2xs cursor-pointer"
+          title="Inspect Details"
+          aria-label={`Inspect question ${question.id}`}
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleEditClick(question)}
+          disabled={editingQuestionId !== null}
+          aria-label={editingQuestionId === question.id ? `Loading question ${question.id} for editing` : `Edit question ${question.id}`}
+          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600 hover:border-amber-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+          title="Edit Problem"
+        >
+          {editingQuestionId === question.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Edit3 className="w-3.5 h-3.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleManageTestCases(question)}
+          disabled={editingQuestionId !== null || loadingTestCasesId !== null}
+          aria-label={loadingTestCasesId === question.id ? `Loading test cases for question ${question.id}` : `Manage test cases for question ${question.id}`}
+          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:border-emerald-400 transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+          title="Manage Test Cases"
+        >
+          {loadingTestCasesId === question.id ? <RotateCw className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setTargetQuestionForTestCode({
+              id: question.id,
+              title: question.title,
+              difficultyRefName: question.difficultyName,
+            });
+            setIsTestCodeOpen(true);
+          }}
+          className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600 hover:border-purple-400 transition-colors shadow-2xs cursor-pointer"
+          title="Run Code Sandbox"
+          aria-label={`Run question ${question.id} in code sandbox`}
+        >
+          <Terminal className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 font-sans text-left pb-12">
@@ -782,30 +675,33 @@ export const AdminQuestions: React.FC = () => {
         </div>
       </div>
 
-      {/* Error State */}
-      {!loading && error && questions.length === 0 && <AdminErrorState message={error} onRetry={fetchQuestions} />}
-
       {/* Questions Table */}
-      {(!error || questions.length > 0 || loading) && (
-        <div className="space-y-4">
-          <AdminTable<QuestionListItem>
-            columns={columns}
-            data={questions}
-            loading={loading}
-            keyExtractor={(row) => row.id || row.title}
-            onRowClick={(row) => handleInspect(row)}
-            emptyTitle="No Questions Found"
-            emptyDescription="There are currently no DSA problems matching your active filter criteria."
-            emptyAction={
+      <div className="space-y-4">
+        <CodingQuestionTable
+          questions={adminQuestionRows}
+          loading={loading}
+          error={error && questions.length === 0 ? error : null}
+          onRetry={() => void fetchQuestions()}
+          emptyTitle="No Questions Found"
+          emptyDescription="There are currently no DSA problems matching your active filter criteria."
+          renderTitle={(row) => (
+            <div className={row.source.isActive === false ? 'rounded-xl border border-rose-400/80 bg-rose-50/40 p-2 dark:border-rose-500/70 dark:bg-rose-950/20' : ''}>
               <button
-                onClick={handleCreateClick}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center gap-2"
+                type="button"
+                onClick={() => void handleInspect(row.source)}
+                className="text-left leading-snug transition-colors hover:text-blue-600 dark:hover:text-blue-400"
               >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create First Question</span>
+                {row.title}
               </button>
-            }
-          />
+              {row.source.isActive === false && (
+                <span className="ml-2 inline-flex rounded-md border border-rose-300 bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700 dark:border-rose-700 dark:bg-rose-900/60 dark:text-rose-300">
+                  Inactive
+                </span>
+              )}
+            </div>
+          )}
+          renderAction={renderAdminActions}
+        />
 
           {/* Pagination */}
           {totalElements > 0 && (
@@ -818,8 +714,7 @@ export const AdminQuestions: React.FC = () => {
               onPageChange={(p) => setPageNumber(p - 1)}
             />
           )}
-        </div>
-      )}
+      </div>
 
       {/* Question Form Modal (Create / Edit) */}
       <QuestionFormModal

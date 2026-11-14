@@ -1,0 +1,87 @@
+{
+  "info": {
+    "name": "Fresh Live Question Contract Probe",
+    "description": "Fresh 2026-11-14 probe of production question/admin-question contracts. No prior collection or environment reused.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "origin",
+      "value": "https://api.connect2code.in"
+    }
+  ],
+  "item": [
+    {
+      "name": "Discovery",
+      "item": [
+        {
+          "name": "OpenAPI root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{origin}}/v3/api-docs"
+          }
+        },
+        {
+          "name": "OpenAPI API prefix",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{origin}}/api/v1/v3/api-docs"
+          }
+        },
+        {
+          "name": "Swagger config",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{origin}}/v3/api-docs/swagger-config"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Question contract",
+      "item": [
+        {
+          "name": "Question detail 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{origin}}/api/v1/question/1"
+          }
+        },
+        {
+          "name": "Question list",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"level\":null,\"companies\":null,\"topic\":null,\"searchText\":null,\"pageRequest\":{\"pageNumber\":0,\"pageSize\":1,\"sortBy\":\"id\",\"sortDirection\":\"ASC\"}}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{origin}}/api/v1/questions"
+          }
+        },
+        {
+          "name": "Question test cases 1",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{origin}}/api/v1/question/1/testCases"
+          }
+        }
+      ]
+    }
+  ]
+}

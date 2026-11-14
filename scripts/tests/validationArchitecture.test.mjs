@@ -296,6 +296,8 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
         topicRefName: 'Arrays',
         qpfRefCode: 'LC',
         qpfRefName: 'LeetCode',
+        timeLimit: '2',
+        memoryLimit: '256',
         constraints: '1 <= nums.length <= 10^4',
         editorial: '',
       };
@@ -308,6 +310,17 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.throws(
         () => adminQuestionSchema.parse({ ...validQuestion, difficultyRefCode: '' }),
         /Difficulty is required/
+      );
+      const parsed = adminQuestionSchema.parse(validQuestion);
+      assert.equal(parsed.timeLimit, 2);
+      assert.equal(parsed.memoryLimit, 256);
+      assert.throws(
+        () => adminQuestionSchema.parse({ ...validQuestion, timeLimit: 0 }),
+        /Time limit must be greater than 0/
+      );
+      assert.throws(
+        () => adminQuestionSchema.parse({ ...validQuestion, memoryLimit: '' }),
+        /Memory limit must be greater than 0/
       );
     });
 

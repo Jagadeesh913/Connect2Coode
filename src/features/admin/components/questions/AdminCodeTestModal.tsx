@@ -441,6 +441,16 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                     Failed: {result.failedTestCases}
                   </AdminBadge>
                 )}
+                {result.executionTime !== undefined && result.executionTime !== null && (
+                  <AdminBadge variant="neutral" size="sm">
+                    Time: {result.executionTime}{result.executionTimeUnit ? ` ${result.executionTimeUnit}` : ''}
+                  </AdminBadge>
+                )}
+                {result.memoryUsage !== undefined && result.memoryUsage !== null && (
+                  <AdminBadge variant="neutral" size="sm">
+                    Memory: {result.memoryUsage}{result.memoryUnit ? ` ${result.memoryUnit}` : ''}
+                  </AdminBadge>
+                )}
               </div>
             </div>
 
@@ -471,6 +481,16 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
                           {tc.status || (isPassed ? 'Passed' : 'Failed')}
                         </AdminBadge>
                       </div>
+                      {(tc.executionTime !== undefined || tc.memoryUsage !== undefined) && (
+                        <div className="flex flex-wrap gap-3 mb-1.5 text-[11px] text-slate-600 dark:text-slate-400">
+                          {tc.executionTime !== undefined && (
+                            <span>Time: <strong>{tc.executionTime}</strong></span>
+                          )}
+                          {tc.memoryUsage !== undefined && (
+                            <span>Memory: <strong>{tc.memoryUsage}</strong></span>
+                          )}
+                        </div>
+                      )}
                       {tc.actualOutput && (
                         <pre className="p-2 bg-white/80 dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800 text-[11px] overflow-x-auto whitespace-pre-wrap">
                           {tc.actualOutput}

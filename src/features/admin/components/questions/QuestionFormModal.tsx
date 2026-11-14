@@ -106,6 +106,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       qpfRefGroupCode: 'QPF',
       qpfRefCode: '',
       qpfRefName: '',
+      timeLimit: undefined,
+      memoryLimit: undefined,
       isOwnProblem: true,
       isActive: true,
       askedDate: '',
@@ -187,6 +189,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         title: initialData.title || '',
         description: initialData.description || '',
         constraints: initialData.constraints || extractConstraintsFromDescription(initialData.description),
+        timeLimit: initialData.timeLimit,
+        memoryLimit: initialData.memoryLimit,
         difficultyRefGroupCode: matchedDiff?.refGroupCode || initialData.difficultyRefGroupCode || 'DIFF',
         difficultyRefCode: matchedDiff?.refCode || initialData.difficultyRefCode || '',
         difficultyRefName: matchedDiff?.refName || initialData.difficultyRefName || '',
@@ -244,6 +248,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         title: '',
         description: '',
         constraints: '',
+        timeLimit: undefined,
+        memoryLimit: undefined,
         difficultyRefGroupCode: defaultDiff?.refGroupCode || 'DIFF',
         difficultyRefCode: defaultDiff?.refCode || '',
         difficultyRefName: defaultDiff?.refName || '',
@@ -737,6 +743,50 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                 placeholder="1 <= nums.length <= 10^4&#10;-10^9 <= nums[i] <= 10^9"
                 className="w-full px-3.5 py-2.5 text-xs font-mono font-medium rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label htmlFor="question-time-limit" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Time Limit <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="question-time-limit"
+                  type="number"
+                  min="0"
+                  step="any"
+                  inputMode="decimal"
+                  {...register('timeLimit')}
+                  placeholder="Enter API limit value"
+                  className={`w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border ${
+                    errors.timeLimit
+                      ? 'border-rose-500 bg-rose-50/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                  } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all`}
+                />
+                <FormFieldError error={errors.timeLimit?.message} />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="question-memory-limit" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Memory Limit <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="question-memory-limit"
+                  type="number"
+                  min="0"
+                  step="any"
+                  inputMode="decimal"
+                  {...register('memoryLimit')}
+                  placeholder="Enter API limit value"
+                  className={`w-full px-3.5 py-2.5 text-xs font-medium rounded-xl border ${
+                    errors.memoryLimit
+                      ? 'border-rose-500 bg-rose-50/20'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                  } text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 transition-all`}
+                />
+                <FormFieldError error={errors.memoryLimit?.message} />
+              </div>
             </div>
 
             {/* Company Tagging */}

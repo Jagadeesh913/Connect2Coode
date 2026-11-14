@@ -151,15 +151,16 @@ describe('shared UX interaction contracts', () => {
   });
 
   it('uses one API-driven coding-question table across learner and company surfaces', async () => {
-    const [practice, companyDetails, dsaSheet, adminCompany, table] = await Promise.all([
+    const [practice, companyDetails, dsaSheet, adminCompany, adminQuestions, table] = await Promise.all([
       readSource('src/features/problems/pages/PracticePage.tsx'),
       readSource('src/features/companies/pages/CompanyDetails.tsx'),
       readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx'),
       readSource('src/features/admin/components/companies/CompanyDetailsModal.tsx'),
+      readSource('src/features/admin/pages/AdminQuestions.tsx'),
       readSource('src/features/problems/components/CodingQuestionTable.tsx'),
     ]);
 
-    for (const source of [practice, companyDetails, dsaSheet, adminCompany]) {
+    for (const source of [practice, companyDetails, dsaSheet, adminCompany, adminQuestions]) {
       assert.match(source, /CodingQuestionTable/);
     }
     assert.match(practice, /fetchProblems\(/);
@@ -169,7 +170,32 @@ describe('shared UX interaction contracts', () => {
     assert.match(table, /CompanyCircleBadge/);
     assert.match(table, /TableRowSkeleton/);
     assert.match(table, /onBookmark/);
+    assert.match(adminQuestions, /renderAction=\{renderAdminActions\}/);
     assert.doesNotMatch(dsaSheet, /getDsaQuestionProblemPath/);
+  });
+
+  it('renders compact API-backed platform and company wordmarks in rectangular viewports', async () => {
+    const logo = await readSource('src/features/companies/components/CompanyBrandLogo.tsx');
+    assert.match(logo, /sizeClassName = 'w-12 h-7'/);
+    assert.match(logo, /overflow-hidden rounded-md bg-transparent/);
+    assert.doesNotMatch(logo, /overflow-hidden rounded-full bg-transparent/);
+  });
+
+  it('presents CodeChef-style company wordmarks with the original marquee controls', async () => {
+    const landing = await readSource('src/features/landing/pages/Landing.tsx');
+    const companySection = landing.slice(
+      landing.indexOf('CodeChef-inspired standalone company wordmark strip'),
+      landing.indexOf('6. SECTION: "Practice Problems Across Different Topics."')
+    );
+
+    assert.match(companySection, /\[\.\.\.companiesList, \.\.\.companiesList\]\.map\(\(company, index\) =>/);
+    assert.match(companySection, /className="h-10 w-full sm:h-12"/);
+    assert.match(companySection, /animate-marquee-rtl/);
+    assert.match(companySection, /Previous companies/);
+    assert.match(companySection, /Next companies/);
+    assert.match(companySection, /focus-within:\[animation-play-state:paused\]/);
+    assert.match(companySection, /aria-hidden=\{isDuplicate \|\| undefined\}/);
+    assert.doesNotMatch(companySection, /rounded-2xl bg-white[\s\S]*?border border-slate/);
   });
 
   it('company catalog pagination is URL-backed, server-owned, and keyboard accessible', async () => {
@@ -253,12 +279,14 @@ describe('shared UX interaction contracts', () => {
       'src/features/admin/pages/AdminCompanies.tsx',
       'src/features/admin/pages/AdminInstitutions.tsx',
       'src/features/admin/pages/AdminMcqs.tsx',
-      'src/features/admin/pages/AdminQuestions.tsx',
     ]) {
       const source = await readSource(path);
       assert.match(source, /!loading && error &&/);
       assert.match(source, /\|\| loading\) &&/);
     }
+
+    const adminQuestions = await readSource('src/features/admin/pages/AdminQuestions.tsx');
+    assert.match(adminQuestions, /<CodingQuestionTable[\s\S]*?loading=\{loading\}[\s\S]*?error=\{error && questions\.length === 0 \? error : null\}/);
   });
 
   it('auth modal hides the underlying layout boundary and notifications replace stale messages', async () => {
@@ -305,7 +333,16 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /userInfo\?\.gender/);
     assert.match(source, /userInfo\?\.dob/);
     assert.match(source, /buildActivityCells/);
-    assert.match(source, /Practice activity/);
+    assert.match(source, /Practice signal/);
+    assert.match(source, /26-week activity trail/);
+    const activityMap = source.slice(
+      source.indexOf('Connect2Code activity signal'),
+      source.indexOf('Practice & Submissions Explorer')
+    );
+    assert.match(activityMap, /\/logo-mark-transparent\.png/);
+    assert.match(activityMap, /activitySummary\.activeDays/);
+    assert.match(activityMap, /Connect2Code practice activity heat map/);
+    assert.doesNotMatch(activityMap, /emerald/);
     assert.doesNotMatch(source, /EditPersonalInfoModal/);
     assert.match(source, /const fullName\s*=/);
     assert.match(source, /authUser\?\.fullName/);

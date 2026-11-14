@@ -233,18 +233,20 @@ describe('VERIFICATION: 5 User Tasks Remediation', () => {
     const fs = await import('node:fs');
     const adminQuestionsSource = fs.readFileSync('src/features/admin/pages/AdminQuestions.tsx', 'utf-8');
     const adminMcqsSource = fs.readFileSync('src/features/admin/pages/AdminMcqs.tsx', 'utf-8');
+    const codingQuestionTableSource = fs.readFileSync('src/features/problems/components/CodingQuestionTable.tsx', 'utf-8');
 
-    // Both should define getDifficultyNumberColor
-    assert.ok(adminQuestionsSource.includes('getDifficultyNumberColor'), 'AdminQuestions must define getDifficultyNumberColor');
+    // Coding questions inherit the combined identifier/difficulty styling from the canonical Practice table.
+    assert.ok(adminQuestionsSource.includes('CodingQuestionTable'), 'AdminQuestions must use CodingQuestionTable');
+    assert.ok(codingQuestionTableSource.includes('difficultyNumberColor'), 'CodingQuestionTable must color identifiers by difficulty');
     assert.ok(adminMcqsSource.includes('getDifficultyNumberColor'), 'AdminMcqs must define getDifficultyNumberColor');
 
     // Both should have # as the combined column header
-    assert.ok(adminQuestionsSource.includes("header: '#'"), 'AdminQuestions must have # column header');
+    assert.match(codingQuestionTableSource, />#<\/th>/, 'CodingQuestionTable must have # column header');
     assert.ok(adminMcqsSource.includes("header: '#'"), 'AdminMcqs must have # column header');
 
     // Inactive styling (red rounded border container & Inactive badge, without bold red text)
     assert.ok(
-      adminQuestionsSource.includes('border-rose-400') && adminQuestionsSource.includes('rounded-xl') && adminQuestionsSource.includes('isInactive'),
+      adminQuestionsSource.includes('border-rose-400') && adminQuestionsSource.includes('rounded-xl') && adminQuestionsSource.includes('row.source.isActive === false'),
       'AdminQuestions must highlight inactive problems with a red rounded border container'
     );
     assert.ok(

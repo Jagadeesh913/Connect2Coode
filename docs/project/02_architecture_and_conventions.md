@@ -148,7 +148,7 @@ sequenceDiagram
 2. **Component Structure**:
    - Keep components focused and modular.
    - Separate complex data-fetching or modal logic into subcomponents (e.g. `src/features/admin/components/`).
-   - `CodingQuestionTable` in `src/features/problems/components/` is the single renderer for API-backed coding-question listings. Practice, Company Prep, the learner DSA Sheet, and the admin company-question view supply their own verified DTOs and callbacks; MCQ answer flows and editorial roadmap content are deliberately not coerced into this coding-question contract.
+   - `CodingQuestionTable` in `src/features/problems/components/` is the single renderer for API-backed coding-question listings. Practice, Company Prep, the learner DSA Sheet, the admin company-question view, and the admin coding-question bank supply their own verified DTOs and callbacks; admin-only title/action slots preserve CRUD operations without duplicating the table. MCQ answer flows and editorial roadmap content are deliberately not coerced into this coding-question contract.
 3. **Icons & UI Assets**:
    - Use `lucide-react` for standard UI iconography.
    - Use `<BrandLogo />` for all Connect2Code branding.

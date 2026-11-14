@@ -40,3 +40,4 @@ export async function executeAppLogout(dispatch?: AppDispatch): Promise<void> {
   // and guarantees landing cleanly on the Home page.
   window.location.replace('/');
 }
+

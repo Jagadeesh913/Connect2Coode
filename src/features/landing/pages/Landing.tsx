@@ -59,14 +59,13 @@ export const Landing: React.FC = () => {
   const [demoSelectedLang, setDemoSelectedLang] = useState('Java');
   const [demoActiveTab, setDemoActiveTab] = useState<'custom' | 'testcases'>('testcases');
 
-  // Company Marquee Horizontal Scroll Ref for manual arrows
   const companiesScrollRef = useRef<HTMLDivElement>(null);
 
   const handleScrollCompanies = (direction: 'left' | 'right') => {
-    if (companiesScrollRef.current) {
-      const scrollAmount = direction === 'left' ? -280 : 280;
-      companiesScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
-    }
+    companiesScrollRef.current?.scrollBy({
+      left: direction === 'left' ? -280 : 280,
+      behavior: 'smooth',
+    });
   };
 
   // Automated Feedback Carousel State (Auto-advances from Right to Left)
@@ -197,90 +196,13 @@ export const Landing: React.FC = () => {
   ];
 
   const companiesList = [
-    {
-      name: 'TCS',
-      brand: 'tcs',
-      badgeColor: 'text-rose-600 dark:text-rose-400',
-      logo: (
-        <span className="text-base font-black text-rose-600 dark:text-rose-400 tracking-tighter lowercase leading-none">
-          tcs
-        </span>
-      ),
-    },
-    {
-      name: 'Infosys',
-      brand: 'Infosys',
-      badgeColor: 'text-blue-600 dark:text-blue-400',
-      logo: (
-        <span className="text-sm font-black text-blue-600 dark:text-blue-400 tracking-tight leading-none">
-          Infosys
-        </span>
-      ),
-    },
-    {
-      name: 'Accenture',
-      brand: 'Accenture',
-      badgeColor: 'text-purple-600 dark:text-purple-400',
-      logo: (
-        <span className="flex items-center gap-0.5 text-xs font-black text-purple-600 dark:text-purple-400 lowercase leading-none">
-          <span className="text-purple-500 font-bold text-sm">&gt;</span>accenture
-        </span>
-      ),
-    },
-    {
-      name: 'Cognizant',
-      brand: 'Cognizant',
-      badgeColor: 'text-cyan-600 dark:text-cyan-400',
-      logo: (
-        <div className="flex items-center gap-1 leading-none">
-          <span className="w-3.5 h-3.5 rounded-full border-2 border-cyan-500 flex items-center justify-center text-[9px] font-black text-cyan-600 dark:text-cyan-400">
-            C
-          </span>
-          <span className="text-xs font-bold text-cyan-700 dark:text-cyan-400">Cognizant</span>
-        </div>
-      ),
-    },
-    {
-      name: 'Microsoft',
-      brand: 'Microsoft',
-      badgeColor: 'text-slate-800 dark:text-slate-200',
-      logo: (
-        <div className="flex items-center gap-1.5 leading-none">
-          <span className="grid grid-cols-2 gap-0.5 w-3 h-3 shrink-0">
-            <span className="bg-red-500 rounded-[1px]"></span>
-            <span className="bg-green-500 rounded-[1px]"></span>
-            <span className="bg-blue-500 rounded-[1px]"></span>
-            <span className="bg-amber-500 rounded-[1px]"></span>
-          </span>
-          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">Microsoft</span>
-        </div>
-      ),
-    },
-    {
-      name: 'Amazon',
-      brand: 'Amazon',
-      badgeColor: 'text-amber-500',
-      logo: (
-        <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight leading-none">
-          amazon<span className="text-amber-500">⌣</span>
-        </span>
-      ),
-    },
-    {
-      name: 'Google',
-      brand: 'Google',
-      badgeColor: 'text-slate-900 dark:text-white',
-      logo: (
-        <span className="text-sm font-bold tracking-tight leading-none">
-          <span className="text-blue-500">G</span>
-          <span className="text-red-500">o</span>
-          <span className="text-amber-500">o</span>
-          <span className="text-blue-500">g</span>
-          <span className="text-green-500">l</span>
-          <span className="text-red-500">e</span>
-        </span>
-      ),
-    },
+    { name: 'Google' },
+    { name: 'Microsoft' },
+    { name: 'Amazon' },
+    { name: 'Accenture' },
+    { name: 'Cognizant' },
+    { name: 'Infosys' },
+    { name: 'TCS' },
   ];
 
   return (
@@ -665,8 +587,9 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* 5. SECTION: "Company-wise Questions" (AUTOMATICALLY MOVES RIGHT TO LEFT) */}
-      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 text-center">
+      {/* 5. SECTION: CodeChef-inspired standalone company wordmark strip */}
+      <section className="w-full bg-white dark:bg-[#070A13] py-14 sm:py-16 text-center">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Badge */}
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 dark:bg-[#0F1D38] border border-blue-200 dark:border-blue-800/60 text-blue-600 dark:text-sky-300 text-xs font-bold tracking-wider uppercase mb-3">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-sky-400"></span>
@@ -690,64 +613,55 @@ export const Landing: React.FC = () => {
           Browse company-associated questions returned by the platform API. The logos below are navigation examples, not a guarantee of current catalog coverage or interview content.
         </p>
 
-        {/* Marquee Row with navigation arrows on left and right */}
-        <div className="relative flex items-center justify-center gap-3 sm:gap-4 max-w-6xl mx-auto">
-          {/* Left Arrow Button */}
+        <div className="relative mx-auto mt-9 flex max-w-6xl items-center gap-3 sm:gap-4" aria-label="Practice questions by company">
           <button
             type="button"
             onClick={() => handleScrollCompanies('left')}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            className="z-20 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-2xs transition-all hover:scale-105 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-800 dark:bg-[#0F172A] dark:hover:text-white"
             aria-label="Previous companies"
           >
             <i className="fa-solid fa-chevron-left text-xs"></i>
           </button>
 
-          {/* Infinite Marquee Track Moving Automatically from Right to Left */}
           <div
             ref={companiesScrollRef}
-            className="w-full overflow-hidden relative rounded-2xl py-2"
+            className="relative w-full overflow-hidden rounded-2xl py-2"
           >
-            {/* Fade masks on left & right edges for seamless visuals */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#FBFBFD] dark:from-[#070A13] to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#FBFBFD] dark:from-[#070A13] to-transparent z-10 pointer-events-none" />
+            <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-white to-transparent dark:from-[#070A13]" />
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-white to-transparent dark:from-[#070A13]" />
 
-            <div className="animate-marquee-rtl flex items-center gap-3.5 sm:gap-4 hover:[animation-play-state:paused]">
-              {/* Loop list twice for seamless infinite movement */}
-              {[...companiesList, ...companiesList].map((company, index) => (
-                <Link
-                  key={`${company.name}-${index}`}
-                  to={`/practice?company=${encodeURIComponent(company.name)}`}
-                  className="min-w-[130px] sm:min-w-[145px] h-[78px] px-3.5 py-2.5 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 shadow-2xs hover:shadow-sm flex flex-col items-center justify-center transition-all cursor-pointer group shrink-0 no-underline"
-                >
-                  <div className="h-6 flex items-center justify-center">
-                    <CompanyBrandLogo name={company.name} className="h-6 w-20" />
-                  </div>
-                  <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mt-1.5 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-colors">
-                    {company.name}
-                  </span>
-                </Link>
-              ))}
-
-              {/* View All Card */}
-              <Link
-                to="/companies"
-                className="min-w-[130px] sm:min-w-[145px] h-[78px] px-4 rounded-2xl bg-white dark:bg-[#0D1322] border border-slate-200/80 dark:border-slate-800/80 hover:border-blue-400 dark:hover:border-blue-500/50 text-blue-600 dark:text-sky-400 text-xs font-bold transition-all shrink-0 flex items-center justify-center gap-2 no-underline shadow-2xs hover:shadow-sm"
-              >
-                <span>View All</span>
-                <i className="fa-solid fa-arrow-right text-[11px]"></i>
-              </Link>
+            <div className="animate-marquee-rtl items-center gap-9 px-2 py-4 hover:[animation-play-state:paused] focus-within:[animation-play-state:paused] sm:gap-12">
+              {[...companiesList, ...companiesList].map((company, index) => {
+                const isDuplicate = index >= companiesList.length;
+                return (
+                  <Link
+                    key={`${company.name}-${index}`}
+                    to={`/practice?company=${encodeURIComponent(company.name)}`}
+                    className="group flex h-14 w-32 shrink-0 items-center justify-center rounded-lg no-underline outline-hidden transition-transform duration-200 hover:scale-105 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-4 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#070A13] sm:h-16 sm:w-36"
+                    aria-label={isDuplicate ? undefined : `Practice ${company.name} questions`}
+                    aria-hidden={isDuplicate || undefined}
+                    tabIndex={isDuplicate ? -1 : undefined}
+                  >
+                    <CompanyBrandLogo
+                      name={company.name}
+                      className="h-10 w-full sm:h-12"
+                      loading="lazy"
+                    />
+                  </Link>
+                );
+              })}
             </div>
           </div>
 
-          {/* Right Arrow Button */}
           <button
             type="button"
             onClick={() => handleScrollCompanies('right')}
-            className="w-9 h-9 rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0F172A] text-slate-400 hover:text-slate-700 dark:hover:text-white flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:scale-105 transition-all z-20"
+            className="z-20 flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-2xs transition-all hover:scale-105 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 dark:border-slate-800 dark:bg-[#0F172A] dark:hover:text-white"
             aria-label="Next companies"
           >
             <i className="fa-solid fa-chevron-right text-xs"></i>
           </button>
+        </div>
         </div>
       </section>
 

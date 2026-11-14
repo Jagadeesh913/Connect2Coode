@@ -73,4 +73,25 @@ describe('Admin question UI contracts', () => {
     assert.match(source, /const activeDraftKey = question\?\.id && selectedLanguageId !== null/);
     assert.match(source, /codeDraftsRef\.current = \{ \.\.\.codeDraftsRef\.current, \[activeDraftKey\]: nextCode \}/);
   });
+
+  it('sends the live question limits and renders admin execution metrics', () => {
+    const formSource = fs.readFileSync(
+      'src/features/admin/components/questions/QuestionFormModal.tsx',
+      'utf8'
+    );
+    const pageSource = fs.readFileSync('src/features/admin/pages/AdminQuestions.tsx', 'utf8');
+    const runnerSource = fs.readFileSync(
+      'src/features/admin/components/questions/AdminCodeTestModal.tsx',
+      'utf8'
+    );
+
+    assert.match(formSource, /register\('timeLimit'\)/);
+    assert.match(formSource, /register\('memoryLimit'\)/);
+    assert.match(pageSource, /timeLimit: formData\.timeLimit/);
+    assert.match(pageSource, /memoryLimit: formData\.memoryLimit/);
+    assert.match(runnerSource, /Time: \{result\.executionTime\}/);
+    assert.match(runnerSource, /Memory: \{result\.memoryUsage\}/);
+    assert.match(runnerSource, /Time: <strong>\{tc\.executionTime\}<\/strong>/);
+    assert.match(runnerSource, /Memory: <strong>\{tc\.memoryUsage\}<\/strong>/);
+  });
 });

@@ -1127,7 +1127,12 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
                 )}
                 {result.executionTime !== undefined && result.executionTime !== null && (
                   <AdminBadge variant="neutral" size="sm">
-                    {result.executionTime}{result.executionTimeUnit ? ` ${result.executionTimeUnit}` : ''}
+                    Time: {result.executionTime}{result.executionTimeUnit ? ` ${result.executionTimeUnit}` : ''}
+                  </AdminBadge>
+                )}
+                {result.memoryUsage !== undefined && result.memoryUsage !== null && (
+                  <AdminBadge variant="neutral" size="sm">
+                    Memory: {result.memoryUsage}{result.memoryUnit ? ` ${result.memoryUnit}` : ''}
                   </AdminBadge>
                 )}
               </div>

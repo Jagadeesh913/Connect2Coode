@@ -175,6 +175,18 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                 <Calendar className="w-3 h-3 text-slate-400" /> Asked: {formattedAskedDate}
               </span>
             )}
+
+            {question.timeLimit !== undefined && (
+              <AdminBadge variant="neutral" size="sm">
+                Time Limit: {question.timeLimit}
+              </AdminBadge>
+            )}
+
+            {question.memoryLimit !== undefined && (
+              <AdminBadge variant="neutral" size="sm">
+                Memory Limit: {question.memoryLimit}
+              </AdminBadge>
+            )}
           </div>
 
           {/* External Reference / Challenge Links */}
