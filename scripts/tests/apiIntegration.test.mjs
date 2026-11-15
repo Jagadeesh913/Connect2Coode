@@ -245,6 +245,39 @@ describe('API Integration: Endpoints, Contracts, & Payload Integrity', () => {
       }
     });
 
+    it('normalizes a null company collection in a linked-question response', async () => {
+      const originalGet = apiClient.get;
+      apiClient.get = async (path) => {
+        assert.equal(path, '/user/learningSheet/section/5/questions');
+        return { statusCode: 200, data: [{
+          id: 8,
+          sectionId: null,
+          displayOrder: 1,
+          isActive: true,
+          question: {
+            id: 35,
+            title: 'Anagram Check',
+            description: 'Determine whether two strings are anagrams.',
+            difficultyId: 2,
+            difficultyName: 'Easy',
+            topicId: 10,
+            topicName: 'Strings',
+            isOwnProblem: true,
+            isActive: true,
+            companies: null,
+            questionPlatform: null,
+          },
+        }] };
+      };
+      try {
+        const links = await learningSheetService.getSectionQuestions(5);
+        assert.deepEqual(links[0].question.companies, []);
+        assert.equal(links[0].sectionId, null);
+      } finally {
+        apiClient.get = originalGet;
+      }
+    });
+
     it('rejects malformed successful learning sheet payloads', async () => {
       const originalGet = apiClient.get;
       apiClient.get = async () => ({ statusCode: 200, data: [{ id: 1, sheetName: 'Missing fields' }] });

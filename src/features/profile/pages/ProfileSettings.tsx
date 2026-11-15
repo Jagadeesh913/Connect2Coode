@@ -39,6 +39,7 @@ import {
   CheckCircle2,
   Code2,
   Layers,
+  ChevronLeft,
   ChevronRight,
   TrendingUp,
 } from 'lucide-react';
@@ -47,37 +48,44 @@ interface ActivityCell {
   key: string;
   label: string;
   attempts: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
 }
 
-const buildActivityCells = (attempts: Array<{ submittedDate?: string }>): ActivityCell[] => {
+const toDateKey = (date: Date): string => [
+  date.getFullYear(),
+  String(date.getMonth() + 1).padStart(2, '0'),
+  String(date.getDate()).padStart(2, '0'),
+].join('-');
+
+const buildActivityCells = (
+  attempts: Array<{ submittedDate?: string }>,
+  visibleMonth: Date
+): ActivityCell[] => {
   const counts = new Map<string, number>();
   attempts.forEach(({ submittedDate }) => {
     if (!submittedDate) return;
     const date = new Date(submittedDate);
     if (Number.isNaN(date.getTime())) return;
-    const key = [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0'),
-    ].join('-');
+    const key = toDateKey(date);
     counts.set(key, (counts.get(key) || 0) + 1);
   });
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const firstDay = new Date(today);
-  firstDay.setDate(today.getDate() - 181);
-  return Array.from({ length: 182 }, (_, offset) => {
-    const date = new Date(firstDay);
-    date.setDate(firstDay.getDate() + offset);
-    const key = [
-      date.getFullYear(),
-      String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0'),
-    ].join('-');
+  const monthStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+  const calendarStart = new Date(monthStart);
+  calendarStart.setDate(monthStart.getDate() - monthStart.getDay());
+
+  return Array.from({ length: 42 }, (_, offset) => {
+    const date = new Date(calendarStart);
+    date.setDate(calendarStart.getDate() + offset);
+    const key = toDateKey(date);
     return {
       key,
-      attempts: counts.get(key) || 0,
+      attempts: date.getMonth() === monthStart.getMonth() ? counts.get(key) || 0 : 0,
+      isCurrentMonth: date.getMonth() === monthStart.getMonth(),
+      isToday: date.getTime() === today.getTime(),
       label: date.toLocaleDateString(undefined, {
         weekday: 'short',
         month: 'short',
@@ -121,6 +129,10 @@ export const UserProfilePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ContentTab>('solved');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<'ALL' | 'EASY' | 'MEDIUM' | 'HARD'>('ALL');
+  const [activityMonth, setActivityMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
   const {
     solvedItems,
@@ -332,7 +344,6 @@ export const UserProfilePage: React.FC = () => {
 
   // Real live question statistics strictly from backend API
   const realSolvedCount = uniqueSolvedItems.length;
-  const realAttemptedCount = uniqueAttemptedItems.length;
   const realStreak = calculateStreak(attemptedItems);
 
   // Live difficulty breakdown dynamically calculated from unique solved items
@@ -382,7 +393,19 @@ export const UserProfilePage: React.FC = () => {
   const bio = userInfo?.bio || '';
   const genderName = userInfo?.gender?.refName || '';
   const dateOfBirth = userInfo?.dob || '';
-  const activityCells = useMemo(() => buildActivityCells(attemptedItems), [attemptedItems]);
+  const activityCells = useMemo(
+    () => buildActivityCells(attemptedItems, activityMonth),
+    [activityMonth, attemptedItems]
+  );
+  const currentMonthStart = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  }, []);
+  const isCurrentActivityMonth = activityMonth.getTime() >= currentMonthStart.getTime();
+  const activityMonthLabel = activityMonth.toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+  });
   const activitySummary = useMemo(() => {
     return activityCells.reduce(
       (summary, cell) => ({
@@ -648,60 +671,7 @@ export const UserProfilePage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Master Stats & Segmented Track */}
-              <div className="pt-6 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl sm:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                        {realSolvedCount}
-                      </span>
-                      <span className="text-sm font-semibold text-slate-500 dark:text-slate-400">
-                        Problems Solved
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-400">
-                      Unique algorithmic problems successfully verified
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2.5 text-xs font-medium flex-wrap">
-                    <span className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-neutral-800/70 border border-slate-200/70 dark:border-neutral-700/60 text-slate-700 dark:text-slate-300 font-mono">
-                      <strong className="text-slate-900 dark:text-white font-bold">{realAttemptedCount}</strong> Unique Attempted
-                    </span>
-                    <span className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-neutral-800/70 border border-slate-200/70 dark:border-neutral-700/60 text-slate-700 dark:text-slate-300 font-mono">
-                      <strong className="text-slate-900 dark:text-white font-bold">{attemptedItems.length}</strong> Total Submissions
-                    </span>
-                  </div>
-                </div>
-
-                {/* Segmented Multi-Color Progress Track */}
-                <div className="space-y-2">
-                  <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-neutral-800 flex overflow-hidden gap-1 p-0.5">
-                    {realSolvedCount > 0 ? (
-                      <>
-                        <div
-                          style={{ width: `${(difficultyCounts.easy / realSolvedCount) * 100}%` }}
-                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                          title={`Easy: ${difficultyCounts.easy} (${Math.round((difficultyCounts.easy / realSolvedCount) * 100)}%)`}
-                        />
-                        <div
-                          style={{ width: `${(difficultyCounts.medium / realSolvedCount) * 100}%` }}
-                          className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                          title={`Medium: ${difficultyCounts.medium} (${Math.round((difficultyCounts.medium / realSolvedCount) * 100)}%)`}
-                        />
-                        <div
-                          style={{ width: `${(difficultyCounts.hard / realSolvedCount) * 100}%` }}
-                          className="bg-rose-500 h-full rounded-full transition-all duration-500"
-                          title={`Hard: ${difficultyCounts.hard} (${Math.round((difficultyCounts.hard / realSolvedCount) * 100)}%)`}
-                        />
-                      </>
-                    ) : (
-                      <div className="w-full h-full bg-slate-200 dark:bg-neutral-800 rounded-full" />
-                    )}
-                  </div>
-                </div>
-
+              <div className="pt-6">
                 {/* 3 Difficulty Metric Cards (Responsive Grid) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {/* Easy Card */}
@@ -814,7 +784,7 @@ export const UserProfilePage: React.FC = () => {
                         Build your trail, one mark at a time.
                       </h2>
                       <p className="mt-2 max-w-48 text-xs leading-relaxed text-slate-300">
-                        A 26-week view of your recorded coding attempts.
+                        A monthly view of your recorded coding attempts.
                       </p>
                     </div>
 
@@ -844,17 +814,30 @@ export const UserProfilePage: React.FC = () => {
                   <div className="flex flex-col justify-between gap-3 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-end dark:border-white/10">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
-                        26-week activity trail
+                        Monthly activity trail
                       </span>
                       <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                        {activityCells[0]?.label} — {activityCells[activityCells.length - 1]?.label}
+                        {activityMonthLabel}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg ring-1 ring-blue-400/70 dark:ring-blue-300/60">
-                        <img src="/logo-mark-transparent.png" alt="" aria-hidden="true" className="h-[18px] w-[18px] object-contain" />
-                      </span>
-                      Today
+                    <div className="flex items-center gap-2" aria-label="Activity month navigation">
+                      <button
+                        type="button"
+                        onClick={() => setActivityMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                        aria-label="Show previous month"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 dark:border-white/10 dark:text-slate-300 dark:hover:border-violet-500/50 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActivityMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                        aria-label="Show next month"
+                        disabled={isCurrentActivityMonth}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition-colors hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-35 dark:border-white/10 dark:text-slate-300 dark:hover:border-violet-500/50 dark:hover:bg-violet-500/10 dark:hover:text-violet-200"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
 
@@ -870,11 +853,14 @@ export const UserProfilePage: React.FC = () => {
                     </div>
 
                     <div
-                      className="grid min-w-0 flex-1 grid-flow-col grid-rows-7 gap-1.5 overflow-x-auto rounded-2xl bg-slate-50 p-3 pb-4 [scrollbar-color:theme(colors.violet.300)_transparent] dark:bg-black/20"
-                      style={{ gridTemplateColumns: `repeat(${Math.ceil(activityCells.length / 7)}, minmax(1.25rem, 1fr))` }}
+                      className="grid min-w-0 flex-1 grid-flow-col grid-rows-7 gap-1.5 rounded-2xl bg-slate-50 p-3 dark:bg-black/20"
+                      style={{ gridTemplateColumns: 'repeat(6, minmax(1.25rem, 1fr))' }}
                       aria-label="Connect2Code practice activity heat map"
                     >
-                      {activityCells.map((cell, index) => {
+                      {activityCells.map((cell) => {
+                        if (!cell.isCurrentMonth) {
+                          return <span key={cell.key} aria-hidden="true" className="h-5 min-w-5" />;
+                        }
                         const markTone =
                           cell.attempts === 0
                             ? 'opacity-[0.12] grayscale dark:opacity-[0.18]'
@@ -884,7 +870,6 @@ export const UserProfilePage: React.FC = () => {
                             ? 'opacity-80 drop-shadow-[0_1px_2px_rgba(124,58,237,0.28)]'
                             : 'opacity-100 drop-shadow-[0_2px_4px_rgba(124,58,237,0.38)]';
                         const activityLabel = `${cell.label}: ${cell.attempts} ${cell.attempts === 1 ? 'attempt' : 'attempts'}`;
-                        const isToday = index === activityCells.length - 1;
                         return (
                           <span
                             key={cell.key}
@@ -892,7 +877,7 @@ export const UserProfilePage: React.FC = () => {
                             aria-label={activityLabel}
                             tabIndex={cell.attempts > 0 ? 0 : -1}
                             className={`relative flex h-5 min-w-5 items-center justify-center rounded-md outline-hidden transition-transform hover:scale-125 focus-visible:scale-125 focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-50 dark:focus-visible:ring-offset-neutral-900 ${
-                              isToday ? 'ring-1 ring-blue-400/70 dark:ring-blue-300/60' : ''
+                              cell.isToday ? 'ring-1 ring-blue-400/70 dark:ring-blue-300/60' : ''
                             }`}
                           >
                             <img

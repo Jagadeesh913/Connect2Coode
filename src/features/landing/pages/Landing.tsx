@@ -8,6 +8,7 @@ import { Navbar } from '../../../shared/components/ui/Navbar';
 import { Footer } from '../../../shared/components/ui/Footer';
 import { CompanyBrandLogo } from '../../companies/components/CompanyBrandLogo';
 import { C2CSelect, type C2CSelectOption } from '../../../shared/components/ui/C2CSelect';
+import { useTheme } from '../../../shared/context/ThemeContext';
 import { toast } from '@/shared/notifications/toast';
 
 const DEMO_LANGUAGES: C2CSelectOption[] = [
@@ -36,6 +37,7 @@ const DEMO_LANGUAGES: C2CSelectOption[] = [
 export const Landing: React.FC = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { theme } = useTheme();
   const { isAuthModalOpen, user } = useAppSelector((state) => state.auth);
 
   const handleLogout = () => {
@@ -314,19 +316,38 @@ export const Landing: React.FC = () => {
 
           {/* Right Column: High-Res Illustration from Reference Images */}
           <div className="lg:col-span-6 xl:col-span-7 relative flex items-end justify-center lg:justify-end self-end w-full">
-            {/* Dark Theme Hero Illustration */}
-            <img
-              src="/hero_illustration_dark_4k.png"
-              alt="Connect2Code Student Preparation Ecosystem"
-              className="hidden dark:block w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none drop-shadow-2xl"
-            />
-
-            {/* Light Theme Authentic Hero Illustration */}
-            <img
-              src="/hero_illustration_light_v2.png"
-              alt="Connect2Code Student Preparation Ecosystem"
-              className="block dark:hidden w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none mix-blend-multiply"
-            />
+            {theme === 'dark' ? (
+              <picture>
+                <source
+                  type="image/avif"
+                  srcSet="/hero-preparation-dark-640.avif 640w, /hero-preparation-dark-960.avif 960w, /hero-preparation-dark-1440.avif 1440w"
+                  sizes="(min-width: 1536px) 780px, (min-width: 1280px) 720px, (min-width: 1024px) 50vw, 100vw"
+                />
+                <source
+                  type="image/webp"
+                  srcSet="/hero-preparation-dark-640.webp 640w, /hero-preparation-dark-960.webp 960w, /hero-preparation-dark-1440.webp 1440w"
+                  sizes="(min-width: 1536px) 780px, (min-width: 1280px) 720px, (min-width: 1024px) 50vw, 100vw"
+                />
+                <img
+                  src="/hero_illustration_dark_4k.png"
+                  alt="Connect2Code Student Preparation Ecosystem"
+                  width={3840}
+                  height={2576}
+                  sizes="(min-width: 1536px) 780px, (min-width: 1280px) 720px, (min-width: 1024px) 50vw, 100vw"
+                  fetchPriority="high"
+                  className="w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none drop-shadow-2xl"
+                />
+              </picture>
+            ) : (
+              <img
+                src="/hero_illustration_light_v2.png"
+                alt="Connect2Code Student Preparation Ecosystem"
+                width={1024}
+                height={682}
+                fetchPriority="high"
+                className="w-full max-w-[660px] xl:max-w-[720px] 2xl:max-w-[780px] h-auto object-contain object-bottom select-none pointer-events-none mix-blend-multiply"
+              />
+            )}
           </div>
 
         </div>

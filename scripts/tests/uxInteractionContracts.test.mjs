@@ -334,7 +334,12 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /userInfo\?\.dob/);
     assert.match(source, /buildActivityCells/);
     assert.match(source, /Practice signal/);
-    assert.match(source, /26-week activity trail/);
+    assert.match(source, /Monthly activity trail/);
+    assert.match(source, /Show previous month/);
+    assert.match(source, /Show next month/);
+    assert.match(source, /disabled=\{isCurrentActivityMonth\}/);
+    assert.match(source, /Array\.from\(\{ length: 42 \}/);
+    assert.doesNotMatch(source, /Problems Solved|Unique Attempted|Total Submissions/);
     const activityMap = source.slice(
       source.indexOf('Connect2Code activity signal'),
       source.indexOf('Practice & Submissions Explorer')
@@ -342,6 +347,7 @@ describe('shared UX interaction contracts', () => {
     assert.match(activityMap, /\/logo-mark-transparent\.png/);
     assert.match(activityMap, /activitySummary\.activeDays/);
     assert.match(activityMap, /Connect2Code practice activity heat map/);
+    assert.doesNotMatch(activityMap, /overflow-x-auto/);
     assert.doesNotMatch(activityMap, /emerald/);
     assert.doesNotMatch(source, /EditPersonalInfoModal/);
     assert.match(source, /const fullName\s*=/);
@@ -487,6 +493,7 @@ describe('shared UX interaction contracts', () => {
     assert.match(gate, /status === 'LOADING'/);
     assert.match(gate, /status === 'RECOVERY_REQUIRED'/);
     assert.match(gate, /if \(!isAuthenticated\)/);
+    assert.match(gate, /<h1 className="sr-only">\{title\}<\/h1>/);
     assert.match(gate, /<EmptyState/);
     assert.match(gate, /actionText="Sign In"/);
     assert.match(gate, /openAuthModal\(\{ mode: 'login' \}\)/);

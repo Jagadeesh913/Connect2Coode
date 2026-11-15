@@ -34,4 +34,6 @@ dist-ssr
 
 # Agent and AI IDE configuration
 .agent/
+.gemini/
+.seo-tools/
 graphify-out/

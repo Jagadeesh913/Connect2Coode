@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const SITE_ORIGIN = 'https://connect2code.in';
+export const SITE_ORIGIN = 'https://www.connect2code.in';
 export const SOCIAL_IMAGE_URL = `${SITE_ORIGIN}/social-card.png`;
 
 export const PUBLIC_PRERENDER_ROUTES = Object.freeze([
@@ -24,7 +24,7 @@ export const PUBLIC_PRERENDER_ROUTES = Object.freeze([
   },
   {
     path: '/dsa-sheet',
-    title: 'DSA Sheet',
+    title: 'DSA Sheet for Placement Preparation',
     description: 'Follow a structured data structures and algorithms sheet for placement preparation.',
     heading: 'Structured Data Structures and Algorithms Sheet',
     introduction: 'Work through placement-focused data structures and algorithms in a guided sequence, from core foundations to advanced problem-solving topics.',
@@ -59,6 +59,30 @@ const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => (
 const escapeXml = escapeHtml;
 const pageTitle = (title) => `${title} | Connect2Code`;
 const canonicalUrl = (path) => new URL(path, `${SITE_ORIGIN}/`).toString();
+const serializeJsonLd = (value) => JSON.stringify(value)
+  .replace(/</g, '\\u003c')
+  .replace(/>/g, '\\u003e')
+  .replace(/&/g, '\\u0026');
+
+const buildWebPageSchema = (route) => {
+  const canonical = canonicalUrl(route.path);
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    '@id': `${canonical}#webpage`,
+    url: canonical,
+    name: pageTitle(route.title),
+    description: route.description,
+    isPartOf: { '@id': `${SITE_ORIGIN}/#website` },
+    inLanguage: 'en-IN',
+  };
+};
+
+const replaceJsonLdScript = (html, id, value) => {
+  const expression = new RegExp(`<script\\s+id="${id}"\\s+type="application/ld\\+json">[\\s\\S]*?<\\/script>`, 'i');
+  if (!expression.test(html)) throw new Error(`Built HTML is missing JSON-LD script: ${id}`);
+  return html.replace(expression, `<script id="${id}" type="application/ld+json">${serializeJsonLd(value)}</script>`);
+};
 
 const replaceHeadTag = (html, selector, replacement) => {
   const expression = new RegExp(`<meta(?=[^>]*${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[^>]*>`, 'i');
@@ -87,6 +111,35 @@ const renderPrerenderedContent = (route) => `
         </article>
       </main>`;
 
+export const buildHomeMarkdown = (route = PUBLIC_PRERENDER_ROUTES[0]) => `# ${route.heading}
+
+${route.introduction}
+
+## What you can prepare
+
+${route.topics.map((topic) => `- ${topic}`).join('\n')}
+
+## Public preparation pages
+
+${PUBLIC_PRERENDER_ROUTES
+  .filter((candidate) => candidate.path !== route.path)
+  .map((candidate) => `- [${candidate.title}](${canonicalUrl(candidate.path)})`)
+  .join('\n')}
+`;
+
+export const buildLlmsTxt = () => `# Connect2Code
+
+> Connect2Code is a placement-preparation platform with coding practice, DSA learning sheets, aptitude practice, and company-preparation resources.
+
+## Public preparation hubs
+
+${PUBLIC_PRERENDER_ROUTES.map((route) => `- [${route.title}](${canonicalUrl(route.path)}): ${route.description}`).join('\n')}
+
+## Access boundary
+
+Interactive problem catalogs, progress, company details, and coding workspaces require sign-in and are not published as public crawl targets.
+`;
+
 export const renderPrerenderedHtml = (template, route) => {
   const canonical = canonicalUrl(route.path);
   let html = template;
@@ -103,8 +156,12 @@ export const renderPrerenderedHtml = (template, route) => {
   html = html.replace(/<link[^>]+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${escapeHtml(canonical)}" data-c2c-managed="true" />`);
   html = html.replace(
     '<div id="root"></div>',
-    `<div id="root"></div>\n    <noscript data-c2c-prerender="true">${renderPrerenderedContent(route)}</noscript>`
+    `<div id="root" data-c2c-prerender-root="true">${renderPrerenderedContent(route)}</div>`
   );
+  if (route.path !== '/') {
+    html = html.replace(/\s*<link[^>]+rel="alternate"[^>]+type="text\/markdown"[^>]*>/i, '');
+  }
+  html = replaceJsonLdScript(html, 'c2c-webpage-schema', buildWebPageSchema(route));
   if (!html.includes('data-c2c-prerender="true"')) throw new Error('Built HTML is missing the empty React root expected by the prerenderer.');
   return html;
 };
@@ -125,6 +182,7 @@ const renderNonIndexableShell = (template, { title, heading, description }) => {
   html = replaceHeadTag(html, 'name="twitter:description"', `<meta name="twitter:description" content="${escapeHtml(description)}" data-c2c-managed="true" />`);
   html = html.replace(/\s*<link[^>]+rel="canonical"[^>]*>/i, '');
   html = html.replace(/\s*<meta[^>]+property="og:url"[^>]*>/i, '');
+  html = html.replace(/\s*<script\s+id="c2c-webpage-schema"\s+type="application\/ld\+json">[\s\S]*?<\/script>/i, '');
   html = html.replace(
     '<div id="root"></div>',
     `<div id="root"></div>\n    <noscript data-c2c-prerender="true"><main><h1>${escapeHtml(heading)}</h1><p>${escapeHtml(description)}</p></main></noscript>`
@@ -156,6 +214,8 @@ export const generateSeoAssets = async ({ distDirectory } = {}) => {
     description: 'The requested Connect2Code page could not be found.',
   }), 'utf8');
   await writeFile(join(outputDirectory, 'sitemap.xml'), buildSitemapXml(), 'utf8');
+  await writeFile(join(outputDirectory, 'index.md'), buildHomeMarkdown(), 'utf8');
+  await writeFile(join(outputDirectory, 'llms.txt'), buildLlmsTxt(), 'utf8');
 };
 
 const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];

@@ -38,9 +38,12 @@ test('HTML supplies one complete default metadata set without duplicate managed 
     assert.equal(html.split(selector).length - 1, 1, `${selector} must appear exactly once`);
   });
   assert.equal(html.split('rel="canonical"').length - 1, 1);
-  assert.match(html, /<link rel="canonical" href="https:\/\/connect2code\.in\/"/);
-  assert.match(html, /property="og:image" content="https:\/\/connect2code\.in\/social-card\.png"/);
+  assert.match(html, /<link rel="canonical" href="https:\/\/www\.connect2code\.in\/"/);
+  assert.match(html, /property="og:image" content="https:\/\/www\.connect2code\.in\/social-card\.png"/);
+  assert.match(html, /id="c2c-organization-schema" type="application\/ld\+json"/);
+  assert.match(html, /id="c2c-webpage-schema" type="application\/ld\+json"/);
   assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertCanonical\(canonicalUrl\)/);
+  assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertJsonLd\('c2c-webpage-schema'/);
   assert.match(html, /<link rel="manifest" href="\/site\.webmanifest" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png" \/>/);
 });
@@ -65,6 +68,20 @@ test('manifest references present, correctly sized app icons', () => {
   });
   assert.deepEqual(pngDimensions('public/apple-touch-icon.png'), { width: 180, height: 180 });
   assert.deepEqual(pngDimensions('public/social-card.png'), { width: 1200, height: 630 });
+});
+
+test('landing hero uses responsive modern formats with a PNG fallback and reserved dimensions', () => {
+  const landing = read('src/features/landing/pages/Landing.tsx');
+  assert.match(landing, /<picture>/);
+  assert.match(landing, /type="image\/avif"/);
+  assert.match(landing, /hero-preparation-dark-640\.avif 640w/);
+  assert.match(landing, /hero-preparation-dark-1440\.avif 1440w/);
+  assert.match(landing, /type="image\/webp"/);
+  assert.match(landing, /hero-preparation-dark-640\.webp 640w/);
+  assert.match(landing, /hero_illustration_dark_4k\.png/);
+  assert.match(landing, /width=\{3840\}/);
+  assert.match(landing, /height=\{2576\}/);
+  assert.match(landing, /fetchPriority="high"/);
 });
 
 test('central route metadata covers public, authenticated, admin, error, and dynamic routes', () => {

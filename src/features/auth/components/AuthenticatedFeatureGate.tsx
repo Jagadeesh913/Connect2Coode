@@ -32,6 +32,7 @@ export const AuthenticatedFeatureGate: React.FC<AuthenticatedFeatureGateProps> =
     return (
       <section className="flex min-h-[65vh] w-full items-center justify-center bg-[#FBFBFD] px-4 py-12 dark:bg-[#070A13]">
         <div className="w-full max-w-3xl">
+          <h1 className="sr-only">{title}</h1>
           <EmptyState
             title={title}
             description={description}

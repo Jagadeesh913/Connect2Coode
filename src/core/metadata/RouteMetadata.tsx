@@ -35,7 +35,27 @@ const upsertCanonical = (href: string): void => {
   element.href = href;
 };
 
+const upsertJsonLd = (id: string, value: Record<string, unknown>): void => {
+  let element = document.head.querySelector<HTMLScriptElement>(`script#${id}`);
+  if (!element) {
+    element = document.createElement('script');
+    element.id = id;
+    element.type = 'application/ld+json';
+    element.dataset.c2cManaged = 'true';
+    document.head.appendChild(element);
+  }
+  element.textContent = JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/&/g, '\\u0026');
+};
+
+const removeJsonLd = (id: string): void => {
+  document.head.querySelector(`script#${id}`)?.remove();
+};
+
 const resolveSiteOrigin = (): string => {
+  if (!import.meta.env.DEV) return 'https://www.connect2code.in';
   const configuredOrigin = import.meta.env.VITE_SITE_URL?.trim();
   if (configuredOrigin) {
     try {
@@ -68,6 +88,21 @@ const applyMetadata = (metadata: PageMetadata): void => {
     metadata.imageAlt || 'Connect2Code placement and coding preparation platform',
     120
   );
+
+  if (metadata.robots === 'index, follow') {
+    upsertJsonLd('c2c-webpage-schema', {
+      '@context': 'https://schema.org',
+      '@type': 'WebPage',
+      '@id': `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: title,
+      description,
+      isPartOf: { '@id': `${origin}/#website` },
+      inLanguage: 'en-IN',
+    });
+  } else {
+    removeJsonLd('c2c-webpage-schema');
+  }
 
   document.title = title;
   upsertCanonical(canonicalUrl);

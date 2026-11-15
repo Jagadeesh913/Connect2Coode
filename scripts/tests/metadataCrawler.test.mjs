@@ -10,6 +10,8 @@ import { pathToFileURL } from 'node:url';
 import {
   PUBLIC_PRERENDER_ROUTES,
   SITE_ORIGIN,
+  buildHomeMarkdown,
+  buildLlmsTxt,
   buildSitemapXml,
   generateSeoAssets,
   renderPrerenderedHtml,
@@ -45,9 +47,16 @@ test('all indexable routes render meaningful, route-specific HTML without JavaSc
     assert.ok(html.includes(`<title>${route.title.replace('&', '&amp;')} | Connect2Code</title>`));
     assert.ok(html.includes(`content="${canonical}"`));
     assert.ok(html.includes('content="index, follow"'));
-    assert.ok(html.includes('https://connect2code.in/social-card.png'));
-    assert.match(html, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
-    assert.doesNotMatch(html, /<div id="root">\s*<main/);
+    assert.ok(html.includes('https://www.connect2code.in/social-card.png'));
+    assert.ok(html.includes('https://schema.org'));
+    assert.ok(html.includes(`"@id":"${canonical}#webpage"`));
+    assert.match(html, /<div id="root" data-c2c-prerender-root="true">\s*<main/);
+    assert.doesNotMatch(html, /<noscript data-c2c-prerender="true">/);
+    if (route.path === '/') {
+      assert.match(html, /rel="alternate" type="text\/markdown" href="\/index\.md"/);
+    } else {
+      assert.doesNotMatch(html, /type="text\/markdown"/);
+    }
     assert.equal(count(html, 'rel="canonical"'), 1);
     assert.equal(count(html, 'property="og:title"'), 1);
     assert.equal(count(html, 'name="twitter:title"'), 1);
@@ -76,27 +85,33 @@ test('build generator emits public pages, a noindex app shell, a noindex 404, an
     const appShell = await readFile(join(directory, 'app.html'), 'utf8');
     const notFound = await readFile(join(directory, '404.html'), 'utf8');
     const sitemap = await readFile(join(directory, 'sitemap.xml'), 'utf8');
+    const homeMarkdown = await readFile(join(directory, 'index.md'), 'utf8');
+    const llmsTxt = await readFile(join(directory, 'llms.txt'), 'utf8');
 
     assert.match(practice, /Coding Practice for Placement Interviews/);
-    assert.match(practice, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
+    assert.match(practice, /<div id="root" data-c2c-prerender-root="true">\s*<main/);
     [appShell, notFound].forEach((html) => {
       assert.match(html, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
       assert.match(html, /name="robots" content="noindex, nofollow"/);
       assert.doesNotMatch(html, /rel="canonical"/);
       assert.doesNotMatch(html, /property="og:url"/);
+      assert.doesNotMatch(html, /id="c2c-webpage-schema"/);
     });
     assert.match(notFound, /Page Not Found \| Connect2Code/);
     assert.equal(sitemap, buildSitemapXml());
+    assert.equal(homeMarkdown, buildHomeMarkdown());
+    assert.equal(llmsTxt, buildLlmsTxt());
+    assert.match(llmsTxt, /Interactive problem catalogs[\s\S]*require sign-in/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 });
 
-test('robots advertises the apex sitemap and does not hide pages from noindex headers', () => {
+test('robots advertises the canonical sitemap and does not hide pages from noindex headers', () => {
   const robots = readFileSync(join(root, 'public', 'robots.txt'), 'utf8');
   assert.match(robots, /^User-agent: \*$/m);
   assert.match(robots, /^Allow: \/$/m);
-  assert.match(robots, /^Sitemap: https:\/\/connect2code\.in\/sitemap\.xml$/m);
+  assert.match(robots, /^Sitemap: https:\/\/www\.connect2code\.in\/sitemap\.xml$/m);
   ['/login', '/admin', '/bookmarks', '/profile'].forEach((path) => {
     assert.ok(!robots.includes(`Disallow: ${path}`), `${path} must remain crawlable so noindex can be observed`);
   });

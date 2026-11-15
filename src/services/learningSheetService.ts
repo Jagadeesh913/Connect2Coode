@@ -74,6 +74,20 @@ const isQuestionLink = (value: unknown): value is DsaSheetQuestionLink =>
   typeof value.isActive === 'boolean' &&
   (value.sectionId === null || isPositiveId(value.sectionId));
 
+const normalizeQuestionLink = (value: unknown): unknown => {
+  if (!isRecord(value) || !isRecord(value.question) || value.question.companies !== null) {
+    return value;
+  }
+
+  return {
+    ...value,
+    question: {
+      ...value.question,
+      companies: [],
+    },
+  };
+};
+
 const requireArray = <T>(value: unknown, guard: (item: unknown) => item is T, label: string): T[] => {
   if (!Array.isArray(value) || !value.every(guard)) {
     throw new Error(`Unexpected ${label} response format`);
@@ -117,7 +131,10 @@ export const learningSheetService = {
       API_ENDPOINTS.LEARNING_SHEET.SECTION_QUESTIONS(sectionId),
       { signal }
     );
-    const links = requireArray(response.data, isQuestionLink, 'learning sheet questions');
+    const normalizedData = Array.isArray(response.data)
+      ? response.data.map(normalizeQuestionLink)
+      : response.data;
+    const links = requireArray(normalizedData, isQuestionLink, 'learning sheet questions');
     if (links.some((link) => link.sectionId !== null && link.sectionId !== sectionId)) {
       throw new Error('Unexpected learning sheet questions response format');
     }

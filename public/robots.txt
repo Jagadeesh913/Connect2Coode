@@ -7,4 +7,4 @@ Allow: /
 Disallow: /api/
 Disallow: /oauth2/
 
-Sitemap: https://connect2code.in/sitemap.xml
+Sitemap: https://www.connect2code.in/sitemap.xml

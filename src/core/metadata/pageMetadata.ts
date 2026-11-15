@@ -90,7 +90,7 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
       '/practice'
     ),
     '/dsa-sheet': publicPage(
-      'DSA Sheet',
+      'DSA Sheet for Placement Preparation',
       'Follow a structured data structures and algorithms sheet for placement preparation.',
       '/dsa-sheet'
     ),
