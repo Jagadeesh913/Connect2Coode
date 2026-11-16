@@ -68,6 +68,9 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
   useEffect(() => {
     testCaseTypesRef.current = testCaseTypes;
+    if (testCaseTypes.length > 0) {
+      setTestCases((current) => reconcileTestCasesWithReferenceTypes(current, testCaseTypes));
+    }
   }, [testCaseTypes]);
 
   // Fetch existing test cases from backend or problem on modal open
