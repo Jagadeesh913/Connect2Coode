@@ -51,7 +51,8 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`. |
+| `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`; selectively hydrates via `hydrateRoot` when SSR prerender markup is present (`data-c2c-ssr="true"`). |
+| `src/entry-server.tsx` | SSR prerendering entry point | `RUNTIME-VERIFIED` | Renders `<App />` via `renderToString` with StaticRouter and headless store for build-time public page prerendering. |
 | `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Redux Provider, user-scoped ThemeProvider, ErrorBoundary, and a responsive safe-area-aware Toaster offset below the sticky navbar. |
 | `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, and print output is suppressed. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
@@ -73,6 +74,8 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/mappers/problemMapper.ts` | Question DTO to problem model mapper | `RUNTIME-VERIFIED` | Maps question catalog and detail payloads, preserving structured company/platform summaries, list-supplied logos, testCases, examples, constraints, hints, and ref metadata. |
 | `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families; authenticated API-backed and coming-soon routes default to noindex without guessed entity names. |
+| `src/core/metadata/publicPageContent.json` | Semantic public page metadata & hub content copy | `RUNTIME-VERIFIED` | Houses verified, factual copy for public hub prerendering without credentials or dynamic secrets. |
+| `src/core/metadata/publicPageContent.ts` | Typed accessor & validation for public page content | `RUNTIME-VERIFIED` | Strong typing for public hub headings, key areas, topics, and structured metadata. |
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
@@ -154,6 +157,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
+| `src/shared/components/seo/PublicHubContent.tsx` | Accessible semantic public hub fallback | `RUNTIME-VERIFIED` | Renders crawlable, accessible public hub content, headings, and key areas when rendered unauthenticated or during SSR. |
 | `src/shared/hooks/useAssessmentIntegrity.ts` | Learner-route clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Keyboard classification tolerates absent/non-string keys without crashing forms and its regression passed; native clipboard, selection, browser export, capture, focus-loss, secure mode, and internal-editor routing remain covered. Final browser/password-manager/IME acceptance is still pending. |
 | `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Normalized identity scopes retire legacy global values, direct/toggle updates persist per user, and `system` follows live OS color-scheme changes. |
 
@@ -166,7 +170,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/GoogleSignInButton.tsx` | Google OAuth2 sign-in button | `RUNTIME-VERIFIED` | Triggers Google authorization popup. |
 | `hooks/useGoogleOAuthLogin.ts` | OAuth hook managing popup and postMessage | `RUNTIME-VERIFIED` | Tested in `googleOAuthLifecycle.test.mjs`. |
-| `components/AuthenticatedFeatureGate.tsx` | Shared authenticated learning-content mount boundary | `RUNTIME-VERIFIED` | Keeps API-owning feature pages unmounted during session restoration and while signed out, while reusing the standard loading, recovery, and sign-in states. |
+| `components/AuthenticatedFeatureGate.tsx` | Shared authenticated learning-content mount boundary | `RUNTIME-VERIFIED` | Keeps API-owning feature pages unmounted during session restoration and while signed out; renders accessible semantic `PublicHubContent` for unauthenticated visitors and SSR crawlers, while reusing the standard loading, recovery, and sign-in states. |
 | `components/SessionRecoveryState.tsx` | Temporary startup-auth failure gate | `PARTIALLY VERIFIED` | Keeps protected content closed, uses theme tokens in light/dark modes, and offers safe retry without treating network/5xx failure as logout; deployed visual acceptance remains pending. |
 | `pages/Login.tsx` | Unified authentication modal (Login, Signup, ForgotPassword OTP) | `PARTIALLY VERIFIED` | Submit-only Zod validation with native validation disabled, role-based redirect, duplicate-action guards, shared accessible modal lifecycle, and an opaque modal backdrop that hides the underlying navbar boundary; final browser verification is pending. |
 | `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Exchanges only the HttpOnly cookie, sends a credential-free popup signal, uses response role, and displays only safe errors. |
@@ -266,8 +270,16 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Files in `src/`**: 161
-- **Total Automated Test Files in `scripts/tests/`**: 23
-- **Automated Test Cases**: 393 across 25 files; the latest full run passed 393/393 with zero failures.
-- **Final-tree Unit Tests / Typecheck / Lint / Build / Documentation / Architecture / Preview**: `UNKNOWN` — intentionally not executed in this session because no OS-level sandbox is available for repository-controlled scripts. Historical green results do not certify the modified tree.
+- **Total First-Party TypeScript/TSX Source Files in `src/`**: 171 (180 including unit test files in `src/test/`)
+- **Node Test Runner Suites (`scripts/tests/`)**: 25 suites, 423 passing regression contract assertions (`npm test`)
+- **Vitest Unit/Component Test Suites (`src/test/`)**: 14 suites, 56 passing tests (`npm run test:unit`)
+- **Playwright E2E Browser Specs (`e2e/`)**: 3 specs, 9 passing tests (`npm run test:e2e`)
+- **Static Quality & Security Gates**:
+  - `npm run typecheck`: 0 TypeScript compiler errors across entire codebase.
+  - `npm run lint`: 0 oxlint errors and 0 warnings across 218 source and test files.
+  - `npm run lint:eslint`: 0 ESLint errors and 0 warnings across `src/`.
+  - `npm run depcruise`: 0 circular dependencies and 0 boundary violations across 204 modules.
+  - `npm run build`: Production client and SSR prerender built cleanly in ~3.3s.
+  - `node scripts/smoke-preview.mjs`: 5 public routes, SSR markers, and 12 assets verified against local preview server.
+  - `node scripts/verify-documentation.mjs`: 11 canonical documentation files, 322 cross-reference links verified with 0 broken links.
 

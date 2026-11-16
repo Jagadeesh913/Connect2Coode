@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- route modules intentionally define lazy components beside the router */
 import React, { lazy, Suspense } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, createMemoryRouter, Navigate } from 'react-router-dom';
 import { MainLayout } from '../layouts/MainLayout';
 import { AppRouterLayout } from '../layouts/AppRouterLayout';
 import { ProtectedRoute } from '../core/guards/ProtectedRoute';
@@ -55,9 +55,10 @@ const withSuspense = (Component: React.LazyExoticComponent<React.FC>) => (
 const requireFeatureSession = (
   element: React.ReactNode,
   title: string,
-  description: string
+  description: string,
+  publicPath?: string
 ) => (
-  <AuthenticatedFeatureGate title={title} description={description}>
+  <AuthenticatedFeatureGate title={title} description={description} publicPath={publicPath}>
     {element}
   </AuthenticatedFeatureGate>
 );
@@ -98,7 +99,7 @@ const appRoutes = [
     element: <MainLayout />,
     children: [
       // Company Prep routes keep stable URLs but mount API content only after sign-in.
-      { path: '/companies', element: requireFeatureSession(withSuspense(CompanyList), 'Sign in to explore Company Prep', 'Log in with your Connect 2 Code account to browse hiring companies, recruitment patterns, and interview questions.') },
+      { path: '/companies', element: requireFeatureSession(withSuspense(CompanyList), 'Sign in to explore Company Prep', 'Log in with your Connect 2 Code account to browse hiring companies, recruitment patterns, and interview questions.', '/companies') },
       { path: '/companies/:slug', element: requireFeatureSession(withSuspense(CompanyDetails), 'Sign in to view Company Prep', 'Log in to view company interview questions, practice problem sets, and recruitment details.') },
       { path: '/companies/:companyId/exams/:examId', element: requireFeatureSession(withSuspense(CompanyExamDetails), 'Sign in to view Company Prep', 'Log in to view company assessment rounds, exam sections, and preparation resources.') },
       { path: '/companies/exams/:examId', element: requireFeatureSession(withSuspense(CompanyExamDetails), 'Sign in to view Company Prep', 'Log in to view company assessment rounds, exam sections, and preparation resources.') },
@@ -106,13 +107,13 @@ const appRoutes = [
       { path: '/company-patterns/:slug', element: requireFeatureSession(withSuspense(CompanyDetails), 'Sign in to view Company Prep', 'Log in to view company interview questions, practice problem sets, and recruitment details.') },
 
       // Practice routes show the shared sign-in state before mounting API-owning pages.
-      { path: '/dsa-sheet', element: requireFeatureSession(withSuspense(DsaSheetPage), 'Sign in to explore DSA Sheet', 'Log in with your Connect 2 Code account to browse curated DSA learning sheets, track your progress, and practice problems.') },
-      { path: '/practice', element: requireFeatureSession(withSuspense(PracticePage), 'Sign in to explore Problem Bank', 'Log in with your Connect 2 Code account to browse coding problems, track your submissions, and practice algorithms.') },
+      { path: '/dsa-sheet', element: requireFeatureSession(withSuspense(DsaSheetPage), 'Sign in to explore DSA Sheet', 'Log in with your Connect 2 Code account to browse curated DSA learning sheets, track your progress, and practice problems.', '/dsa-sheet') },
+      { path: '/practice', element: requireFeatureSession(withSuspense(PracticePage), 'Sign in to explore Problem Bank', 'Log in with your Connect 2 Code account to browse coding problems, track your submissions, and practice algorithms.', '/practice') },
       { path: '/problems', element: <Navigate to="/practice" replace /> },
       { path: '/problems/:slug', element: requireFeatureSession(withSuspense(ProblemDetails), 'Sign in to solve coding problems', 'Log in to open the coding workspace, run solutions, submit code, and track your progress.') },
 
       // Aptitude routes show the shared sign-in state before mounting API-owning pages.
-      { path: '/aptitude', element: requireFeatureSession(withSuspense(AptitudePrep), 'Sign in to explore Aptitude Bank', 'Log in with your Connect 2 Code account to access quantitative, reasoning, verbal, and pseudocode practice.') },
+      { path: '/aptitude', element: requireFeatureSession(withSuspense(AptitudePrep), 'Sign in to explore Aptitude Bank', 'Log in with your Connect 2 Code account to access quantitative, reasoning, verbal, and pseudocode practice.', '/aptitude') },
       { path: '/progress', element: <Navigate to="/aptitude" replace /> },
       { path: '/roadmaps', element: <Navigate to="/aptitude" replace /> },
       { path: '/roadmaps/:slug', element: renderFeature(RoadmapDetails, 'Roadmaps') },
@@ -165,10 +166,14 @@ const appRoutes = [
   },
 ];
 
-export const router = createBrowserRouter([
+export const routeTree = [
   {
     element: <AppRouterLayout />,
     errorElement: <RouteErrorBoundary />,
     children: appRoutes,
   },
-]);
+];
+
+export const router = typeof document === 'undefined'
+  ? createMemoryRouter(routeTree, { initialEntries: ['/'] })
+  : createBrowserRouter(routeTree);

@@ -5,7 +5,7 @@ import type { QuestionTestCase, Question } from '../../../core/types/domain';
  */
 export function extractConstraintsFromDescription(description?: string | null): string {
   if (!description) return '';
-  const match = description.match(/(?:(?:\*\*|##)?\s*Constraints:?\s*(?:\*\*)?)([\s\S]*?)(?=(?:\n\s*(?:Example|Note|Follow-up|Hints|\*\*Example)|\n\n\n|$))/i);
+  const match = description.match(/(?:(?:^|\n)\s*(?:\*\*|##)?\s*Constraints:?\s*(?:\*\*)?)([\s\S]*?)(?=(?:\n\s*(?:Example|Note|Follow-up|Hints|\*\*Example)|\n\n\n|$))/i);
   if (match && match[1]) {
     return match[1]
       .replace(/^[-*•]\s+/gm, '')

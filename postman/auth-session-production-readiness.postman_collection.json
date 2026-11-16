@@ -1,0 +1,246 @@
+{
+  "info": {
+    "name": "Connect2Code Authentication Production Readiness",
+    "description": "Read-only authentication lifecycle checks. Credentials are runtime-only variables; access tokens remain transient collection variables and are never logged or exported.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.connect2code.in/api/v1",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "initial_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Login establishes a secure session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "const data = json && json.data;",
+              "const identity = data && (data.user || data);",
+              "const token = data && (data.token || data.accessToken);",
+              "const forbiddenKeys = new Set(['refreshToken', 'refresh_token', 'jwtToken', 'jwttoken', 'jwt_token']);",
+              "const foundForbiddenKeys = [];",
+              "const collectForbiddenKeys = (value) => {",
+              "  if (!value || typeof value !== 'object') return;",
+              "  Object.entries(value).forEach(([key, nested]) => {",
+              "    if (forbiddenKeys.has(key)) foundForbiddenKeys.push(key);",
+              "    collectForbiddenKeys(nested);",
+              "  });",
+              "};",
+              "collectForbiddenKeys(json);",
+              "pm.test('login returns HTTP 200 JSON', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.headers.get('Content-Type') || '').to.match(/application\\/json/i);",
+              "});",
+              "pm.test('login returns a canonical access token and identity', () => {",
+              "  pm.expect(token).to.be.a('string').and.to.have.length.above(20);",
+              "  pm.expect(identity).to.be.an('object');",
+              "  pm.expect(String(identity.id || '')).to.not.equal('');",
+              "  pm.expect(identity.email).to.be.a('string').and.to.include('@');",
+              "  pm.expect(identity.role).to.be.a('string').and.to.have.length.above(0);",
+              "});",
+              "pm.test(`login does not expose refresh credentials in JSON (found: ${[...new Set(foundForbiddenKeys)].join(', ') || 'none'})`, () => {",
+              "  pm.expect(foundForbiddenKeys).to.be.empty;",
+              "});",
+              "pm.test('login is public and does not send bearer credentials', () => {",
+              "  pm.expect(pm.request.headers.has('Authorization')).to.equal(false);",
+              "});",
+              "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "pm.test('refresh cookie is HttpOnly and Secure with an explicit SameSite policy', () => {",
+              "  pm.expect(setCookie).to.match(/HttpOnly/i);",
+              "  pm.expect(setCookie).to.match(/Secure/i);",
+              "  pm.expect(setCookie).to.match(/SameSite=(?:Lax|Strict|None)/i);",
+              "});",
+              "pm.collectionVariables.set('access_token', token);",
+              "pm.collectionVariables.set('initial_access_token', token);",
+              "pm.collectionVariables.set('user_id', String(identity.id));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{test_email}}\",\n  \"password\": \"{{test_password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": "{{base_url}}/auth/login"
+      }
+    },
+    {
+      "name": "02 Refresh rotates the access token using only the cookie",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const json = pm.response.json();",
+              "const data = json && json.data;",
+              "const identity = data && (data.user || data);",
+              "const token = data && (data.token || data.accessToken);",
+              "pm.test('refresh is bodyless and bearer-free', () => {",
+              "  pm.expect(pm.request.body === undefined || pm.request.body === null || pm.request.body.toString() === '').to.equal(true);",
+              "  pm.expect(pm.request.headers.has('Authorization')).to.equal(false);",
+              "});",
+              "pm.test('refresh returns HTTP 200 with identity', () => {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(token).to.be.a('string').and.to.have.length.above(20);",
+              "  pm.expect(String(identity.id)).to.equal(pm.collectionVariables.get('user_id'));",
+              "});",
+              "pm.test('refresh rotates the access token', () => {",
+              "  pm.expect(token).to.not.equal(pm.collectionVariables.get('initial_access_token'));",
+              "});",
+              "pm.collectionVariables.set('access_token', token);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/auth/refresh"
+      }
+    },
+    {
+      "name": "03 Protected profile accepts the rotated bearer token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('protected request sends bearer auth without query or body tokens', () => {",
+              "  pm.expect(pm.request.headers.get('Authorization')).to.equal(`Bearer ${pm.collectionVariables.get('access_token')}`);",
+              "  pm.expect(pm.request.url.query.all().some((entry) => /^(?:token|jwtToken|jwttoken|jwt_token)$/i.test(entry.key))).to.equal(false);",
+              "  pm.expect(pm.request.body === undefined || pm.request.body === null).to.equal(true);",
+              "});",
+              "pm.test('same-user profile request is authorized without a server error', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 204, 404]);",
+              "  pm.expect(pm.response.code).to.not.be.oneOf([401, 403, 500]);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/userInfo/{{user_id}}"
+      }
+    },
+    {
+      "name": "04 Logout invalidates the cookie session",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('logout is bodyless and bearer-free', () => {",
+              "  pm.expect(pm.request.body === undefined || pm.request.body === null || pm.request.body.toString() === '').to.equal(true);",
+              "  pm.expect(pm.request.headers.has('Authorization')).to.equal(false);",
+              "});",
+              "pm.test('logout succeeds without exposing credentials', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+              "});",
+              "const setCookie = pm.response.headers.get('Set-Cookie') || '';",
+              "pm.test('logout expires the server-owned cookie', () => {",
+              "  pm.expect(setCookie).to.match(/(?:Max-Age=0|Expires=Thu, 01 Jan 1970)/i);",
+              "});",
+              "pm.collectionVariables.unset('access_token');",
+              "pm.collectionVariables.unset('initial_access_token');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/auth/logout"
+      }
+    },
+    {
+      "name": "05 Refresh is rejected after logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('logged-out refresh is rejected', () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+              "});",
+              "pm.test('rejected refresh does not return an access token', () => {",
+              "  let json = {};",
+              "  try { json = pm.response.json(); } catch {}",
+              "  const data = json && json.data;",
+              "  pm.expect(data && (data.token || data.accessToken)).to.not.be.ok;",
+              "});",
+              "pm.collectionVariables.unset('user_id');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/auth/refresh"
+      }
+    }
+  ]
+}

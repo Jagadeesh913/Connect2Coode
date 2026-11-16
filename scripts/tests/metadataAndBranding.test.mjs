@@ -107,7 +107,7 @@ test('central route metadata covers public, authenticated, admin, error, and dyn
 test('private, admin, callback, and error metadata is not indexable', () => {
   const metadataSource = read('src/core/metadata/pageMetadata.ts');
   assert.match(metadataSource, /robots: 'noindex, nofollow'/);
-  assert.match(metadataSource, /robots: 'noindex, follow'/);
+  assert.doesNotMatch(metadataSource, /robots: 'noindex, follow'/);
   assert.match(metadataSource, /'Admin Dashboard'[\s\S]*?privatePage/);
   assert.match(metadataSource, /'Page Not Found'[\s\S]*?privatePage|privatePage\([\s\S]*?'Page Not Found'/);
 });

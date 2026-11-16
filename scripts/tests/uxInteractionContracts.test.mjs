@@ -472,14 +472,15 @@ describe('shared UX interaction contracts', () => {
     assert.match(deploymentConfig, /Strict-Transport-Security/);
   });
 
-  it('unauthenticated users on dsa-sheet page are presented with the sign-in EmptyState', async () => {
-    const dsaSheetSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
-    assert.match(dsaSheetSource, /openAuthModal/);
-    assert.match(dsaSheetSource, /!isAuthenticated && sheets\.length === 0/);
-    assert.match(dsaSheetSource, /title="Sign in to explore DSA Sheet"/);
-    assert.match(dsaSheetSource, /actionText="Sign In"/);
-    assert.match(dsaSheetSource, /onAction=\{\(\) => dispatch\(openAuthModal\(\{ mode: 'login' \}\)\)\}/);
-    assert.match(dsaSheetSource, /icon=\{<Lock className="w-12 h-12 text-blue-500" \/>\}/);
+  it('unauthenticated public hubs retain factual content and a sign-in action', async () => {
+    const gate = await readSource('src/features/auth/components/AuthenticatedFeatureGate.tsx');
+    const publicHub = await readSource('src/shared/components/seo/PublicHubContent.tsx');
+    assert.match(gate, /publicContent && !isAuthenticated/);
+    assert.match(gate, /<PublicHubContent/);
+    assert.match(gate, /signInDisabled=\{status === 'LOADING'\}/);
+    assert.match(publicHub, /<h1 id="public-hub-heading"/);
+    assert.match(publicHub, /Sign in to continue/);
+    assert.match(publicHub, /aria-label="Public preparation pages"/);
   });
 
   it('gates feature routes before their API-owning page components mount', async () => {
@@ -490,6 +491,7 @@ describe('shared UX interaction contracts', () => {
       const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       assert.match(routes, new RegExp(`path: '${escapedPath}', element: requireFeatureSession`));
     }
+    assert.match(gate, /publicContent && !isAuthenticated/);
     assert.match(gate, /status === 'LOADING'/);
     assert.match(gate, /status === 'RECOVERY_REQUIRED'/);
     assert.match(gate, /if \(!isAuthenticated\)/);

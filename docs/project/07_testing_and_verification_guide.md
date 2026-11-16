@@ -114,7 +114,7 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit (0 errors)
 
 ### 4. Unit & Component Tests
 ```bash
-npm run test:unit     # Vitest + React Testing Library (9 suites, 37 passing unit/component tests)
+npm run test:unit     # Vitest + React Testing Library (14 suites, 56 passing unit/component tests)
 ```
 
 ### 5. Regression Contract Test Suites

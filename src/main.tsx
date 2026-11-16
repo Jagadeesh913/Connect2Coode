@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { createRoot } from 'react-dom/client';
+import { createRoot, hydrateRoot } from 'react-dom/client';
 import './index.css';
 import { App } from './App';
 
@@ -18,8 +18,14 @@ if (!rootElement) {
   throw new Error('Failed to find root element');
 }
 
-createRoot(rootElement).render(
+const application = (
   <StrictMode>
     <App />
   </StrictMode>
 );
+
+if (rootElement.dataset.c2cSsr === 'true') {
+  hydrateRoot(rootElement, application);
+} else {
+  createRoot(rootElement).render(application);
+}

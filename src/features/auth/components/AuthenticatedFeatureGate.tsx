@@ -5,11 +5,14 @@ import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { PageLoading } from '../../../shared/components/ui/PageLoading';
 import { openAuthModal } from '../redux/authSlice';
 import { SessionRecoveryState } from './SessionRecoveryState';
+import { getPublicPageContent } from '../../../core/metadata/publicPageContent';
+import { PublicHubContent } from '../../../shared/components/seo/PublicHubContent';
 
 interface AuthenticatedFeatureGateProps {
   children: React.ReactNode;
   title: string;
   description: string;
+  publicPath?: string;
 }
 
 /**
@@ -21,9 +24,22 @@ export const AuthenticatedFeatureGate: React.FC<AuthenticatedFeatureGateProps> =
   children,
   title,
   description,
+  publicPath,
 }) => {
   const dispatch = useAppDispatch();
   const { status, isAuthenticated } = useAppSelector((state) => state.auth);
+
+  const publicContent = publicPath ? getPublicPageContent(publicPath) : null;
+
+  if (publicContent && !isAuthenticated) {
+    return (
+      <PublicHubContent
+        content={publicContent}
+        signInDisabled={status === 'LOADING'}
+        onSignIn={() => dispatch(openAuthModal({ mode: 'login' }))}
+      />
+    );
+  }
 
   if (status === 'LOADING') return <PageLoading />;
   if (status === 'RECOVERY_REQUIRED') return <SessionRecoveryState />;

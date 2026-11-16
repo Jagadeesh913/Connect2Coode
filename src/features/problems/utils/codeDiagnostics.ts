@@ -15,7 +15,7 @@ export interface CodeDiagnostic {
 
 const lineAndColumnPatterns = [
   /(?:line|Line)\s+(\d+)(?::(\d+))?/,
-  /:(\d+):(\d+)(?:\D|$)/,
+  /:(\d+)(?::(\d+))?(?:\D|$)/,
   /\((\d+),(\d+)\)/,
 ];
 
@@ -49,11 +49,21 @@ export function collectExecutionDiagnostics(
 ): CodeDiagnostic[] {
   const messages: Array<{ key: string; message: string }> = [];
   if (requestError?.trim()) messages.push({ key: 'request', message: requestError.trim() });
-  result?.testCases.forEach((testCase, index) => {
-    if (testCase.errorMessage?.trim()) {
-      messages.push({ key: `case-${testCase.testCaseId || index + 1}`, message: testCase.errorMessage.trim() });
-    }
-  });
+  if (result?.message?.trim()) messages.push({ key: 'message', message: result.message.trim() });
+  if (Array.isArray(result?.diagnostics)) {
+    result.diagnostics.forEach((diag, idx) => {
+      if (typeof diag === 'string' && diag.trim()) {
+        messages.push({ key: `diagnostic-${idx + 1}`, message: diag.trim() });
+      }
+    });
+  }
+  if (Array.isArray(result?.testCases)) {
+    result.testCases.forEach((testCase, index) => {
+      if (testCase.errorMessage?.trim()) {
+        messages.push({ key: `case-${testCase.testCaseId || index + 1}`, message: testCase.errorMessage.trim() });
+      }
+    });
+  }
 
   const seen = new Set<string>();
   return messages.flatMap(({ key, message }) => {

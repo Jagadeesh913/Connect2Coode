@@ -1,0 +1,67 @@
+[
+  {
+    "path": "/",
+    "title": "Placement & Coding Preparation",
+    "description": "Prepare for placements with coding problems, DSA sheets, aptitude practice, company exam patterns, and interview resources.",
+    "heading": "Code Today For A Brighter Tomorrow",
+    "introduction": "Build placement skills with structured coding practice, data structures and algorithms, aptitude preparation, and company-focused resources.",
+    "topics": [
+      "Coding practice by topic and difficulty",
+      "Structured DSA preparation",
+      "Aptitude and reasoning practice",
+      "Company placement resources"
+    ]
+  },
+  {
+    "path": "/practice",
+    "title": "Coding Practice",
+    "description": "Practice curated coding problems by topic, difficulty, and company for placement interviews.",
+    "heading": "Coding Practice for Placement Interviews",
+    "introduction": "Explore the coding catalog, filter problems by topic and difficulty, and use the Connect2Code workspace to build consistent problem-solving skills.",
+    "topics": [
+      "Topic-based problem discovery",
+      "Difficulty and company filters",
+      "Browser coding workspace",
+      "Progress available after sign-in"
+    ]
+  },
+  {
+    "path": "/dsa-sheet",
+    "title": "DSA Sheet for Placement Preparation",
+    "description": "Follow a structured data structures and algorithms sheet for placement preparation.",
+    "heading": "Structured Data Structures and Algorithms Sheet",
+    "introduction": "Work through placement-focused data structures and algorithms in a guided sequence, from core foundations to advanced problem-solving topics.",
+    "topics": [
+      "Arrays and strings",
+      "Linked lists, stacks, and queues",
+      "Trees and graphs",
+      "Dynamic programming"
+    ]
+  },
+  {
+    "path": "/companies",
+    "title": "Company Preparation",
+    "description": "Explore company-specific placement exams, hiring patterns, aptitude topics, and coding questions.",
+    "heading": "Company Placement Preparation",
+    "introduction": "Use company-focused preparation resources to understand recruitment assessments, practice relevant topics, and organize placement study.",
+    "topics": [
+      "Recruitment exam patterns",
+      "Company-focused coding practice",
+      "Aptitude and reasoning topics",
+      "Authenticated access to current catalog data"
+    ]
+  },
+  {
+    "path": "/aptitude",
+    "title": "Aptitude Practice",
+    "description": "Practice quantitative aptitude, logical reasoning, verbal ability, and pseudocode questions.",
+    "heading": "Aptitude Practice for Placement Assessments",
+    "introduction": "Prepare for common placement assessment sections with focused quantitative, reasoning, verbal, and programming-logic practice.",
+    "topics": [
+      "Quantitative aptitude",
+      "Logical reasoning",
+      "Verbal ability",
+      "Pseudocode and code tracing"
+    ]
+  }
+]
