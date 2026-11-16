@@ -37,3 +37,8 @@ dist-ssr
 .gemini/
 .seo-tools/
 graphify-out/
+
+# Test outputs
+test-results/
+playwright-report/
+coverage/

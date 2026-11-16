@@ -19,7 +19,8 @@
     "jsx": "react-jsx",
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": ["@testing-library/jest-dom/vitest"]
   },
   "include": [
     "src/**/*"
