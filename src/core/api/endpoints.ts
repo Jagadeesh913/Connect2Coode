@@ -23,7 +23,7 @@ export const API_ENDPOINTS = {
     BASE: '/company',
     LIST: '/company/list',
     DETAILS: (id: string | number) => `/company/${id}`,
-    EXAMS: (companyId: string | number) => `/company/${companyId}/exams/list`,
+    EXAMS: (companyId: number) => `/company/${companyId}/exams/list`,
     EXAM_DETAILS: (examId: string | number) => `/company/exams/${examId}`,
     ADMIN_BASE: '/admin/company',
     ADMIN_ROLE: '/admin/companyRole',

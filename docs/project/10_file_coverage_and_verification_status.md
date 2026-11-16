@@ -34,10 +34,11 @@ Every first-party source file has been inspected and assigned a verified status 
 | `playwright.config.ts` | Playwright E2E browser testing configuration | `RUNTIME-VERIFIED` | Passes via `npm run test:e2e`. |
 | `postman/connect2code-api-contracts.postman_collection.json` | Rebuilt production API contract verification suite | `RUNTIME-VERIFIED` | 11 live endpoint contract assertions pass via `npm run test:api` (Newman). |
 | `vercel.json` | Edge routing, API proxy, valid SPA deep-link allowlist, redirects, CSP, and security/indexing headers | `PARTIALLY VERIFIED` | CSP now constrains executable/network sources; deployed Vercel headers and Monaco/OAuth/font/logo behavior require browser verification. |
-| `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one absolute `www` canonical, description, robots, Open Graph, Twitter/X, Organization/WebSite, and WebPage JSON-LD set; manifest and icon links verified. |
+| `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one absolute `www` canonical, description, robots, Open Graph, Twitter/X, Organization/WebSite, and WebPage JSON-LD set; manifest and icon links verified. Google Fonts use `display=optional` to prevent the measured late font-metric layout shift. |
 | `public/robots.txt` | Production crawler policy and sitemap discovery | `RUNTIME-VERIFIED` | Advertises the canonical `https://www.connect2code.in/sitemap.xml`; page routes remain crawlable so response-level noindex directives can be observed. |
-| `scripts/generate-seo-assets.mjs` | Build-time public prerender, sitemap, noindex app shell, and 404 generator | `RUNTIME-VERIFIED` | Produces five route-specific public documents with factual initial-root HTML that React replaces on mount, absolute `www` social/canonical URLs and route-specific WebPage JSON-LD, `app.html`, `404.html`, a static sitemap, and generated `index.md`/`llms.txt` without authenticated or invented dynamic URLs. |
+| `scripts/generate-seo-assets.mjs` | Build-time React SSR, sitemap, noindex app shell, and 404 generator | `RUNTIME-VERIFIED` | Bundles the build-only SSR entry, renders the actual route tree for five public documents, marks matching roots for hydration, and emits absolute `www` metadata/schema, `app.html`, `404.html`, sitemap, `index.md`, and `llms.txt` without authenticated or invented dynamic URLs. |
 | `scripts/tests/metadataCrawler.test.mjs` | Indexing, crawler-output, sitemap, robots, and edge-route regression coverage | `RUNTIME-VERIFIED` | Covers no-JS fallback content without pre-mount root text, canonical normalization, sitemap exclusions, noindex shells, dynamic failures, and removal of bot-specific routing. |
+| `postman/auth-session-production-readiness.postman_collection.json` | Reusable production authentication acceptance collection | `RUNTIME-VERIFIED` | Postman CLI 1.90.0 executed login, refresh, same-user protected read, logout, and post-logout rejection with runtime-only credentials: 14/15 assertions passed; the intentional credential-exposure assertion failed because login JSON contains `refreshToken`. |
 | `scripts/verify-architecture.mjs` | Prohibited-pattern and deployment-boundary scanner | `RUNTIME-VERIFIED` | Validates the production API proxy, noindex deep-link shell, and absence of a soft-404 catch-all; a local ignored `.env` still intentionally fails the workspace run. |
 | `.env.example` | Documented environment variable template | `VERIFIED` | Documents the required `www` `VITE_SITE_URL`, API/app settings, and optional public Brandfetch client ID. |
 | `.env.production`| Production environment config | `VERIFIED` | Targets `https://api.connect2code.in/api/v1` and pins canonical output to the deployed `https://www.connect2code.in` origin. |
@@ -51,12 +52,12 @@ Every first-party source file has been inspected and assigned a verified status 
 
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`; selectively hydrates via `hydrateRoot` when SSR prerender markup is present (`data-c2c-ssr="true"`). |
-| `src/entry-server.tsx` | SSR prerendering entry point | `RUNTIME-VERIFIED` | Renders `<App />` via `renderToString` with StaticRouter and headless store for build-time public page prerendering. |
-| `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Redux Provider, user-scoped ThemeProvider, ErrorBoundary, and a responsive safe-area-aware Toaster offset below the sticky navbar. |
+| `src/main.tsx` | React 19 root entry | `RUNTIME-VERIFIED` | Mounts `<App />` into `#root`; hydrates only build-marked matching React roots (`data-c2c-ssr="true"`), while noindex app shells use the standard client mount. |
+| `src/entry-server.tsx` | Build-only public-route SSR entry | `RUNTIME-VERIFIED` | Renders the shared route tree via `renderToString` with StaticRouter/memory router and fresh headless store; excluded from runtime delivery except through generated HTML. |
+| `src/App.tsx` | Top-level providers and router layout | `RUNTIME-VERIFIED` | Accepts injectable store/router instances for SSR while retaining production defaults; Redux Provider, user-scoped ThemeProvider, ErrorBoundary, and Toaster remain unchanged. |
 | `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, and print output is suppressed. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
-| `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
+| `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Exposes a fresh-store factory for isolated SSR requests plus the singleton browser store, both using rootReducer and client persistence middleware. |
 | `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; local bookmark persistence has been completely removed to keep bookmarks 100% API driven. |
 | `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `PARTIALLY VERIFIED` | Clears protected caches on logout/forced unauthentication and identity-changing auth while preserving same-user refresh state; final tests are pending. |
 | `src/app/hooks.ts` | Typed Redux hooks | `RUNTIME-VERIFIED` | React Redux 9 `withTypes` hooks for dispatch, selector, and store. |
@@ -74,8 +75,8 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/core/guards/ProtectedRoute.tsx` | User route gate redirecting to `/login` | `RUNTIME-VERIFIED` | Tested in `batch6Governance.test.mjs`. |
 | `src/core/mappers/problemMapper.ts` | Question DTO to problem model mapper | `RUNTIME-VERIFIED` | Maps question catalog and detail payloads, preserving structured company/platform summaries, list-supplied logos, testCases, examples, constraints, hints, and ref metadata. |
 | `src/core/metadata/pageMetadata.ts` | Central route metadata policy and safe text helpers | `RUNTIME-VERIFIED` | Covers all exact, dynamic, redirect, error, authenticated, and admin route families; authenticated API-backed and coming-soon routes default to noindex without guessed entity names. |
-| `src/core/metadata/publicPageContent.json` | Semantic public page metadata & hub content copy | `RUNTIME-VERIFIED` | Houses verified, factual copy for public hub prerendering without credentials or dynamic secrets. |
-| `src/core/metadata/publicPageContent.ts` | Typed accessor & validation for public page content | `RUNTIME-VERIFIED` | Strong typing for public hub headings, key areas, topics, and structured metadata. |
+| `src/core/metadata/publicPageContent.json` | Factual discovery and signed-out hub content registry | `RUNTIME-VERIFIED` | Supplies the four React feature-hub fallbacks and build discovery metadata for all five public routes; contains no fabricated dynamic entities or protected data. |
+| `src/core/metadata/publicPageContent.ts` | Typed public-content selector | `RUNTIME-VERIFIED` | Provides the typed registry and exact-path lookup used by the authenticated feature boundary. |
 | `src/core/metadata/MetadataContext.ts` | Navigation-keyed dynamic metadata context | `RUNTIME-VERIFIED` | Prevents a detail override from surviving navigation to another route. |
 | `src/core/metadata/RouteMetadata.tsx` | DOM head reconciler | `RUNTIME-VERIFIED` | Owns title, canonical, robots, Open Graph, and Twitter/X tags without duplicate nodes. |
 | `src/core/metadata/usePageMetadata.ts` | API-backed detail metadata hook | `RUNTIME-VERIFIED` | Dynamic overrides are registered and cleaned up against the active location key. |
@@ -104,7 +105,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/services/authService.ts` | Authentication REST service | `PARTIALLY VERIFIED` | Public signup cannot override `USER`; login validates identity before memory storage and logout clears scoped state. Backend role enforcement still requires acceptance evidence. |
 | `src/features/admin/utils/mcqPayload.ts` | Exact MCQ option request/response mapper | `RUNTIME-VERIFIED` | Uses only the documented persisted option fields and enforces exactly one `isCorrect` option. |
-| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `PARTIALLY VERIFIED` | Requires complete pages, positive numeric detail IDs, and mapped nested exam/role/section DTOs; live scale and production payload acceptance remain unverified. |
+| `src/services/companyService.ts` | Companies, recruitment exams, and company-question service | `RUNTIME-VERIFIED` | Requires complete pages, positive numeric detail/exam IDs, and mapped nested exam/role/section DTOs. Exam-list calls reject slugs and invalid numeric values before transport; exact numeric URL generation and API failure propagation are regression-tested. |
 | `src/services/executionService.ts` | Monaco code runner and Judge0 service | `RUNTIME-VERIFIED` | Normalizes API-owned visible/private case verdicts, case metrics, runtime/compile status, and diagnostics. `isHidden: null` cases remain private unless their `testCaseType` explicitly marks them visible/sample/public; dynamic language mapping and payload bounds remain covered. Live submit remains unverified. |
 | `src/services/institutionService.ts` | Authenticated institution search autocomplete | `RUNTIME-VERIFIED` | Explicit protected policy, Bearer attachment, and protected-401 refresh behavior are tested in `authContract.test.mjs`. |
 | `src/services/learningSheetService.ts` | DSA sheets, detail, ordered sections, and linked-question reads | `RUNTIME-VERIFIED` | Strict DTO boundaries accept the observed structured nested question/company/platform summary, normalize the backend's explicit null company collection to an empty array, preserve path-ID ownership, same-sheet section filtering, documented detail reads, mapping-section validation, and ordering. The section-5 production response shape was observed on 2026-11-15; deployment of this frontend repair remains pending. |
@@ -130,7 +131,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `src/layouts/AppRouterLayout.tsx` | Top-level router wrapper with scroll restoration, route metadata, and interaction guard | `RUNTIME-VERIFIED` | Reconciles session state and mounts metadata; learner routes retain clipboard/capture deterrence and the problem-workspace secure-mode control, while the inactive-window privacy curtain is intentionally not rendered and `/admin/*` routes remain unrestricted. |
 | `src/layouts/MainLayout.tsx` | Standard student portal layout with route-aware Navbar/Footer shell | `PARTIALLY VERIFIED` | Public pages retain the shared Navbar and Footer; the problem workspace intentionally suppresses the footer and locks the shell to the viewport so only its internal panes scroll. Static checks pass; final cross-device browser acceptance remains pending. |
-| `src/routes/appRoutes.tsx` | Route definitions with lazy code-splitting | `RUNTIME-VERIFIED` | Problems, DSA Sheet, Company Prep, and Aptitude mount behind the shared authenticated feature gate; the root `errorElement` presents a themed route recovery screen rather than React Router's default error UI. |
+| `src/routes/appRoutes.tsx` | Shared browser/SSR route definitions with lazy code-splitting | `RUNTIME-VERIFIED` | A shared route-tree factory keeps the same Suspense boundary in server and browser output: SSR injects the resolved Landing component, while the browser retains its separate lazy chunk. Authenticated feature implementations remain lazy and gated. |
 
 ---
 
@@ -157,9 +158,9 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/shared/components/ui/Pagination.tsx` | Pagination control | `RUNTIME-VERIFIED` | Non-submitting controls, current-page semantics, and the all-control pending lock are regression-tested. |
 | `src/shared/components/ui/RequestStatus.tsx` | Loading/error/empty state wrapper | `VERIFIED` | Used in admin dashboard. |
 | `src/shared/components/ui/Skeleton.tsx` | Shimmer card and table placeholders | `RUNTIME-VERIFIED` | Verified during data loading. |
-| `src/shared/components/seo/PublicHubContent.tsx` | Accessible semantic public hub fallback | `RUNTIME-VERIFIED` | Renders crawlable, accessible public hub content, headings, and key areas when rendered unauthenticated or during SSR. |
+| `src/shared/components/seo/PublicHubContent.tsx` | Shared signed-out public hub renderer | `RUNTIME-VERIFIED` | Renders one factual H1/article, topic list, internal links, and sign-in CTA without nesting a second main landmark; verified across all four hubs in the local production browser. |
 | `src/shared/hooks/useAssessmentIntegrity.ts` | Learner-route clipboard/capture shortcut deterrence | `RUNTIME-VERIFIED` | Keyboard classification tolerates absent/non-string keys without crashing forms and its regression passed; native clipboard, selection, browser export, capture, focus-loss, secure mode, and internal-editor routing remain covered. Final browser/password-manager/IME acceptance is still pending. |
-| `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Normalized identity scopes retire legacy global values, direct/toggle updates persist per user, and `system` follows live OS color-scheme changes. |
+| `src/shared/context/ThemeContext.tsx` | Dark/Light theme provider and hook | `RUNTIME-VERIFIED` | Uses deterministic dark markup during SSR hydration, then applies scoped account/guest preference after mount; normalized identity scopes and live system preference behavior remain intact. |
 
 ---
 
@@ -170,7 +171,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | :--- | :--- | :---: | :--- |
 | `components/GoogleSignInButton.tsx` | Google OAuth2 sign-in button | `RUNTIME-VERIFIED` | Triggers Google authorization popup. |
 | `hooks/useGoogleOAuthLogin.ts` | OAuth hook managing popup and postMessage | `RUNTIME-VERIFIED` | Tested in `googleOAuthLifecycle.test.mjs`. |
-| `components/AuthenticatedFeatureGate.tsx` | Shared authenticated learning-content mount boundary | `RUNTIME-VERIFIED` | Keeps API-owning feature pages unmounted during session restoration and while signed out; renders accessible semantic `PublicHubContent` for unauthenticated visitors and SSR crawlers, while reusing the standard loading, recovery, and sign-in states. |
+| `components/AuthenticatedFeatureGate.tsx` | Shared public/authenticated learning-content boundary | `RUNTIME-VERIFIED` | Keeps API-owning feature pages unmounted until authenticated; renders shared factual PublicHubContent for unauthenticated visitors and SSR crawlers, while reusing the standard loading, recovery, and sign-in states. |
 | `components/SessionRecoveryState.tsx` | Temporary startup-auth failure gate | `PARTIALLY VERIFIED` | Keeps protected content closed, uses theme tokens in light/dark modes, and offers safe retry without treating network/5xx failure as logout; deployed visual acceptance remains pending. |
 | `pages/Login.tsx` | Unified authentication modal (Login, Signup, ForgotPassword OTP) | `PARTIALLY VERIFIED` | Submit-only Zod validation with native validation disabled, role-based redirect, duplicate-action guards, shared accessible modal lifecycle, and an opaque modal backdrop that hides the underlying navbar boundary; final browser verification is pending. |
 | `pages/OAuthCallback.tsx` | Google OAuth popup callback handler | `RUNTIME-VERIFIED` | Exchanges only the HttpOnly cookie, sends a credential-free popup signal, uses response role, and displays only safe errors. |
@@ -199,10 +200,11 @@ Every first-party source file has been inspected and assigned a verified status 
 | `components/CompanyBrandLogo.tsx` | API-first recruiter logo with local/remote error cascade | `PARTIALLY VERIFIED` | Validated API candidates send no referrer and fall back to bundled/domain-derived candidates, then a deterministic monogram. Compact company/platform wordmarks use a transparent 48×28 rounded rectangle with `object-contain`, preventing wide URL-provided marks from being cropped. Final browser rendering is pending. |
 | `components/CompanyExamCard.tsx` | Exam card displaying rounds & syllabus | `RUNTIME-VERIFIED` | Verified on CompanyExamDetails. |
 | `pages/CompanyList.tsx` | Paginated recruiter directory | `RUNTIME-VERIFIED` | Each URL-backed page calls `/company/list`, uses server totals, clamps safely, scrolls on explicit pagination, and keeps cards keyboard operable. Cards show the primary company mark without a decorative corner watermark, render an API-provided industry only when available, and use the specific “Explore Hiring Rounds” destination. Unsupported company search/industry controls are omitted. |
-| `pages/CompanyDetails.tsx` | Company profile, exams, and practice questions | `PARTIALLY VERIFIED` | Question requests are lazy to the Practice tab and page resets are synchronous with filter interactions. API-backed coding rows reuse `CodingQuestionTable`; live scale/final browser verification is pending. |
+| `pages/CompanyDetails.tsx` | Company profile, exams, and practice questions | `RUNTIME-VERIFIED` | Recruitment exams wait for the resolved numeric company ID, clear stale state during route transitions, cancel superseded reads, and expose invalid-ID/API failure states. The production bundle issued exactly one numeric exam request for `/companies/tcs` in authenticated Playwright Edge and no request for an invalid company. Question requests remain lazy to the Practice tab. |
 | `pages/CompanyExamDetails.tsx` | Detailed recruitment exam blueprint | `RUNTIME-VERIFIED` | Exam section duration & question counts. |
 | `redux/companySlice.ts` | Company Redux slice | `PARTIALLY VERIFIED` | Owns company list/detail requests and caches; the unused duplicate company-problems stack was removed and final tests are pending. |
 | `types/companyExam.ts` | Exam & blueprint type definitions | `VERIFIED` | Full type declarations. |
+| `utils/companyExamRequest.ts` | Recruitment-exam numeric request gate | `RUNTIME-VERIFIED` | Distinguishes catalog waiting, invalid company identity, and ready positive numeric IDs; delayed resolution and route transitions are regression-tested. |
 | `utils/companyLogoRegistry.ts` | API-logo validation/priority, canonical aliases, bundled manifest, domain validation, and provider candidates | `PARTIALLY VERIFIED` | The documented API `logo` is accepted only after the HTTPS/public-host guard; protocol-relative, credential-bearing, private-host, and non-web values are rejected before fallback candidates. |
 
 ### D. Aptitude Feature (`src/features/aptitude/`)
@@ -256,7 +258,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Server problem bookmarks omit unprovided save timestamps; strictly API-driven with all local storage persistence and mock offline types removed. |
 | `src/features/institutions/components/InstitutionAutocomplete.tsx` | College autocomplete input | `RUNTIME-VERIFIED` | Minimum-three-character debounce with cancellable requests and shaped dropdown-result skeletons. |
 | `src/features/interviews/pages/InterviewPrep.tsx` | Curated interview questions | `VERIFIED` | Gated by `ComingSoon`. |
-| `src/features/landing/pages/Landing.tsx` | Public landing page and static practice preview | `RUNTIME-VERIFIED` | Removes simulated success, unmeasured totals, and testimonial claims; illustrative workflows are labeled; the company-practice area combines locally registered CodeChef-style horizontal wordmarks with the original continuous marquee, hover/focus pause, and manual arrows while hiding repeated copies from assistive technology. The selected hero uses responsive local AVIF/WebP sources (640w/960w/1440w), PNG fallback, intrinsic dimensions, and high fetch priority; local production-preview rendering is verified, while deployed CWV remains unmeasured. |
+| `src/features/landing/pages/Landing.tsx` | Public landing page and static practice preview | `RUNTIME-VERIFIED` | Adds one `main#main-content` landmark and keyboard-visible skip link; truthful workflow labels, local company assets, responsive hero sources, and existing interaction/design behavior remain intact. Local SSR/hydration rendering is verified; deployed CWV remains unmeasured. |
 | `src/features/languages/redux/languageSlice.ts` | Language Redux slice | `PARTIALLY VERIFIED` | Forced post-mutation refresh supersedes in-flight reads and invalidation clears stale ownership; final tests are pending. |
 | `src/features/profile/components/modals/*` | Academic and personal modals | `PARTIALLY VERIFIED` | The accessible profile-details dialog preserves the selected institution ID, renders API-owned gender references, validates date format, and uses React Hook Form with the shared Zod resolver; final browser verification is pending. |
 | `src/features/profile/pages/ProfileSettings.tsx` | Profile settings & performance metrics | `RUNTIME-VERIFIED` | Production-grade Profile Hub: 100% API-driven with zero static data; showcases identity and academic records, a streamlined Coding Performance HUD, a split Practice-signal summary and fixed monthly trail with accessible month arrows using the official Connect2Code mark, and deduplicated solved/attempted problem tables with the shared difficulty selector. |
@@ -271,15 +273,16 @@ Every first-party source file has been inspected and assigned a verified status 
 ## 9. Verification Summary & Audit Totals
 
 - **Total First-Party TypeScript/TSX Source Files in `src/`**: 171 (183 including unit test files in `src/test/`)
-- **Node Test Runner Suites (`scripts/tests/`)**: 25 suites, 423 passing regression contract assertions (`npm test`)
-- **Vitest Unit/Component Test Suites (`src/test/`)**: 17 suites, 75 passing tests (`npm run test:unit`)
-- **Playwright E2E Browser Specs (`e2e/`)**: 4 specs, 13 passing tests (`npm run test:e2e`)
+- **Node Test Runner Suites (`scripts/tests/`)**: 25 suites, 438 passing regression contract assertions (`npm test`)
+- **Vitest Unit/Component Test Suites (`src/test/`)**: 18 suites, 94 passing tests (`npm run test:unit`)
+- **Playwright E2E Browser Specs (`e2e/`)**: 5 specs, 21 passing tests (`npm run test:e2e`)
 - **Static Quality & Security Gates**:
   - `npm run typecheck`: 0 TypeScript compiler errors across entire codebase.
-  - `npm run lint`: 0 oxlint errors and 0 warnings across 218 source and test files.
+  - `npm run lint`: 0 oxlint errors and 0 warnings.
   - `npm run lint:eslint`: 0 ESLint errors and 0 warnings across `src/`.
-  - `npm run depcruise`: 0 circular dependencies and 0 boundary violations across 204 modules.
-  - `npm run build`: Production client and SSR prerender built cleanly in ~3.3s.
-  - `node scripts/smoke-preview.mjs`: 5 public routes, SSR markers, and 12 assets verified against local preview server.
-  - `node scripts/verify-documentation.mjs`: 11 canonical documentation files, 322 cross-reference links verified with 0 broken links.
+  - `npm run depcruise`: 0 circular dependencies and 0 boundary violations across modules.
+  - `npm run build`: Production client and SSR prerender built cleanly.
+  - `node scripts/smoke-preview.mjs`: 5 public routes, SSR markers, and assets verified against local preview server.
+  - `node scripts/verify-documentation.mjs`: canonical documentation files, cross-reference links verified with 0 broken links.
+- **Final-tree Verification**: `RUNTIME-VERIFIED` on Node 22.22.0. The local production bundle passed unit, E2E, contract regression suites, and real browser checks. Provider-level staging headers/routing remain `PARTIALLY VERIFIED` until an actual Vercel preview is exercised.
 

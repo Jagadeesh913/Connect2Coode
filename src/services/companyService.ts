@@ -248,10 +248,14 @@ export const companyService = {
    * Fetches exams associated with a company
    */
   async getCompanyExamsList(
-    companyId: number | string,
+    companyId: number,
     pageRequest: Partial<PageRequestPayload> = {},
     signal?: AbortSignal
   ): Promise<ApiResponse<PaginatedData<CompanyExamItem>>> {
+    if (!Number.isSafeInteger(companyId) || companyId <= 0) {
+      throw new Error('Company ID must be a positive integer');
+    }
+
     const payload = {
       pageNumber: pageRequest.pageNumber ?? 0,
       pageSize: pageRequest.pageSize ?? 20,

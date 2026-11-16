@@ -46,11 +46,14 @@ const ComingSoon = lazy(() => import('../shared/components/ComingSoon').then(({ 
 
 const PageLoader = PageLoading;
 
-const withSuspense = (Component: React.LazyExoticComponent<React.FC>) => (
+export const withRouteSuspense = (element: React.ReactNode) => (
   <Suspense fallback={<PageLoader />}>
-    <Component />
+    {element}
   </Suspense>
 );
+
+const withSuspense = (Component: React.LazyExoticComponent<React.FC>) =>
+  withRouteSuspense(<Component />);
 
 const requireFeatureSession = (
   element: React.ReactNode,
@@ -78,10 +81,10 @@ const renderFeature = (Component: React.LazyExoticComponent<React.FC>, featureNa
   return withSuspense(Component);
 };
 
-const appRoutes = [
+const createAppRoutes = (landingElement: React.ReactNode) => [
   {
     path: '/',
-    element: withSuspense(Landing),
+    element: landingElement,
   },
   {
     path: '/oauth/callback',
@@ -166,14 +169,15 @@ const appRoutes = [
   },
 ];
 
-export const routeTree = [
+export const createRouteTree = (landingElement: React.ReactNode) => [
   {
     element: <AppRouterLayout />,
     errorElement: <RouteErrorBoundary />,
-    children: appRoutes,
+    children: createAppRoutes(landingElement),
   },
 ];
 
+export const routeTree = createRouteTree(withSuspense(Landing));
 export const router = typeof document === 'undefined'
   ? createMemoryRouter(routeTree, { initialEntries: ['/'] })
   : createBrowserRouter(routeTree);

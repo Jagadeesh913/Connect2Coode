@@ -139,7 +139,7 @@ sequenceDiagram
 
 `AppRouterLayout` mounts [`RouteMetadata`](../../src/core/metadata/RouteMetadata.tsx) around every route. [`pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts) owns the route defaults and canonical policy; dynamic problem, company, and company-exam pages use [`usePageMetadata`](../../src/core/metadata/usePageMetadata.ts) only after the loaded entity matches the current route. The override is keyed to React Router's navigation key so metadata from a previous detail page cannot survive client-side navigation.
 
-The five indexable public routes share factual copy through [`publicPageContent.json`](../../src/core/metadata/publicPageContent.json). The build generator and signed-out React hub UI consume that one registry. Authenticated feature components remain unmounted until session restoration succeeds, while signed-out and recovery-failed visitors keep the public hub content instead of swapping to a private loading/error surface.
+The four indexable feature hubs share their signed-out factual fallback through [`publicPageContent.json`](../../src/core/metadata/publicPageContent.json); the build generator also uses that registry for discovery metadata covering all five public routes. The homepage continues to render the full existing `Landing` component. Authenticated feature components remain unmounted until session restoration succeeds, while signed-out and recovery-failed visitors keep the public hub content instead of swapping to a private loading/error surface.
 
 ---
 

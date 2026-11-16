@@ -229,6 +229,23 @@ describe('shared UX interaction contracts', () => {
     assert.doesNotMatch(details, /list = list\.filter/);
   });
 
+  it('company recruitment exams wait for a numeric catalog ID and cancel superseded requests', async () => {
+    const details = await readSource('src/features/companies/pages/CompanyDetails.tsx');
+    const service = await readSource('src/services/companyService.ts');
+    const endpoints = await readSource('src/core/api/endpoints.ts');
+
+    assert.match(details, /resolveCompanyExamRequestIdentity\(company\)/);
+    assert.match(details, /examRequestIdentity\.status === 'waiting'[\s\S]*?setExamsLoading\(true\)/);
+    assert.match(details, /examRequestIdentity\.status === 'invalid'[\s\S]*?setExamsError\(examRequestIdentity\.error\)[\s\S]*?setExamsLoading\(false\)/);
+    assert.match(details, /new AbortController\(\)/);
+    assert.match(details, /controller\.abort\(\)/);
+    assert.match(details, /\[examRequestIdentity, examsRetry, examPage\]/);
+    assert.doesNotMatch(details, /companyId \?\? slug/);
+    assert.match(service, /getCompanyExamsList\(\s*companyId: number/);
+    assert.match(service, /Number\.isSafeInteger\(companyId\)/);
+    assert.match(endpoints, /EXAMS: \(companyId: number\)/);
+  });
+
   it('practice filters and page controls dispatch the canonical server query', async () => {
     const source = await readSource('src/features/problems/pages/PracticePage.tsx');
     assert.match(source, /fetchProblems\(\{[\s\S]*?page: currentPage/);

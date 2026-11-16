@@ -46,6 +46,8 @@ test('HTML supplies one complete default metadata set without duplicate managed 
   assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertJsonLd\('c2c-webpage-schema'/);
   assert.match(html, /<link rel="manifest" href="\/site\.webmanifest" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png" \/>/);
+  assert.match(html, /fonts\.googleapis\.com[^"]+display=optional/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com[^"]+display=swap/);
 });
 
 test('manifest references present, correctly sized app icons', () => {

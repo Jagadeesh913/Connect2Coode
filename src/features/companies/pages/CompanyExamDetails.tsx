@@ -83,8 +83,8 @@ export const CompanyExamDetails: React.FC = () => {
         setLoading(false);
 
         // Load associated company information and sibling exams
-        const compId = effectiveCompanyId || res.data?.exam?.companyId;
-        if (compId) {
+        const compId = Number(effectiveCompanyId || res.data?.exam?.companyId);
+        if (Number.isSafeInteger(compId) && compId > 0) {
           try {
             const compRes = await companyService.getCompanyBySlug(
               String(compId),

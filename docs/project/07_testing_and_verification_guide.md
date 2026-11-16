@@ -14,7 +14,7 @@ Connect2Code implements a multi-tiered, production-grade verification strategy:
    - Postman CLI collection runner executing real HTTP contract assertions against the live backend (`https://api.connect2code.in/api/v1`).
    - Defined in [`postman/connect2code-api-contracts.postman_collection.json`](../../postman/connect2code-api-contracts.postman_collection.json).
 4. **Node.js Regression Test Runner** (`npm test`):
-   - Native `node:test` regression runner executing 423 deep contract tests across 25 suites in `scripts/tests/`.
+   - Native `node:test` regression runner executing 438 deep contract tests across 25 suites in `scripts/tests/`.
 5. **Dependency & Architecture Validation** (`npm run depcruise`):
    - `dependency-cruiser` enforcing 0 circular dependencies, strict module boundaries, and central `apiClient` isolation.
    - Configured via [`.dependency-cruiser.cjs`](../../.dependency-cruiser.cjs).
@@ -56,10 +56,10 @@ Connect2Code implements a multi-tiered, production-grade verification strategy:
 | [`questionsPaginationResilience.test.mjs`](../../scripts/tests/questionsPaginationResilience.test.mjs) | Real pagination metadata, strict row identity/title, mixed-page rejection, detail/save identity checks, production-grade optional-field normalization, and problem-service propagation. | 12 |
 | [`referenceLibraryManagement.test.mjs`](../../scripts/tests/referenceLibraryManagement.test.mjs) | Central reference endpoints, strict DTO validation, direct list-owned platform logos without a duplicate QPF request, admin-only mutations, shared taxonomy state, dynamic exam taxonomy, transport ownership guards, semantic save naming, envelope/bodyless-204 hard-delete success, hard-delete confirmation, and guarded routing. | 14 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, generation-owned pagination, ref-synchronized manual selection, per-question/language draft restoration, and stable initial MCQ requests. | 14 |
-| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, and all-page company loading. | 22 |
+| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, all-page company loading, and numeric-only company-exam request gating. | 28 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
-| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, shared API-backed coding-question listing, static CodeChef-style company wordmarks, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, viewport-locked responsive problem splitters, responsive toast placement, and deployment-header contracts. | 32 |
-| **Current declared total** | **All 25 test files** | **422 tests; latest full run passed (422/422) on 2026-11-15.** |
+| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, shared API-backed coding-question listing, static CodeChef-style company wordmarks, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, public SSR hub contracts, numeric company-exam sequencing, viewport-locked responsive problem splitters, responsive toast placement, and deployment-header contracts. | 33 |
+| **Current declared total** | **All 25 test files** | **430 tests; latest full run passed (430/430) on 2026-11-16.** |
 
 ---
 
