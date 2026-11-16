@@ -79,7 +79,7 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
           {/* Exam Platform / Acceptance */}
           {showExamPlatform && (
             <td className="py-3.5 px-4">
-              <Skeleton className="h-4 w-20 rounded-md" />
+              <Skeleton className="h-9 w-20 rounded-md" />
             </td>
           )}
 
@@ -87,8 +87,7 @@ export const TableRowSkeleton: React.FC<TableRowSkeletonProps> = ({
           {showCompanies && (
             <td className="py-3.5 px-4 whitespace-nowrap">
               <div className="flex items-center gap-1.5">
-                <Skeleton className="w-7 h-7 rounded-full shrink-0" />
-                <Skeleton className="w-7 h-7 rounded-full shrink-0" />
+                <Skeleton className="w-20 h-9 rounded-md shrink-0" />
               </div>
             </td>
           )}
