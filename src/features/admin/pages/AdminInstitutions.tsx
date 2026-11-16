@@ -600,5 +600,3 @@ export const AdminInstitutions: React.FC = () => {
     </div>
   );
 };
-
-export default AdminInstitutions;

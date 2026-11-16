@@ -541,5 +541,3 @@ export const AdminCompanies: React.FC = () => {
     </div>
   );
 };
-
-export default AdminCompanies;

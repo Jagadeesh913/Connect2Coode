@@ -146,7 +146,7 @@ export const getActionableErrorMessage = (
 /**
  * Detects internal backend implementation leakage (SQL, Java exception traces, class names)
  */
-export const isInternalServerLeak = (text: string): boolean => {
+const isInternalServerLeak = (text: string): boolean => {
   if (!text || typeof text !== 'string') return false;
   const lower = text.toLowerCase();
   return (

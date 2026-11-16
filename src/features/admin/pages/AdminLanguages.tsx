@@ -444,5 +444,3 @@ export const AdminLanguages: React.FC = () => {
     </div>
   );
 };
-
-export default AdminLanguages;

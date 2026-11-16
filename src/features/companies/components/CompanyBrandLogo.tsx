@@ -143,5 +143,3 @@ export const CompanyCircleBadge: React.FC<CompanyCircleBadgeProps> = ({
     />
   </span>
 );
-
-export default CompanyBrandLogo;

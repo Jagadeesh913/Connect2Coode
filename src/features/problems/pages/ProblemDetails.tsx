@@ -2070,5 +2070,3 @@ export const ProblemDetails: React.FC = () => {
     </div>
   );
 };
-
-export default ProblemDetails;

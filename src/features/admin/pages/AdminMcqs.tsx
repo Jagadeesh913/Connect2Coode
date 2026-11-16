@@ -1150,5 +1150,3 @@ export const AdminMcqs: React.FC = () => {
     </div>
   );
 };
-
-export default AdminMcqs;

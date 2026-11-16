@@ -309,5 +309,3 @@ export const AdminDashboard: React.FC = () => {
     </div>
   );
 };
-
-export default AdminDashboard;

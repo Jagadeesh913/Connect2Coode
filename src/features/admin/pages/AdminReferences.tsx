@@ -425,5 +425,3 @@ export const AdminReferences: React.FC = () => {
     </div>
   );
 };
-
-export default AdminReferences;

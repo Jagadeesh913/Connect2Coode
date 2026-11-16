@@ -105,7 +105,7 @@ const DIFFICULTY_OPTIONS: C2CSelectOption[] = [
   { value: 'HARD', label: 'Hard' },
 ];
 
-export const UserProfilePage: React.FC = () => {
+const UserProfilePage: React.FC = () => {
   const dispatch = useAppDispatch();
 
   const {
@@ -1235,5 +1235,4 @@ export const UserProfilePage: React.FC = () => {
   );
 };
 
-export { UserProfilePage as ProfileSettings, UserProfilePage as UserProfile };
-export default UserProfilePage;
+export { UserProfilePage as ProfileSettings };

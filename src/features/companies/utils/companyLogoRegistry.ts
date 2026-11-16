@@ -668,7 +668,7 @@ export function normalizeCompanySearchKey(rawName: string | undefined | null): s
     .trim();
 }
 
-export function toCompanyAssetSlug(rawName: string | undefined | null): string {
+function toCompanyAssetSlug(rawName: string | undefined | null): string {
   return normalizeCompanySearchKey(rawName)
     .replace(/\band\b/g, '')
     .replace(/[^a-z0-9]+/g, '-')

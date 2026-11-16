@@ -31,7 +31,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
  * nullable descriptions, nullable company logos/websites, string company arrays,
  * and string/null question platforms without dropping valid catalog rows.
  */
-export const normalizeQuestionListItem = (value: unknown): DomainQuestionListItem | null => {
+const normalizeQuestionListItem = (value: unknown): DomainQuestionListItem | null => {
   if (!isRecord(value)) {
     return null;
   }
@@ -206,9 +206,6 @@ export const normalizeQuestionListItem = (value: unknown): DomainQuestionListIte
     isActive,
   };
 };
-
-export const isQuestionListItem = (value: unknown): value is DomainQuestionListItem =>
-  normalizeQuestionListItem(value) !== null;
 
 const requirePageInteger = (
   primary: unknown,

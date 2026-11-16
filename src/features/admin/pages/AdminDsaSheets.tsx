@@ -628,5 +628,3 @@ export const AdminDsaSheets: React.FC = () => {
     </div>
   );
 };
-
-export default AdminDsaSheets;

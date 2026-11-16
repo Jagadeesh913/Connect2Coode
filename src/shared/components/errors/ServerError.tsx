@@ -74,5 +74,3 @@ export const ServerError: React.FC = () => {
     </div>
   );
 };
-
-export default ServerError;

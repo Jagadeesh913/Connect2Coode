@@ -163,5 +163,3 @@ export const RouteErrorBoundary: React.FC = () => {
     </div>
   );
 };
-
-export default RouteErrorBoundary;

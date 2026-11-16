@@ -151,5 +151,3 @@ export const ComingSoon: React.FC<ComingSoonProps> = ({ featureName }) => {
     </div>
   );
 };
-
-export default ComingSoon;

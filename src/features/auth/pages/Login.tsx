@@ -940,5 +940,3 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     </div>
   );
 };
-
-export default Login;

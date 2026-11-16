@@ -1642,5 +1642,3 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
     </div>
   );
 };
-
-export default AptitudePrep;

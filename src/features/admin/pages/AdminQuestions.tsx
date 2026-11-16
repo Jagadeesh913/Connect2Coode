@@ -770,5 +770,3 @@ export const AdminQuestions: React.FC = () => {
     </div>
   );
 };
-
-export default AdminQuestions;

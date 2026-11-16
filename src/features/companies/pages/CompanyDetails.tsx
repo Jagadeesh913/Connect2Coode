@@ -1225,5 +1225,3 @@ export const CompanyDetails: React.FC = () => {
     </div>
   );
 };
-
-export default CompanyDetails;

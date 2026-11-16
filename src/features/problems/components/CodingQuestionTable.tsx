@@ -84,7 +84,7 @@ const normalizePlatform = (raw?: string | null): { name: string; website?: strin
   return { name: trimmed };
 };
 
-export const PlatformCircleBadge: React.FC<{ question: CodingQuestionListItem; logoUrl?: string | null }> = ({ question, logoUrl }) => {
+const PlatformCircleBadge: React.FC<{ question: CodingQuestionListItem; logoUrl?: string | null }> = ({ question, logoUrl }) => {
   const raw =
     question.questionPlatform ||
     question.qpfRefName ||

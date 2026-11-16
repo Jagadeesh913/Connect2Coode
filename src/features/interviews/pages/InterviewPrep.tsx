@@ -176,5 +176,3 @@ export const InterviewPrep: React.FC = () => {
     </div>
   );
 };
-
-export default InterviewPrep;

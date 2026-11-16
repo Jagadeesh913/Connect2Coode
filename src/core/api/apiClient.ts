@@ -13,6 +13,25 @@ import {
 } from '../security/authContract';
 import { withCrossTabRefreshLock } from '../security/refreshCoordinator';
 import { userScopedStorage } from '../storage/userScopedStorage';
+import type { ApiResponse } from '../types/api';
+
+type HeaderContainer = Record<string, unknown>;
+
+function setRequestHeader(headers: HeaderContainer, name: string, value: string): void {
+  if (typeof (headers as { set?: unknown }).set === 'function') {
+    (headers as { set: (k: string, v: string) => void }).set(name, value);
+  }
+  headers[name] = value;
+  headers[name.toLowerCase()] = value;
+}
+
+function deleteRequestHeader(headers: HeaderContainer, name: string): void {
+  if (typeof (headers as { delete?: unknown }).delete === 'function') {
+    (headers as { delete: (k: string) => void }).delete(name);
+  }
+  delete headers[name];
+  delete headers[name.toLowerCase()];
+}
 
 /**
  * Resolves and normalizes the API base URL.
@@ -115,13 +134,13 @@ export type AuthPolicy = 'public' | 'protected';
 export type C2CAxiosRequestConfig = AxiosRequestConfig & { authPolicy?: AuthPolicy };
 
 type UnwrappedApiClient = Omit<AxiosInstance, 'request' | 'get' | 'delete' | 'post' | 'put' | 'patch'> & {
-  <T = any>(config: C2CAxiosRequestConfig): Promise<T>;
-  request<T = any>(config: C2CAxiosRequestConfig): Promise<T>;
-  get<T = any>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
-  delete<T = any>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
-  post<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
-  put<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
-  patch<T = any>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
+  <T = unknown>(config: C2CAxiosRequestConfig): Promise<T>;
+  request<T = unknown>(config: C2CAxiosRequestConfig): Promise<T>;
+  get<T = unknown>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
+  delete<T = unknown>(url: string, config?: C2CAxiosRequestConfig): Promise<T>;
+  post<T = unknown>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
+  put<T = unknown>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
+  patch<T = unknown>(url: string, data?: unknown, config?: C2CAxiosRequestConfig): Promise<T>;
 };
 
 export const apiClient = axios.create({
@@ -189,7 +208,7 @@ export const executeRefreshToken = async (): Promise<AuthSessionData> => {
     try {
       const refreshUrl = `${BASE_URL}/auth/refresh`;
 
-      const refreshRes: any = await axios.post(
+      const refreshRes = await axios.post<ApiResponse<AuthSessionData>>(
         refreshUrl,
         undefined,
         {
@@ -332,14 +351,10 @@ apiClient.interceptors.request.use(
     requestConfig.authPolicy = authPolicy;
 
     const token = tokenStorage.getAccessToken();
+    config.headers = (config.headers || {}) as InternalAxiosRequestConfig['headers'];
 
     if (token && authPolicy === 'protected') {
-      config.headers = config.headers || {};
-      if (typeof (config.headers as any).set === 'function') {
-        (config.headers as any).set('Authorization', `Bearer ${token}`);
-      }
-      config.headers['Authorization'] = `Bearer ${token}`;
-      config.headers['authorization'] = `Bearer ${token}`;
+      setRequestHeader(config.headers as HeaderContainer, 'Authorization', `Bearer ${token}`);
     }
 
     // Parameter protection: Ensure token is NEVER sent in URL query parameters
@@ -356,18 +371,9 @@ apiClient.interceptors.request.use(
     config.data = sanitizeRequestData(config.data);
     const preparedContentType = getPreparedRequestContentType(config.data);
     if (preparedContentType === null) {
-      if (typeof (config.headers as any).delete === 'function') {
-        (config.headers as any).delete('Content-Type');
-      } else {
-        delete config.headers['Content-Type'];
-        delete config.headers['content-type'];
-      }
+      deleteRequestHeader(config.headers as HeaderContainer, 'Content-Type');
     } else if (preparedContentType) {
-      if (typeof (config.headers as any).set === 'function') {
-        (config.headers as any).set('Content-Type', preparedContentType);
-      } else {
-        config.headers['Content-Type'] = preparedContentType;
-      }
+      setRequestHeader(config.headers as HeaderContainer, 'Content-Type', preparedContentType);
     }
     return config;
   },
@@ -433,23 +439,21 @@ apiClient.interceptors.response.use(
       try {
         const refreshedSession = await executeRefreshToken();
         const newAccessToken = refreshedSession.token;
-        originalRequest.headers = originalRequest.headers || {};
-        if (typeof (originalRequest.headers as any).set === 'function') {
-          (originalRequest.headers as any).set('Authorization', `Bearer ${newAccessToken}`);
-        }
-        originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
-        originalRequest.headers['authorization'] = `Bearer ${newAccessToken}`;
+        originalRequest.headers = (originalRequest.headers || {}) as C2CAxiosRequestConfig['headers'];
+        setRequestHeader(originalRequest.headers as HeaderContainer, 'Authorization', `Bearer ${newAccessToken}`);
         return apiClient(originalRequest);
-      } catch (refreshErr: any) {
-        const refreshStatus = refreshErr?.response?.status || 0;
-        const refreshBody = refreshErr?.response?.data;
+      } catch (refreshErr: unknown) {
+        const axiosErr = axios.isAxiosError(refreshErr) ? refreshErr : null;
+        const refreshStatus = axiosErr?.response?.status || 0;
+        const refreshBody = axiosErr?.response?.data;
         const fallbackMessage = refreshStatus === 401
           ? 'Your session has expired. Please log in again.'
-          : refreshErr?.message || 'Session refresh failed. Please try again.';
+          : (axiosErr?.message || (refreshErr instanceof Error ? refreshErr.message : 'Session refresh failed. Please try again.'));
         if (refreshBody && typeof refreshBody === 'object' && !Array.isArray(refreshBody)) {
+          const bodyObj = refreshBody as { statusCode?: number };
           return Promise.reject({
             ...refreshBody,
-            statusCode: refreshBody.statusCode || refreshStatus,
+            statusCode: bodyObj.statusCode || refreshStatus,
           });
         }
         return Promise.reject({

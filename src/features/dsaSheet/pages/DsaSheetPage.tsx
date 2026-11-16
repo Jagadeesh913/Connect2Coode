@@ -497,5 +497,3 @@ export const DsaSheetPage: React.FC = () => {
     </div>
   );
 };
-
-export default DsaSheetPage;

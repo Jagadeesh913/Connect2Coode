@@ -171,7 +171,7 @@ export interface Question {
   questionPlatform?: string | QuestionPlatformSummary | null;
   platformName?: string;
   questionHints: QuestionHint[];
-  companies?: Company[] | any[];
+  companies?: Company[];
   hackerRankUrl?: string;
   leetCodeUrl?: string;
   gfgUrl?: string;

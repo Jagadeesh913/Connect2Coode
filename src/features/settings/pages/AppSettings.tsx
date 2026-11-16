@@ -71,5 +71,3 @@ export const AppSettings: React.FC = () => {
     </div>
   );
 };
-
-export default AppSettings;

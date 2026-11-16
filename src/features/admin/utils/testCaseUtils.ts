@@ -19,7 +19,7 @@ export function extractConstraintsFromDescription(description?: string | null): 
 /**
  * Parses structured test cases (Input, Output, Explanation) from Markdown / text problem descriptions.
  */
-export function parseTestCasesFromMarkdown(
+function parseTestCasesFromMarkdown(
   text?: string | null,
   questionId?: number | string | null
 ): QuestionTestCase[] {

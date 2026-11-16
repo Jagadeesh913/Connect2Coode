@@ -18,11 +18,11 @@ interface UseAssessmentIntegrityOptions {
 const CLIPBOARD_ALLOWED_SELECTOR = '[data-assessment-clipboard="allowed"]';
 const INTERNAL_CLIPBOARD_SELECTOR = '[data-assessment-clipboard="internal"]';
 
-export function isAssessmentClipboardAllowed(target: EventTarget | null): boolean {
+function isAssessmentClipboardAllowed(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(CLIPBOARD_ALLOWED_SELECTOR));
 }
 
-export function isInternalAssessmentClipboard(target: EventTarget | null): boolean {
+function isInternalAssessmentClipboard(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(INTERNAL_CLIPBOARD_SELECTOR));
 }
 
