@@ -114,7 +114,7 @@ npm run typecheck     # tsc -p tsconfig.json --noEmit (0 errors)
 
 ### 4. Unit & Component Tests
 ```bash
-npm run test:unit     # Vitest + React Testing Library (14 suites, 56 passing unit/component tests)
+npm run test:unit     # Vitest + React Testing Library (15 suites, 68 passing unit/component tests)
 ```
 
 ### 5. Regression Contract Test Suites
@@ -129,7 +129,7 @@ npm run test:api      # Newman runner executing live contract assertions (--time
 
 ### 7. End-to-End Browser Tests
 ```bash
-npm run test:e2e      # Playwright Chromium tests (4 specs, 9 passing browser flows)
+npm run test:e2e      # Playwright Chromium tests (4 specs, 13 passing browser flows)
 ```
 
 ### 8. Production Build & Smoke Test

@@ -270,10 +270,10 @@ Every first-party source file has been inspected and assigned a verified status 
 
 ## 9. Verification Summary & Audit Totals
 
-- **Total First-Party TypeScript/TSX Source Files in `src/`**: 171 (180 including unit test files in `src/test/`)
+- **Total First-Party TypeScript/TSX Source Files in `src/`**: 171 (181 including unit test files in `src/test/`)
 - **Node Test Runner Suites (`scripts/tests/`)**: 25 suites, 423 passing regression contract assertions (`npm test`)
-- **Vitest Unit/Component Test Suites (`src/test/`)**: 14 suites, 56 passing tests (`npm run test:unit`)
-- **Playwright E2E Browser Specs (`e2e/`)**: 3 specs, 9 passing tests (`npm run test:e2e`)
+- **Vitest Unit/Component Test Suites (`src/test/`)**: 15 suites, 68 passing tests (`npm run test:unit`)
+- **Playwright E2E Browser Specs (`e2e/`)**: 4 specs, 13 passing tests (`npm run test:e2e`)
 - **Static Quality & Security Gates**:
   - `npm run typecheck`: 0 TypeScript compiler errors across entire codebase.
   - `npm run lint`: 0 oxlint errors and 0 warnings across 218 source and test files.
