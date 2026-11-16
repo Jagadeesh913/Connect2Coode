@@ -33,7 +33,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 
 | ID | Check | Resolution / evidence required | Status |
 | :--- | :--- | :--- | :---: |
-| AUTH-01 | Login and refresh accept the deployed access-token field without exposing refresh credentials | The boundary now accepts the workspace-evidenced `token` and `accessToken` spellings and emits only canonical `token`; refresh-token fields remain discarded. Live 2026-11-07 evidence shows startup refresh reaches the backend but returns HTTP 401 `Refresh token missing` immediately after login/reload. The active `www` production origin passes credentialed CORS preflight, so backend login cookie issuance/attributes remain a release blocker. | `NOT WORKING` |
+| AUTH-01 | Login and refresh accept the deployed access-token field without exposing refresh credentials | Playwright Edge verified login, the canonical protected refresh cookie, hard-reload refresh, access-token rotation, logout clearing, and post-logout rejection against the real backend from the production web origin. Postman passed 14/15 assertions; the failure proves successful login JSON still exposes `refreshToken`. The frontend discards it, but backend response exposure remains release-blocking. | `NOT WORKING` |
 | AUTH-02 | A failed startup refresh cannot permanently hide login | Guest recovery retains the safe retry path and adds an explicit **Sign in instead** action that clears client access/profile memory and stale-response ownership without touching the HttpOnly cookie. Final interaction/browser verification is pending. | `PARTIALLY VERIFIED` |
 | AUTH-03 | A startup or same-tab reconciliation refresh cannot overwrite a completed credential login | Reducer request ownership ignores stale startup settlement, and the cross-tab transport now shares one channel object per tab so the origin tab cannot consume its own login event and discard the new session. Static regressions cover both protections; browser confirmation remains pending. | `PARTIALLY VERIFIED` |
 | AUTH-04 | Navbar and feature gates agree on authenticated state | Redux `isAuthenticated` is the sole navbar authority; nullable profile data no longer forces guest buttons during an authenticated session. Final rendered-browser confirmation remains pending. | `PARTIALLY VERIFIED` |
@@ -90,7 +90,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 
 | ID | Journey | Acceptance requirement | Status |
 | :--- | :--- | :--- | :---: |
-| J-01 | Signup, login, OAuth, refresh, logout, account switch | Supported-browser desktop/mobile run; stale session and cross-tab cases included. | `UNKNOWN` |
+| J-01 | Signup, login, OAuth, refresh, logout, account switch | Playwright Edge verified credential login, hard-reload restoration, protected-401 refresh recovery, token rotation, mobile rendering, logout clearing, and signed-out reload. Signup, OAuth, account switching, simultaneous tabs, and true time-based expiry remain untested. | `PARTIALLY VERIFIED` |
 | J-02 | Academic profile search/edit/save | Authenticated search plus selected/free-text institution save validation. | `UNKNOWN` |
 | J-03 | Aptitude and company MCQ answering | List row without options, detail success, empty detail, retry, and correctness persistence. | `UNKNOWN` |
 | J-04 | Question list/detail/search/filter/pagination | Every page/filter must return correct real metadata; known corrupt backend rows must be repaired. | `NOT WORKING` |
@@ -108,8 +108,8 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 | :--- | :--- | :--- | :---: |
 | OPS-01 | CI uses the lockfile toolchain | Typecheck uses the installed package script; checkout and setup-node are pinned to reviewed immutable v7 SHAs. A CI run and dependency-update policy remain required. | `PARTIALLY VERIFIED` |
 | OPS-02 | Runtime version is reproducible | `package.json` now declares Node `>=22.12.0 <23`; deployment and CI must use that range. | `PARTIALLY VERIFIED` |
-| OPS-03 | Postman workspace is an authoritative, secret-free contract source | The five-request collection was renamed as the canonical contract, moved to `{{base_url}}`, changed to collection-level `{{access_token}}`, and verified to contain no legacy Render host, literal JWT-like value, or explicit Authorization header. The workspace remains fragmented and incomplete; rotate the formerly exposed credential, consolidate the remaining endpoints, and add meaningful assertions before treating it as authoritative. | `PARTIALLY VERIFIED` |
-| OPS-04 | Dependency/build/security checks run on the final tree | Tests, typecheck, lint, architecture/docs checks, production build, diff validation, and `npm audit --omit=dev` (0 vulnerabilities) pass on the final tree. A clean install, preview smoke, and deployed header/browser checks remain required. | `PARTIALLY VERIFIED` |
+| OPS-03 | Postman workspace is an authoritative, secret-free contract source | `postman/auth-session-production-readiness.postman_collection.json` is a reusable, secret-free five-request auth collection. Postman CLI 1.90.0 executed 15 assertions: 14 passed and the refresh-credential JSON exposure failed as designed. Credentials were supplied only at runtime and no token value was logged or exported. Broader API coverage remains fragmented. | `PARTIALLY VERIFIED` |
+| OPS-04 | Dependency/build/security checks run on the final tree | Node 22.22.0 tests (423/423), typecheck, lint, architecture/docs checks, and production build pass. The changed local production bundle was exercised in Playwright Edge with Vercel-equivalent document routing; provider-level Vercel headers/routing and a clean install remain pending. | `PARTIALLY VERIFIED` |
 | OPS-05 | Development proxy verifies upstream TLS | All proxy targets use default TLS certificate verification; final dev proxy smoke is pending. | `PARTIALLY VERIFIED` |
 
 ## 4. Release-blocking external work
@@ -119,10 +119,12 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 3. Prove hidden test data is absent from USER network responses.
 4. Define company-question replace/remove semantics and verify removals persist.
 5. Repair the learning-sheet section-question 500 and the submit-code null test-case failure.
-6. Rotate the credential formerly exposed in Postman, consolidate the fragmented workspace into the sanitized canonical collection/environment, and add meaningful assertions for the complete API surface.
-7. Execute the final verification matrix and supported-browser production journeys.
-8. Supply reviewed privacy/terms/legal content and add routes only after approval; complete the assistive-technology/browser audit.
-9. Define the update policy for the now-immutable GitHub Action pins and verify the workflow on the final tree.
+6. Remove `refreshToken` from successful authentication JSON responses; retain it only in the protected cookie contract.
+7. Fix company detail to wait for the resolved numeric company ID before requesting `/company/{companyId}/exams/list`; make invalid backend path values return 4xx rather than 500.
+8. Rotate the credential formerly exposed in historical Postman assets and consolidate the remaining fragmented API surface around secret-free executable collections.
+9. Execute deployed Vercel routing/header acceptance, real simultaneous multi-tab rotation, and the remaining mutation/execution journeys in an approved non-production environment.
+10. Supply reviewed privacy/terms/legal content and add routes only after approval; complete the assistive-technology/browser audit.
+11. Define the update policy for the now-immutable GitHub Action pins and verify the workflow on the final tree.
 
 ## 5. Current Phase 1 verdict
 

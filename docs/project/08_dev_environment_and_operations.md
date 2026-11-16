@@ -108,7 +108,7 @@ Connect2Code is configured for deployment on Vercel or any SPA static web host.
   ]
 }
 ```
-- **Public prerendering**: `npm run build` runs Vite and then [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs). It emits route-specific documents for `/`, `/practice`, `/dsa-sheet`, `/companies`, and `/aptitude`, plus `sitemap.xml`, `index.md`, `llms.txt`, `app.html`, and `404.html`. Public pages place factual route content in the initial React root, which React replaces on client mount; private shells retain their empty root plus noindex fallback. The output is identical for browsers and crawlers; no User-Agent routing remains.
+- **Public prerendering and hydration**: `npm run build` runs the client build and then [`scripts/generate-seo-assets.mjs`](../../scripts/generate-seo-assets.mjs). The generator creates a temporary bundled SSR entry from [`src/entry-server.tsx`](../../src/entry-server.tsx), renders the real React route tree for `/`, `/practice`, `/dsa-sheet`, `/companies`, and `/aptitude`, and injects it into roots marked `data-c2c-ssr="true"`. `src/main.tsx` hydrates only those roots; private shells keep an empty root and use client mounting. Public route copy comes from one JSON registry shared by SSR and React. The build also emits `sitemap.xml`, `index.md`, `llms.txt`, `app.html`, and `404.html`. Browser and crawler output is identical and no User-Agent routing remains.
 - **Deep links and real 404s**: Static public hubs resolve through Vercel clean URLs. Every other valid React route is explicitly rewritten to the noindex `/app` shell. With no global SPA catch-all, any path outside the allowlist falls through to generated `404.html` and Vercel's HTTP 404 behavior. Keep the allowlist synchronized with `src/routes/appRoutes.tsx`.
 - **Edge proxy**: Rewrites `/api/*` and `/oauth2/*` directly to `https://api.connect2code.in`; refresh and OAuth callback paths retain their existing dedicated rules.
 - **Canonical and social metadata**: All generated public documents contain the canonical `www` URL, absolute social image URLs, and route-specific WebPage JSON-LD before JavaScript loads. After React mounts, `RouteMetadata` continues to reconcile metadata on navigation using the pinned production origin.
@@ -153,6 +153,8 @@ steps:
 ```
 
 The smoke harness defaults to port 4173. Local runs may set `C2C_SMOKE_PORT` to another available port; strict-port startup prevents false timeouts caused by Vite silently selecting a different port.
+
+`vite preview` alone is not a fidelity-equivalent Vercel staging environment for the generated route documents. Its SPA fallback can return `index.html` for `/practice`, `/dsa-sheet`, other deep links, and protected routes instead of the route-specific `*.html` or `app.html` selected by `vercel.json`; hydrating that mismatched document produces React error 418. In addition, a production-mode bundle intentionally pins the canonical API and does not honor a relative `/api/v1` override, so an authenticated preview on `127.0.0.1` is rejected by production CORS. The 2026-11-16 browser audit therefore served the changed local bundle through a production-origin Playwright route mapper that reproduced the checked-in Vercel document rules while leaving real API requests and cookie/CORS handling untouched. A deployed Vercel preview remains required for provider-level routing/header acceptance.
 
 ### Operational Note on `.env` in Local vs CI
 - `npm run verify:architecture` checks if a `.env` file exists and fails if found.

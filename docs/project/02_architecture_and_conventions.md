@@ -26,7 +26,8 @@ Connect-2-code/
 │   └── tests/                    # 23 Node test runner files; run count recorded in 07
 ├── src/
 │   ├── App.tsx                   # Top-level providers, theme, toast, error boundary
-│   ├── main.tsx                  # React 19 entry point and DOM mounting
+│   ├── main.tsx                  # React 19 entry point; hydrates matching build-time markup
+│   ├── entry-server.tsx          # Build-only memory-router SSR entry for public routes
 │   ├── index.css                 # Tailwind v4 import, design tokens, dark/light variables
 │   ├── vite-env.d.ts             # Vite client environment typing
 │   ├── app/                      # Redux store configuration & typed hooks
@@ -118,7 +119,7 @@ sequenceDiagram
     participant Client as apiClient
 
     Browser->>main: Load bundle & HTML #root
-    main->>App: Mount <App /> inside StrictMode
+    main->>App: Hydrate matching public markup, otherwise mount <App />
     App->>Store: Initialize Store with rootReducer
     App->>Client: Register auth interceptors & storage listeners
     App->>Store: Dispatch hydrateProgress()
@@ -127,7 +128,7 @@ sequenceDiagram
 ```
 
 1. **`index.html`**: Defines the `<div id="root"></div>` container, branded favicon/manifest links, and a complete default SEO/social metadata set for the initial HTML response, then loads the application fonts.
-2. **`src/main.tsx`**: Obtains `#root`, validates DOM presence, and mounts `<App />` within React `StrictMode`.
+2. **`src/main.tsx`**: Obtains `#root`, validates DOM presence, and hydrates only roots marked `data-c2c-ssr="true"`; noindex application shells retain the standard client mount. [`src/entry-server.tsx`](../../src/entry-server.tsx) renders the same route tree, fresh Redux store, and memory router at build time, so hydration never consumes a separately authored SEO tree.
 3. **`src/App.tsx`**: Wraps the tree with:
    - `<Provider store={store}>` (Redux)
    - `<ProgressHydrator />` (hydrates solved/attempted problem IDs per user scope)
@@ -137,6 +138,8 @@ sequenceDiagram
    - `<RouterProvider router={router} />` (React Router v7). The root router also owns a themed `errorElement` (`RouteErrorBoundary`) because React Router handles route-render failures before a conventional application boundary can receive them.
 
 `AppRouterLayout` mounts [`RouteMetadata`](../../src/core/metadata/RouteMetadata.tsx) around every route. [`pageMetadata.ts`](../../src/core/metadata/pageMetadata.ts) owns the route defaults and canonical policy; dynamic problem, company, and company-exam pages use [`usePageMetadata`](../../src/core/metadata/usePageMetadata.ts) only after the loaded entity matches the current route. The override is keyed to React Router's navigation key so metadata from a previous detail page cannot survive client-side navigation.
+
+The five indexable public routes share factual copy through [`publicPageContent.json`](../../src/core/metadata/publicPageContent.json). The build generator and signed-out React hub UI consume that one registry. Authenticated feature components remain unmounted until session restoration succeeds, while signed-out and recovery-failed visitors keep the public hub content instead of swapping to a private loading/error surface.
 
 ---
 
