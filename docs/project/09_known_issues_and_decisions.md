@@ -243,6 +243,12 @@
 - **Decision**: Filtered and paginated `/questions` recovery is accepted only when completeness is proven; numeric detail failures are never hidden by catalog rows. Authentication follows the backend-owned HttpOnly refresh-cookie contract, uses same-tab and cross-tab locking, and distinguishes refresh 401 from temporary failures. Missing required user IDs reject rather than returning fake empty data. Company-ID question requests never fall back to an unscoped text search.
 - **Verification boundary**: Source and unit/runtime regression tests cover these frontend behaviors. The Spring Boot source was not present in the public repository and no live integration or mutation was executed; unprovided backend DTOs remain `UNKNOWN` and admin mutation endpoints remain `PARTIALLY VERIFIED`.
 
+### Decision 26: User Profile (`/userInfo/{userId}`) Primary Key Resolution
+
+- **Context**: When updating existing user academic details via `POST /api/v1/userInfo/{userId}`, transmitting `"id": null` causes Spring Data JPA / Hibernate to trigger an entity insert or null-key constraint violation resulting in HTTP 500 (`"Failed to save user profile"`, `"An unexpected error occurred"`).
+- **Decision**: In `profileService.saveUserInfo` and `ProfileSettings.handleSaveAcademic`, if `payload.id` is not supplied or is null, the frontend automatically issues `GET /api/v1/userInfo/{userId}` to retrieve the existing record `id`, which is then attached to the `POST` payload (`"id": <id>`). For newly registered users with no existing `user_info` record, `id` remains `null`.
+- **Verification**: Verified via `src/test/profile/profileService.test.ts` and `scripts/tests/userInfoProfile.test.mjs`.
+
 ---
 
 ## 3. Unresolved Questions & Future Work

@@ -71,6 +71,93 @@ describe('profileService unit tests', () => {
         'A valid user ID is required to manage profile details.'
       );
     });
+
+    it('resolves existing record id via GET when payload.id is null/missing', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({
+        statusCode: 200,
+        message: 'Success',
+        data: {
+          id: 42,
+          userId: 63,
+          regNumber: '231fa04913',
+          joinedYear: 2023,
+          passedOutYear: 2027,
+          college: 'Test College',
+          bio: 'Test bio',
+        },
+      } as unknown as ApiResponse<unknown>);
+
+      let capturedPostPayload: Record<string, unknown> | null = null;
+      const postSpy = vi.spyOn(apiClient, 'post').mockImplementationOnce(async (_url, body) => {
+        capturedPostPayload = body as Record<string, unknown>;
+        return {
+          statusCode: 200,
+          message: 'Saved',
+          data: {
+            id: 42,
+            userId: 63,
+            regNumber: '231fa04913',
+            joinedYear: 2023,
+            passedOutYear: 2027,
+            college: 'Test College',
+            bio: 'Test bio',
+          },
+        } as unknown as ApiResponse<unknown>;
+      });
+
+      const payload: SaveUserInfoPayload = {
+        id: null,
+        userId: 63,
+        regNumber: '231fa04913',
+        joinedYear: 2023,
+        passedOutYear: 2027,
+        college: 'Test College',
+        bio: 'Test bio',
+      };
+
+      const result = await profileService.saveUserInfo(63, payload);
+      expect(getSpy).toHaveBeenCalledWith('/userInfo/63', { signal: undefined });
+      expect(postSpy).toHaveBeenCalled();
+      expect(capturedPostPayload).not.toBeNull();
+      expect((capturedPostPayload as unknown as Record<string, unknown>)?.id).toBe(42);
+      expect(result.data.id).toBe(42);
+    });
+
+    it('preserves existing payload.id when already a valid positive number without calling GET', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get');
+      let capturedPostPayload: Record<string, unknown> | null = null;
+      vi.spyOn(apiClient, 'post').mockImplementationOnce(async (_url, body) => {
+        capturedPostPayload = body as Record<string, unknown>;
+        return {
+          statusCode: 200,
+          message: 'Saved',
+          data: {
+            id: 99,
+            userId: 63,
+            regNumber: 'REG99',
+            joinedYear: 2023,
+            passedOutYear: 2027,
+            college: 'Test College',
+            bio: 'Test bio',
+          },
+        } as unknown as ApiResponse<unknown>;
+      });
+
+      const payload: SaveUserInfoPayload = {
+        id: 99,
+        userId: 63,
+        regNumber: 'REG99',
+        joinedYear: 2023,
+        passedOutYear: 2027,
+        college: 'Test College',
+        bio: 'Test bio',
+      };
+
+      const result = await profileService.saveUserInfo(63, payload);
+      expect(getSpy).not.toHaveBeenCalled();
+      expect((capturedPostPayload as unknown as Record<string, unknown>)?.id).toBe(99);
+      expect(result.data.id).toBe(99);
+    });
   });
 
   describe('theme preference', () => {

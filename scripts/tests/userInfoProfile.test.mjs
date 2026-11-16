@@ -240,9 +240,73 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
       assert.equal(res.data.college, 'ABC Engineering College');
     });
 
+    it('resolves existing record id from GET /userInfo/{userId} when payload id is null', async () => {
+      let capturedGetUrl = '';
+      let capturedPostUrl = '';
+      let capturedPostPayload = null;
+
+      apiClient.get = async (url) => {
+        capturedGetUrl = url;
+        return {
+          statusCode: 200,
+          message: 'User profile fetched successfully',
+          data: {
+            id: 1,
+            userId: 89,
+            firstName: 'connecttocodetechsolutions',
+            lastName: null,
+            regNumber: '192G1A0497',
+            joinedYear: 2024,
+            passedOutYear: 2028,
+            college: 'Anantha Lakshmi Institute of Technology & Sciences',
+            bio: 'just for test',
+          },
+          errors: null,
+        };
+      };
+
+      apiClient.post = async (url, payload) => {
+        capturedPostUrl = url;
+        capturedPostPayload = payload;
+        return {
+          statusCode: 200,
+          message: 'User profile saved successfully',
+          data: {
+            ...payload,
+            id: payload.id,
+            userId: 89,
+          },
+          errors: null,
+        };
+      };
+
+      const payload = {
+        id: null,
+        userId: 89,
+        regNumber: '192G1A0497',
+        joinedYear: 2024,
+        passedOutYear: 2028,
+        college: 'Anantha Lakshmi Institute of Technology & Sciences',
+        bio: 'just for test',
+      };
+
+      const res = await profileService.saveUserInfo(89, payload);
+      assert.equal(capturedGetUrl, '/userInfo/89');
+      assert.equal(capturedPostUrl, '/userInfo/89');
+      assert.equal(capturedPostPayload.id, 1, 'id in POST payload must resolve to existing record id from GET');
+      assert.equal(res.data.id, 1);
+    });
+
     it('sends only the established user-info DTO fields', async () => {
       let capturedUrl = '';
       let capturedPayload = null;
+
+      apiClient.get = async () => ({
+        statusCode: 200,
+        message: 'User profile not created yet',
+        data: null,
+        errors: null,
+      });
 
       apiClient.post = async (url, payload) => {
         capturedUrl = url;

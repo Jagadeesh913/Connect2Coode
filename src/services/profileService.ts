@@ -158,6 +158,8 @@ export const profileService = {
   /**
    * POST /api/v1/userInfo/{userId}
    * Creates or updates academic profile data with bearer authentication.
+   * If record primary key `id` is not supplied in the payload, calls GET /api/v1/userInfo/{userId}
+   * to resolve the existing record's `id`, preventing backend 500 error when updating existing users.
    */
   async saveUserInfo(
     userId: string | number,
@@ -167,8 +169,32 @@ export const profileService = {
     if (!Number.isSafeInteger(normalizedUserId) || normalizedUserId < 1) {
       throw new Error('A valid user ID is required to manage profile details.');
     }
+
+    let resolvedId: number | null =
+      payload.id !== undefined && payload.id !== null && Number.isSafeInteger(Number(payload.id)) && Number(payload.id) > 0
+        ? Number(payload.id)
+        : null;
+
+    // When record id is not provided in payload, fetch existing user profile via GET API to retrieve the record id
+    if (resolvedId === null) {
+      try {
+        const existing = await this.getUserInfo(normalizedUserId);
+        const existingId = existing?.data?.id;
+        if (
+          existingId !== undefined &&
+          existingId !== null &&
+          Number.isSafeInteger(Number(existingId)) &&
+          Number(existingId) > 0
+        ) {
+          resolvedId = Number(existingId);
+        }
+      } catch {
+        // If GET fails (e.g. 404 or profile not created yet), continue with resolvedId = null
+      }
+    }
+
     const requestPayload: Record<string, unknown> = {
-      id: payload.id !== undefined && payload.id !== null ? Number(payload.id) : null,
+      id: resolvedId,
       userId: normalizedUserId,
       regNumber: payload.regNumber,
       joinedYear: Number(payload.joinedYear),

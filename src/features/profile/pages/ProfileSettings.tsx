@@ -6,6 +6,7 @@ import {
   fetchUserInfoThunk,
   saveUserInfoThunk,
 } from '../redux/profileSlice';
+import { profileService } from '../../../services/profileService';
 import type { SaveUserInfoPayload } from '../../../core/types/domain';
 import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
 
@@ -261,8 +262,25 @@ const UserProfilePage: React.FC = () => {
       }
       const trimmedFirstName = (data.firstName || '').trim();
       const trimmedLastName = (data.lastName || '').trim();
+
+      let targetRecordId: number | null =
+        userInfo?.id !== undefined && userInfo?.id !== null && Number(userInfo.id) > 0
+          ? Number(userInfo.id)
+          : null;
+
+      if (targetRecordId === null) {
+        try {
+          const existing = await profileService.getUserInfo(effectiveUserId);
+          if (existing?.data?.id && Number(existing.data.id) > 0) {
+            targetRecordId = Number(existing.data.id);
+          }
+        } catch {
+          // Fall back to profileService.saveUserInfo internal resolution
+        }
+      }
+
       const payload: SaveUserInfoPayload = {
-        id: userInfo?.id !== undefined && userInfo?.id !== null ? Number(userInfo.id) : null,
+        id: targetRecordId,
         userId: Number(effectiveUserId),
         ...(trimmedFirstName ? { firstName: trimmedFirstName } : {}),
         ...(trimmedLastName ? { lastName: trimmedLastName } : {}),
