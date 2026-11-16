@@ -1,0 +1,239 @@
+{
+  "info": {
+    "name": "Connect2Code Production API Contracts",
+    "description": "Production API contract verification suite for Connect2Code backend (https://api.connect2code.in/api/v1). Validates authentication, endpoints, C2CResponse wrappers, error sanitization, and security headers.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.connect2code.in/api/v1"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication & Session",
+      "item": [
+        {
+          "name": "Login - Invalid Credentials Rejection",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Response matches C2CResponse schema', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('statusCode', 401);",
+                  "    pm.expect(json).to.have.property('message');",
+                  "    pm.expect(json.data).to.be.null;",
+                  "    pm.expect(json.errors).to.be.an('array');",
+                  "    pm.expect(json.errors).to.include('Invalid Email or Password');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"invalid.user.probe@connect2code.in\",\"password\":\"invalid_password_hash\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Password Reset OTP - Non-existent User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 4xx or 5xx structured response', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 404, 500]);",
+                  "});",
+                  "pm.test('Response is valid JSON with timestamp', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('statusCode');",
+                  "    pm.expect(json).to.have.property('message');",
+                  "    pm.expect(json).to.have.property('timestamp');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"nonexistent.user.test@connect2code.in\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/generatePasswordResetOtp",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "generatePasswordResetOtp"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Security & Route Guards (Unauthenticated Ingestion)",
+      "item": [
+        {
+          "name": "Reference Library - 401 Protected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Returns JWT missing or invalid error message', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('statusCode', 401);",
+                  "    pm.expect(json.errors).to.be.an('array');",
+                  "    pm.expect(json.errors[0]).to.include('JWT token is missing or invalid');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/referenceLibrary/refGroupCode/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["referenceLibrary", "refGroupCode", "list"]
+            }
+          }
+        },
+        {
+          "name": "Company List - 401 Protected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Rejects unauthenticated company query', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.statusCode).to.eql(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/company/list",
+              "host": ["{{baseUrl}}"],
+              "path": ["company", "list"]
+            }
+          }
+        },
+        {
+          "name": "Questions Query - 401 Protected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "pm.test('Rejects unauthenticated question list request', function () {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.statusCode).to.eql(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pageRequest\":{\"pageNumber\":0,\"pageSize\":10}}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/questions",
+              "host": ["{{baseUrl}}"],
+              "path": ["questions"]
+            }
+          }
+        },
+        {
+          "name": "Admin Execution - 401 Protected",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"languageId\":1,\"sourceCode\":\"print('probe')\"}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/testCode",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "testCode"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@ if (!Number.isInteger(port) || port < 1 || port > 65535) {
 const baseUrl = `http://${host}:${port}`;
 const routes = ['/', '/login', '/practice', '/problems/1', '/companies/tcs'];
 
-const server = spawn('npm', ['run', 'preview', '--', '--host', host, '--port', String(port), '--strictPort'], {
+const server = spawn(`npm run preview -- --host ${host} --port ${port} --strictPort`, {
   stdio: ['ignore', 'pipe', 'pipe'],
   shell: true,
 });
