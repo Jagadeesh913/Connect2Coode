@@ -57,7 +57,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `src/index.css` | Tailwind v4 styles, tokens, themes | `RUNTIME-VERIFIED` | Compiled cleanly by `@tailwindcss/vite`; application content is non-selectable except isolated Monaco, and print output is suppressed. |
 | `src/vite-env.d.ts`| Vite client type declarations | `VERIFIED` | Standard client typings. |
 | `src/app/store.ts` | Redux store configuration | `RUNTIME-VERIFIED` | Configured with rootReducer and post-reducer persistence middleware. |
-| `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; only COMPANY/APTITUDE bookmarks are stored locally. |
+| `src/app/clientPersistenceMiddleware.ts` | Scoped bookmark/progress persistence boundary | `RUNTIME-VERIFIED` | Persists next Redux state after fulfilled mutations/hydration; local bookmark persistence has been completely removed to keep bookmarks 100% API driven. |
 | `src/app/rootReducer.ts` | Combined root reducer (9 slices) | `PARTIALLY VERIFIED` | Clears protected caches on logout/forced unauthentication and identity-changing auth while preserving same-user refresh state; final tests are pending. |
 | `src/app/hooks.ts` | Typed Redux hooks | `RUNTIME-VERIFIED` | React Redux 9 `withTypes` hooks for dispatch, selector, and store. |
 
@@ -252,8 +252,8 @@ Every first-party source file has been inspected and assigned a verified status 
 ### G. Profile, Bookmarks, Landing, Settings, Roadmaps
 | File Path | Role | Status | Notes |
 | :--- | :--- | :---: | :--- |
-| `src/features/bookmarks/pages/BookmarksList.tsx` | User bookmarked problems page | `RUNTIME-VERIFIED` | Per-item pending state disables duplicate removal and exposes progress accessibly. |
-| `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Server problem bookmarks omit unprovided save timestamps; scoped local persistence, refresh failure preservation, and stale-response ownership are tested. |
+| `src/features/bookmarks/pages/BookmarksList.tsx` | User bookmarked problems page | `RUNTIME-VERIFIED` | Production-grade 100% API-driven bookmarks hub with Connect2Code design tokens, search, difficulty filtering, sorting, breadcrumbs, Lucide icons, and accessible deletion. |
+| `src/features/bookmarks/redux/bookmarkSlice.ts` | Bookmarks Redux slice | `RUNTIME-VERIFIED` | Server problem bookmarks omit unprovided save timestamps; strictly API-driven with all local storage persistence and mock offline types removed. |
 | `src/features/institutions/components/InstitutionAutocomplete.tsx` | College autocomplete input | `RUNTIME-VERIFIED` | Minimum-three-character debounce with cancellable requests and shaped dropdown-result skeletons. |
 | `src/features/interviews/pages/InterviewPrep.tsx` | Curated interview questions | `VERIFIED` | Gated by `ComingSoon`. |
 | `src/features/landing/pages/Landing.tsx` | Public landing page and static practice preview | `RUNTIME-VERIFIED` | Removes simulated success, unmeasured totals, and testimonial claims; illustrative workflows are labeled; the company-practice area combines locally registered CodeChef-style horizontal wordmarks with the original continuous marquee, hover/focus pause, and manual arrows while hiding repeated copies from assistive technology. The selected hero uses responsive local AVIF/WebP sources (640w/960w/1440w), PNG fallback, intrinsic dimensions, and high fetch priority; local production-preview rendering is verified, while deployed CWV remains unmeasured. |

@@ -121,21 +121,21 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.match(code, /addCase\(fetchBookmarks\.rejected,\s*\(state,\s*action\)\s*=>\s*\{[\s\S]*?state\.loading\s*=\s*false/, 'fetchBookmarks.rejected must set loading to false');
     });
 
-    it('verifies auth transitions reset bookmarks and browser-only types use scoped storage', () => {
+    it('verifies auth transitions reset bookmarks and bookmarks are strictly API-driven without local storage', () => {
       const slicePath = path.resolve(process.cwd(), 'src/features/bookmarks/redux/bookmarkSlice.ts');
       const code = fs.readFileSync(slicePath, 'utf8');
       assert.match(code, /auth\/logout\/fulfilled/, 'bookmarkSlice must handle auth/logout/fulfilled');
       assert.match(code, /auth\/logout\/rejected/, 'bookmarkSlice must handle auth/logout/rejected');
       assert.match(code, /auth\/login\/fulfilled/, 'bookmarkSlice must handle auth/login/fulfilled');
-      assert.match(code, /userScopedStorage/, 'browser-only bookmark types must use user-scoped storage');
-      assert.match(code, /item\.type === 'APTITUDE' \|\| item\.type === 'COMPANY'/, 'only unsupported browser-only types may hydrate locally');
+      assert.doesNotMatch(code, /myjo_bookmarks/, 'bookmarkSlice must not use local bookmark storage keys');
+      assert.doesNotMatch(code, /readLocalBookmarks/, 'bookmarkSlice must not read local bookmarks');
 
       const middlewareCode = fs.readFileSync(
         path.resolve(process.cwd(), 'src/app/clientPersistenceMiddleware.ts'),
         'utf8'
       );
-      assert.match(middlewareCode, /type === 'APTITUDE' \|\| type === 'COMPANY'/);
-      assert.match(middlewareCode, /\.filter\(isLocalOnlyBookmark\)/);
+      assert.doesNotMatch(middlewareCode, /myjo_bookmarks/, 'middleware must not persist local bookmarks');
+      assert.doesNotMatch(middlewareCode, /isLocalOnlyBookmark/, 'middleware must not store local-only bookmarks');
     });
 
     it('preserves fresh bookmarks when the same user session is refreshed', () => {
@@ -331,9 +331,8 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
       assert.deepEqual(state.bookmarks, retryBookmarks);
     });
 
-    it('preserves known server bookmarks and restores scoped local-only bookmarks on refresh failure', () => {
-      const problem = { id: 'bm-q-1', itemId: '1', type: 'PROBLEM', title: 'Two Sum', savedAt: '2026-01-01' };
-      const aptitude = { id: 'bm-aptitude-7', itemId: '7', type: 'APTITUDE', title: 'Ratios', savedAt: '2026-01-02' };
+    it('preserves known server bookmarks on refresh failure without local storage fallbacks', () => {
+      const problem = { id: 'bm-q-1', itemId: '1', type: 'PROBLEM', title: 'Two Sum' };
       let state = {
         ...bookmarkReducer(undefined, { type: '@@init' }),
         activeUserId: 'user-A',
@@ -346,14 +345,13 @@ describe('BATCH 6 AUDIT REMEDIATION TEST SUITE: Governance, CI Infrastructure & 
         type: fetchBookmarks.rejected.type,
         payload: {
           userId: 'user-A',
-          localBookmarks: [aptitude],
           message: 'Network unavailable',
         },
         meta: { requestId: 'req-A', aborted: false, condition: false },
         error: {},
       });
 
-      assert.deepEqual(state.bookmarks, [problem, aptitude]);
+      assert.deepEqual(state.bookmarks, [problem]);
       assert.equal(state.error, 'Network unavailable');
       assert.equal(state.loading, false);
     });

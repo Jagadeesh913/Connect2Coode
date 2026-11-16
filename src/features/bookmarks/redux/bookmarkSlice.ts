@@ -1,7 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { userQuestionService, type UserBookmarkQuestionResponse } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
-import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 
 export type BookmarkType = 'PROBLEM' | 'COMPANY' | 'APTITUDE';
 
@@ -27,7 +26,6 @@ export interface BookmarkState {
 
 interface BookmarkFetchFailure {
   userId: string | number | null;
-  localBookmarks: BookmarkItem[];
   message: string;
 }
 
@@ -37,42 +35,6 @@ type BookmarkThunkState = {
     isAuthenticated?: boolean;
   };
   bookmarks: BookmarkState;
-};
-
-const BOOKMARK_STORAGE_KEY = 'myjo_bookmarks';
-
-const readLocalBookmarks = (): BookmarkItem[] => {
-  try {
-    const raw = userScopedStorage.getItem(BOOKMARK_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item): item is BookmarkItem =>
-      Boolean(
-        item &&
-        typeof item === 'object' &&
-        typeof item.id === 'string' &&
-        typeof item.itemId === 'string' &&
-        (item.type === 'APTITUDE' || item.type === 'COMPANY') &&
-        typeof item.title === 'string' &&
-        typeof item.savedAt === 'string'
-      )
-    );
-  } catch {
-    return [];
-  }
-};
-
-const mergeBookmarks = (
-  serverBookmarks: BookmarkItem[],
-  localBookmarks: BookmarkItem[]
-): BookmarkItem[] => {
-  const merged = [...serverBookmarks];
-  localBookmarks.forEach((item) => {
-    if (!merged.some((bookmark) => isBookmarkItem(bookmark, item.itemId, item.type))) {
-      merged.push(item);
-    }
-  });
-  return merged;
 };
 
 const getInitialActiveUserId = (): string | number | null => {
@@ -85,9 +47,8 @@ const getInitialActiveUserId = (): string | number | null => {
 };
 
 const initialState: BookmarkState = {
-  // Problem bookmarks are server-owned. Aptitude/company bookmarks have no
-  // backend endpoint and remain isolated in user-scoped browser storage.
-  bookmarks: readLocalBookmarks(),
+  // Purely API-driven; initialized empty. Populated via GET /users/{userId}/questions/bookmarks
+  bookmarks: [],
   loading: false,
   error: null,
   currentRequestId: null,
@@ -96,13 +57,13 @@ const initialState: BookmarkState = {
   pendingToggleKeys: {},
 };
 
-const getBookmarkKey = (itemId: string | number, type: BookmarkType): string =>
+const getBookmarkKey = (itemId: string | number, type: BookmarkType = 'PROBLEM'): string =>
   `${type}:${String(itemId)}`;
 
 export const isBookmarkItem = (
   item: BookmarkItem,
   itemId: string | number,
-  type: BookmarkType
+  type: BookmarkType = 'PROBLEM'
 ): boolean => item.type === type && String(item.itemId) === String(itemId);
 
 export const mapServerBookmark = (item: UserBookmarkQuestionResponse): BookmarkItem => ({
@@ -125,7 +86,6 @@ export const fetchBookmarks = createAsyncThunk<
     const state = getState() as BookmarkThunkState;
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
-    const localBookmarks = readLocalBookmarks();
 
     if (isAuthenticated && userId) {
       try {
@@ -134,7 +94,7 @@ export const fetchBookmarks = createAsyncThunk<
           const mappedServer = serverBookmarks.map(mapServerBookmark);
           return {
             userId,
-            bookmarks: mergeBookmarks(mappedServer, localBookmarks),
+            bookmarks: mappedServer,
             fetchedAt: Date.now(),
           };
         }
@@ -143,7 +103,6 @@ export const fetchBookmarks = createAsyncThunk<
         const msg = error instanceof Error ? error.message : (error as { message?: string })?.message;
         return rejectWithValue({
           userId,
-          localBookmarks,
           message: msg || 'Could not refresh bookmarks from the server.',
         });
       }
@@ -151,7 +110,7 @@ export const fetchBookmarks = createAsyncThunk<
 
     return {
       userId: userId || null,
-      bookmarks: localBookmarks,
+      bookmarks: [],
       fetchedAt: Date.now(),
     };
   },
@@ -202,35 +161,36 @@ export const toggleBookmarkItem = createAsyncThunk<
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
 
-    // Cloud synchronization for PROBLEM bookmarks when authenticated
-    if (type === 'PROBLEM' && isAuthenticated && userId) {
-      try {
-        if (exists) {
-          await userQuestionService.unbookmarkQuestion(userId, itemId);
-        } else {
-          await userQuestionService.bookmarkQuestion(userId, itemId);
-        }
-      } catch (apiErr: unknown) {
-        const errorObj = apiErr as { message?: string; errors?: string[] };
-        const msg =
-          errorObj?.message ||
-          (errorObj?.errors && errorObj.errors[0]) ||
-          'Failed to update bookmark on server';
-        return rejectWithValue(msg);
+    if (!isAuthenticated || !userId) {
+      return rejectWithValue('Please sign in to bookmark questions');
+    }
+
+    // Bookmarking is synchronized with the backend question bookmark API
+    try {
+      if (exists) {
+        await userQuestionService.unbookmarkQuestion(userId, itemId);
+      } else {
+        await userQuestionService.bookmarkQuestion(userId, itemId);
       }
+    } catch (apiErr: unknown) {
+      const errorObj = apiErr as { message?: string; errors?: string[] };
+      const msg =
+        errorObj?.message ||
+        (errorObj?.errors && errorObj.errors[0]) ||
+        'Failed to update bookmark on server';
+      return rejectWithValue(msg);
     }
 
     return {
       removed: exists,
       item:
         existing || {
-          id: `bm-${type.toLowerCase()}-${itemId}`,
+          id: `bm-q-${itemId}`,
           itemId,
           type,
-          title: title || itemId,
+          title: title || `Problem #${itemId}`,
           difficulty,
           category,
-          savedAt: new Date().toISOString(),
         },
     };
   },
@@ -305,10 +265,6 @@ const bookmarkSlice = createSlice({
         state.loading = false;
         state.currentRequestId = null;
         if (action.meta.aborted) return;
-        if (failure) {
-          const existingServerBookmarks = state.bookmarks.filter((item) => item.type === 'PROBLEM');
-          state.bookmarks = mergeBookmarks(existingServerBookmarks, failure.localBookmarks);
-        }
         state.error = failure?.message ||
           (typeof action.payload === 'string' ? action.payload : null) ||
           action.error.message ||
@@ -338,7 +294,7 @@ const bookmarkSlice = createSlice({
         if (action.meta.condition) return;
         state.error = (action.payload as string) || 'Failed to toggle bookmark';
       })
-      // Reset and re-scope bookmarks on auth lifecycle events (logout, login) (F-010)
+      // Reset and re-scope bookmarks on auth lifecycle events (logout, login)
       .addMatcher(
         (action) =>
           action.type === 'auth/logout/fulfilled' ||

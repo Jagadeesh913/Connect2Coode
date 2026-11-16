@@ -138,7 +138,7 @@
 ### Decision 7: Server Authority for Admin Test Cases and Submission History
 - **Context**: Admin question metadata and test cases were overridden or retained in browser storage, and two hard-coded fixtures included hidden evaluation cases. `ProblemDetails` also mirrored submitted source code and results even though the submission-history endpoint is available.
 - **Decision**: Use API payloads as the sole source for admin question metadata, test cases, and authenticated submission history. A failed test-case save reports an error and leaves the modal open. Visible Input/Output examples may be parsed from backend descriptions for display, but missing test-case classification fields remain blank and must be selected from backend reference data. ID/title-based sample fixtures and invented hidden cases are prohibited.
-- **Boundary**: Problem bookmarks remain server-authoritative. COMPANY/APTITUDE bookmarks have no corresponding API endpoint and use only user-scoped browser persistence; the persistence middleware explicitly excludes server-owned problem bookmarks.
+- **Boundary**: Bookmarks are strictly API-driven and server-authoritative. Local storage persistence and mock bookmarks have been completely removed; only backend-verified problem bookmarks are managed.
 
 ### Decision 8: Deterministic Redux State and Request Ownership
 - **Context**: Bookmark/progress reducers wrote browser storage directly; bookmark identity ignored item type; async profile/progress responses could apply after the active user changed; and incomplete refresh responses could not safely restore authorization after reload.
