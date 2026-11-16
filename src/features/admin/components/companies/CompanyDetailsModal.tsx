@@ -129,7 +129,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
   // Load recruitment exams
   const fetchExams = useCallback(async (signal?: AbortSignal) => {
     if (!company?.id) return;
-    const companyId = company.id;
+    const companyId = Number(company.id);
     const epoch = readEpoch.current;
     setExamsLoading(true);
     setExamsError(null);

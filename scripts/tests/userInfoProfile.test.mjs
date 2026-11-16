@@ -28,9 +28,45 @@ register('data:text/javascript,' + encodeURIComponent(loaderCode), pathToFileURL
 const { API_ENDPOINTS } = await import('../../src/core/api/endpoints.ts');
 const { profileService } = await import('../../src/services/profileService.ts');
 const { companyService } = await import('../../src/services/companyService.ts');
+const { resolveCompanyExamRequestIdentity } = await import(
+  '../../src/features/companies/utils/companyExamRequest.ts'
+);
 const { adminCompanyService } = await import('../../src/services/admin/adminCompanyService.ts');
 const { apiClient } = await import('../../src/core/api/apiClient.ts');
 const { tokenStorage } = await import('../../src/core/security/tokenStorage.ts');
+
+describe('company recruitment-exam request identity', () => {
+  it('waits during the initial company catalog load', () => {
+    assert.deepEqual(resolveCompanyExamRequestIdentity(null), { status: 'waiting' });
+  });
+
+  it('becomes ready only after delayed catalog resolution supplies a numeric backend ID', () => {
+    const beforeCatalogResolution = resolveCompanyExamRequestIdentity(null);
+    const afterCatalogResolution = resolveCompanyExamRequestIdentity({ id: '12' });
+
+    assert.equal(beforeCatalogResolution.status, 'waiting');
+    assert.deepEqual(afterCatalogResolution, { status: 'ready', companyId: 12 });
+  });
+
+  it('does not retain a stale ID across route changes', () => {
+    const firstRoute = resolveCompanyExamRequestIdentity({ id: 12 });
+    const routeTransition = resolveCompanyExamRequestIdentity(null);
+    const secondRoute = resolveCompanyExamRequestIdentity({ id: 27 });
+
+    assert.deepEqual(firstRoute, { status: 'ready', companyId: 12 });
+    assert.deepEqual(routeTransition, { status: 'waiting' });
+    assert.deepEqual(secondRoute, { status: 'ready', companyId: 27 });
+  });
+
+  it('rejects invalid company records instead of treating a slug as an API ID', () => {
+    for (const id of ['tcs', '', 0, -1, 1.5, Number.NaN]) {
+      const identity = resolveCompanyExamRequestIdentity({ id });
+      assert.equal(identity.status, 'invalid');
+      assert.match(identity.error, /valid numeric ID/);
+    }
+  });
+});
+
 describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userId})', () => {
   it('API_ENDPOINTS: accurately defines USER_INFO parameterized endpoint', () => {
     assert.equal(API_ENDPOINTS.USER.USER_INFO(68), '/userInfo/68');
@@ -390,17 +426,48 @@ describe('BATCH-11: User Info & Profile API Contracts (GET/POST /userInfo/{userI
     });
 
     it('companyService.getCompanyExamsList leaves authentication to apiClient', async () => {
+      let capturedUrl = '';
       let capturedPayload = null;
       apiClient.post = async (url, payload) => {
+        capturedUrl = url;
         capturedPayload = payload;
         return { statusCode: 200, message: 'Success', data: { content: [], pageNumber: 0, pageSize: 20, totalElements: 0, totalPages: 0 } };
       };
       tokenStorage.setAccessToken(TEST_TOKEN);
 
       await companyService.getCompanyExamsList(12);
+      assert.equal(capturedUrl, '/company/12/exams/list');
       assert.equal(capturedPayload.jwtToken, undefined);
       assert.equal(capturedPayload.token, undefined);
       assert.equal(capturedPayload.jwttoken, undefined);
+    });
+
+    it('companyService rejects slug and invalid IDs before making a request', async () => {
+      let requestCount = 0;
+      apiClient.post = async () => {
+        requestCount += 1;
+        throw new Error('network should not be reached');
+      };
+
+      for (const companyId of ['tcs', '', 0, -1, 1.5, Number.NaN]) {
+        await assert.rejects(
+          () => companyService.getCompanyExamsList(companyId),
+          /Company ID must be a positive integer/
+        );
+      }
+      assert.equal(requestCount, 0);
+    });
+
+    it('companyService preserves an API failure for the page error state', async () => {
+      apiClient.post = async (url) => {
+        assert.equal(url, '/company/12/exams/list');
+        throw new Error('Recruitment exams unavailable');
+      };
+
+      await assert.rejects(
+        () => companyService.getCompanyExamsList(12),
+        /Recruitment exams unavailable/
+      );
     });
 
     it('adminCompanyService reads through the shared company service without injecting credentials', async () => {

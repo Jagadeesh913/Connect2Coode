@@ -36,10 +36,11 @@ const { resolvePageMetadata } = await import('../../src/core/metadata/pageMetada
 const root = process.cwd();
 const sourceTemplate = readFileSync(join(root, 'index.html'), 'utf8');
 const count = (source, needle) => source.split(needle).length - 1;
+const renderFixture = (route) => `<main id="main-content"><h1>${route.heading}</h1><p>${route.introduction}</p></main>`;
 
 test('all indexable routes render meaningful, route-specific HTML without JavaScript', () => {
   for (const route of PUBLIC_PRERENDER_ROUTES) {
-    const html = renderPrerenderedHtml(sourceTemplate, route);
+    const html = renderPrerenderedHtml(sourceTemplate, route, renderFixture(route));
     const canonical = new URL(route.path, `${SITE_ORIGIN}/`).toString();
 
     assert.match(html, new RegExp(`<h1>${route.heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}</h1>`));
@@ -50,7 +51,7 @@ test('all indexable routes render meaningful, route-specific HTML without JavaSc
     assert.ok(html.includes('https://www.connect2code.in/social-card.png'));
     assert.ok(html.includes('https://schema.org'));
     assert.ok(html.includes(`"@id":"${canonical}#webpage"`));
-    assert.match(html, /<div id="root" data-c2c-prerender-root="true">\s*<main/);
+    assert.match(html, /<div id="root" data-c2c-ssr="true">\s*<main/);
     assert.doesNotMatch(html, /<noscript data-c2c-prerender="true">/);
     if (route.path === '/') {
       assert.match(html, /rel="alternate" type="text\/markdown" href="\/index\.md"/);
@@ -79,7 +80,10 @@ test('build generator emits public pages, a noindex app shell, a noindex 404, an
   const directory = await mkdtemp(join(tmpdir(), 'c2c-seo-'));
   try {
     await writeFile(join(directory, 'index.html'), sourceTemplate, 'utf8');
-    await generateSeoAssets({ distDirectory: directory });
+    await generateSeoAssets({
+      distDirectory: directory,
+      renderRoute: async (path) => renderFixture(PUBLIC_PRERENDER_ROUTES.find((route) => route.path === path)),
+    });
 
     const practice = await readFile(join(directory, 'practice.html'), 'utf8');
     const appShell = await readFile(join(directory, 'app.html'), 'utf8');
@@ -89,7 +93,7 @@ test('build generator emits public pages, a noindex app shell, a noindex 404, an
     const llmsTxt = await readFile(join(directory, 'llms.txt'), 'utf8');
 
     assert.match(practice, /Coding Practice for Placement Interviews/);
-    assert.match(practice, /<div id="root" data-c2c-prerender-root="true">\s*<main/);
+    assert.match(practice, /<div id="root" data-c2c-ssr="true">\s*<main/);
     [appShell, notFound].forEach((html) => {
       assert.match(html, /<div id="root"><\/div>\s*<noscript data-c2c-prerender="true">/);
       assert.match(html, /name="robots" content="noindex, nofollow"/);

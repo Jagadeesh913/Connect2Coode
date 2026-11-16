@@ -26,6 +26,7 @@ import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
+import { resolveCompanyExamRequestIdentity } from '../utils/companyExamRequest';
 import { CodingQuestionTable } from '../../problems/components/CodingQuestionTable';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
@@ -174,6 +175,10 @@ export const CompanyDetails: React.FC = () => {
   }, [dispatch, slug]);
 
   const companyId = company?.id;
+  const examRequestIdentity = useMemo(
+    () => resolveCompanyExamRequestIdentity(company),
+    [company]
+  );
 
   usePageMetadata(
     company
@@ -188,9 +193,25 @@ export const CompanyDetails: React.FC = () => {
 
   // Fetch Company Related Exams (API driven)
   useEffect(() => {
-    const targetId = companyId ?? slug;
-    if (targetId === undefined || targetId === null || targetId === '') return;
-    const safeTargetId: string | number = targetId;
+    if (examRequestIdentity.status === 'waiting') {
+      setExams([]);
+      setExamTotal(0);
+      setExamTotalPages(1);
+      setExamsError(null);
+      setExamsLoading(true);
+      return;
+    }
+
+    if (examRequestIdentity.status === 'invalid') {
+      setExams([]);
+      setExamTotal(0);
+      setExamTotalPages(1);
+      setExamsError(examRequestIdentity.error);
+      setExamsLoading(false);
+      return;
+    }
+
+    const { companyId: numericCompanyId } = examRequestIdentity;
 
     let isMounted = true;
     const controller = new AbortController();
@@ -200,7 +221,7 @@ export const CompanyDetails: React.FC = () => {
       setExamsError(null);
       try {
         const res = await companyService.getCompanyExamsList(
-          safeTargetId,
+          numericCompanyId,
           { pageNumber: examPage - 1, pageSize: 12, sortBy: 'year', sortDirection: 'DESC' },
           controller.signal
         );
@@ -217,6 +238,8 @@ export const CompanyDetails: React.FC = () => {
         if (isMounted && err?.name !== 'CanceledError') {
           setExamsError(err?.message || 'Failed to fetch company exams');
           setExams([]);
+          setExamTotal(0);
+          setExamTotalPages(1);
         }
       } finally {
         if (isMounted) {
@@ -231,7 +254,7 @@ export const CompanyDetails: React.FC = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [companyId, slug, examsRetry, examPage]);
+  }, [examRequestIdentity, examsRetry, examPage]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuestionSearch(questionSearch.trim()), 350);

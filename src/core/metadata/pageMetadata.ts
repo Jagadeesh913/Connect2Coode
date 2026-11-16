@@ -69,15 +69,15 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
     ),
     '/login': {
       ...publicPage('Log In', 'Log in to track coding progress, bookmarks, and placement preparation.', '/login'),
-      robots: 'noindex, follow',
+      robots: 'noindex, nofollow',
     },
     '/signup': {
       ...publicPage('Create Account', 'Create a Connect2Code account to save progress and prepare for placements.', '/signup'),
-      robots: 'noindex, follow',
+      robots: 'noindex, nofollow',
     },
     '/forgot-password': {
       ...publicPage('Reset Password', 'Recover access to your Connect2Code account securely.', '/forgot-password'),
-      robots: 'noindex, follow',
+      robots: 'noindex, nofollow',
     },
     '/practice': publicPage(
       'Coding Practice',

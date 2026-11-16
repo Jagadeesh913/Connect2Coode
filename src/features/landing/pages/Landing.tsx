@@ -215,9 +215,17 @@ export const Landing: React.FC = () => {
       <div className="hidden dark:block fixed top-[45%] -right-48 w-[450px] h-[550px] bg-indigo-600/25 rounded-full blur-[140px] pointer-events-none -z-10" />
       <div className="hidden dark:block fixed bottom-20 -left-40 w-96 h-[500px] bg-purple-900/20 rounded-full blur-[130px] pointer-events-none -z-10" />
 
+      <a
+        href="#main-content"
+        className="sr-only fixed left-4 top-4 z-[10000] rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white focus:not-sr-only"
+      >
+        Skip to main content
+      </a>
+
       {/* 1. HEADER NAVBAR */}
       <Navbar user={user} onLogout={handleLogout} />
 
+      <main id="main-content" className="flex w-full flex-col items-center">
       {/* 2. HERO FOLD SECTION */}
       <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-2 sm:pb-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-6 items-end">
@@ -1065,6 +1073,7 @@ export const Landing: React.FC = () => {
 
         </div>
       </section>
+      </main>
 
       {/* 10. FOOTER */}
       <Footer />

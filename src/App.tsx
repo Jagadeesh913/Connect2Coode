@@ -8,6 +8,14 @@ import { ThemeProvider } from './shared/context/ThemeContext';
 import { useAppDispatch, useAppSelector } from './app/hooks';
 import { hydrateProgress } from './features/progress/redux/progressSlice';
 import { AppErrorBoundary } from './shared/components/errors/AppErrorBoundary';
+import type { AppStore } from './app/store';
+
+type AppRouter = React.ComponentProps<typeof RouterProvider>['router'];
+
+interface AppProps {
+  appStore?: AppStore;
+  appRouter?: AppRouter;
+}
 
 const ProgressHydrator: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -25,9 +33,9 @@ const ProgressHydrator: React.FC = () => {
   return null;
 };
 
-export const App: React.FC = () => {
+export const App: React.FC<AppProps> = ({ appStore = store, appRouter = router }) => {
   return (
-    <Provider store={store}>
+    <Provider store={appStore}>
       <ProgressHydrator />
       <ThemeProvider>
         <Toaster
@@ -66,7 +74,7 @@ export const App: React.FC = () => {
           }}
         />
       <AppErrorBoundary>
-        <RouterProvider router={router} />
+        <RouterProvider router={appRouter} />
       </AppErrorBoundary>
       </ThemeProvider>
     </Provider>

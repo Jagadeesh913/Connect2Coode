@@ -71,6 +71,12 @@ const loadScopedThemePreference = (): ThemePreference => {
   return migratedPreference;
 };
 
+const loadInitialThemePreference = (): ThemePreference => {
+  if (typeof document === 'undefined') return 'dark';
+  const isHydratingServerMarkup = document.getElementById('root')?.dataset.c2cSsr === 'true';
+  return isHydratingServerMarkup ? 'dark' : loadScopedThemePreference();
+};
+
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = useAppSelector((state) => state.auth.user);
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -84,7 +90,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const scopeKey = isAuthenticated
     ? normalizedIdentity
     : 'guest';
-  const [preference, setPreference] = useState<ThemePreference>(loadScopedThemePreference);
+  // Server-rendered pages use the template's deterministic dark theme for the
+  // hydration pass. The account/guest preference is applied immediately after
+  // hydration, avoiding a server/client tree mismatch for theme-dependent UI.
+  const [preference, setPreference] = useState<ThemePreference>(loadInitialThemePreference);
   const [theme, setThemeState] = useState<Theme>(() => resolveThemePreference(preference));
   const themeRequestVersionRef = useRef(0);
   const themeSaveQueueRef = useRef(Promise.resolve());

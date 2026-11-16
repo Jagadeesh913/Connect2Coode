@@ -4,7 +4,7 @@
 
 Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
 - **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Last verified baseline**: 422 tests passed, 0 failed on the current working tree on 2026-11-15.
+- **Last verified baseline**: 430 tests passed, 0 failed on the current working tree on 2026-11-16.
 - **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
 
 ---
@@ -35,10 +35,10 @@ Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:asse
 | [`questionsPaginationResilience.test.mjs`](../../scripts/tests/questionsPaginationResilience.test.mjs) | Real pagination metadata, strict row identity/title, mixed-page rejection, detail/save identity checks, production-grade optional-field normalization, and problem-service propagation. | 12 |
 | [`referenceLibraryManagement.test.mjs`](../../scripts/tests/referenceLibraryManagement.test.mjs) | Central reference endpoints, strict DTO validation, direct list-owned platform logos without a duplicate QPF request, admin-only mutations, shared taxonomy state, dynamic exam taxonomy, transport ownership guards, semantic save naming, envelope/bodyless-204 hard-delete success, hard-delete confirmation, and guarded routing. | 14 |
 | [`taskRemediationVerification.test.mjs`](../../scripts/tests/taskRemediationVerification.test.mjs) | Problem mapping, canonical token storage, authoritative admin editing, generation-owned pagination, ref-synchronized manual selection, per-question/language draft restoration, and stable initial MCQ requests. | 14 |
-| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, and all-page company loading. | 22 |
+| [`userInfoProfile.test.mjs`](../../scripts/tests/userInfoProfile.test.mjs) | Academic/personal profile contracts including `collegeName` normalization, requested-user identity repair, gender/date/institution save fields, business-only service payloads, all-page company loading, and numeric-only company-exam request gating. | 28 |
 | [`validationArchitecture.test.mjs`](../../scripts/tests/validationArchitecture.test.mjs) | Zod schemas and backend error/security sanitization, including compiler-service URL/IP suppression. | 25 |
-| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, shared API-backed coding-question listing, static CodeChef-style company wordmarks, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, viewport-locked responsive problem splitters, responsive toast placement, and deployment-header contracts. | 32 |
-| **Current declared total** | **All 25 test files** | **422 tests; latest full run passed (422/422) on 2026-11-15.** |
+| [`uxInteractionContracts.test.mjs`](../../scripts/tests/uxInteractionContracts.test.mjs) | Skeleton transitions, shared API-backed coding-question listing, static CodeChef-style company wordmarks, stale-request cancellation, scoped theme migration, server-owned pagination/filter contracts, duplicate-submit guards, DSA carousel motion/tab-order semantics, Lucide result icons, stable auth-dialog focus, modal/row keyboard behavior, isolated editor clipboard, secure mode, authenticated feature mounting, public SSR hub contracts, numeric company-exam sequencing, viewport-locked responsive problem splitters, responsive toast placement, and deployment-header contracts. | 33 |
+| **Current declared total** | **All 25 test files** | **430 tests; latest full run passed (430/430) on 2026-11-16.** |
 
 ---
 

@@ -46,6 +46,8 @@ test('HTML supplies one complete default metadata set without duplicate managed 
   assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertJsonLd\('c2c-webpage-schema'/);
   assert.match(html, /<link rel="manifest" href="\/site\.webmanifest" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png" \/>/);
+  assert.match(html, /fonts\.googleapis\.com[^"]+display=optional/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com[^"]+display=swap/);
 });
 
 test('manifest references present, correctly sized app icons', () => {
@@ -107,7 +109,7 @@ test('central route metadata covers public, authenticated, admin, error, and dyn
 test('private, admin, callback, and error metadata is not indexable', () => {
   const metadataSource = read('src/core/metadata/pageMetadata.ts');
   assert.match(metadataSource, /robots: 'noindex, nofollow'/);
-  assert.match(metadataSource, /robots: 'noindex, follow'/);
+  assert.doesNotMatch(metadataSource, /robots: 'noindex, follow'/);
   assert.match(metadataSource, /'Admin Dashboard'[\s\S]*?privatePage/);
   assert.match(metadataSource, /'Page Not Found'[\s\S]*?privatePage|privatePage\([\s\S]*?'Page Not Found'/);
 });

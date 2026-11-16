@@ -229,6 +229,23 @@ describe('shared UX interaction contracts', () => {
     assert.doesNotMatch(details, /list = list\.filter/);
   });
 
+  it('company recruitment exams wait for a numeric catalog ID and cancel superseded requests', async () => {
+    const details = await readSource('src/features/companies/pages/CompanyDetails.tsx');
+    const service = await readSource('src/services/companyService.ts');
+    const endpoints = await readSource('src/core/api/endpoints.ts');
+
+    assert.match(details, /resolveCompanyExamRequestIdentity\(company\)/);
+    assert.match(details, /examRequestIdentity\.status === 'waiting'[\s\S]*?setExamsLoading\(true\)/);
+    assert.match(details, /examRequestIdentity\.status === 'invalid'[\s\S]*?setExamsError\(examRequestIdentity\.error\)[\s\S]*?setExamsLoading\(false\)/);
+    assert.match(details, /new AbortController\(\)/);
+    assert.match(details, /controller\.abort\(\)/);
+    assert.match(details, /\[examRequestIdentity, examsRetry, examPage\]/);
+    assert.doesNotMatch(details, /companyId \?\? slug/);
+    assert.match(service, /getCompanyExamsList\(\s*companyId: number/);
+    assert.match(service, /Number\.isSafeInteger\(companyId\)/);
+    assert.match(endpoints, /EXAMS: \(companyId: number\)/);
+  });
+
   it('practice filters and page controls dispatch the canonical server query', async () => {
     const source = await readSource('src/features/problems/pages/PracticePage.tsx');
     assert.match(source, /fetchProblems\(\{[\s\S]*?page: currentPage/);
@@ -472,14 +489,15 @@ describe('shared UX interaction contracts', () => {
     assert.match(deploymentConfig, /Strict-Transport-Security/);
   });
 
-  it('unauthenticated users on dsa-sheet page are presented with the sign-in EmptyState', async () => {
-    const dsaSheetSource = await readSource('src/features/dsaSheet/pages/DsaSheetPage.tsx');
-    assert.match(dsaSheetSource, /openAuthModal/);
-    assert.match(dsaSheetSource, /!isAuthenticated && sheets\.length === 0/);
-    assert.match(dsaSheetSource, /title="Sign in to explore DSA Sheet"/);
-    assert.match(dsaSheetSource, /actionText="Sign In"/);
-    assert.match(dsaSheetSource, /onAction=\{\(\) => dispatch\(openAuthModal\(\{ mode: 'login' \}\)\)\}/);
-    assert.match(dsaSheetSource, /icon=\{<Lock className="w-12 h-12 text-blue-500" \/>\}/);
+  it('unauthenticated public hubs retain factual content and a sign-in action', async () => {
+    const gate = await readSource('src/features/auth/components/AuthenticatedFeatureGate.tsx');
+    const publicHub = await readSource('src/shared/components/seo/PublicHubContent.tsx');
+    assert.match(gate, /publicContent && !isAuthenticated/);
+    assert.match(gate, /<PublicHubContent/);
+    assert.match(gate, /signInDisabled=\{status === 'LOADING'\}/);
+    assert.match(publicHub, /<h1 id="public-hub-heading"/);
+    assert.match(publicHub, /Sign in to continue/);
+    assert.match(publicHub, /aria-label="Public preparation pages"/);
   });
 
   it('gates feature routes before their API-owning page components mount', async () => {
@@ -490,6 +508,7 @@ describe('shared UX interaction contracts', () => {
       const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       assert.match(routes, new RegExp(`path: '${escapedPath}', element: requireFeatureSession`));
     }
+    assert.match(gate, /publicContent && !isAuthenticated/);
     assert.match(gate, /status === 'LOADING'/);
     assert.match(gate, /status === 'RECOVERY_REQUIRED'/);
     assert.match(gate, /if \(!isAuthenticated\)/);

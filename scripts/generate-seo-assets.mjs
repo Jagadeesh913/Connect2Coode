@@ -1,52 +1,20 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { build } from 'vite';
 
 export const SITE_ORIGIN = 'https://www.connect2code.in';
 export const SOCIAL_IMAGE_URL = `${SITE_ORIGIN}/social-card.png`;
 
-export const PUBLIC_PRERENDER_ROUTES = Object.freeze([
-  {
-    path: '/',
-    title: 'Placement & Coding Preparation',
-    description: 'Prepare for placements with coding problems, DSA sheets, aptitude practice, company exam patterns, and interview resources.',
-    heading: 'Code Today For A Brighter Tomorrow',
-    introduction: 'Build placement skills with structured coding practice, data structures and algorithms, aptitude preparation, and company-focused resources.',
-    topics: ['Coding practice by topic and difficulty', 'Structured DSA preparation', 'Aptitude and reasoning practice', 'Company placement resources'],
-  },
-  {
-    path: '/practice',
-    title: 'Coding Practice',
-    description: 'Practice curated coding problems by topic, difficulty, and company for placement interviews.',
-    heading: 'Coding Practice for Placement Interviews',
-    introduction: 'Explore the coding catalog, filter problems by topic and difficulty, and use the Connect2Code workspace to build consistent problem-solving skills.',
-    topics: ['Topic-based problem discovery', 'Difficulty and company filters', 'Browser coding workspace', 'Progress available after sign-in'],
-  },
-  {
-    path: '/dsa-sheet',
-    title: 'DSA Sheet for Placement Preparation',
-    description: 'Follow a structured data structures and algorithms sheet for placement preparation.',
-    heading: 'Structured Data Structures and Algorithms Sheet',
-    introduction: 'Work through placement-focused data structures and algorithms in a guided sequence, from core foundations to advanced problem-solving topics.',
-    topics: ['Arrays and strings', 'Linked lists, stacks, and queues', 'Trees and graphs', 'Dynamic programming'],
-  },
-  {
-    path: '/companies',
-    title: 'Company Preparation',
-    description: 'Explore company-specific placement exams, hiring patterns, aptitude topics, and coding questions.',
-    heading: 'Company Placement Preparation',
-    introduction: 'Use company-focused preparation resources to understand recruitment assessments, practice relevant topics, and organize placement study.',
-    topics: ['Recruitment exam patterns', 'Company-focused coding practice', 'Aptitude and reasoning topics', 'Authenticated access to current catalog data'],
-  },
-  {
-    path: '/aptitude',
-    title: 'Aptitude Practice',
-    description: 'Practice quantitative aptitude, logical reasoning, verbal ability, and pseudocode questions.',
-    heading: 'Aptitude Practice for Placement Assessments',
-    introduction: 'Prepare for common placement assessment sections with focused quantitative, reasoning, verbal, and programming-logic practice.',
-    topics: ['Quantitative aptitude', 'Logical reasoning', 'Verbal ability', 'Pseudocode and code tracing'],
-  },
-]);
+const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+const projectDirectory = join(scriptDirectory, '..');
+const publicContentPath = join(projectDirectory, 'src', 'core', 'metadata', 'publicPageContent.json');
+
+export const PUBLIC_PRERENDER_ROUTES = Object.freeze(
+  JSON.parse(readFileSync(publicContentPath, 'utf8'))
+);
 
 const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({
   '&': '&amp;',
@@ -90,27 +58,6 @@ const replaceHeadTag = (html, selector, replacement) => {
   return html.replace(expression, replacement);
 };
 
-const renderPrerenderedContent = (route) => `
-      <main data-c2c-prerender="true" aria-label="${escapeHtml(route.heading)}">
-        <article>
-          <header>
-            <p>Connect2Code placement preparation</p>
-            <h1>${escapeHtml(route.heading)}</h1>
-            <p>${escapeHtml(route.introduction)}</p>
-          </header>
-          <section aria-labelledby="page-topics">
-            <h2 id="page-topics">What you can prepare</h2>
-            <ul>${route.topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
-          </section>
-          <nav aria-label="Public preparation pages">
-            <a href="/practice">Coding Practice</a>
-            <a href="/dsa-sheet">DSA Sheet</a>
-            <a href="/companies">Company Preparation</a>
-            <a href="/aptitude">Aptitude Practice</a>
-          </nav>
-        </article>
-      </main>`;
-
 export const buildHomeMarkdown = (route = PUBLIC_PRERENDER_ROUTES[0]) => `# ${route.heading}
 
 ${route.introduction}
@@ -140,7 +87,10 @@ ${PUBLIC_PRERENDER_ROUTES.map((route) => `- [${route.title}](${canonicalUrl(rout
 Interactive problem catalogs, progress, company details, and coding workspaces require sign-in and are not published as public crawl targets.
 `;
 
-export const renderPrerenderedHtml = (template, route) => {
+export const renderPrerenderedHtml = (template, route, renderedApp) => {
+  if (typeof renderedApp !== 'string' || !renderedApp.trim()) {
+    throw new Error(`React prerender returned no markup for ${route.path}`);
+  }
   const canonical = canonicalUrl(route.path);
   let html = template;
   html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtml(pageTitle(route.title))}</title>`);
@@ -156,13 +106,15 @@ export const renderPrerenderedHtml = (template, route) => {
   html = html.replace(/<link[^>]+rel="canonical"[^>]*>/i, `<link rel="canonical" href="${escapeHtml(canonical)}" data-c2c-managed="true" />`);
   html = html.replace(
     '<div id="root"></div>',
-    `<div id="root" data-c2c-prerender-root="true">${renderPrerenderedContent(route)}</div>`
+    `<div id="root" data-c2c-ssr="true">${renderedApp}</div>`
   );
   if (route.path !== '/') {
     html = html.replace(/\s*<link[^>]+rel="alternate"[^>]+type="text\/markdown"[^>]*>/i, '');
   }
   html = replaceJsonLdScript(html, 'c2c-webpage-schema', buildWebPageSchema(route));
-  if (!html.includes('data-c2c-prerender="true"')) throw new Error('Built HTML is missing the empty React root expected by the prerenderer.');
+  if (!html.includes('data-c2c-ssr="true"')) {
+    throw new Error('Built HTML is missing the server-rendered React root.');
+  }
   return html;
 };
 
@@ -190,32 +142,73 @@ const renderNonIndexableShell = (template, { title, heading, description }) => {
   return html;
 };
 
-export const generateSeoAssets = async ({ distDirectory } = {}) => {
-  const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+export const createPublicRouteRenderer = async () => {
+  const outputDirectory = await mkdtemp(join(tmpdir(), 'c2c-seo-ssr-'));
+  try {
+    await build({
+      root: projectDirectory,
+      configFile: join(projectDirectory, 'vite.config.ts'),
+      publicDir: false,
+      logLevel: 'error',
+      ssr: { noExternal: true },
+      build: {
+        ssr: join(projectDirectory, 'src', 'entry-server.tsx'),
+        outDir: outputDirectory,
+        emptyOutDir: true,
+        rollupOptions: {
+          output: { entryFileNames: 'entry-server.mjs' },
+        },
+      },
+    });
+
+    const serverEntry = join(outputDirectory, 'entry-server.mjs');
+    const serverModule = await import(`${pathToFileURL(serverEntry).href}?v=${Date.now()}`);
+    if (typeof serverModule.renderPublicRoute !== 'function') {
+      throw new Error('SSR bundle does not export renderPublicRoute.');
+    }
+
+    return {
+      renderRoute: serverModule.renderPublicRoute,
+      cleanup: () => rm(outputDirectory, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(outputDirectory, { recursive: true, force: true });
+    throw error;
+  }
+};
+
+export const generateSeoAssets = async ({ distDirectory, renderRoute } = {}) => {
   const outputDirectory = distDirectory || join(scriptDirectory, '..', 'dist');
   const template = await readFile(join(outputDirectory, 'index.html'), 'utf8');
+  const renderer = renderRoute ? null : await createPublicRouteRenderer();
+  const render = renderRoute || renderer.renderRoute;
 
-  for (const route of PUBLIC_PRERENDER_ROUTES) {
-    const outputPath = route.path === '/'
-      ? join(outputDirectory, 'index.html')
-      : join(outputDirectory, `${route.path.slice(1)}.html`);
-    await mkdir(dirname(outputPath), { recursive: true });
-    await writeFile(outputPath, renderPrerenderedHtml(template, route), 'utf8');
+  try {
+    for (const route of PUBLIC_PRERENDER_ROUTES) {
+      const outputPath = route.path === '/'
+        ? join(outputDirectory, 'index.html')
+        : join(outputDirectory, `${route.path.slice(1)}.html`);
+      const renderedApp = await render(route.path);
+      await mkdir(dirname(outputPath), { recursive: true });
+      await writeFile(outputPath, renderPrerenderedHtml(template, route, renderedApp), 'utf8');
+    }
+
+    await writeFile(join(outputDirectory, 'app.html'), renderNonIndexableShell(template, {
+      title: 'Connect2Code Application',
+      heading: 'Connect2Code',
+      description: 'This route loads current application data in the browser and is not available for search indexing.',
+    }), 'utf8');
+    await writeFile(join(outputDirectory, '404.html'), renderNonIndexableShell(template, {
+      title: 'Page Not Found',
+      heading: 'Page Not Found',
+      description: 'The requested Connect2Code page could not be found.',
+    }), 'utf8');
+    await writeFile(join(outputDirectory, 'sitemap.xml'), buildSitemapXml(), 'utf8');
+    await writeFile(join(outputDirectory, 'index.md'), buildHomeMarkdown(), 'utf8');
+    await writeFile(join(outputDirectory, 'llms.txt'), buildLlmsTxt(), 'utf8');
+  } finally {
+    await renderer?.cleanup();
   }
-
-  await writeFile(join(outputDirectory, 'app.html'), renderNonIndexableShell(template, {
-    title: 'Connect2Code Application',
-    heading: 'Connect2Code',
-    description: 'This route loads current application data in the browser and is not available for search indexing.',
-  }), 'utf8');
-  await writeFile(join(outputDirectory, '404.html'), renderNonIndexableShell(template, {
-    title: 'Page Not Found',
-    heading: 'Page Not Found',
-    description: 'The requested Connect2Code page could not be found.',
-  }), 'utf8');
-  await writeFile(join(outputDirectory, 'sitemap.xml'), buildSitemapXml(), 'utf8');
-  await writeFile(join(outputDirectory, 'index.md'), buildHomeMarkdown(), 'utf8');
-  await writeFile(join(outputDirectory, 'llms.txt'), buildLlmsTxt(), 'utf8');
 };
 
 const isMainModule = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
