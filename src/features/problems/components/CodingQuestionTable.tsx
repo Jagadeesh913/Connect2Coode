@@ -113,8 +113,6 @@ export const PlatformCircleBadge: React.FC<{ question: CodingQuestionListItem; l
   );
 };
 
-export const PlatformBadge = PlatformCircleBadge;
-
 export const CodingQuestionTable = <T extends CodingQuestionListItem>({
   questions,
   companies = [],

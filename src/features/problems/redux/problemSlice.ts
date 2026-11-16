@@ -276,9 +276,6 @@ export const fetchProblemById = createAsyncThunk(
   }
 );
 
-export const fetchProblemBySlug = fetchProblemById;
-
-
 const problemSlice = createSlice({
   name: 'problems',
   initialState,

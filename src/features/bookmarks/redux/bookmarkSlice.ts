@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import type { RootState } from '../../../app/store';
 import { userQuestionService, type UserBookmarkQuestionResponse } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
@@ -31,6 +30,14 @@ interface BookmarkFetchFailure {
   localBookmarks: BookmarkItem[];
   message: string;
 }
+
+type BookmarkThunkState = {
+  auth?: {
+    user?: { id?: string | number | null } | null;
+    isAuthenticated?: boolean;
+  };
+  bookmarks: BookmarkState;
+};
 
 const BOOKMARK_STORAGE_KEY = 'myjo_bookmarks';
 
@@ -111,11 +118,11 @@ export const mapServerBookmark = (item: UserBookmarkQuestionResponse): BookmarkI
 export const fetchBookmarks = createAsyncThunk<
   { userId: string | number | null; bookmarks: BookmarkItem[]; fetchedAt: number },
   { force?: boolean } | boolean | void,
-  { state: RootState; rejectValue: BookmarkFetchFailure }
+  { state: BookmarkThunkState; rejectValue: BookmarkFetchFailure }
 >(
   'bookmarks/fetchList',
   async (_, { getState, rejectWithValue, signal }) => {
-    const state = getState() as RootState;
+    const state = getState() as BookmarkThunkState;
     const userId = state.auth?.user?.id;
     const isAuthenticated = state.auth?.isAuthenticated;
     const localBookmarks = readLocalBookmarks();
@@ -149,7 +156,7 @@ export const fetchBookmarks = createAsyncThunk<
   },
   {
     condition: (arg, { getState }) => {
-      const state = getState() as RootState;
+      const state = getState() as BookmarkThunkState;
       if (state.bookmarks?.loading) {
         return false;
       }
@@ -179,7 +186,7 @@ export const toggleBookmarkItem = createAsyncThunk<
     difficulty?: string;
     category?: string;
   },
-  { state: RootState; rejectValue: string }
+  { state: BookmarkThunkState; rejectValue: string }
 >(
   'bookmarks/toggle',
   async (
@@ -187,7 +194,7 @@ export const toggleBookmarkItem = createAsyncThunk<
     { getState, rejectWithValue }
   ) => {
     const { itemId, type = 'PROBLEM', title, difficulty, category } = payload;
-    const state = getState() as RootState;
+    const state = getState() as BookmarkThunkState;
     const current = state.bookmarks.bookmarks;
     const existing = current.find((b) => isBookmarkItem(b, itemId, type));
     const exists = Boolean(existing);

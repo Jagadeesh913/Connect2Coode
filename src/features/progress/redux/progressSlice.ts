@@ -1,5 +1,4 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
-import type { RootState } from '../../../app/store';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
 import { userQuestionService } from '../../../services/userQuestionService';
 import type {
@@ -25,6 +24,14 @@ export interface ProblemProgressState {
   loadingUserId: string | number | null;
   error: string | null;
 }
+
+type ProgressThunkState = {
+  auth?: {
+    user?: { id?: string | number | null } | null;
+    isAuthenticated?: boolean;
+  };
+  progress: ProblemProgressState;
+};
 
 const readMap = (key: string): SolvedByProblemId => {
   try {
@@ -96,12 +103,12 @@ export const hydrateProgress = createAsyncThunk<
     warning: string | null;
   },
   { force?: boolean; userId?: string | number | null } | boolean | void,
-  { state: RootState; rejectValue: string }
+  { state: ProgressThunkState; rejectValue: string }
 >(
   'progress/hydrate',
   async (arg, { getState, signal }) => {
     const localFallback = loadInitialProgress();
-    const state = getState() as RootState;
+    const state = getState() as ProgressThunkState;
     const requestedUserId = typeof arg === 'object' && arg ? arg.userId : undefined;
     const userId = requestedUserId !== undefined ? requestedUserId : state.auth?.user?.id ?? null;
     const isAuthenticated = state.auth?.isAuthenticated;
@@ -174,7 +181,7 @@ export const hydrateProgress = createAsyncThunk<
   },
   {
     condition: (arg, { getState }) => {
-      const state = getState() as RootState;
+      const state = getState() as ProgressThunkState;
       const requestedUserId = typeof arg === 'object' && arg && arg.userId !== undefined
         ? arg.userId
         : state.auth?.user?.id ?? null;
@@ -202,7 +209,7 @@ export const hydrateProgress = createAsyncThunk<
 export const toggleSolvedProblem = createAsyncThunk(
   'progress/toggleSolved',
   async (ref: ProblemProgressRef, { getState }) => {
-    const state = getState() as RootState;
+    const state = getState() as ProgressThunkState;
     const current = getProblemSolvedStatus(state.progress.solvedByProblemId, ref);
     const isSolved = !current;
 

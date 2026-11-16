@@ -1,5 +1,4 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { RootState } from '../../../app/store';
 import { isRequestCanceled } from '../../../core/api/apiClient';
 import { getActionableErrorMessage } from '../../../core/validation/serverErrorMapper';
 import { learningSheetService } from '../../../services/learningSheetService';
@@ -36,6 +35,8 @@ export interface DsaSheetState {
   questionsFetchedAt: Record<number, number>;
 }
 
+type DsaSheetThunkState = { dsaSheet: DsaSheetState };
+
 const initialState: DsaSheetState = {
   sheets: [],
   selectedSheetId: null,
@@ -65,7 +66,7 @@ const initialState: DsaSheetState = {
 export const fetchDsaSheets = createAsyncThunk<
   DsaSheet[],
   { force?: boolean } | void,
-  { state: RootState }
+  { state: DsaSheetThunkState }
 >('dsaSheet/fetchSheets', async (arg, { getState, rejectWithValue, signal }) => {
   const { dsaSheet } = getState();
   const now = Date.now();
@@ -91,7 +92,7 @@ export const fetchDsaSheets = createAsyncThunk<
 export const fetchDsaSections = createAsyncThunk<
   { sheetId: number; sections: DsaSheetSection[] },
   { sheetId: number; force?: boolean },
-  { state: RootState }
+  { state: DsaSheetThunkState }
 >('dsaSheet/fetchSections', async ({ sheetId, force }, { getState, rejectWithValue, signal }) => {
   const { dsaSheet } = getState();
   const now = Date.now();
@@ -116,7 +117,7 @@ export const fetchDsaSections = createAsyncThunk<
 export const fetchSectionQuestions = createAsyncThunk<
   { sectionId: number; questions: DsaSheetQuestionLink[] },
   { sectionId: number; force?: boolean },
-  { state: RootState }
+  { state: DsaSheetThunkState }
 >('dsaSheet/fetchSectionQuestions', async ({ sectionId, force }, { getState, rejectWithValue, signal }) => {
   const { dsaSheet } = getState();
   const now = Date.now();
