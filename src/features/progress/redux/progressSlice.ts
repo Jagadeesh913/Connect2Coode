@@ -155,8 +155,9 @@ export const hydrateProgress = createAsyncThunk<
       if (attemptedRes.status === 'fulfilled' && Array.isArray(attemptedRes.value)) {
         attemptedItems = attemptedRes.value;
         if (attemptedRes.value.length > 0) {
-          attemptedRes.value.forEach((item: any) => {
-            const qId = String(item?.questionId ?? item?.id ?? item);
+          attemptedRes.value.forEach((item: unknown) => {
+            const rec = item as Record<string, unknown> | null;
+            const qId = String(rec?.questionId ?? rec?.id ?? item);
             if (qId && qId !== '[object Object]') {
               attemptedMap[qId] = true;
             }

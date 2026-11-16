@@ -31,8 +31,9 @@ export const fetchLanguages = createAsyncThunk<
         items: await executionService.getLanguageDropdown(Boolean(_?.force)),
         fetchedAt: Date.now(),
       };
-    } catch (error: any) {
-      return rejectWithValue(error?.message || 'Failed to load languages');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : (error as { message?: string })?.message;
+      return rejectWithValue(message || 'Failed to load languages');
     }
   },
   {

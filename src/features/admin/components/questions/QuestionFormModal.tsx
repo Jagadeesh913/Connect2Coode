@@ -140,40 +140,41 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     initializedFormIdentity.current = formIdentity;
 
     if (initialData) {
+      const initRec = initialData as unknown as Record<string, unknown> | null;
       const diffName = (
         initialData.difficultyRefName ||
-        (initialData as any).difficultyName ||
-        (initialData as any).difficulty ||
+        (initRec?.difficultyName as string | undefined) ||
+        (initRec?.difficulty as string | undefined) ||
         ''
       ).toLowerCase();
       const matchedDiff = difficulties.find(
         (d) =>
           (initialData.difficultyRefCode && d.refCode === initialData.difficultyRefCode) ||
-          (initialData as any).difficultyId === d.id ||
+          initRec?.difficultyId === d.id ||
           (diffName && d.refName.toLowerCase() === diffName) ||
           (diffName && d.refCode.toLowerCase() === diffName)
       );
 
       const topicName = (
         initialData.topicRefName ||
-        (initialData as any).topicName ||
-        (initialData as any).category ||
-        (initialData as any).topic ||
+        (initRec?.topicName as string | undefined) ||
+        (initRec?.category as string | undefined) ||
+        (initRec?.topic as string | undefined) ||
         ''
       ).toLowerCase();
       const matchedTopic = topics.find(
         (t) =>
           (initialData.topicRefCode && t.refCode === initialData.topicRefCode) ||
-          (initialData as any).topicId === t.id ||
+          initRec?.topicId === t.id ||
           (topicName && t.refName.toLowerCase() === topicName) ||
           (topicName && t.refCode.toLowerCase() === topicName)
       );
 
       const qpfName = (
         initialData.qpfRefName ||
-        (initialData as any).questionPlatform ||
-        (initialData as any).platformName ||
-        (initialData as any).platform ||
+        (initRec?.questionPlatform as string | undefined) ||
+        (initRec?.platformName as string | undefined) ||
+        (initRec?.platform as string | undefined) ||
         ''
       ).toLowerCase().trim();
       const matchedQpf = qpfs.find(
@@ -199,7 +200,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         topicRefName: matchedTopic?.refName || initialData.topicRefName || '',
         qpfRefGroupCode: matchedQpf?.refGroupCode || initialData.qpfRefGroupCode || 'QPF',
         qpfRefCode: matchedQpf?.refCode || initialData.qpfRefCode || '',
-        qpfRefName: matchedQpf?.refName || initialData.qpfRefName || (initialData as any).questionPlatform || '',
+        qpfRefName: matchedQpf?.refName || initialData.qpfRefName || (initRec?.questionPlatform as string | undefined) || '',
         leetCodeUrl: initialData.leetCodeUrl || '',
         gfgUrl: initialData.gfgUrl || '',
         hackerRankUrl: initialData.hackerRankUrl || '',
@@ -210,27 +211,31 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
 
       setHints(
         Array.isArray(initialData.questionHints) && initialData.questionHints.length > 0
-          ? initialData.questionHints.map((h: any) => ({
-              id: h.id ?? null,
-              hintText: h.hintText || h.hint || '',
-            }))
+          ? initialData.questionHints.map((h: unknown) => {
+              const hRec = h as { id?: number | null; hintText?: string; hint?: string };
+              return {
+                id: hRec.id ?? null,
+                hintText: hRec.hintText || hRec.hint || '',
+              };
+            })
           : []
       );
 
       if (Array.isArray(initialData.companies)) {
         const mapped = initialData.companies
-          .map((c: any) => {
-            const cName = typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c).trim();
+          .map((c: unknown) => {
+            const cRec = c as { id?: string | number | null; name?: string; companyName?: string } | null;
+            const cName = typeof c === 'object' && c !== null ? cRec?.name || cRec?.companyName || '' : String(c).trim();
             if (!cName) return null;
             const found = allCompanies.find((ac) => ac.name.toLowerCase() === cName.toLowerCase());
             return (
               found || {
-                id: typeof c === 'object' && c?.id ? c.id : null,
+                id: typeof c === 'object' && cRec?.id ? cRec.id : null,
                 name: cName,
               }
             );
           })
-          .filter((c): c is { id?: any; name: string } => c !== null);
+          .filter((c): c is { id?: string | number | null; name: string } => c !== null);
         setSelectedCompanies(mapped);
       } else {
         setSelectedCompanies([]);
@@ -311,12 +316,13 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       setValue(nameField, match.refName, { shouldDirty: false });
     };
 
+    const initRec = initialData as Record<string, unknown> | null;
     resolveReference(
       difficulties,
       'difficultyRefCode',
       'difficultyRefGroupCode',
       'difficultyRefName',
-      initialData?.difficultyRefName || (initialData as any)?.difficultyName || (initialData as any)?.difficulty || '',
+      initialData?.difficultyRefName || (initRec?.difficultyName as string | undefined) || (initRec?.difficulty as string | undefined) || '',
       'DIFF'
     );
     resolveReference(
@@ -324,7 +330,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       'topicRefCode',
       'topicRefGroupCode',
       'topicRefName',
-      initialData?.topicRefName || (initialData as any)?.topicName || (initialData as any)?.topic || '',
+      initialData?.topicRefName || (initRec?.topicName as string | undefined) || (initRec?.topic as string | undefined) || '',
       'TOPIC'
     );
     resolveReference(
@@ -332,7 +338,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       'qpfRefCode',
       'qpfRefGroupCode',
       'qpfRefName',
-      initialData?.qpfRefName || (initialData as any)?.questionPlatform || (initialData as any)?.platformName || '',
+      initialData?.qpfRefName || (initRec?.questionPlatform as string | undefined) || (initRec?.platformName as string | undefined) || '',
       'QPF'
     );
 
@@ -442,14 +448,14 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     setTestCases((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleTestCaseChange = (index: number, field: keyof QuestionTestCase, value: any) => {
+  const handleTestCaseChange = <K extends keyof QuestionTestCase>(index: number, field: K, value: QuestionTestCase[K]) => {
     setTestCases((prev) => {
       const updated = [...prev];
       const target = { ...updated[index], [field]: value };
 
       if (field === 'typeRefCode') {
         const matched = testCaseTypes.find((t) => t.refCode === value);
-        target.typeRefCode = value;
+        target.typeRefCode = (value as string) || '';
         target.typeRefGroupCode = 'TESTCASETYPE';
         target.typeRefName = matched?.refName || '';
         if (value === 'SAMPLE') {
@@ -469,8 +475,8 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     if (testCaseErrors[index]) {
       setTestCaseErrors((prev) => {
         const current = { ...prev[index] };
-        if (field === 'input' && value.trim()) delete current.input;
-        if (field === 'expectedOutput' && value.trim()) delete current.expectedOutput;
+        if (field === 'input' && typeof value === 'string' && value.trim()) delete current.input;
+        if (field === 'expectedOutput' && typeof value === 'string' && value.trim()) delete current.expectedOutput;
         if (Object.keys(current).length === 0) {
           const next = { ...prev };
           delete next[index];

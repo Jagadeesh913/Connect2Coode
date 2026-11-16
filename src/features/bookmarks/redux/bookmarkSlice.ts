@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { userQuestionService, type UserBookmarkQuestionResponse } from '../../../services/userQuestionService';
 import { tokenStorage } from '../../../core/security/tokenStorage';
 import { userScopedStorage } from '../../../core/storage/userScopedStorage';
@@ -138,12 +138,13 @@ export const fetchBookmarks = createAsyncThunk<
             fetchedAt: Date.now(),
           };
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (signal.aborted) throw error;
+        const msg = error instanceof Error ? error.message : (error as { message?: string })?.message;
         return rejectWithValue({
           userId,
           localBookmarks,
-          message: error?.message || 'Could not refresh bookmarks from the server.',
+          message: msg || 'Could not refresh bookmarks from the server.',
         });
       }
     }
@@ -209,10 +210,11 @@ export const toggleBookmarkItem = createAsyncThunk<
         } else {
           await userQuestionService.bookmarkQuestion(userId, itemId);
         }
-      } catch (apiErr: any) {
+      } catch (apiErr: unknown) {
+        const errorObj = apiErr as { message?: string; errors?: string[] };
         const msg =
-          apiErr?.message ||
-          (apiErr?.errors && apiErr.errors[0]) ||
+          errorObj?.message ||
+          (errorObj?.errors && errorObj.errors[0]) ||
           'Failed to update bookmark on server';
         return rejectWithValue(msg);
       }
@@ -355,7 +357,7 @@ const bookmarkSlice = createSlice({
           action.type === 'auth/login/fulfilled' ||
           action.type === 'auth/refreshSession/fulfilled' ||
           action.type === 'auth/setAuthenticatedSession',
-        (state, action: any) => {
+        (state, action: PayloadAction<{ user?: { id?: number }; id?: number } | undefined>) => {
           state.currentRequestId = null;
           const nextUserId = action.payload?.user?.id ?? action.payload?.id ?? null;
           const isSameScope =
@@ -372,7 +374,7 @@ const bookmarkSlice = createSlice({
       )
       .addMatcher(
         (action) => action.type === 'auth/initializeAuth',
-        (state, action: any) => {
+        (state, action: PayloadAction<{ savedUser?: { id?: number } } | undefined>) => {
           state.currentRequestId = null;
           const nextUserId = action.payload?.savedUser?.id ?? null;
           const isSameScope = String(state.activeUserId ?? '') === String(nextUserId ?? '');

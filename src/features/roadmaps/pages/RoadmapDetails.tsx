@@ -588,7 +588,7 @@ export const RoadmapDetails: React.FC = () => {
                                 <span className="font-bold text-white font-heading">Practice Problems:</span>
                                 <div className="grid grid-cols-1 gap-2">
                                   {node.problems.map((p, pIdx) => {
-                                    const isOwn = (p as any).isOwnProblem !== false;
+                                    const isOwn = p.isOwnProblem !== false;
                                     return (
                                       <div
                                         key={pIdx}

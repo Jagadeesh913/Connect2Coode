@@ -42,17 +42,18 @@ interface QuestionOption {
   testCases?: QuestionTestCase[];
 }
 
-const toQuestionOption = (item: any): QuestionOption | null => {
+const toQuestionOption = (rawItem: unknown): QuestionOption | null => {
+  const item = rawItem as Record<string, unknown> | null;
   if (!item || typeof item.id !== 'number') return null;
   return {
     id: item.id,
-    title: item.title,
-    description: item.description,
-    constraints: item.constraints,
-    difficulty: item.difficulty || item.difficultyRefName || item.difficultyName,
-    difficultyRefName: item.difficultyRefName || item.difficulty || item.difficultyName,
-    topicRefName: item.topicRefName || item.topicName,
-    testCases: item.testCases,
+    title: (typeof item.title === 'string' ? item.title : String(item.title || '')),
+    description: item.description as string | undefined,
+    constraints: item.constraints as string | undefined,
+    difficulty: (item.difficulty || item.difficultyRefName || item.difficultyName) as string | undefined,
+    difficultyRefName: (item.difficultyRefName || item.difficulty || item.difficultyName) as string | undefined,
+    topicRefName: (item.topicRefName || item.topicName) as string | undefined,
+    testCases: item.testCases as QuestionTestCase[] | undefined,
   };
 };
 
@@ -280,9 +281,10 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         .filter((item): item is QuestionOption => item !== null);
       setQuestions((current) => mergeQuestionOptions(current, incoming));
       setQuestionPage(nextPage);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (generation !== pageGenerationRef.current) return;
-      toast.error('Unable to load more questions: ' + (err?.message || 'Server error'));
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      toast.error('Unable to load more questions: ' + (message || 'Server error'));
     } finally {
       if (generation === pageGenerationRef.current) {
         setIsLoadingMoreQuestions(false);
@@ -496,14 +498,14 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         const qData = response.data;
 
         if (qData && (qData.id || qData.title)) {
-          const qAny = qData as any;
+          const qRecord = qData as unknown as Record<string, unknown>;
           const newOpt: QuestionOption = {
             id: Number(qData.id || num),
             title: qData.title,
             description: qData.description,
             constraints: qData.constraints,
-            difficulty: qData.difficultyRefName || qAny.difficulty,
-            difficultyRefName: qData.difficultyRefName || qAny.difficulty,
+            difficulty: qData.difficultyRefName || (qRecord.difficulty as string | undefined),
+            difficultyRefName: qData.difficultyRefName || (qRecord.difficulty as string | undefined),
             topicRefName: qData.topicRefName,
             testCases: qData.testCases,
           };
@@ -572,14 +574,15 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
       } else {
         toast.error(`${res.failedTestCases} of ${res.totalTestCases} sample test cases failed.`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
+      const errObj = err as { errors?: string[]; error?: string; message?: string };
       const detail =
-        Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
+        Array.isArray(errObj?.errors) && errObj.errors.length > 0 ? errObj.errors.join('; ') : errObj?.error || '';
       const msg =
-        detail && detail !== err?.message
-          ? `${err?.message || 'Admin testCode execution failed'}: ${detail}`
-          : err?.message || 'Admin testCode execution failed';
+        detail && detail !== errObj?.message
+          ? `${errObj?.message || 'Admin testCode execution failed'}: ${detail}`
+          : errObj?.message || 'Admin testCode execution failed';
       toast.error(msg);
       setExecutionMessage(msg);
       setResult(null);
@@ -622,20 +625,21 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
       } else {
         toast.error(`${res.failedTestCases} of ${res.totalTestCases} validation test cases failed.`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
+      const errObj = err as { errors?: string[]; error?: string; message?: string; statusCode?: number };
       const detail =
-        Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
+        Array.isArray(errObj?.errors) && errObj.errors.length > 0 ? errObj.errors.join('; ') : errObj?.error || '';
       const isKnownNpe =
-        String(err?.message || detail).includes('getType') ||
-        String(err?.message || detail).includes('NullPointerException') ||
-        err?.statusCode === 500;
+        String(errObj?.message || detail).includes('getType') ||
+        String(errObj?.message || detail).includes('NullPointerException') ||
+        errObj?.statusCode === 500;
 
       const msg = isKnownNpe
         ? 'Remote submission engine encountered an evaluation defect on hidden test cases (backend TestCase.getType() NPE). Sample test cases can still be tested via "Run Code".'
-        : detail && detail !== err?.message
-        ? `${err?.message || 'Admin submitCode failed'}: ${detail}`
-        : err?.message || 'Admin submitCode failed';
+        : detail && detail !== errObj?.message
+        ? `${errObj?.message || 'Admin submitCode failed'}: ${detail}`
+        : errObj?.message || 'Admin submitCode failed';
 
       toast.error(msg);
       setExecutionMessage(msg);

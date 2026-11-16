@@ -52,6 +52,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
   };
 
   const formattedAskedDate = formatAskedDate(question?.askedDate);
+  const qRec = question as Record<string, unknown> | null;
   const platformSummary =
     typeof question?.questionPlatform === 'object' && question.questionPlatform !== null
       ? question.questionPlatform
@@ -61,9 +62,21 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
     question?.qpfRefName ||
     platformSummary?.refName ||
     (typeof question?.questionPlatform === 'string' ? question.questionPlatform : '') ||
-    (question as any)?.platformName ||
-    (question as any)?.platform ||
+    (qRec?.platformName as string | undefined) ||
+    (qRec?.platform as string | undefined) ||
     '';
+
+  const rawDifficulty =
+    question?.difficultyRefName ||
+    (qRec?.difficultyName as string | undefined) ||
+    (qRec?.difficulty as string | undefined) ||
+    question?.difficultyRefCode;
+
+  const rawTopic =
+    question?.topicRefName ||
+    (qRec?.topicName as string | undefined) ||
+    (qRec?.category as string | undefined) ||
+    (qRec?.topic as string | undefined);
 
   return (
     <AdminModal
@@ -115,30 +128,15 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
             )}
 
             <AdminBadge
-              variant={getDifficultyVariant(
-                question.difficultyRefName ||
-                  (question as any).difficultyName ||
-                  (question as any).difficulty ||
-                  question.difficultyRefCode
-              )}
+              variant={getDifficultyVariant(rawDifficulty)}
               size="sm"
             >
-              {question.difficultyRefName ||
-                (question as any).difficultyName ||
-                (question as any).difficulty ||
-                question.difficultyRefCode ||
-                'Medium'}
+              {rawDifficulty || 'Medium'}
             </AdminBadge>
 
-            {(question.topicRefName ||
-              (question as any).topicName ||
-              (question as any).category ||
-              (question as any).topic) && (
+            {rawTopic && (
               <AdminBadge variant="primary" size="sm">
-                {question.topicRefName ||
-                  (question as any).topicName ||
-                  (question as any).category ||
-                  (question as any).topic}
+                {rawTopic}
               </AdminBadge>
             )}
 
@@ -265,11 +263,13 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                 <span>Tagged Hiring Companies</span>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {question.companies.map((c: any, i: number) => {
-                  const companyName = typeof c === 'object' && c !== null ? c.name || c.companyName || '' : String(c);
+                {question.companies.map((c: unknown, i: number) => {
+                  const cRec = c as Record<string, unknown> | null;
+                  const companyName = typeof c === 'object' && c !== null ? (cRec?.name as string | undefined) || (cRec?.companyName as string | undefined) || '' : String(c);
+                  const companyId = cRec?.id as string | number | undefined;
                   return (
                     <span
-                      key={c.id ? `comp-${c.id}` : `comp-name-${companyName || i}-${i}`}
+                      key={companyId ? `comp-${companyId}` : `comp-name-${companyName || i}-${i}`}
                       className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 text-xs font-semibold"
                     >
                       <Building2 className="w-3 h-3" />
@@ -354,7 +354,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                     className="p-3 rounded-xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-900/40 text-amber-900 dark:text-amber-200 text-xs"
                   >
                     <span className="font-bold mr-1.5">Hint {i + 1}:</span>
-                    {hint.hintText || (hint as any).hint}
+                    {hint.hintText || (hint as { hint?: string }).hint}
                   </div>
                 ))}
               </div>

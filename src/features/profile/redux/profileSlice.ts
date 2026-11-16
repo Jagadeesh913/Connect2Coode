@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { profileService } from '../../../services/profileService';
 import type { UserProfile, UserInfoData, SaveUserInfoPayload } from '../../../core/types/domain';
 
@@ -76,9 +76,10 @@ export const fetchUserInfoThunk = createAsyncThunk<
     try {
       const res = await profileService.getUserInfo(userId, signal);
       return { userId, data: res.data };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (signal.aborted) throw err;
-      return rejectWithValue(err?.message || 'Unable to refresh academic details.');
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Unable to refresh academic details.');
     }
   },
   {
@@ -120,8 +121,9 @@ export const saveUserInfoThunk = createAsyncThunk<
         userId,
         college: res.data.college,
       };
-    } catch (err: any) {
-      return rejectWithValue(err?.message || 'Unable to save academic details.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Unable to save academic details.');
     }
   }
 );
@@ -241,7 +243,7 @@ const profileSlice = createSlice({
           action.type === 'auth/login/fulfilled' ||
           action.type === 'auth/setAuthenticatedSession' ||
           action.type === 'auth/initializeAuth',
-        (state, action: any) => {
+        (state, action: PayloadAction<{ user?: { id?: number }; savedUser?: { id?: number }; id?: number } | undefined>) => {
           if (
             action.type === 'auth/setAuthenticatedSession' &&
             !action.payload?.user
@@ -249,7 +251,7 @@ const profileSlice = createSlice({
             return;
           }
 
-          const nextUser = action.payload?.user || action.payload?.savedUser || action.payload;
+          const nextUser = action.payload?.user || action.payload?.savedUser || (action.payload as { id?: number } | undefined);
           const nextUserId = nextUser?.id ?? null;
           const profileBelongsToNextUser =
             state.profile?.id != null && String(state.profile.id) === String(nextUserId ?? '');

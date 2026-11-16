@@ -44,7 +44,7 @@ export const fetchReferenceGroup = createAsyncThunk<
         items: Array.isArray(response.data) ? response.data : [],
         fetchedAt: Date.now(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (signal.aborted) throw error;
       return rejectWithValue({
         groupCode,

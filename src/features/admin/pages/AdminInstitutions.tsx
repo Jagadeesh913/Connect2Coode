@@ -141,7 +141,7 @@ export const AdminInstitutions: React.FC = () => {
       } else {
         throw new Error('Unexpected institutions response format');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch institutions.'));
 
@@ -185,7 +185,7 @@ export const AdminInstitutions: React.FC = () => {
       const res = await adminInstitutionService.getInstitutionById(id, controller.signal);
       if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       setSelectedInstitution(res.data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       setIsDetailsOpen(false);
       toast.error(getActionableErrorMessage(err, 'Could not retrieve full institution details.'));
@@ -217,7 +217,7 @@ export const AdminInstitutions: React.FC = () => {
       }
       setSelectedInstitution(response.data);
       setIsFormOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete institution data for editing.'));
     } finally {
@@ -270,8 +270,9 @@ export const AdminInstitutions: React.FC = () => {
       }
       setIsFormOpen(false);
       await fetchInstitutions();
-    } catch (err: any) {
-      const fieldError = err?.response?.data?.errors?.[0];
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { errors?: Array<{ field?: string; defaultMessage?: string }> } } };
+      const fieldError = errorObj?.response?.data?.errors?.[0];
       if (fieldError?.field) {
         setFormServerError({
           field: fieldError.field,
@@ -298,7 +299,7 @@ export const AdminInstitutions: React.FC = () => {
       );
       setIsStatusModalOpen(false);
       await fetchInstitutions();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to update institution status.'));
     } finally {
       mutationPendingRef.current = false;
@@ -463,7 +464,7 @@ export const AdminInstitutions: React.FC = () => {
           <C2CSelect
             value={typeFilter}
             onChange={(val) => {
-              setTypeFilter(val as any);
+              setTypeFilter(val as InstitutionType | 'ALL');
               setPage(0);
             }}
             options={[
@@ -489,7 +490,7 @@ export const AdminInstitutions: React.FC = () => {
           <C2CSelect
             value={activeFilter}
             onChange={(val) => {
-              setActiveFilter(val as any);
+              setActiveFilter(val as 'ALL' | 'ACTIVE' | 'INACTIVE');
               setPage(0);
             }}
             options={[

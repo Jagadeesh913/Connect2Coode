@@ -75,7 +75,7 @@ export const AdminCompanies: React.FC = () => {
       if (res.data.totalElements > 0 && pageNumber >= res.data.totalPages) {
         setPageNumber(Math.max(0, res.data.totalPages - 1));
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
       const msg = getActionableErrorMessage(err, 'Failed to fetch companies list.');
       setError(msg);
@@ -127,7 +127,7 @@ export const AdminCompanies: React.FC = () => {
         setSelectedCompany(null);
         toast.error('Company details not found.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (requestId !== inspectionId.current) return;
       setIsDetailsOpen(false);
       setSelectedCompany(null);
@@ -151,7 +151,7 @@ export const AdminCompanies: React.FC = () => {
       } else {
         toast.error('Unable to retrieve full company data for editing.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (requestId !== inspectionId.current) return;
       toast.error(getActionableErrorMessage(err, 'Error retrieving company for editing.'));
     } finally {
@@ -184,7 +184,7 @@ export const AdminCompanies: React.FC = () => {
       toast.success(formData.id ? 'Company updated successfully!' : 'Company registered successfully!');
       setIsFormOpen(false);
       await Promise.all([fetchCompanies(), fetchAvailableCompanies()]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save company entity.'));
     } finally {
       mutationPendingRef.current = false;

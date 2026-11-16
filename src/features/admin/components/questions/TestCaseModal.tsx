@@ -153,7 +153,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     });
   };
 
-  const handleChange = (index: number, field: keyof QuestionTestCase, value: any) => {
+  const handleChange = <K extends keyof QuestionTestCase>(index: number, field: K, value: QuestionTestCase[K]) => {
     setTestCases((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
@@ -164,8 +164,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       setFieldErrors((prev) => {
         if (!prev[index]) return prev;
         const current = { ...prev[index] };
-        if (field === 'input' && value.trim()) delete current.input;
-        if (field === 'expectedOutput' && value.trim()) delete current.expectedOutput;
+        if (field === 'input' && typeof value === 'string' && value.trim()) delete current.input;
+        if (field === 'expectedOutput' && typeof value === 'string' && value.trim()) delete current.expectedOutput;
         return { ...prev, [index]: current };
       });
     }
@@ -229,7 +229,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       toast.success(`Successfully saved ${payload.length} test cases for Question #${questionId}`);
       if (onSuccess) onSuccess();
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save test cases.'));
     } finally {
       mutationPendingRef.current = false;

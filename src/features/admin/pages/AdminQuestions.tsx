@@ -179,7 +179,7 @@ export const AdminQuestions: React.FC = () => {
       setQuestions(contentList);
       setTotalElements(total);
       setTotalPages(computedPages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch question bank records.'));
 
@@ -220,7 +220,7 @@ export const AdminQuestions: React.FC = () => {
         testCases: cases,
         constraints: detailedData.constraints || extractConstraintsFromDescription(detailedData.description),
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       setIsDetailsOpen(false);
       toast.error(getActionableErrorMessage(err, 'Failed to load question statement.'));
@@ -249,7 +249,7 @@ export const AdminQuestions: React.FC = () => {
         constraints: detail.constraints || extractConstraintsFromDescription(detail.description),
       });
       setIsFormOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete question data for editing.'));
     } finally {
@@ -280,7 +280,7 @@ export const AdminQuestions: React.FC = () => {
         constraints: detail.constraints || extractConstraintsFromDescription(detail.description),
       });
       setIsTestCaseOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || requestId !== detailRequestId.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load test cases for this problem.'));
     } finally {
@@ -310,17 +310,19 @@ export const AdminQuestions: React.FC = () => {
       // Resolve company entities with IDs from companies list
       const resolvedCompanies: { id?: number; name: string }[] = [];
       for (const c of (formData.companies || [])) {
-        const cName = (typeof c === 'string' ? c : (c as any)?.name || (c as any)?.companyName || '').trim();
+        const cRec = typeof c === 'object' && c !== null ? (c as unknown as Record<string, unknown>) : null;
+        const cName = (typeof c === 'string' ? c : (cRec?.name as string | undefined) || (cRec?.companyName as string | undefined) || '').trim();
         if (!cName) continue;
         const match = companies.find((comp) => comp.name.toLowerCase() === cName.toLowerCase());
-        const cId = (typeof c === 'object' && c !== null && (c as any).id) ? Number((c as any).id) : match?.id;
+        const rawId = cRec?.id;
+        const cId = rawId ? Number(rawId) : match?.id;
         resolvedCompanies.push({
           id: cId ? Number(cId) : undefined,
           name: cName,
         });
       }
 
-      let companiesToSubmit: any[] | undefined = undefined;
+      let companiesToSubmit: Array<{ id?: number; name: string }> | undefined = undefined;
 
       if (!questionId) {
         // Creating new question: submit all companies that have an ID
@@ -341,11 +343,13 @@ export const AdminQuestions: React.FC = () => {
         const existingNames = new Set<string>();
         const existingIds = new Set<number>();
 
-        originalCompanies.forEach((c: any) => {
-          const cName = (typeof c === 'string' ? c : c?.name || c?.companyName || '').toLowerCase().trim();
+        originalCompanies.forEach((c: unknown) => {
+          const cRec = typeof c === 'object' && c !== null ? (c as unknown as Record<string, unknown>) : null;
+          const cName = (typeof c === 'string' ? c : (cRec?.name as string | undefined) || (cRec?.companyName as string | undefined) || '').toLowerCase().trim();
           if (cName) existingNames.add(cName);
-          if (typeof c === 'object' && c !== null && c.id) {
-            existingIds.add(Number(c.id));
+          const rawId = cRec?.id;
+          if (rawId) {
+            existingIds.add(Number(rawId));
           } else if (cName) {
             const match = companies.find((comp) => comp.name.toLowerCase() === cName);
             if (match?.id) existingIds.add(Number(match.id));
@@ -438,7 +442,7 @@ export const AdminQuestions: React.FC = () => {
             typeRefName: tc.typeRefName || '',
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);
-        } catch (tcErr: any) {
+        } catch (tcErr: unknown) {
           await fetchQuestions();
           toast.error(
             getActionableErrorMessage(
@@ -464,7 +468,7 @@ export const AdminQuestions: React.FC = () => {
       } else {
         await fetchQuestions();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save question entity.'));
     } finally {
       mutationPendingRef.current = false;

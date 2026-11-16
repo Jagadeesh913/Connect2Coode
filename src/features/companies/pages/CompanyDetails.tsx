@@ -26,6 +26,7 @@ import { usePageMetadata } from '../../../core/metadata/usePageMetadata';
 import { C2CSelect } from '../../../shared/components/ui/C2CSelect';
 import { Pagination } from '../../../shared/components/ui/Pagination';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
+import { isRequestCanceled } from '../../../core/api/apiClient';
 import { CodingQuestionTable } from '../../problems/components/CodingQuestionTable';
 
 type CompanySection = 'coding' | 'aptitude' | 'reasoning' | 'verbal' | 'pseudocode';
@@ -213,9 +214,10 @@ export const CompanyDetails: React.FC = () => {
           setExamTotal(res.data.totalElements);
           setExamTotalPages(Math.max(1, res.data.totalPages));
         }
-      } catch (err: any) {
-        if (isMounted && err?.name !== 'CanceledError') {
-          setExamsError(err?.message || 'Failed to fetch company exams');
+      } catch (err: unknown) {
+        if (isMounted && !isRequestCanceled(err)) {
+          const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+          setExamsError(message || 'Failed to fetch company exams');
           setExams([]);
         }
       } finally {
@@ -347,7 +349,10 @@ export const CompanyDetails: React.FC = () => {
   );
   const filteredMcqs = currentMcqList;
 
-  const handleBookmarkToggle = (q: any, e: React.MouseEvent) => {
+  const handleBookmarkToggle = (
+    q: { id: number | string; title?: string; difficulty?: string; topicRefName?: string; topic?: string },
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     if (!isAuthenticated) {
       toast.error('Please log in to bookmark questions');

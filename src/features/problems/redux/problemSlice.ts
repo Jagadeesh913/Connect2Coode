@@ -131,15 +131,15 @@ export const sanitizeProblemFilters = (params?: ProblemFilter): ProblemFilter | 
 
   const difficulty = cleanArray(params.difficulty);
   if (difficulty) {
-    sanitized.difficulty = difficulty as any;
+    sanitized.difficulty = difficulty;
   }
 
   const topic = cleanArray(params.topic);
-  if (topic) sanitized.topic = topic as any;
+  if (topic) sanitized.topic = topic;
 
   const companies = cleanArray(params.companies);
   if (companies) {
-    sanitized.companies = companies as any;
+    sanitized.companies = companies;
   }
 
   return sanitized;
@@ -192,11 +192,12 @@ export const fetchProblems = createAsyncThunk(
         },
         fetchedAt: Date.now(),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isRequestCanceled(err)) {
         throw err;
       }
-      return rejectWithValue(err?.message || 'Failed to fetch problems');
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Failed to fetch problems');
     }
   },
   {
@@ -240,11 +241,12 @@ export const fetchProblemById = createAsyncThunk(
         problem: res.data,
         fetchedAt: Date.now(),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isRequestCanceled(err)) {
         throw err;
       }
-      return rejectWithValue(err?.message || 'Failed to fetch problem detail');
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Failed to fetch problem detail');
     }
   },
   {

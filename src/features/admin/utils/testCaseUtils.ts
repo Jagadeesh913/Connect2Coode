@@ -114,7 +114,7 @@ function parseTestCasesFromMarkdown(
  * No test cases are invented when these authoritative sources are absent.
  */
 export function extractTestCasesFromProblem(
-  question?: (Partial<Question> & { examples?: any[]; title?: string }) | null
+  question?: (Partial<Question> & { examples?: Array<{ input?: unknown; output?: unknown; expectedOutput?: unknown; explanation?: unknown }>; title?: string }) | null
 ): QuestionTestCase[] {
   if (!question) return [];
 
@@ -137,14 +137,14 @@ export function extractTestCasesFromProblem(
   const numericId = question.id ? Number(question.id) : undefined;
 
   // 2. Examples array
-  const rawExamples = (question as any).examples;
+  const rawExamples = question.examples;
   if (Array.isArray(rawExamples) && rawExamples.length > 0) {
-    return rawExamples.map((ex: any, idx: number) => ({
+    return rawExamples.map((ex, idx: number) => ({
       id: idx + 1,
       questionId: numericId,
-      input: String(ex.input || '').trim(),
-      expectedOutput: String(ex.output || ex.expectedOutput || '').trim(),
-      explanation: String(ex.explanation || '').trim(),
+      input: String(ex?.input || '').trim(),
+      expectedOutput: String(ex?.output || ex?.expectedOutput || '').trim(),
+      explanation: String(ex?.explanation || '').trim(),
       isHidden: false,
       displayOrder: idx + 1,
       typeRefGroupCode: '',

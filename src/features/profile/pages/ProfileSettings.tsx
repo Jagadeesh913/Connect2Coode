@@ -147,20 +147,20 @@ const UserProfilePage: React.FC = () => {
 
   // Effective User ID from authenticated session (Must be numeric Long for backend APIs)
   const effectiveUserId = useMemo(() => {
-    const parseNum = (val: any): number | null => {
+    const parseNum = (val: unknown): number | null => {
       if (val === null || val === undefined) return null;
       const n = Number(val);
       return !isNaN(n) && n > 0 ? n : null;
     };
 
-    const fromAuth = parseNum(authUser?.id) ?? parseNum((authUser as any)?.userId);
+    const fromAuth = parseNum(authUser?.id) ?? parseNum((authUser as Record<string, unknown> | null)?.userId);
     if (fromAuth) return fromAuth;
 
     const fromProfile = parseNum(profile?.id);
     if (fromProfile) return fromProfile;
 
     const stored = tokenStorage.getUser();
-    const fromStored = parseNum(stored?.id) ?? parseNum((stored as any)?.userId);
+    const fromStored = parseNum(stored?.id) ?? parseNum((stored as Record<string, unknown> | null)?.userId);
     if (fromStored) return fromStored;
 
     return null;
@@ -172,7 +172,8 @@ const UserProfilePage: React.FC = () => {
 
     const dateStrings = submissions
       .map((s) => {
-        const raw = s.submittedDate || (s as any).createdAt || (s as any).submittedAt;
+        const item = s as { submittedDate?: string; createdAt?: string; submittedAt?: string };
+        const raw = item.submittedDate || item.createdAt || item.submittedAt;
         if (!raw) return null;
         const d = new Date(raw);
         return isNaN(d.getTime()) ? null : d.toDateString();
@@ -285,7 +286,7 @@ const UserProfilePage: React.FC = () => {
 
       toast.success('Profile details saved successfully.');
       setIsAcademicModalOpen(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMsg = getActionableErrorMessage(
         err,
         'Unable to save academic details. Please try again.'
@@ -367,7 +368,7 @@ const UserProfilePage: React.FC = () => {
       ? `${profile.firstName} ${profile.lastName || ''}`.trim()
       : userInfo?.firstName
         ? `${userInfo.firstName} ${userInfo.lastName || ''}`.trim()
-        : authUser?.fullName || (authUser as any)?.username || 'User');
+        : authUser?.fullName || (authUser as Record<string, unknown> | null)?.username as string | undefined || 'User');
 
   const email = profile?.email || authUser?.email || '';
 

@@ -543,7 +543,7 @@ export const PracticePage: React.FC = () => {
       .then(() => {
         toast.success(isCurrentlyBookmarked ? 'Bookmark removed' : 'Problem bookmarked!');
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         toast.error(typeof err === 'string' ? err : 'Failed to update bookmark');
       });
   };

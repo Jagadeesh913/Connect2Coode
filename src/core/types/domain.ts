@@ -119,13 +119,13 @@ export interface Problem {
 
 export interface ProblemFilter {
   category?: string;
-  topic?: number[] | string | number | null;
-  difficulty?: number[] | string | number | null;
-  level?: number[] | string | number | null;
+  topic?: number[] | string[] | (number | string)[] | string | number | null;
+  difficulty?: number[] | string[] | (number | string)[] | string | number | null;
+  level?: number[] | string[] | (number | string)[] | string | number | null;
   search?: string | null;
   searchText?: string | null;
-  company?: number[] | string | number | null;
-  companies?: number[] | string[] | null;
+  company?: number[] | string[] | (number | string)[] | string | number | null;
+  companies?: number[] | string[] | (number | string)[] | null;
   page?: number;
   limit?: number;
 }

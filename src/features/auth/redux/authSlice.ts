@@ -87,9 +87,10 @@ export const refreshSessionThunk = createAsyncThunk<
   async (_, { rejectWithValue }) => {
     try {
       return await executeRefreshToken();
-    } catch (err: any) {
-      const responseData = err?.response?.data;
-      const statusCode = Number(err?.response?.status || responseData?.statusCode || 0);
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { status?: number; data?: { statusCode?: number } }; statusCode?: number };
+      const responseData = errorObj?.response?.data;
+      const statusCode = Number(errorObj?.response?.status || responseData?.statusCode || 0);
       return rejectWithValue({
         message: statusCode === 401
           ? 'Your session has expired. Please sign in again.'
@@ -109,8 +110,9 @@ export const loginUser = createAsyncThunk<AuthSessionData, LoginPayload, { rejec
         return res.data as AuthSessionData;
       }
       return rejectWithValue('The authentication service returned an invalid response. Please try again.');
-    } catch (err: any) {
-      const statusCode = Number(err?.statusCode || err?.response?.status || 0);
+    } catch (err: unknown) {
+      const errorObj = err as { statusCode?: number; response?: { status?: number } };
+      const statusCode = Number(errorObj?.statusCode || errorObj?.response?.status || 0);
       if (statusCode === 401) return rejectWithValue('Invalid email or password.');
       if (statusCode === 429) return rejectWithValue('Too many attempts. Please try again later.');
       return rejectWithValue('Unable to sign in right now. Please try again.');
@@ -124,8 +126,9 @@ export const generatePasswordResetOtpThunk = createAsyncThunk(
     try {
       const res = await authService.generatePasswordResetOtp(email);
       return res?.message || 'Password Reset OTP Sent Successfully';
-    } catch (err: any) {
-      const errMsg = err.message || (err.errors && err.errors[0]) || 'Failed to send OTP. Please try again.';
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string; errors?: string[] };
+      const errMsg = errorObj.message || (errorObj.errors && errorObj.errors[0]) || 'Failed to send OTP. Please try again.';
       return rejectWithValue(errMsg);
     }
   }
@@ -137,8 +140,9 @@ export const verifyPasswordResetOtpThunk = createAsyncThunk(
     try {
       const res = await authService.verifyPasswordResetOtp(payload);
       return res?.message || 'Password Reset Successfully';
-    } catch (err: any) {
-      const errMsg = err.message || (err.errors && err.errors[0]) || 'Failed to verify OTP. Please try again.';
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string; errors?: string[] };
+      const errMsg = errorObj.message || (errorObj.errors && errorObj.errors[0]) || 'Failed to verify OTP. Please try again.';
       return rejectWithValue(errMsg);
     }
   }

@@ -174,8 +174,8 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
     try {
       const result = await dispatch(loginUser(data));
       if (loginUser.fulfilled.match(result)) {
-        const userObj = result.payload as any;
-        const userName = userObj?.firstName || userObj?.fullName || 'User';
+        const userObj = result.payload as (AuthSessionData & { user?: { role?: string }; role?: string }) | null;
+        const userName = (userObj?.firstName as string | undefined) || (userObj?.fullName as string | undefined) || 'User';
         toast.success(`Welcome ${userName}`);
 
         const isAdmin = isAdminRole(userObj?.user?.role || userObj?.role);
@@ -255,7 +255,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         setSignupError(errMsg);
         toast.error(errMsg);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSignupLoading(false);
       const errMsg = getActionableErrorMessage(err, 'Failed to create account. Please try again.');
       setSignupError(errMsg);
@@ -300,7 +300,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         setForgotOtpError(errMsg);
         toast.error(errMsg);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setForgotOtpLoading(false);
       const errMsg = getActionableErrorMessage(err, 'Failed to send OTP.');
       setForgotOtpError(errMsg);
@@ -365,10 +365,11 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
         setForgotOtpError(errMsg);
         toast.error(errMsg);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
       setForgotOtpLoading(false);
-      setForgotOtpError(err?.message || 'Error resetting password.');
-      toast.error(err?.message || 'Error resetting password.');
+      setForgotOtpError(message || 'Error resetting password.');
+      toast.error(message || 'Error resetting password.');
     } finally {
       authActionPendingRef.current = false;
     }
@@ -389,9 +390,10 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
       } else {
         toast.error((res.payload as string) || 'Failed to resend OTP.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
       setForgotOtpLoading(false);
-      toast.error(err?.message || 'Failed to resend OTP.');
+      toast.error(message || 'Failed to resend OTP.');
     } finally {
       authActionPendingRef.current = false;
     }

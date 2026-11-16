@@ -110,9 +110,10 @@ export const CompanyExamDetails: React.FC = () => {
             // Non-critical if sibling exams fail
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (!isMounted) return;
-        const errMsg = err?.response?.data?.message || err?.message || 'Failed to load company exam details';
+        const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+        const errMsg = errorObj?.response?.data?.message || errorObj?.message || 'Failed to load company exam details';
         setError(errMsg);
       } finally {
         if (isMounted) {

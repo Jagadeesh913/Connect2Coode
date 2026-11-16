@@ -80,11 +80,12 @@ export const fetchCompanies = createAsyncThunk(
         companies: res.data,
         fetchedAt: Date.now(),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isRequestCanceled(err)) {
         throw err;
       }
-      return rejectWithValue(err?.message || 'Failed to fetch companies');
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Failed to fetch companies');
     }
   },
   {
@@ -132,11 +133,12 @@ export const fetchCompanyBySlug = createAsyncThunk(
         company: res.data,
         fetchedAt: Date.now(),
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (isRequestCanceled(err)) {
         throw err;
       }
-      return rejectWithValue(err?.message || 'Failed to fetch company detail');
+      const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+      return rejectWithValue(message || 'Failed to fetch company detail');
     }
   },
   {

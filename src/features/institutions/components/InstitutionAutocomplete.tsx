@@ -91,8 +91,9 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
       if (results.length === 0) {
         setSearchFeedback(`No institutions found matching "${trimmed}"`);
       }
-    } catch (err: any) {
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
+    } catch (err: unknown) {
+      const errObj = err as { name?: string; code?: string };
+      if (errObj?.name === 'CanceledError' || errObj?.code === 'ERR_CANCELED') {
         return;
       }
       setOptions([]);

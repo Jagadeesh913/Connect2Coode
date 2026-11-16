@@ -59,8 +59,8 @@ export const OAuthCallback: React.FC = () => {
 
         if (refreshSessionThunk.fulfilled.match(result)) {
           dispatch(closeAuthModal());
-          const userPayload = result.payload as any;
-          const user = userPayload?.user || userPayload;
+          const userPayload = result.payload as unknown as Record<string, unknown> | null;
+          const user = (userPayload?.user || userPayload) as { firstName?: string; fullName?: string; role?: string } | undefined;
           const userName = user?.firstName || user?.fullName || 'User';
 
           toast.success(`Welcome back, ${userName}! Signed in with Google.`);

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type Path } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import { AdminModal } from '../AdminModal';
@@ -95,7 +95,7 @@ export const InstitutionFormModal: React.FC<InstitutionFormModalProps> = ({
   // Handle server-side field error mappings (e.g. 409 duplicate AISHE code)
   useEffect(() => {
     if (serverError?.field) {
-      setError(serverError.field as any, {
+      setError(serverError.field as Path<AdminInstitutionFormData>, {
         type: 'server',
         message: serverError.message,
       });

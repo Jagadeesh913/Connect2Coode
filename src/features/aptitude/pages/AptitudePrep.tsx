@@ -750,8 +750,9 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
       setCommittedPage(currentPage);
       setTotalElements(total);
       setTotalPages(computedPages);
-    } catch (err: any) {
-      if (controller.signal.aborted || err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
+    } catch (err: unknown) {
+      const errObj = err as { name?: string; code?: string };
+      if (controller.signal.aborted || errObj?.name === 'CanceledError' || errObj?.code === 'ERR_CANCELED') return;
       setError('Unable to load questions. Please try again.');
 
     } finally {
@@ -1381,7 +1382,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 value={sortBy}
                 onChange={(val) => {
                   beginQuestionTransition();
-                  setSortBy(val as any);
+                  setSortBy(val as 'default' | 'diff-asc' | 'diff-desc' | 'title-asc');
                   setCurrentPage(1);
                 }}
                 options={[

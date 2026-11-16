@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
 import { fetchLanguages } from '../../../languages/redux/languageSlice';
+import type { Question } from '../../../../core/types/domain';
 
 interface AdminCodeTestModalProps {
   isOpen: boolean;
@@ -98,7 +99,7 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [result, setResult] = useState<ExecutionResultData | null>(null);
-  const [questionDetails, setQuestionDetails] = useState<any | null>(null);
+  const [questionDetails, setQuestionDetails] = useState<Question | null>(null);
   const [loadingDetails, setLoadingDetails] = useState<boolean>(false);
   const [isStatementOpen, setIsStatementOpen] = useState<boolean>(false);
   const [executionMessage, setExecutionMessage] = useState<string>('');
@@ -198,10 +199,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       } else {
         toast.error(`${res.failedTestCases} sample test case(s) failed.`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
-      const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin testCode failed'}: ${detail}` : (err?.message || 'Admin testCode execution failed');
+      const errObj = err as { errors?: string[]; error?: string; message?: string };
+      const detail = Array.isArray(errObj?.errors) && errObj.errors.length > 0 ? errObj.errors.join('; ') : errObj?.error || '';
+      const msg = detail && detail !== errObj?.message ? `${errObj?.message || 'Admin testCode failed'}: ${detail}` : (errObj?.message || 'Admin testCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
       setResult(null);
@@ -236,10 +238,11 @@ export const AdminCodeTestModal: React.FC<AdminCodeTestModalProps> = ({
       } else {
         toast.error(`${res.failedTestCases} validation test case(s) failed.`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
-      const detail = Array.isArray(err?.errors) && err.errors.length > 0 ? err.errors.join('; ') : err?.error || '';
-      const msg = detail && detail !== err?.message ? `${err?.message || 'Admin submitCode failed'}: ${detail}` : (err?.message || 'Admin submitCode execution failed');
+      const errObj = err as { errors?: string[]; error?: string; message?: string };
+      const detail = Array.isArray(errObj?.errors) && errObj.errors.length > 0 ? errObj.errors.join('; ') : errObj?.error || '';
+      const msg = detail && detail !== errObj?.message ? `${errObj?.message || 'Admin submitCode failed'}: ${detail}` : (errObj?.message || 'Admin submitCode execution failed');
       toast.error(msg);
       setExecutionMessage(msg);
       setResult(null);

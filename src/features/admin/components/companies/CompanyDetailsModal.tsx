@@ -259,7 +259,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       toast.success(formData.id ? 'Company Exam updated successfully' : 'Company Exam created successfully');
       setIsExamModalOpen(false);
       await fetchExams();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save company exam.'));
     } finally {
       setSavingAction(false);
@@ -301,7 +301,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       toast.success(formData.id ? 'Company Role updated successfully' : 'Company Role added successfully');
       setIsRoleModalOpen(false);
       await fetchExamDetails(activeExamForRole.id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save company role.'));
     } finally {
       setSavingAction(false);
@@ -355,7 +355,7 @@ export const CompanyDetailsModal: React.FC<CompanyDetailsModalProps> = ({
       toast.success(formData.id ? 'Exam Section updated successfully' : 'Exam Section created successfully');
       setIsSectionModalOpen(false);
       await fetchExamDetails(activeExamForSection.id);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save exam section.'));
     } finally {
       setSavingAction(false);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { fetchBookmarks, toggleBookmarkItem, type BookmarkType } from '../redux/bookmarkSlice';
+import { fetchBookmarks, toggleBookmarkItem, type BookmarkType, type BookmarkItem } from '../redux/bookmarkSlice';
 import { RequestStatus } from '../../../shared/components/ui/RequestStatus';
 import { EmptyState } from '../../../shared/components/ui/EmptyState';
 import { Badge } from '../../../shared/components/ui/Badge';
@@ -34,7 +34,7 @@ export const BookmarksList: React.FC = () => {
       .then(() => {
         toast.success('Bookmark removed');
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         toast.error(typeof err === 'string' ? err : 'Failed to remove bookmark');
       });
   };
@@ -44,7 +44,7 @@ export const BookmarksList: React.FC = () => {
     return bm.type === filterType;
   });
 
-  const getTargetUrl = (bm: any) => {
+  const getTargetUrl = (bm: BookmarkItem) => {
     if (bm.type === 'PROBLEM') return `/problems/${bm.itemId}`;
     if (bm.type === 'APTITUDE') return `/aptitude`;
     if (bm.type === 'COMPANY') return `/companies/${bm.itemId}`;

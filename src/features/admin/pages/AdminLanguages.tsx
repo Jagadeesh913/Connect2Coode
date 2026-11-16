@@ -133,7 +133,7 @@ export const AdminLanguages: React.FC = () => {
       setIsModalOpen(false);
       dispatch(invalidateLanguages());
       void dispatch(fetchLanguages({ force: true }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to save language.'));
     } finally {
       mutationPendingRef.current = false;
@@ -151,7 +151,7 @@ export const AdminLanguages: React.FC = () => {
       setLanguageToDeactivate(null);
       dispatch(invalidateLanguages());
       void dispatch(fetchLanguages({ force: true }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to deactivate language.'));
     } finally {
       mutationPendingRef.current = false;

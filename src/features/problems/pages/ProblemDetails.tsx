@@ -181,26 +181,41 @@ export const ProblemDetails: React.FC = () => {
   const editorWorkspaceRef = useRef<HTMLDivElement>(null);
   const splitterPointerRef = useRef<{ kind: 'problem' | 'console'; pointerId: number } | null>(null);
 
+interface VendorFullscreenElement extends Element {
+  webkitRequestFullscreen?: () => Promise<void>;
+  msRequestFullscreen?: () => Promise<void>;
+}
+
+interface VendorFullscreenDocument extends Document {
+  webkitExitFullscreen?: () => Promise<void>;
+  msExitFullscreen?: () => Promise<void>;
+  webkitFullscreenElement?: Element | null;
+  mozFullScreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+}
+
   // Native Fullscreen Toggle with safe browser fallback
   const toggleFullscreen = useCallback(async () => {
     try {
       if (!document.fullscreenElement) {
         const elem = workspaceRef.current || document.documentElement;
+        const vendorElem = elem as VendorFullscreenElement;
         if (elem.requestFullscreen) {
           await elem.requestFullscreen();
-        } else if ((elem as any).webkitRequestFullscreen) {
-          await (elem as any).webkitRequestFullscreen();
-        } else if ((elem as any).msRequestFullscreen) {
-          await (elem as any).msRequestFullscreen();
+        } else if (vendorElem.webkitRequestFullscreen) {
+          await vendorElem.webkitRequestFullscreen();
+        } else if (vendorElem.msRequestFullscreen) {
+          await vendorElem.msRequestFullscreen();
         }
         setIsFullscreen(true);
       } else {
+        const vendorDoc = document as VendorFullscreenDocument;
         if (document.exitFullscreen) {
           await document.exitFullscreen();
-        } else if ((document as any).webkitExitFullscreen) {
-          await (document as any).webkitExitFullscreen();
-        } else if ((document as any).msExitFullscreen) {
-          await (document as any).msExitFullscreen();
+        } else if (vendorDoc.webkitExitFullscreen) {
+          await vendorDoc.webkitExitFullscreen();
+        } else if (vendorDoc.msExitFullscreen) {
+          await vendorDoc.msExitFullscreen();
         }
         setIsFullscreen(false);
       }
@@ -211,11 +226,12 @@ export const ProblemDetails: React.FC = () => {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
+      const vendorDoc = document as VendorFullscreenDocument;
       const isNativeFs = Boolean(
         document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
+        vendorDoc.webkitFullscreenElement ||
+        vendorDoc.mozFullScreenElement ||
+        vendorDoc.msFullscreenElement
       );
       setIsFullscreen(isNativeFs);
     };
@@ -614,7 +630,7 @@ export const ProblemDetails: React.FC = () => {
         .then(() => {
           toast.success(isBookmarked ? 'Bookmark removed' : 'Problem bookmarked!');
         })
-        .catch((err: any) => {
+        .catch((err: unknown) => {
           toast.error(typeof err === 'string' ? err : 'Failed to update bookmark');
         });
     }

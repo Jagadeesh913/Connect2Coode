@@ -9,6 +9,7 @@ import { openAuthModal } from '../../auth/redux/authSlice';
 import { companyService } from '../../../services/companyService';
 import type { CompanyItem } from '../types/companyExam';
 import { getSafeExternalUrl } from '../../../core/security/externalUrl';
+import { isRequestCanceled } from '../../../core/api/apiClient';
 import {
   ExternalLink,
   ArrowRight,
@@ -64,9 +65,10 @@ export const CompanyList: React.FC = () => {
         setCompanies(res.data.content);
         setTotalElements(res.data.totalElements);
         setTotalPages(Math.max(1, res.data.totalPages));
-      } catch (err: any) {
-        if (requestId !== requestSequence.current || err?.name === 'CanceledError' || signal?.aborted) return;
-        setError(err?.message || 'Failed to fetch companies');
+      } catch (err: unknown) {
+        if (requestId !== requestSequence.current || isRequestCanceled(err) || signal?.aborted) return;
+        const message = err instanceof Error ? err.message : (err as { message?: string })?.message;
+        setError(message || 'Failed to fetch companies');
       } finally {
         if (!signal?.aborted && requestId === requestSequence.current) setLoading(false);
       }

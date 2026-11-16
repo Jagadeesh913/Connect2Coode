@@ -12,7 +12,7 @@ import { adminMcqService } from '../../../services/admin/adminMcqService';
 import { companyService } from '../../../services/companyService';
 import { toast } from '@/shared/notifications/toast';
 import { getActionableErrorMessage } from '../../../core/validation';
-import type { McqQuestion, Company, AdminSaveMcqPayload } from '../../../core/types/domain';
+import type { McqQuestion, Company, AdminSaveMcqPayload, McqOption } from '../../../core/types/domain';
 import { cleanQuestionText, synthesizeMcqOptions } from '../../aptitude/utils/mcqUtils';
 import {
   Plus,
@@ -264,7 +264,7 @@ export const AdminMcqs: React.FC = () => {
       setMcqs(normalizedContentList);
       setTotalElements(total);
       setTotalPages(computedPages);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted) return;
       setError(getActionableErrorMessage(err, 'Failed to fetch MCQ questions'));
 
@@ -328,10 +328,10 @@ export const AdminMcqs: React.FC = () => {
         setFormQuestion(cleanQuestionText(authoritativeMcq.question) || authoritativeMcq.question || '');
         setFormExplanation(authoritativeMcq.explanation || '');
 
-        const authoritativeOpts: any[] =
+        const authoritativeOpts: readonly McqOption[] =
           Array.isArray(authoritativeMcq.options) && authoritativeMcq.options.length > 0
-            ? authoritativeMcq.options
-            : synthesizeMcqOptions(authoritativeMcq);
+            ? (authoritativeMcq.options as unknown as McqOption[])
+            : (synthesizeMcqOptions(authoritativeMcq) as unknown as McqOption[]);
 
         const mapped = normalizeApiMcqOptions(authoritativeOpts);
 
@@ -340,7 +340,7 @@ export const AdminMcqs: React.FC = () => {
         }
         setFormOptions(mapped);
         setIsCreateModalOpen(true);
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
         toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ data for editing.'));
       }
@@ -363,7 +363,7 @@ export const AdminMcqs: React.FC = () => {
       }
       setSelectedMcq({ ...mcq, ...detailData });
       setIsViewModalOpen(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (controller.signal.aborted || generation !== detailGenerationRef.current) return;
       toast.error(getActionableErrorMessage(err, 'Unable to load complete MCQ details.'));
     } finally {
@@ -458,7 +458,7 @@ export const AdminMcqs: React.FC = () => {
       setIsCreateModalOpen(false);
       setEditingMcq(null);
       await fetchMcqs();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(
         getActionableErrorMessage(
           err,
@@ -483,7 +483,7 @@ export const AdminMcqs: React.FC = () => {
       setIsDeleteModalOpen(false);
       setSelectedMcq(null);
       await fetchMcqs();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(getActionableErrorMessage(err, 'Failed to delete MCQ'));
     } finally {
       mutationPendingRef.current = false;
@@ -539,7 +539,8 @@ export const AdminMcqs: React.FC = () => {
       className: 'min-w-[280px]',
       cell: (row) => {
         const cleanStatement = cleanQuestionText(row.question);
-        const isInactive = row.isActive === false || String((row as any)?.isActive) === 'false' || String((row as any)?.status).toLowerCase() === 'inactive';
+        const rowRec = row as unknown as Record<string, unknown>;
+        const isInactive = row.isActive === false || String(rowRec.isActive) === 'false' || String(rowRec.status).toLowerCase() === 'inactive';
         return (
           <div
             className={`flex flex-col gap-1 max-w-xl transition-colors ${
