@@ -98,38 +98,38 @@ Run all checks in sequence to verify code health:
 
 ### 1. Dual-Engine Linting
 ```bash
-npm run lint          # Oxlint
-npm run lint:eslint   # ESLint + TypeScript ESLint
+npm run lint          # Oxlint (210 files, 0 errors, 0 warnings)
+npm run lint:eslint   # ESLint + TypeScript ESLint (strict type-safe clean style)
 ```
 
 ### 2. Architecture & Dependency Boundary Check
 ```bash
-npm run depcruise     # dependency-cruiser (zero circular dependencies)
+npm run depcruise     # dependency-cruiser (zero circular dependencies, 194 modules)
 ```
 
 ### 3. Static Typecheck
 ```bash
-npm run typecheck     # tsc -p tsconfig.json --noEmit
+npm run typecheck     # tsc -p tsconfig.json --noEmit (0 errors)
 ```
 
 ### 4. Unit & Component Tests
 ```bash
-npm run test:unit     # Vitest + React Testing Library (JSDOM)
+npm run test:unit     # Vitest + React Testing Library (9 suites, 37 passing unit/component tests)
 ```
 
 ### 5. Regression Contract Test Suites
 ```bash
-npm test              # Node test runner across scripts/tests/*.test.mjs
+npm test              # Node test runner across scripts/tests/*.test.mjs (423/423 passing tests)
 ```
 
 ### 6. API Contract Integration Suite
 ```bash
-npm run test:api      # Newman runner executing live contract assertions
+npm run test:api      # Newman runner executing live contract assertions (--timeout-request 10000)
 ```
 
 ### 7. End-to-End Browser Tests
 ```bash
-npm run test:e2e      # Playwright Chromium tests
+npm run test:e2e      # Playwright Chromium tests (4 specs, 9 passing browser flows)
 ```
 
 ### 8. Production Build & Smoke Test

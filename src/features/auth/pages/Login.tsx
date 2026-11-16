@@ -16,6 +16,7 @@ import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { useGoogleOAuthLogin } from '../hooks/useGoogleOAuthLogin';
 import { useAccessibleDialog } from '../../../shared/hooks/useAccessibleDialog';
 import { isAdminRole, getSafeRedirectUrl } from '../../../core/security/jwt';
+import type { AuthSessionData } from '../../../core/security/authContract';
 
 import {
   loginSchema,

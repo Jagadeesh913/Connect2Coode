@@ -18,7 +18,7 @@
     "knip": "knip",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
-    "test:api": "newman run postman/connect2code-api-contracts.postman_collection.json",
+    "test:api": "newman run postman/connect2code-api-contracts.postman_collection.json --timeout-request 10000",
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "verify:docs": "node scripts/verify-documentation.mjs"
   },
