@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@5/overview/configuration-schema.json",
   "entry": [
+    "src/entry-server.tsx",
     "scripts/**/*.{js,mjs,cjs}",
+    "scripts/tests/**/*.{js,mjs,cjs}",
     "e2e/**/*.{ts,js}"
   ],
   "project": [

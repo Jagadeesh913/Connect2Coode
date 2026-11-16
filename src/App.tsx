@@ -81,4 +81,3 @@ export const App: React.FC<AppProps> = ({ appStore = store, appRouter = router }
   );
 };
 
-export default App;
