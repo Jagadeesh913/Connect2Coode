@@ -130,6 +130,15 @@ export const questionService = {
     testCases: QuestionTestCase[],
     signal?: AbortSignal
   ): Promise<ApiResponse<QuestionTestCase[]>> {
+    if (!Array.isArray(testCases) || testCases.length === 0) {
+      throw new Error('At least one test case is required');
+    }
+    const emptyTypeCase = testCases.find(
+      (tc) => tc && typeof tc.typeRefCode === 'string' && !tc.typeRefCode.trim()
+    );
+    if (emptyTypeCase) {
+      throw new Error('Test cases must not contain empty typeRefCode references.');
+    }
     return apiClient.post(API_ENDPOINTS.QUESTION.TEST_CASES(id), testCases, { signal });
   },
 };

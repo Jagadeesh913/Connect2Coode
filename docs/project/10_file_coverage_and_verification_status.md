@@ -238,7 +238,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `pages/AdminMcqs.tsx` | MCQ question bank authoring | `PARTIALLY VERIFIED` | View/edit reads are abortable/generation-owned, row activation uses authoritative detail, and authoring controls are labeled; final tests are pending. |
 | `pages/AdminQuestions.tsx` | Coding problem CRUD | `PARTIALLY VERIFIED` | Adapts the verified admin list DTO into the canonical Practice `CodingQuestionTable`, while title/action slots preserve inspect, edit, test-case, sandbox, and inactive-state controls. Save payloads include the question contract's `timeLimit` and `memoryLimit`. Fresh authenticated observation on 2026-11-14 loaded 54 catalog rows and confirmed those limits are detail/save fields rather than list fields. Persistent live mutations and final browser acceptance remain unverified. |
 | `pages/AdminDsaSheets.tsx` | DSA sheet, section, and question-link management | `PARTIALLY VERIFIED` | Uses documented sheet detail, section, and question reads; creates send `id: null`, updates send existing mapping IDs, and successful mutations refresh owning reads. Live authenticated mutations remain pending. |
-| `utils/testCaseUtils.ts` | Test case extractor & parser | `PARTIALLY VERIFIED` | Parses API payload/visible examples only; no bundled hidden fixtures. |
+| `utils/testCaseUtils.ts` | Test case extractor, parser, type resolver & validator | `RUNTIME-VERIFIED` | Tested across visible, hidden, imported, and edited test-case flows; resolves backend TESTCASETYPE taxonomy without inventing defaults and prevents empty typeRefCode payloads. |
 
 ### F. DSA Sheet Feature (`src/features/dsaSheet/`)
 | File Path | Role | Status | Notes |

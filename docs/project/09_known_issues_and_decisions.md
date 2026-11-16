@@ -14,11 +14,16 @@
 ## 1. Known Backend Quirks & Observed Defects
 
 ### 1. `POST /api/v1/submitCode` NPE on `TestCase.getType()`
-- **Observed Behavior**: Probing `POST /submitCode` or `POST /admin/submitCode` with complete code execution payloads returns HTTP 500 (`NullPointerException: Cannot invoke "TestCase.getType()" because "testCase" is null`).
+- **Observed Behavior**: Probing `POST /submitCode` or `POST /admin/submitCode` with complete code execution payloads returns HTTP 500 (`NullPointerException: Cannot invoke "com.connect2code.codingPlatform.common.entity.ReferenceLibrary.getRefName()" because the return value of "com.connect2code.codingPlatform.question.entity.TestCase.getType()" is null`).
 - **Root Cause**: In the remote Spring Boot backend, the submission evaluator attempts to read `getType().getRefName()` on test case entities without verifying nullability or handling incomplete test case fixtures in the database.
-- **Frontend Mitigation**:
-  - Sample test case execution (`POST /runCode` and `POST /admin/testCode`) works reliably and evaluates properly.
-  - The frontend maps HTTP 500 cleanly via [`src/core/validation/serverErrorMapper.ts`](../../src/core/validation/serverErrorMapper.ts) so no raw Java stack traces are exposed to users.
+- **Frontend Remediation (Modernization Branch)**:
+  - **Type Reference Requirement**: Both `TestCaseModal` and `QuestionFormModal` strictly validate that all test cases have a non-empty `typeRefCode` referencing actual backend taxonomy options (`TESTCASETYPE`).
+  - **Preservation & Reconciliation**: Existing valid test-case types are strictly preserved. When test cases are imported or extracted from descriptions, missing types are automatically reconciled against actual loaded reference-library options (`SAMPLE` for visible, `NECESSARY` for hidden) without inventing unverified defaults.
+  - **Payload Guard**: `questionService.addTestCases` and `AdminQuestions` strictly prevent any payload containing empty `typeRefCode` strings from being dispatched across the wire.
+  - **User Feedback**: Inline field-level error indicators clearly show missing or invalid test-case types in admin authoring modals.
+  - **Sample Runner Isolation**: Sample test case execution (`POST /runCode` and `POST /admin/testCode`) remains unaffected (200 OK) and evaluates properly.
+  - **Server Error Mapping**: The frontend maps HTTP 500 cleanly via [`src/core/validation/serverErrorMapper.ts`](../../src/core/validation/serverErrorMapper.ts) so no raw Java stack traces are exposed to users.
+- **Remaining Backend Dependency**: The remote Spring Boot backend still requires a null safety guard in `com.connect2code.codingPlatform` (`if (testCase.getType() != null)`) and an SQL data migration to backfill legacy database rows where `test_case.type_id IS NULL`.
 
 ### 2. Numeric Question Details vs Text Slugs & Specific Question 500s
 - **Verified Behavior**: The archived direct HTTP inventory records `GET /question/1` as `PASS`/`VERIFIED` and returning full question details. The earlier claim that every numeric details request returned 500 was stale.

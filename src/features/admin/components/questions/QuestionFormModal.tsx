@@ -11,7 +11,13 @@ import type { CompanyItem } from '../../../../services/admin/adminCompanyService
 import { toast } from '@/shared/notifications/toast';
 import { adminQuestionSchema, AdminQuestionFormData } from '../../../../core/validation';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
-import { extractTestCasesFromProblem, extractConstraintsFromDescription } from '../../utils/testCaseUtils';
+import {
+  extractTestCasesFromProblem,
+  extractConstraintsFromDescription,
+  resolveTestCaseType,
+  reconcileTestCasesWithReferenceTypes,
+  validateTestCase,
+} from '../../utils/testCaseUtils';
 import { Code2, Building2, Plus, Trash2, X, Calendar, Globe } from 'lucide-react';
 import { useReferenceGroup } from '../../../references/hooks/useReferenceGroup';
 import type { ReferenceItem } from '../../../../core/types/domain';
@@ -81,7 +87,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       typeRefName: '',
     },
   ]);
-  const [testCaseErrors, setTestCaseErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
+  const [testCaseErrors, setTestCaseErrors] = useState<Record<number, { input?: string; expectedOutput?: string; typeRefCode?: string }>>({});
 
   const {
     register,
@@ -241,8 +247,12 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         setSelectedCompanies([]);
       }
 
-      const resolvedTestCases = extractTestCasesFromProblem(initialData);
-      setTestCases(resolvedTestCases);
+      const resolvedTestCases = extractTestCasesFromProblem(initialData, testCaseTypes);
+      setTestCases(
+        testCaseTypes.length > 0
+          ? reconcileTestCasesWithReferenceTypes(resolvedTestCases, testCaseTypes)
+          : resolvedTestCases
+      );
     } else {
       const defaultDiff = difficulties[0];
       const defaultTopic = topics[0];
@@ -273,10 +283,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       });
       setHints([]);
       setSelectedCompanies([]);
-      const defaultCreateType =
-        testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || '';
-      const defaultCreateTypeName =
-        testCaseTypes.find((t) => t.refCode === defaultCreateType)?.refName || '';
+      const defaultCreateType = resolveTestCaseType(testCaseTypes, false);
       setTestCases([
         {
           input: '',
@@ -284,9 +291,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           explanation: '',
           isHidden: false,
           displayOrder: 1,
-          typeRefGroupCode: 'TESTCASETYPE',
-          typeRefCode: defaultCreateType,
-          typeRefName: defaultCreateTypeName,
+          typeRefGroupCode: defaultCreateType?.refGroupCode || 'TESTCASETYPE',
+          typeRefCode: defaultCreateType?.refCode || '',
+          typeRefName: defaultCreateType?.refName || '',
         },
       ]);
     }
@@ -348,18 +355,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       ));
     }
     if (testCaseTypes.length > 0) {
-      setTestCases((current) =>
-        current.map((testCase) => {
-          if (testCase.typeRefCode) {
-            const matched = testCaseTypes.find((t) => t.refCode === testCase.typeRefCode);
-            if (matched && !testCase.typeRefName) {
-              return { ...testCase, typeRefName: matched.refName };
-            }
-            return testCase;
-          }
-          return testCase;
-        })
-      );
+      setTestCases((current) => reconcileTestCasesWithReferenceTypes(current, testCaseTypes));
     }
   }, [isOpen, initialData, difficulties, topics, qpfs, allCompanies, testCaseTypes, getValues, setValue]);
 
@@ -421,10 +417,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
   };
 
   const handleAddTestCase = () => {
-    const defaultType =
-      testCaseTypes.find((t) => t.refCode === 'SAMPLE')?.refCode || testCaseTypes[0]?.refCode || '';
-    const defaultTypeName =
-      testCaseTypes.find((t) => t.refCode === defaultType)?.refName || '';
+    const defaultType = resolveTestCaseType(testCaseTypes, false);
     setTestCases((prev) => [
       ...prev,
       {
@@ -433,9 +426,9 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
         explanation: '',
         isHidden: false,
         displayOrder: prev.length + 1,
-        typeRefGroupCode: 'TESTCASETYPE',
-        typeRefCode: defaultType,
-        typeRefName: defaultTypeName,
+        typeRefGroupCode: defaultType?.refGroupCode || 'TESTCASETYPE',
+        typeRefCode: defaultType?.refCode || '',
+        typeRefName: defaultType?.refName || '',
       },
     ]);
   };
@@ -456,27 +449,51 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
       if (field === 'typeRefCode') {
         const matched = testCaseTypes.find((t) => t.refCode === value);
         target.typeRefCode = (value as string) || '';
-        target.typeRefGroupCode = 'TESTCASETYPE';
+        target.typeRefGroupCode = matched?.refGroupCode || 'TESTCASETYPE';
         target.typeRefName = matched?.refName || '';
-        if (value === 'SAMPLE') {
+        if (matched?.refCode === 'SAMPLE' || matched?.refCode.toLowerCase().includes('sample')) {
           target.isHidden = false;
-        } else if (value === 'NECESSARY') {
+        } else if (
+          matched?.refCode === 'NECESSARY' ||
+          matched?.refCode.toLowerCase().includes('necessary') ||
+          matched?.refCode.toLowerCase().includes('hidden')
+        ) {
           target.isHidden = true;
         }
       }
       if (field === 'isHidden') {
-        target.isHidden = Boolean(value);
+        const isHidden = Boolean(value);
+        target.isHidden = isHidden;
+        const currentCode = target.typeRefCode?.toUpperCase();
+        const isCurrentlySample = currentCode === 'SAMPLE';
+        const isCurrentlyHidden = currentCode === 'NECESSARY' || currentCode === 'HIDDEN';
+        if (isHidden && isCurrentlySample) {
+          const hiddenOption = resolveTestCaseType(testCaseTypes, true);
+          if (hiddenOption) {
+            target.typeRefCode = hiddenOption.refCode;
+            target.typeRefGroupCode = hiddenOption.refGroupCode || 'TESTCASETYPE';
+            target.typeRefName = hiddenOption.refName;
+          }
+        } else if (!isHidden && isCurrentlyHidden) {
+          const sampleOption = resolveTestCaseType(testCaseTypes, false);
+          if (sampleOption) {
+            target.typeRefCode = sampleOption.refCode;
+            target.typeRefGroupCode = sampleOption.refGroupCode || 'TESTCASETYPE';
+            target.typeRefName = sampleOption.refName;
+          }
+        }
       }
 
       updated[index] = target;
       return updated;
     });
 
-    if (testCaseErrors[index]) {
+    if (field === 'input' || field === 'expectedOutput' || field === 'typeRefCode') {
       setTestCaseErrors((prev) => {
         const current = { ...prev[index] };
         if (field === 'input' && typeof value === 'string' && value.trim()) delete current.input;
         if (field === 'expectedOutput' && typeof value === 'string' && value.trim()) delete current.expectedOutput;
+        if (field === 'typeRefCode' && typeof value === 'string' && value.trim()) delete current.typeRefCode;
         if (Object.keys(current).length === 0) {
           const next = { ...prev };
           delete next[index];
@@ -492,27 +509,26 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     const finalIsActive = isNew ? (data.isActive !== false) : (data.isActive ?? true);
     const isOwn = data.isOwnProblem === true;
 
-    // Validate any test cases that have partial input/output
-    const newErrors: Record<number, { input?: string; expectedOutput?: string }> = {};
+    if (testCaseTypes.length === 0) {
+      setActiveTab('TESTCASES');
+      toast.error('Test case taxonomy options are loading or unavailable. Please retry.');
+      return;
+    }
+
+    // Validate any test cases that have partial input/output or are required
+    const newErrors: Record<number, { input?: string; expectedOutput?: string; typeRefCode?: string }> = {};
     let hasError = false;
     for (let i = 0; i < testCases.length; i++) {
       const tc = testCases[i];
       const hasInput = Boolean(tc.input?.trim());
       const hasOutput = Boolean(tc.expectedOutput?.trim());
 
-      // If either input or output is provided, or if isOwn is true, require both
+      // If either input or output is provided, or if isOwn is true, require complete valid test case
       if (hasInput || hasOutput || isOwn) {
-        const tcErrors: { input?: string; expectedOutput?: string } = {};
-        if (!hasInput) {
-          tcErrors.input = 'Input raw string is required.';
+        const tcErr = validateTestCase(tc, testCaseTypes);
+        if (tcErr) {
+          newErrors[i] = tcErr;
           hasError = true;
-        }
-        if (!hasOutput) {
-          tcErrors.expectedOutput = 'Expected output raw string is required.';
-          hasError = true;
-        }
-        if (tcErrors.input || tcErrors.expectedOutput) {
-          newErrors[i] = tcErrors;
         }
       }
     }
@@ -520,19 +536,14 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
     if (hasError) {
       setTestCaseErrors(newErrors);
       setActiveTab('TESTCASES');
-      toast.error('Please enter required inputs and outputs for all test cases.');
-      return;
-    }
-    if (testCaseTypes.length === 0 || testCases.some((testCase) => !testCase.typeRefCode)) {
-      setActiveTab('TESTCASES');
-      toast.error('Load and select an API-provided test case type before saving.');
+      toast.error('Please resolve missing or invalid test case fields before saving.');
       return;
     }
 
     const sanitizedTestCases: QuestionTestCase[] = testCases
       .filter((tc) => tc.input?.trim() && tc.expectedOutput?.trim())
       .map((tc, idx) => {
-        const typeCode = tc.typeRefCode;
+        const typeCode = tc.typeRefCode.trim();
         const matched = testCaseTypes.find((t) => t.refCode === typeCode);
         return {
           ...tc,
@@ -540,7 +551,7 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
           expectedOutput: tc.expectedOutput.trim(),
           explanation: tc.explanation ? tc.explanation.trim() : '',
           displayOrder: idx + 1,
-          typeRefGroupCode: 'TESTCASETYPE',
+          typeRefGroupCode: matched?.refGroupCode || tc.typeRefGroupCode || 'TESTCASETYPE',
           typeRefCode: typeCode,
           typeRefName: matched?.refName || tc.typeRefName || '',
         };
@@ -1023,16 +1034,27 @@ export const QuestionFormModal: React.FC<QuestionFormModalProps> = ({
                         >
                           Type:
                         </label>
-                        <C2CSelect
-                          id={`tc-type-${idx}`}
-                          ariaLabel={`Test Case #${idx + 1} Type`}
-                          value={tc.typeRefCode || ''}
-                          onChange={(val) => handleTestCaseChange(idx, 'typeRefCode', val)}
-                          options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName || t.refCode }))}
-                          placeholder="Select Type"
-                          className="w-36"
-                          buttonClassName="rounded-xl px-2.5 py-1.5 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                        />
+                        <div className="flex flex-col">
+                          <C2CSelect
+                            id={`tc-type-${idx}`}
+                            ariaLabel={`Test Case #${idx + 1} Type`}
+                            value={tc.typeRefCode || ''}
+                            onChange={(val) => handleTestCaseChange(idx, 'typeRefCode', val)}
+                            options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName || t.refCode }))}
+                            placeholder={testCaseTypes.length === 0 ? 'No API types available' : 'Select Type'}
+                            className="w-36"
+                            buttonClassName={`rounded-xl px-2.5 py-1.5 text-xs font-semibold border ${
+                              testCaseErrors[idx]?.typeRefCode
+                                ? 'border-rose-500 bg-rose-50/20'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                            } text-slate-900 dark:text-white`}
+                          />
+                          {testCaseErrors[idx]?.typeRefCode && (
+                            <span className="text-[11px] text-rose-500 font-medium mt-0.5">
+                              {testCaseErrors[idx]?.typeRefCode}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Hidden Case Toggle */}

@@ -1,4 +1,4 @@
-import type { QuestionTestCase, Question } from '../../../core/types/domain';
+import type { QuestionTestCase, Question, ReferenceItem } from '../../../core/types/domain';
 
 /**
  * Extracts constraints block from Markdown / text problem descriptions.
@@ -106,17 +106,126 @@ function parseTestCasesFromMarkdown(
 }
 
 /**
+ * Resolves a semantic ReferenceItem from the available TESTCASETYPE reference library options.
+ * Never invents defaults: uses ONLY options present in the backend reference library.
+ * Preserves existing valid type code if found in options.
+ */
+export function resolveTestCaseType(
+  options: ReferenceItem[],
+  isHidden: boolean,
+  existingRefCode?: string
+): ReferenceItem | undefined {
+  if (!Array.isArray(options) || options.length === 0) {
+    return undefined;
+  }
+
+  // 1. If an existing valid refCode is provided, preserve it if present in options
+  if (existingRefCode && existingRefCode.trim()) {
+    const matched = options.find(
+      (opt) => opt.refCode.toLowerCase() === existingRefCode.trim().toLowerCase()
+    );
+    if (matched) return matched;
+  }
+
+  // 2. Select appropriate option based on visibility (isHidden)
+  if (!isHidden) {
+    // Prefer exact 'SAMPLE' code
+    const sample = options.find((opt) => opt.refCode.toUpperCase() === 'SAMPLE');
+    if (sample) return sample;
+    // Fall back to any option containing 'sample'
+    const sampleLike = options.find(
+      (opt) =>
+        opt.refCode.toLowerCase().includes('sample') ||
+        opt.refName.toLowerCase().includes('sample')
+    );
+    if (sampleLike) return sampleLike;
+    // Fall back to first option that is not marked as hidden/necessary
+    const nonHidden = options.find(
+      (opt) =>
+        !opt.refCode.toLowerCase().includes('hidden') &&
+        !opt.refCode.toLowerCase().includes('necessary')
+    );
+    return nonHidden || options[0];
+  } else {
+    // Prefer exact 'NECESSARY' code
+    const necessary = options.find((opt) => opt.refCode.toUpperCase() === 'NECESSARY');
+    if (necessary) return necessary;
+    // Prefer exact 'HIDDEN' code
+    const hidden = options.find((opt) => opt.refCode.toUpperCase() === 'HIDDEN');
+    if (hidden) return hidden;
+    // Fall back to any option containing 'necessary' or 'hidden'
+    const hiddenLike = options.find(
+      (opt) =>
+        opt.refCode.toLowerCase().includes('necessary') ||
+        opt.refCode.toLowerCase().includes('hidden') ||
+        opt.refName.toLowerCase().includes('hidden')
+    );
+    if (hiddenLike) return hiddenLike;
+    // Fall back to second option or first option
+    return options[1] || options[0];
+  }
+}
+
+/**
+ * Reconciles test cases with backend reference-library options.
+ * Preserves existing valid type codes. Resolves missing/empty type codes using actual backend options.
+ * Never invents defaults when options are unavailable.
+ */
+export function reconcileTestCasesWithReferenceTypes(
+  testCases: QuestionTestCase[],
+  options: ReferenceItem[]
+): QuestionTestCase[] {
+  if (!Array.isArray(testCases) || testCases.length === 0) return [];
+  if (!Array.isArray(options) || options.length === 0) return testCases;
+
+  return testCases.map((tc) => {
+    // If tc already has a non-empty typeRefCode:
+    if (tc.typeRefCode && tc.typeRefCode.trim()) {
+      const matched = options.find(
+        (opt) => opt.refCode.toLowerCase() === tc.typeRefCode.trim().toLowerCase()
+      );
+      if (matched) {
+        return {
+          ...tc,
+          typeRefGroupCode: matched.refGroupCode || 'TESTCASETYPE',
+          typeRefCode: matched.refCode,
+          typeRefName: matched.refName || tc.typeRefName || '',
+        };
+      }
+      // Preserve existing valid type even if not in options
+      return tc;
+    }
+
+    // Otherwise, resolve missing type using reference options and isHidden
+    const resolved = resolveTestCaseType(options, Boolean(tc.isHidden));
+    if (resolved) {
+      return {
+        ...tc,
+        typeRefGroupCode: resolved.refGroupCode || 'TESTCASETYPE',
+        typeRefCode: resolved.refCode,
+        typeRefName: resolved.refName || '',
+      };
+    }
+
+    return tc;
+  });
+}
+
+/**
  * Robust test cases resolver for any DSA problem.
  * Evaluates in order:
  * 1. Explicit question.testCases (if non-empty)
  * 2. question.examples array
  * 3. Extracted test cases from question description
- * No test cases are invented when these authoritative sources are absent.
+ * If referenceOptions is provided, resolves test case types using actual backend taxonomy.
  */
 export function extractTestCasesFromProblem(
-  question?: (Partial<Question> & { examples?: Array<{ input?: unknown; output?: unknown; expectedOutput?: unknown; explanation?: unknown }>; title?: string }) | null
+  question?: (Partial<Question> & { examples?: Array<{ input?: unknown; output?: unknown; expectedOutput?: unknown; explanation?: unknown }>; title?: string }) | null,
+  referenceOptions?: ReferenceItem[]
 ): QuestionTestCase[] {
   if (!question) return [];
+
+  let cases: QuestionTestCase[] = [];
 
   // 1. Explicit question.testCases
   if (Array.isArray(question.testCases) && question.testCases.length > 0) {
@@ -124,7 +233,7 @@ export function extractTestCasesFromProblem(
       (tc) => tc && (tc.input?.trim() || tc.expectedOutput?.trim())
     );
     if (valid.length > 0) {
-      return valid.map((tc, idx) => ({
+      cases = valid.map((tc, idx) => ({
         ...tc,
         displayOrder: tc.displayOrder || idx + 1,
         typeRefGroupCode: tc.typeRefGroupCode || '',
@@ -137,29 +246,17 @@ export function extractTestCasesFromProblem(
   const numericId = question.id ? Number(question.id) : undefined;
 
   // 2. Examples array
-  const rawExamples = question.examples;
-  if (Array.isArray(rawExamples) && rawExamples.length > 0) {
-    return rawExamples.map((ex, idx: number) => ({
-      id: idx + 1,
-      questionId: numericId,
-      input: String(ex?.input || '').trim(),
-      expectedOutput: String(ex?.output || ex?.expectedOutput || '').trim(),
-      explanation: String(ex?.explanation || '').trim(),
-      isHidden: false,
-      displayOrder: idx + 1,
-      typeRefGroupCode: '',
-      typeRefCode: '',
-      typeRefName: '',
-    }));
-  }
-
-  // 3. Extracted from description
-  const desc = question.description || '';
-  if (desc) {
-    const parsed = parseTestCasesFromMarkdown(desc, numericId);
-    if (parsed.length > 0) {
-      return parsed.map((testCase) => ({
-        ...testCase,
+  if (cases.length === 0) {
+    const rawExamples = question.examples;
+    if (Array.isArray(rawExamples) && rawExamples.length > 0) {
+      cases = rawExamples.map((ex, idx: number) => ({
+        id: idx + 1,
+        questionId: numericId,
+        input: String(ex?.input || '').trim(),
+        expectedOutput: String(ex?.output || ex?.expectedOutput || '').trim(),
+        explanation: String(ex?.explanation || '').trim(),
+        isHidden: false,
+        displayOrder: idx + 1,
         typeRefGroupCode: '',
         typeRefCode: '',
         typeRefName: '',
@@ -167,5 +264,61 @@ export function extractTestCasesFromProblem(
     }
   }
 
-  return [];
+  // 3. Extracted from description
+  if (cases.length === 0) {
+    const desc = question.description || '';
+    if (desc) {
+      const parsed = parseTestCasesFromMarkdown(desc, numericId);
+      if (parsed.length > 0) {
+        cases = parsed.map((testCase) => ({
+          ...testCase,
+          typeRefGroupCode: '',
+          typeRefCode: '',
+          typeRefName: '',
+        }));
+      }
+    }
+  }
+
+  // If reference options provided, reconcile cases
+  if (Array.isArray(referenceOptions) && referenceOptions.length > 0) {
+    return reconcileTestCasesWithReferenceTypes(cases, referenceOptions);
+  }
+
+  return cases;
 }
+
+/**
+ * Validates a single test case for admin persistence.
+ */
+export function validateTestCase(
+  tc: QuestionTestCase,
+  options?: ReferenceItem[]
+): { input?: string; expectedOutput?: string; typeRefCode?: string } | null {
+  const errors: { input?: string; expectedOutput?: string; typeRefCode?: string } = {};
+  let hasError = false;
+
+  if (!tc.input || !tc.input.trim()) {
+    errors.input = 'Input raw string is required';
+    hasError = true;
+  }
+  if (!tc.expectedOutput || !tc.expectedOutput.trim()) {
+    errors.expectedOutput = 'Expected output raw string is required';
+    hasError = true;
+  }
+  if (!tc.typeRefCode || !tc.typeRefCode.trim()) {
+    errors.typeRefCode = 'Test case type is required';
+    hasError = true;
+  } else if (Array.isArray(options) && options.length > 0) {
+    const isValid = options.some(
+      (opt) => opt.refCode.toLowerCase() === tc.typeRefCode.trim().toLowerCase()
+    );
+    if (!isValid) {
+      errors.typeRefCode = 'Select a valid type from the reference library';
+      hasError = true;
+    }
+  }
+
+  return hasError ? errors : null;
+}
+

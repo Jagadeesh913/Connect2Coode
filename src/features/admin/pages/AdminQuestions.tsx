@@ -428,6 +428,11 @@ export const AdminQuestions: React.FC = () => {
 
       // Attach test cases if provided
       if (targetQuestionId && Array.isArray(formData.testCases) && formData.testCases.length > 0) {
+        const invalidIndex = formData.testCases.findIndex((tc) => !tc.typeRefCode || !tc.typeRefCode.trim());
+        if (invalidIndex !== -1) {
+          toast.error(`Test case #${invalidIndex + 1} is missing a required test-case type. Please select a valid type.`);
+          return;
+        }
         try {
           const testCasesPayload: QuestionTestCase[] = formData.testCases.map((tc, idx) => ({
             id: tc.id,
@@ -438,7 +443,7 @@ export const AdminQuestions: React.FC = () => {
             isHidden: tc.isHidden === true,
             displayOrder: idx + 1,
             typeRefGroupCode: tc.typeRefGroupCode || 'TESTCASETYPE',
-            typeRefCode: tc.typeRefCode || '',
+            typeRefCode: tc.typeRefCode.trim(),
             typeRefName: tc.typeRefName || '',
           }));
           await adminQuestionService.addTestCases(targetQuestionId, testCasesPayload);

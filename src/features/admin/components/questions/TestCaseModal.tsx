@@ -9,7 +9,12 @@ import { toast } from '@/shared/notifications/toast';
 import { FormFieldError } from '../../../../shared/components/ui/FormFieldError';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
 import { getActionableErrorMessage } from '../../../../core/validation';
-import { extractTestCasesFromProblem } from '../../utils/testCaseUtils';
+import {
+  extractTestCasesFromProblem,
+  resolveTestCaseType,
+  reconcileTestCasesWithReferenceTypes,
+  validateTestCase,
+} from '../../utils/testCaseUtils';
 import {
   Layers,
   Plus,
@@ -46,7 +51,7 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     },
   ]);
 
-  const [fieldErrors, setFieldErrors] = useState<Record<number, { input?: string; expectedOutput?: string }>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<number, { input?: string; expectedOutput?: string; typeRefCode?: string }>>({});
   const {
     items: testCaseTypes,
     loading: typesLoading,
@@ -59,8 +64,13 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [casesLoading, setCasesLoading] = useState<boolean>(false);
+  const testCaseTypesRef = useRef(testCaseTypes);
 
-  // Fetch existing test cases & TESTCASETYPE Reference Library from backend on modal open
+  useEffect(() => {
+    testCaseTypesRef.current = testCaseTypes;
+  }, [testCaseTypes]);
+
+  // Fetch existing test cases from backend or problem on modal open
   useEffect(() => {
     if (!isOpen) return;
 
@@ -91,14 +101,18 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
 
         // 3. Fallback: extract visible examples from problem description only when backend returns no records
         if (existingCases.length === 0 && question) {
-          existingCases = extractTestCasesFromProblem(question);
+          existingCases = extractTestCasesFromProblem(question, testCaseTypesRef.current);
         }
 
         if (isMounted) {
           if (existingCases.length > 0) {
-            setTestCases(existingCases);
+            setTestCases(
+              testCaseTypesRef.current.length > 0
+                ? reconcileTestCasesWithReferenceTypes(existingCases, testCaseTypesRef.current)
+                : existingCases
+            );
           } else {
-            const defaultType = testCaseTypes[0]?.refCode || '';
+            const defaultType = resolveTestCaseType(testCaseTypesRef.current, false);
             setTestCases([
               {
                 input: '',
@@ -106,8 +120,9 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                 explanation: '',
                 isHidden: false,
                 displayOrder: 1,
-                typeRefGroupCode: 'TESTCASETYPE',
-                typeRefCode: defaultType,
+                typeRefGroupCode: defaultType?.refGroupCode || 'TESTCASETYPE',
+                typeRefCode: defaultType?.refCode || '',
+                typeRefName: defaultType?.refName || '',
               },
             ]);
           }
@@ -122,10 +137,20 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [isOpen, questionId, question, retry, testCaseTypes]);
+  }, [isOpen, questionId, question, retry]);
+
+  // Reconcile unresolved test-case types when API reference taxonomy options arrive asynchronously
+  useEffect(() => {
+    if (testCaseTypes.length === 0) return;
+    setTestCases((prev) => {
+      const hasUnresolved = prev.some((tc) => !tc.typeRefCode || !tc.typeRefCode.trim());
+      if (!hasUnresolved) return prev;
+      return reconcileTestCasesWithReferenceTypes(prev, testCaseTypes);
+    });
+  }, [testCaseTypes]);
 
   const handleAddTestCase = () => {
-    const defaultType = testCaseTypes[0]?.refCode || '';
+    const defaultType = resolveTestCaseType(testCaseTypes, false);
     setTestCases((prev) => [
       ...prev,
       {
@@ -134,8 +159,9 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
         explanation: '',
         isHidden: false,
         displayOrder: prev.length + 1,
-        typeRefGroupCode: 'TESTCASETYPE',
-        typeRefCode: defaultType,
+        typeRefGroupCode: defaultType?.refGroupCode || 'TESTCASETYPE',
+        typeRefCode: defaultType?.refCode || '',
+        typeRefName: defaultType?.refName || '',
       },
     ]);
   };
@@ -156,16 +182,58 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
   const handleChange = <K extends keyof QuestionTestCase>(index: number, field: K, value: QuestionTestCase[K]) => {
     setTestCases((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
+      const target = { ...next[index], [field]: value };
+
+      if (field === 'typeRefCode') {
+        const matched = testCaseTypes.find((t) => t.refCode === value);
+        target.typeRefCode = (value as string) || '';
+        target.typeRefGroupCode = matched?.refGroupCode || 'TESTCASETYPE';
+        target.typeRefName = matched?.refName || '';
+        if (matched?.refCode === 'SAMPLE' || matched?.refCode.toLowerCase().includes('sample')) {
+          target.isHidden = false;
+        } else if (
+          matched?.refCode === 'NECESSARY' ||
+          matched?.refCode.toLowerCase().includes('necessary') ||
+          matched?.refCode.toLowerCase().includes('hidden')
+        ) {
+          target.isHidden = true;
+        }
+      }
+
+      if (field === 'isHidden') {
+        const isHidden = Boolean(value);
+        target.isHidden = isHidden;
+        const currentCode = target.typeRefCode?.toUpperCase();
+        const isCurrentlySample = currentCode === 'SAMPLE';
+        const isCurrentlyHidden = currentCode === 'NECESSARY' || currentCode === 'HIDDEN';
+        if (isHidden && isCurrentlySample) {
+          const hiddenOption = resolveTestCaseType(testCaseTypes, true);
+          if (hiddenOption) {
+            target.typeRefCode = hiddenOption.refCode;
+            target.typeRefGroupCode = hiddenOption.refGroupCode || 'TESTCASETYPE';
+            target.typeRefName = hiddenOption.refName;
+          }
+        } else if (!isHidden && isCurrentlyHidden) {
+          const sampleOption = resolveTestCaseType(testCaseTypes, false);
+          if (sampleOption) {
+            target.typeRefCode = sampleOption.refCode;
+            target.typeRefGroupCode = sampleOption.refGroupCode || 'TESTCASETYPE';
+            target.typeRefName = sampleOption.refName;
+          }
+        }
+      }
+
+      next[index] = target;
       return next;
     });
 
-    if (field === 'input' || field === 'expectedOutput') {
+    if (field === 'input' || field === 'expectedOutput' || field === 'typeRefCode') {
       setFieldErrors((prev) => {
         if (!prev[index]) return prev;
         const current = { ...prev[index] };
         if (field === 'input' && typeof value === 'string' && value.trim()) delete current.input;
         if (field === 'expectedOutput' && typeof value === 'string' && value.trim()) delete current.expectedOutput;
+        if (field === 'typeRefCode' && typeof value === 'string' && value.trim()) delete current.typeRefCode;
         return { ...prev, [index]: current };
       });
     }
@@ -176,32 +244,25 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
       toast.error('No question targeted for test cases attachment.');
       return;
     }
-    if (typesError || testCaseTypes.length === 0 || testCases.some((testCase) => !testCase.typeRefCode)) {
-      toast.error('Load and select an API-provided test case type before saving.');
+    if (typesError || testCaseTypes.length === 0) {
+      toast.error('Test case taxonomy options are loading or unavailable. Please retry.');
       return;
     }
 
-    const errors: Record<number, { input?: string; expectedOutput?: string }> = {};
+    const errors: Record<number, { input?: string; expectedOutput?: string; typeRefCode?: string }> = {};
     let hasError = false;
 
     testCases.forEach((tc, idx) => {
-      const err: { input?: string; expectedOutput?: string } = {};
-      if (!tc.input?.trim()) {
-        err.input = 'Input raw string is required';
+      const tcErr = validateTestCase(tc, testCaseTypes);
+      if (tcErr) {
+        errors[idx] = tcErr;
         hasError = true;
-      }
-      if (!tc.expectedOutput?.trim()) {
-        err.expectedOutput = 'Expected output raw string is required';
-        hasError = true;
-      }
-      if (err.input || err.expectedOutput) {
-        errors[idx] = err;
       }
     });
 
     if (hasError) {
       setFieldErrors(errors);
-      toast.error('Please resolve missing required inputs/expected outputs.');
+      toast.error('Please resolve missing or invalid test case fields before saving.');
       return;
     }
 
@@ -218,8 +279,8 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
         explanation: tc.explanation ? tc.explanation.trim() : '',
         isHidden: tc.isHidden === true,
         displayOrder: idx + 1,
-        typeRefGroupCode: 'TESTCASETYPE',
-        typeRefCode: tc.typeRefCode,
+        typeRefGroupCode: matched?.refGroupCode || tc.typeRefGroupCode || 'TESTCASETYPE',
+        typeRefCode: tc.typeRefCode.trim(),
         typeRefName: matched?.refName || tc.typeRefName || '',
       };
     });
@@ -324,17 +385,28 @@ export const TestCaseModal: React.FC<TestCaseModalProps> = ({
                     </label>
 
                     {/* Test Case Type */}
-                    <C2CSelect
-                      id={`test-case-type-${idx}`}
-                      value={tc.typeRefCode || ''}
-                      onChange={(val) => handleChange(idx, 'typeRefCode', val)}
-                      disabled={testCaseTypes.length === 0}
-                      options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName }))}
-                      placeholder={testCaseTypes.length === 0 ? 'No API types available' : 'Select Type'}
-                      ariaLabel={`Test case ${idx + 1} type`}
-                      className="w-36"
-                      buttonClassName="rounded-xl px-2.5 py-1.5 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
-                    />
+                    <div className="flex flex-col">
+                      <C2CSelect
+                        id={`test-case-type-${idx}`}
+                        value={tc.typeRefCode || ''}
+                        onChange={(val) => handleChange(idx, 'typeRefCode', val)}
+                        disabled={testCaseTypes.length === 0}
+                        options={testCaseTypes.map((t) => ({ value: t.refCode, label: t.refName || t.refCode }))}
+                        placeholder={testCaseTypes.length === 0 ? 'No API types available' : 'Select Type'}
+                        ariaLabel={`Test case ${idx + 1} type`}
+                        className="w-36"
+                        buttonClassName={`rounded-xl px-2.5 py-1.5 text-xs font-semibold border ${
+                          fieldErrors[idx]?.typeRefCode
+                            ? 'border-rose-500 bg-rose-50/20'
+                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800'
+                        } text-slate-900 dark:text-white`}
+                      />
+                      {fieldErrors[idx]?.typeRefCode && (
+                        <span className="text-[11px] text-rose-500 font-medium mt-0.5">
+                          {fieldErrors[idx]?.typeRefCode}
+                        </span>
+                      )}
+                    </div>
 
                     {/* Remove button */}
                     {testCases.length > 1 && (
