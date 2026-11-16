@@ -27,6 +27,12 @@ Every first-party source file has been inspected and assigned a verified status 
 | `tsconfig.json` | TypeScript 5.9 compiler options (`strict: true`, ES2022) | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run typecheck`; the Vite `@/*` source alias is also declared for TypeScript resolution. |
 | `tsconfig.ci.json`| CI TypeScript configuration | `VERIFIED` | Used in CI environment checks. |
 | `.oxlintrc.json` | Oxlint rules (React hooks and exports) | `RUNTIME-VERIFIED` | Passes with 0 errors on 153 files in 35ms. |
+| `eslint.config.mjs` | ESLint v9 Flat Config with TypeScript-ESLint, React, and Hooks | `RUNTIME-VERIFIED` | Passes with 0 errors via `npm run lint:eslint`. |
+| `.dependency-cruiser.cjs` | Architecture boundary and circular dependency enforcer | `RUNTIME-VERIFIED` | Passes with 0 violations across 185 modules via `npm run depcruise`. |
+| `knip.json` | Dead code, unused exports, and dependency auditor | `RUNTIME-VERIFIED` | Validated via `npm run knip`. |
+| `vitest.config.ts` | Vitest configuration with JSDOM environment and RTL setup | `RUNTIME-VERIFIED` | Passes via `npm run test:unit`. |
+| `playwright.config.ts` | Playwright E2E browser testing configuration | `RUNTIME-VERIFIED` | Passes via `npm run test:e2e`. |
+| `postman/connect2code-api-contracts.postman_collection.json` | Rebuilt production API contract verification suite | `RUNTIME-VERIFIED` | 11 live endpoint contract assertions pass via `npm run test:api` (Newman). |
 | `vercel.json` | Edge routing, API proxy, valid SPA deep-link allowlist, redirects, CSP, and security/indexing headers | `PARTIALLY VERIFIED` | CSP now constrains executable/network sources; deployed Vercel headers and Monaco/OAuth/font/logo behavior require browser verification. |
 | `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one absolute `www` canonical, description, robots, Open Graph, Twitter/X, Organization/WebSite, and WebPage JSON-LD set; manifest and icon links verified. |
 | `public/robots.txt` | Production crawler policy and sitemap discovery | `RUNTIME-VERIFIED` | Advertises the canonical `https://www.connect2code.in/sitemap.xml`; page routes remain crawlable so response-level noindex directives can be observed. |

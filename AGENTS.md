@@ -94,9 +94,14 @@ flowchart TD
 
 | Command | Purpose | Expected Result |
 | :--- | :--- | :--- |
-| `npm test` | Node test runner across `scripts/tests/*.test.mjs` | All suites pass (0 fails) |
-| `npm run typecheck` | TypeScript compiler check without emitting | Clean output, exit code 0 |
 | `npm run lint` | Oxlint linter across `src/` | 0 errors, 0 warnings |
+| `npm run lint:eslint` | ESLint + TypeScript ESLint | 0 errors, clean code style |
+| `npm run depcruise` | dependency-cruiser module boundary check | 0 circular dependencies, valid boundaries |
+| `npm run typecheck` | TypeScript compiler check without emitting | Clean output, exit code 0 |
+| `npm run test:unit` | Vitest + React Testing Library component tests | All unit/component tests pass |
+| `npm test` | Node test runner across `scripts/tests/*.test.mjs` | All suites pass (0 fails) |
+| `npm run test:api` | Newman API contract test suite | 11/11 live endpoint assertions pass |
+| `npm run test:e2e` | Playwright browser E2E test suite | All browser navigation specs pass |
 | `npm run build` | Production Vite build | Clean bundle in `dist/` |
 | `node scripts/verify-documentation.mjs` | Documentation integrity and link checker | All links and file references valid |
 | `npm run verify:architecture` | Architecture rule scanner | Passes when `.env` is absent |

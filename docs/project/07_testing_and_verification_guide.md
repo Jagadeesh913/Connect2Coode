@@ -1,11 +1,32 @@
 # 07. Testing Strategy & Verification Guide
 
-## 1. Testing Architecture & Test Runner
+## 1. Testing Architecture & Verification Matrix
 
-Connect2Code uses the native **Node.js Test Runner** (`node:test` and `node:assert/strict`).
-- **Command**: `npm test` (`node --test scripts/tests/*.test.mjs`)
-- **Last verified baseline**: 422 tests passed, 0 failed on the current working tree on 2026-11-15.
-- **Zero Heavy Harnesses**: Requires no Jest or Vitest installation overhead; executes directly using Node.js ESM loader hooks.
+Connect2Code implements a multi-tiered, production-grade verification strategy:
+
+1. **Vitest + React Testing Library** (`npm run test:unit`):
+   - Fast, in-memory JSDOM component rendering and unit tests for UI components, hooks, security sanitizers, and Redux logic.
+   - Configured via [`vitest.config.ts`](../../vitest.config.ts) and [`src/test/setup.ts`](../../src/test/setup.ts).
+2. **Playwright E2E Suite** (`npm run test:e2e`):
+   - Chromium-driven end-to-end browser tests verifying landing page rendering, brand assets, SPA navigation, and 404 error boundaries against live preview servers.
+   - Configured via [`playwright.config.ts`](../../playwright.config.ts) and [`e2e/landing-and-navigation.spec.ts`](../../e2e/landing-and-navigation.spec.ts).
+3. **Newman API Contract Test Runner** (`npm run test:api`):
+   - Postman CLI collection runner executing real HTTP contract assertions against the live backend (`https://api.connect2code.in/api/v1`).
+   - Defined in [`postman/connect2code-api-contracts.postman_collection.json`](../../postman/connect2code-api-contracts.postman_collection.json).
+4. **Node.js Regression Test Runner** (`npm test`):
+   - Native `node:test` regression runner executing 423 deep contract tests across 25 suites in `scripts/tests/`.
+5. **Dependency & Architecture Validation** (`npm run depcruise`):
+   - `dependency-cruiser` enforcing 0 circular dependencies, strict module boundaries, and central `apiClient` isolation.
+   - Configured via [`.dependency-cruiser.cjs`](../../.dependency-cruiser.cjs).
+6. **Knip Dead Code & Dependency Analysis** (`npm run knip`):
+   - Analyzes unused files, dead exports, duplicate exports, and unlisted dependencies.
+   - Configured via [`knip.json`](../../knip.json).
+7. **Static Code Analysis** (`npm run lint`, `npm run lint:eslint`):
+   - Dual-engine linting with Oxlint for ultra-fast checks and ESLint v9 (`eslint.config.mjs`) + TypeScript-ESLint for comprehensive React and TypeScript rules.
+8. **Security & Vulnerability Auditing**:
+   - Gitleaks (`gitleaks detect --source .`): automated secret detection across git commits.
+   - OSV-Scanner (`osv-scanner --lockfile=package-lock.json`): vulnerability scanning for open-source dependencies.
+   - Semgrep (`semgrep scan --config auto src/`): AST-level security and quality rule validation.
 
 ---
 
@@ -75,44 +96,49 @@ This enables unit testing real TypeScript source code with zero transpilation de
 
 Run all checks in sequence to verify code health:
 
-### 1. Fast Linting
+### 1. Dual-Engine Linting
 ```bash
-npm run lint
+npm run lint          # Oxlint
+npm run lint:eslint   # ESLint + TypeScript ESLint
 ```
-Runs `oxlint` across all files in `src/`. Expected: `Found 0 warnings and 0 errors.`
 
-### 2. Static Typecheck
+### 2. Architecture & Dependency Boundary Check
 ```bash
-npm run typecheck
+npm run depcruise     # dependency-cruiser (zero circular dependencies)
 ```
-Executes `tsc -p tsconfig.json --noEmit`. Expected: Exits with code 0.
 
-### 3. Test Suite
+### 3. Static Typecheck
 ```bash
-npm test
+npm run typecheck     # tsc -p tsconfig.json --noEmit
 ```
-Executes all test files in `scripts/tests/`. Do not copy the historical baseline into a remediation report; record the fresh result from the final tree.
 
-### 4. Production Build
+### 4. Unit & Component Tests
+```bash
+npm run test:unit     # Vitest + React Testing Library (JSDOM)
+```
+
+### 5. Regression Contract Test Suites
+```bash
+npm test              # Node test runner across scripts/tests/*.test.mjs
+```
+
+### 6. API Contract Integration Suite
+```bash
+npm run test:api      # Newman runner executing live contract assertions
+```
+
+### 7. End-to-End Browser Tests
+```bash
+npm run test:e2e      # Playwright Chromium tests
+```
+
+### 8. Production Build & Smoke Test
 ```bash
 npm run build
-```
-Executes Vite production bundle build. Expected: Generates `dist/` bundle cleanly in ~1 second.
-
-### 5. Preview Smoke Test
-```bash
 node scripts/smoke-preview.mjs
 ```
-Spawns Vite preview server on `http://127.0.0.1:4173`, fetches critical routes (`/`, `/login`, `/practice`, `/problems/1`, `/companies/tcs`), and verifies that JS/CSS assets load with HTTP 200 without SPA HTML fallbacks. Set `C2C_SMOKE_PORT` to an unused port when 4173 is occupied; the harness uses Vite's strict-port mode so it never polls a different port than the one actually started.
 
-### 6. Architecture Verification
-```bash
-npm run verify:architecture
-```
-Verifies no direct axios imports outside `apiClient.ts`, no direct fetch calls, no `Math.random()` in app code, and no local root `.env` file. A root `.env` causes a policy failure and must not be deleted without the owner's authorization. The verified 2026-11-04 run passed with no root `.env` present.
-
-### 7. Documentation Integrity
+### 9. Documentation Integrity
 ```bash
 node scripts/verify-documentation.mjs
 ```
-Validates all markdown links, referenced source file paths, and scans for unredacted credentials.
