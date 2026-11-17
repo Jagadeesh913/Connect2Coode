@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { BASE_URL } from '../../../core/api/apiClient';
 
 export const AppSettings: React.FC = () => {
@@ -67,6 +68,34 @@ export const AppSettings: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <section className="p-6 sm:p-8 bg-white dark:bg-[#0D1322] border border-slate-200/90 dark:border-slate-800 rounded-3xl shadow-xs" aria-labelledby="privacy-data-settings-title">
+          <div className="flex items-start gap-3.5">
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/60 text-emerald-600 dark:text-emerald-300 rounded-2xl text-lg">
+              <i className="fa-solid fa-user-shield" aria-hidden="true"></i>
+            </div>
+            <div>
+              <h2 id="privacy-data-settings-title" className="text-base font-bold text-slate-900 dark:text-white">Privacy, data, and support</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-5">
+                Review actual storage practices, clear this account’s local data, and check account-rights dependencies.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {[
+              { to: '/privacy', title: 'Privacy Policy', description: 'Data categories, purposes, sharing, retention, and rights.' },
+              { to: '/cookies', title: 'Cookies & Storage', description: 'Essential authentication and browser-storage inventory.' },
+              { to: '/data-rights', title: 'Data & Account Rights', description: 'Local clearing control and backend deletion/export status.' },
+              { to: '/support', title: 'Contact & Support', description: 'Safe troubleshooting and verified contact status.' },
+            ].map((item) => (
+              <Link key={item.to} to={item.to} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 transition-colors hover:border-blue-300 hover:bg-blue-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-800 dark:bg-slate-900/60 dark:hover:border-blue-800 dark:hover:bg-blue-950/20">
+                <span className="block text-sm font-bold text-slate-900 dark:text-white">{item.title}</span>
+                <span className="mt-1 block text-xs leading-5 text-slate-500 dark:text-slate-400">{item.description}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

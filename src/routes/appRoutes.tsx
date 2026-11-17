@@ -10,6 +10,7 @@ import { AdminLayout } from '../features/admin/components/AdminLayout';
 import { PageLoading } from '../shared/components/ui/PageLoading';
 import { AuthenticatedFeatureGate } from '../features/auth/components/AuthenticatedFeatureGate';
 import { RouteErrorBoundary } from '../shared/components/errors/RouteErrorBoundary';
+import { LegalPage } from '../features/legal/pages/LegalPage';
 
 // Lazy-loaded Pages for Production Code Splitting
 const Landing = lazy(() => import('../features/landing/pages/Landing').then(({ Landing }) => ({ default: Landing })));
@@ -101,6 +102,16 @@ const createAppRoutes = (landingElement: React.ReactNode) => [
   {
     element: <MainLayout />,
     children: [
+      // Public trust, legal, and support routes are rendered from verified frontend practices.
+      { path: '/privacy', element: <LegalPage page="privacy" /> },
+      { path: '/cookies', element: <LegalPage page="cookies" /> },
+      { path: '/terms', element: <LegalPage page="terms" /> },
+      { path: '/disclaimer', element: <LegalPage page="disclaimer" /> },
+      { path: '/accessibility', element: <LegalPage page="accessibility" /> },
+      { path: '/support', element: <LegalPage page="support" /> },
+      { path: '/data-rights', element: <LegalPage page="data-rights" /> },
+      { path: '/copyright', element: <LegalPage page="copyright" /> },
+
       // Company Prep routes keep stable URLs but mount API content only after sign-in.
       { path: '/companies', element: requireFeatureSession(withSuspense(CompanyList), 'Sign in to explore Company Prep', 'Log in with your Connect 2 Code account to browse hiring companies, recruitment patterns, and interview questions.', '/companies') },
       { path: '/companies/:slug', element: requireFeatureSession(withSuspense(CompanyDetails), 'Sign in to view Company Prep', 'Log in to view company interview questions, practice problem sets, and recruitment details.') },

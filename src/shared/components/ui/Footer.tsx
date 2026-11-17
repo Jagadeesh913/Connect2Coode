@@ -6,7 +6,7 @@ export const Footer: React.FC = () => {
   return (
     <footer className="w-full bg-slate-50 dark:bg-[#070A13] text-slate-600 dark:text-slate-400 border-t border-slate-200 dark:border-slate-800/80 font-sans transition-colors duration-200">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-16 pb-12">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-8 pb-12 border-b border-slate-200 dark:border-slate-800/80">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 lg:gap-8 pb-12 border-b border-slate-200 dark:border-slate-800/80">
           
           {/* Brand info & Socials */}
           <div className="lg:col-span-2 flex flex-col gap-4">
@@ -18,20 +18,20 @@ export const Footer: React.FC = () => {
 
           </div>
 
-          {/* Quick Links */}
+          {/* Product */}
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Quick Links
+              Product
             </h3>
             <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <li>
-                <Link to="/" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Home
+                <Link to="/practice" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Problems
                 </Link>
               </li>
               <li>
-                <Link to="/practice" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Problems
+                <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  DSA Sheets
                 </Link>
               </li>
               <li>
@@ -47,25 +47,59 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Resources */}
+          {/* Legal */}
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
-              Resources
+              Legal
             </h3>
             <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
               <li>
-                <Link to="/dsa-sheet" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  DSA Learning Sheets
+                <Link to="/privacy" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/companies" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Company Preparation
+                <Link to="/cookies" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Cookies & Storage
                 </Link>
               </li>
               <li>
-                <Link to="/aptitude" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                  Aptitude Practice
+                <Link to="/terms" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Terms & Conditions
+                </Link>
+              </li>
+              <li>
+                <Link to="/disclaimer" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Disclaimer
+                </Link>
+              </li>
+              <li>
+                <Link to="/copyright" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Copyright
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Help */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">
+              Help & Rights
+            </h3>
+            <ul className="flex flex-col gap-2.5 text-xs sm:text-sm">
+              <li>
+                <Link to="/support" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Contact & Support
+                </Link>
+              </li>
+              <li>
+                <Link to="/data-rights" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Data & Account Rights
+                </Link>
+              </li>
+              <li>
+                <Link to="/accessibility" className="text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                  Accessibility
                 </Link>
               </li>
             </ul>

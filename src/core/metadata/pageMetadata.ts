@@ -160,6 +160,46 @@ export const resolvePageMetadata = (rawPathname: string): PageMetadata => {
       'Manage your Connect2Code application preferences.',
       '/settings'
     ),
+    '/privacy': publicPage(
+      'Privacy Policy',
+      'Learn how Connect2Code uses account, profile, learning, and browser data.',
+      '/privacy'
+    ),
+    '/cookies': publicPage(
+      'Cookie & Storage Policy',
+      'Review Connect2Code authentication cookies, browser storage, and third-party requests.',
+      '/cookies'
+    ),
+    '/terms': publicPage(
+      'Terms & Conditions',
+      'Review the terms for responsible use of Connect2Code learning and assessment features.',
+      '/terms'
+    ),
+    '/disclaimer': publicPage(
+      'Disclaimer',
+      'Understand the educational scope and limitations of Connect2Code preparation resources.',
+      '/disclaimer'
+    ),
+    '/accessibility': publicPage(
+      'Accessibility Statement',
+      'Review Connect2Code accessibility measures, limitations, and feedback process.',
+      '/accessibility'
+    ),
+    '/support': publicPage(
+      'Contact & Support',
+      'Find safe troubleshooting guidance and the current status of official support channels.',
+      '/support'
+    ),
+    '/data-rights': publicPage(
+      'Data & Account Rights',
+      'Review available privacy controls and pending account deletion and export dependencies.',
+      '/data-rights'
+    ),
+    '/copyright': publicPage(
+      'Copyright & Trademark Notice',
+      'Review rights and attribution boundaries for Connect2Code and third-party materials.',
+      '/copyright'
+    ),
     '/admin': privatePage(
       'Admin Portal',
       'Connect2Code administration portal.',

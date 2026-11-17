@@ -148,3 +148,9 @@ Browser storage is shared across users on the same machine. To eliminate privacy
 2. When authenticated, scope key is `id:<userId>` or `email:<email>`.
 3. The complete canonical identity is encoded with `encodeURIComponent` and versioned as `v2:<encoded-identity>`. This is injective for the input string and avoids cross-account collisions caused by the previous truncated 32-bit hash.
 4. All local keys become `c2c:user:v2:<encoded-identity>:<key>`. Each user's browser data is isolated without relying on a probabilistic hash.
+
+## User-Facing Local Data Control (2026-11-17)
+
+`/data-rights` calls `userScopedStorage.clearForUser(activeUser)` only after an authenticated, two-step confirmation. This removes the active account's theme preference, progress cache, and code drafts from that browser. It does not mutate Redux or server records during the current page session and does not represent account deletion. Normal logout continues to preserve `theme_pref`; explicit local clearing does not.
+
+No consent state is persisted because the current frontend has no non-essential analytics or advertising category. Introducing such a service requires a separate, prior-choice persistence design and policy update before the service loads.

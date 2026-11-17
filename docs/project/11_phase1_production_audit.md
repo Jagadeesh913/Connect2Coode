@@ -129,3 +129,7 @@ Status vocabulary follows the repository standard: `VERIFIED`, `RUNTIME-VERIFIED
 ## 5. Current Phase 1 verdict
 
 **Phase 1 is not complete.** The frontend remediation is materially advanced, but production certification remains blocked by the `NOT WORKING` and `UNKNOWN` items above. This ledger is the single checklist for continuing the audit; additional findings must be added here with evidence rather than split into many informal phases.
+
+## Legal and Trust-Surface Follow-up (2026-11-17)
+
+The frontend legal/privacy/accessibility follow-up is documented in [`12_legal_privacy_and_compliance_audit.md`](12_legal_privacy_and_compliance_audit.md). Public policies and local device-data controls are now implemented in source, but release remains blocked on operator/contact approval, backend account-rights and retention contracts, content licensing, child-data decisions, and accessibility conformance evidence.

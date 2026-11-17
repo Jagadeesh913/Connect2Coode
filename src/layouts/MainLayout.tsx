@@ -39,7 +39,8 @@ export const MainLayout: React.FC = () => {
     location.pathname.startsWith('/interviews') ||
     location.pathname.startsWith('/bookmarks') ||
     location.pathname.startsWith('/profile') ||
-    location.pathname.startsWith('/settings');
+    location.pathname.startsWith('/settings') ||
+    ['/privacy', '/cookies', '/terms', '/disclaimer', '/accessibility', '/support', '/data-rights', '/copyright'].includes(location.pathname);
 
   return (
     <div className={`${isProblemWorkspace ? 'h-screen overflow-hidden' : 'min-h-screen overflow-x-hidden'} flex flex-col relative m-0 p-0 bg-[#FFFFFF] dark:bg-[#070A13] text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200`}>

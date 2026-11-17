@@ -30,6 +30,7 @@ import { AdminBadge } from '../components/AdminBadge';
 import { AdminModal } from '../components/AdminModal';
 import { AdminPageHeader } from '../components/AdminPageHeader';
 import { AdminTable, type Column } from '../components/AdminTable';
+import { getSafeRemoteImageUrl } from '../../../core/security/externalUrl';
 
 const normalizeGroupCode = (value: string) => value.trim().toUpperCase();
 
@@ -71,6 +72,7 @@ export const AdminReferences: React.FC = () => {
       isActive: true,
     },
   });
+  const logoPreviewUrl = getSafeRemoteImageUrl(watch('logoUrl'));
 
   const loadGroups = useCallback(async (signal?: AbortSignal, preferredGroup?: string) => {
     const requestGeneration = ++groupsRequestGenerationRef.current;
@@ -226,12 +228,14 @@ export const AdminReferences: React.FC = () => {
     {
       header: 'Logo',
       className: 'w-16 text-center',
-      cell: (item) =>
-        item.logoUrl ? (
+      cell: (item) => {
+        const safeLogoUrl = getSafeRemoteImageUrl(item.logoUrl);
+        return safeLogoUrl ? (
           <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 flex items-center justify-center overflow-hidden mx-auto">
             <img
-              src={item.logoUrl}
+              src={safeLogoUrl}
               alt={`${item.refName} logo`}
+              referrerPolicy="no-referrer"
               className="w-full h-full object-contain"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
@@ -240,7 +244,8 @@ export const AdminReferences: React.FC = () => {
           </div>
         ) : (
           <span className="text-[11px] text-slate-400 italic">None</span>
-        ),
+        );
+      },
     },
     {
       header: 'Reference Code',
@@ -391,11 +396,12 @@ export const AdminReferences: React.FC = () => {
                 className="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 placeholder="https://example.com/logo.png"
               />
-              {watch('logoUrl') && (
+              {logoPreviewUrl && (
                 <div className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 overflow-hidden">
                   <img
-                    src={watch('logoUrl') || ''}
+                    src={logoPreviewUrl}
                     alt="Logo preview"
+                    referrerPolicy="no-referrer"
                     className="w-full h-full object-contain"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).style.opacity = '0.3';

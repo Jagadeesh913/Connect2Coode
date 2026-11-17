@@ -66,7 +66,7 @@ ${route.introduction}
 
 ${route.topics.map((topic) => `- ${topic}`).join('\n')}
 
-## Public preparation pages
+## Public pages
 
 ${PUBLIC_PRERENDER_ROUTES
   .filter((candidate) => candidate.path !== route.path)
@@ -78,7 +78,7 @@ export const buildLlmsTxt = () => `# Connect2Code
 
 > Connect2Code is a placement-preparation platform with coding practice, DSA learning sheets, aptitude practice, and company-preparation resources.
 
-## Public preparation hubs
+## Public pages
 
 ${PUBLIC_PRERENDER_ROUTES.map((route) => `- [${route.title}](${canonicalUrl(route.path)}): ${route.description}`).join('\n')}
 

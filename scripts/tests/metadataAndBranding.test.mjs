@@ -46,8 +46,8 @@ test('HTML supplies one complete default metadata set without duplicate managed 
   assert.match(read('src/core/metadata/RouteMetadata.tsx'), /upsertJsonLd\('c2c-webpage-schema'/);
   assert.match(html, /<link rel="manifest" href="\/site\.webmanifest" \/>/);
   assert.match(html, /<link rel="apple-touch-icon" sizes="180x180" href="\/apple-touch-icon\.png" \/>/);
-  assert.match(html, /fonts\.googleapis\.com[^"]+display=optional/);
-  assert.doesNotMatch(html, /fonts\.googleapis\.com[^"]+display=swap/);
+  assert.match(html, /fonts\.googleapis\.com[^"]+display=swap/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com[^"]+display=optional/);
 });
 
 test('manifest references present, correctly sized app icons', () => {
@@ -94,7 +94,9 @@ test('central route metadata covers public, authenticated, admin, error, and dyn
     '/logical', '/verbal', '/pseudocode', '/progress', '/roadmaps', '/interviews',
     '/dashboard', '/bookmarks', '/profile', '/settings', '/admin', '/admin/dashboard',
     '/admin/questions', '/admin/mcqs', '/admin/companies', '/admin/languages',
-    '/admin/institutions', '/admin/dsa-sheets', '/admin/references', '/500',
+    '/admin/institutions', '/admin/dsa-sheets', '/admin/references', '/privacy',
+    '/cookies', '/terms', '/disclaimer', '/accessibility', '/support', '/data-rights',
+    '/copyright', '/500',
   ];
 
   exactPaths.forEach((path) => {

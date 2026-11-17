@@ -34,7 +34,7 @@ Every first-party source file has been inspected and assigned a verified status 
 | `playwright.config.ts` | Playwright E2E browser testing configuration | `RUNTIME-VERIFIED` | Passes via `npm run test:e2e`. |
 | `postman/connect2code-api-contracts.postman_collection.json` | Rebuilt production API contract verification suite | `RUNTIME-VERIFIED` | 11 live endpoint contract assertions pass via `npm run test:api` (Newman). |
 | `vercel.json` | Edge routing, API proxy, valid SPA deep-link allowlist, redirects, CSP, and security/indexing headers | `PARTIALLY VERIFIED` | CSP now constrains executable/network sources; deployed Vercel headers and Monaco/OAuth/font/logo behavior require browser verification. |
-| `index.html` | HTML entry, browser branding, default SEO/social metadata | `RUNTIME-VERIFIED` | Exactly one absolute `www` canonical, description, robots, Open Graph, Twitter/X, Organization/WebSite, and WebPage JSON-LD set; manifest and icon links verified. Google Fonts use `display=optional` to prevent the measured late font-metric layout shift. |
+| `index.html` | HTML entry, browser branding, default SEO/social metadata | `VERIFIED` | Exactly one absolute `www` canonical, description, robots, Open Graph, Twitter/X, Organization/WebSite, and WebPage JSON-LD set; manifest and icon links verified. Google Fonts use `display=swap`, restoring the established Plus Jakarta Sans metrics instead of allowing a persistent system-font fallback. |
 | `public/robots.txt` | Production crawler policy and sitemap discovery | `RUNTIME-VERIFIED` | Advertises the canonical `https://www.connect2code.in/sitemap.xml`; page routes remain crawlable so response-level noindex directives can be observed. |
 | `scripts/generate-seo-assets.mjs` | Build-time React SSR, sitemap, noindex app shell, and 404 generator | `RUNTIME-VERIFIED` | Bundles the build-only SSR entry, renders the actual route tree for five public documents, marks matching roots for hydration, and emits absolute `www` metadata/schema, `app.html`, `404.html`, sitemap, `index.md`, and `llms.txt` without authenticated or invented dynamic URLs. |
 | `scripts/tests/metadataCrawler.test.mjs` | Indexing, crawler-output, sitemap, robots, and edge-route regression coverage | `RUNTIME-VERIFIED` | Covers no-JS fallback content without pre-mount root text, canonical normalization, sitemap exclusions, noindex shells, dynamic failures, and removal of bot-specific routing. |
@@ -286,3 +286,18 @@ Every first-party source file has been inspected and assigned a verified status 
   - `node scripts/verify-documentation.mjs`: canonical documentation files, cross-reference links verified with 0 broken links.
 - **Final-tree Verification**: `RUNTIME-VERIFIED` on Node 22.22.0. The local production bundle passed unit, E2E, contract regression suites, and real browser checks. Provider-level staging headers/routing remain `PARTIALLY VERIFIED` until an actual Vercel preview is exercised.
 
+## Legal and Compliance Files (2026-11-17)
+
+| File | Status | Coverage |
+| :--- | :--- | :--- |
+| `src/features/legal/legalContent.ts` | `VERIFIED` (source) | Eight source-grounded policies/notices; owner/backend unknowns are explicit. |
+| `src/features/legal/pages/LegalPage.tsx` | `VERIFIED` (source) | Shared responsive/legal layout, section navigation, tables, notices, and related links. |
+| `src/features/legal/components/LocalDataControls.tsx` | `VERIFIED` (source) | Authenticated two-step user-scoped browser clearing; server deletion excluded. |
+| `src/features/admin/components/questions/QuestionDetailsModal.tsx` | `VERIFIED` (source) | API-derived external challenge links and platform images are revalidated at the final DOM boundary. |
+| `src/features/admin/pages/AdminReferences.tsx` | `VERIFIED` (source) | Stored and previewed remote reference logos use the strict HTTPS/private-host image boundary and no-referrer policy. |
+| `scripts/tests/legalCompliance.test.mjs` | `PARTIALLY VERIFIED` | Test intent and source assertions inspected; test execution blocked by audit sandbox requirements. |
+| `e2e/legal-compliance.spec.ts` | `PARTIALLY VERIFIED` | Chromium coverage for eight pages, links, responsive overflow, theme, keyboard focus, runtime tracking/storage, and local clearing; execution awaits Linux CI. |
+| `.github/workflows/legal-compliance-verification.yml` | `PARTIALLY VERIFIED` | Read-only, network-disabled, resource-bounded Linux verification job; workflow execution requires a committed remote revision. |
+| `docs/project/12_legal_privacy_and_compliance_audit.md` | `VERIFIED` (source) | Complete requirement checklist, legal applicability, dependencies, approvals, and verification status. |
+
+Modified route, footer, settings, metadata, prerender, security-boundary, and canonical documentation files are `PARTIALLY VERIFIED`: source integration was inspected, while target-controlled lint/typecheck/test/build/browser checks remain unexecuted on this host.

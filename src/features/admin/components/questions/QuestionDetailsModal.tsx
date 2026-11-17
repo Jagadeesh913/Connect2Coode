@@ -3,6 +3,7 @@ import { AdminModal } from '../AdminModal';
 import { AdminBadge } from '../AdminBadge';
 import { QuestionPayload } from '../../../../services/questionService';
 import { Skeleton } from '../../../../shared/components/ui/Skeleton';
+import { getSafeExternalUrl, getSafeRemoteImageUrl } from '../../../../core/security/externalUrl';
 import {
   Code2,
   Terminal,
@@ -57,7 +58,10 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
     typeof question?.questionPlatform === 'object' && question.questionPlatform !== null
       ? question.questionPlatform
       : null;
-  const platformLogo = platformSummary?.logoUrl;
+  const platformLogo = getSafeRemoteImageUrl(platformSummary?.logoUrl);
+  const safeLeetCodeUrl = getSafeExternalUrl(question?.leetCodeUrl);
+  const safeGfgUrl = getSafeExternalUrl(question?.gfgUrl);
+  const safeHackerRankUrl = getSafeExternalUrl(question?.hackerRankUrl);
   const platformDisplayName =
     question?.qpfRefName ||
     platformSummary?.refName ||
@@ -146,6 +150,7 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                   <img
                     src={platformLogo}
                     alt=""
+                    referrerPolicy="no-referrer"
                     className="w-3.5 h-3.5 object-contain"
                   />
                 )}
@@ -188,16 +193,16 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
           </div>
 
           {/* External Reference / Challenge Links */}
-          {(question.leetCodeUrl || question.gfgUrl || question.hackerRankUrl) && (
+          {(safeLeetCodeUrl || safeGfgUrl || safeHackerRankUrl) && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 <Globe className="w-3.5 h-3.5 text-blue-600" />
                 <span>External Challenge Links</span>
               </div>
               <div className="flex items-center gap-2.5 flex-wrap">
-                {question.leetCodeUrl && (
+                {safeLeetCodeUrl && (
                   <a
-                    href={question.leetCodeUrl}
+                    href={safeLeetCodeUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 font-semibold text-xs hover:bg-amber-100 dark:hover:bg-amber-900/60 transition-colors"
@@ -206,9 +211,9 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
-                {question.gfgUrl && (
+                {safeGfgUrl && (
                   <a
-                    href={question.gfgUrl}
+                    href={safeGfgUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-semibold text-xs hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors"
@@ -217,9 +222,9 @@ export const QuestionDetailsModal: React.FC<QuestionDetailsModalProps> = ({
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
-                {question.hackerRankUrl && (
+                {safeHackerRankUrl && (
                   <a
-                    href={question.hackerRankUrl}
+                    href={safeHackerRankUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 font-semibold text-xs hover:bg-green-100 dark:hover:bg-green-900/60 transition-colors"

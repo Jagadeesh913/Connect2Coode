@@ -1,0 +1,105 @@
+name: Legal Compliance Verification
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "src/features/legal/**"
+      - "src/shared/components/ui/Footer.tsx"
+      - "src/features/settings/pages/AppSettings.tsx"
+      - "src/routes/appRoutes.tsx"
+      - "src/layouts/MainLayout.tsx"
+      - "src/core/metadata/**"
+      - "src/core/security/**"
+      - "src/core/storage/**"
+      - "scripts/**"
+      - "e2e/legal-compliance.spec.ts"
+      - "docs/project/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/legal-compliance-verification.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-verification:
+    name: Network-isolated Linux verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install locked dependencies without lifecycle execution
+        run: npm ci --ignore-scripts
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit the complete dependency graph
+        id: full-audit
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+      - name: Preload the pinned browser runner
+        run: docker pull mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
+
+      - name: Prepare read-only shared-memory boundary
+        run: mkdir -p "$RUNNER_TEMP/c2c-empty-shm"
+
+      - name: Run bounded verification without network or target writes
+        shell: bash
+        run: |
+          docker run --rm \
+            --network none \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 512 \
+            --memory 6g \
+            --cpus 2 \
+            --ulimit fsize=1048576:1048576 \
+            --user 1000:1000 \
+            --mount type=bind,source="$PWD",target=/workspace,readonly \
+            --mount type=bind,source="$RUNNER_TEMP/c2c-empty-shm",target=/dev/shm,readonly \
+            --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777 \
+            mcr.microsoft.com/playwright@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579 \
+            env -i \
+              HOME=/scratch/home \
+              TMPDIR=/scratch/tmp \
+              XDG_CACHE_HOME=/scratch/cache \
+              PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+              CI=true \
+              PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+              bash -euc '
+                mkdir -p "$HOME" "$TMPDIR" "$XDG_CACHE_HOME" /scratch/repo
+                cp -R /workspace/. /scratch/repo/
+                cd /scratch/repo
+                npm rebuild --offline
+                npm run lint
+                npm run lint:eslint
+                npm run verify:architecture
+                npm run depcruise
+                npm run verify:docs
+                npm run test:unit
+                npm test
+                npm run typecheck
+                npm run build
+                npm run test:e2e -- e2e/legal-compliance.spec.ts
+              '
+
+      - name: Enforce complete dependency audit
+        if: always() && steps.full-audit.outcome == 'failure'
+        run: |
+          echo "The complete dependency audit reported high-severity findings." >&2
+          exit 1

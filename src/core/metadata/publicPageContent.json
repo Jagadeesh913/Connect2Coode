@@ -63,5 +63,69 @@
       "Verbal ability",
       "Pseudocode and code tracing"
     ]
+  },
+  {
+    "path": "/privacy",
+    "title": "Privacy Policy",
+    "description": "Learn how Connect2Code uses account, profile, learning, and browser data.",
+    "heading": "Privacy Policy",
+    "introduction": "Review the personal data used by current Connect2Code website and API features, the purposes for using it, and the controls available to users.",
+    "topics": ["Account and profile data", "Learning and code activity", "Browser storage", "Privacy rights and dependencies"]
+  },
+  {
+    "path": "/cookies",
+    "title": "Cookie & Storage Policy",
+    "description": "Review Connect2Code authentication cookies, browser storage, and third-party requests.",
+    "heading": "Cookie & Storage Policy",
+    "introduction": "Understand the required authentication cookie, account-scoped browser storage, and third-party resources used by the current service.",
+    "topics": ["Essential session cookie", "Local feature storage", "Third-party resources", "Browser controls"]
+  },
+  {
+    "path": "/terms",
+    "title": "Terms & Conditions",
+    "description": "Review the terms for responsible use of Connect2Code learning and assessment features.",
+    "heading": "Terms & Conditions",
+    "introduction": "Review responsible-use expectations for accounts, learning features, code execution, platform content, and service availability.",
+    "topics": ["Accounts and security", "Acceptable use", "Code and content", "Service limitations"]
+  },
+  {
+    "path": "/disclaimer",
+    "title": "Disclaimer",
+    "description": "Understand the educational scope and limitations of Connect2Code preparation resources.",
+    "heading": "Disclaimer",
+    "introduction": "Connect2Code is a preparation and practice service, not a recruiter, employer, examination authority, or professional adviser.",
+    "topics": ["Educational use", "No outcome guarantee", "Code execution limits", "Third-party resources"]
+  },
+  {
+    "path": "/accessibility",
+    "title": "Accessibility Statement",
+    "description": "Review Connect2Code accessibility measures, limitations, and feedback process.",
+    "heading": "Accessibility Statement",
+    "introduction": "Review current keyboard, screen-reader, contrast, zoom, reduced-motion, and responsive design measures and known limitations.",
+    "topics": ["Accessible controls", "Reduced motion", "Known limitations", "Feedback process"]
+  },
+  {
+    "path": "/support",
+    "title": "Contact & Support",
+    "description": "Find safe troubleshooting guidance and the current status of official support channels.",
+    "heading": "Contact & Support",
+    "introduction": "Use safe troubleshooting guidance and review which verified owner contact channels must still be configured.",
+    "topics": ["Account help", "Coding issue details", "Privacy and accessibility requests", "Security report safety"]
+  },
+  {
+    "path": "/data-rights",
+    "title": "Data & Account Rights",
+    "description": "Review available privacy controls and pending account deletion and export dependencies.",
+    "heading": "Data & Account Rights",
+    "introduction": "Review current profile and browser-data controls and understand which deletion, export, and privacy-request workflows still require backend support.",
+    "topics": ["Profile controls", "Local data clearing", "Account deletion dependency", "Privacy request safety"]
+  },
+  {
+    "path": "/copyright",
+    "title": "Copyright & Trademark Notice",
+    "description": "Review rights and attribution boundaries for Connect2Code and third-party materials.",
+    "heading": "Copyright & Trademark Notice",
+    "introduction": "Understand the boundary between Connect2Code materials and third-party company brands, problem references, fonts, icons, and linked content.",
+    "topics": ["Platform materials", "Third-party trademarks", "User submissions", "Rights notices"]
   }
 ]

@@ -169,3 +169,9 @@ Located in [`src/features/companies/utils/companyLogoRegistry.ts`](../../src/fea
 - **Remote-image boundary**: API-logo and website-derived candidates reuse the shared HTTPS/public-host guard and send no referrer. The UI never inserts an unvalidated backend value into `img.src`.
 
 The cascade is designed for broad dynamic coverage, but **95% coverage is not asserted by repository tests**. Brandfetch advertises 95%+ core-brand coverage; that external claim and production CDN availability must be validated with the deployed client ID and the production company dataset. The deterministic monogram remains the guaranteed terminal state.
+
+## Legal, Trust, and Data-Rights UI (2026-11-17)
+
+[`LegalPage`](../../src/features/legal/pages/LegalPage.tsx) uses the existing Connect2Code surface language: Plus Jakarta/Inter typography, slate/blue tokens, rounded `2xl`/`3xl` cards, compact uppercase eyebrows, plain borders, light/dark parity, and responsive `max-w-7xl` spacing. It deliberately adds no gradients, marketing template, or alternate design system. Desktop uses a sticky in-page section navigator; mobile retains a single-column reading order and horizontal scrolling for the cookie inventory table.
+
+[`LocalDataControls`](../../src/features/legal/components/LocalDataControls.tsx) is the destructive-action boundary on `/data-rights`. It requires an authenticated account, uses a two-step confirmation, clears only that account's browser scope, reports completion through a status message, and explicitly states that server records are unaffected. The global [`Footer`](../../src/shared/components/ui/Footer.tsx) now exposes product, legal, and help/rights groups without external or unimplemented destinations.

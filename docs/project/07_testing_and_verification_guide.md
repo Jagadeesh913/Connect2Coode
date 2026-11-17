@@ -142,3 +142,11 @@ node scripts/smoke-preview.mjs
 ```bash
 node scripts/verify-documentation.mjs
 ```
+
+## Legal and Compliance Contract Tests (2026-11-17)
+
+[`legalCompliance.test.mjs`](../../scripts/tests/legalCompliance.test.mjs) statically verifies public policy/support route coverage, footer access, source-grounded privacy statements, absence of false DPDP/GDPR compliance claims, the documented reason no optional-cookie banner exists, the local-versus-server deletion boundary, metadata/prerender registration, and final external-URL boundaries.
+
+[`legal-compliance.spec.ts`](../../e2e/legal-compliance.spec.ts) verifies all eight public pages in Chromium, footer navigation, mobile/desktop overflow, dark/light mode, keyboard focus, runtime tracking/cookie behavior, and authenticated account-scoped browser-data clearing. [`.github/workflows/legal-compliance-verification.yml`](../../.github/workflows/legal-compliance-verification.yml) runs the full verification set in a read-only, network-disabled Linux container with bounded CPU, memory, processes, file size, duration, and scratch storage.
+
+The 2026-11-17 legal implementation audit did not execute target-controlled checks: the active security-audit workflow requires an OS-enforced no-network, read-only-target, scratch-only sandbox with explicit resource limits, which is unavailable on this native Windows host. Run the full verification command set in an approved Linux/WSL CI environment before release.

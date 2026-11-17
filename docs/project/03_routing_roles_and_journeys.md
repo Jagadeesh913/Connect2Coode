@@ -148,3 +148,9 @@ All guard types keep protected/guest decisions closed during `LOADING`. A tempor
 3. **MCQ CRUD**: At `/admin/mcqs`, admin creates MCQ. Marks correct option explicitly. Dispatches `POST /api/v1/admin/mcq`.
 4. **Institution Governance**: At `/admin/institutions`, admin reviews colleges, edits AISHE codes, and toggles active status via `PATCH /api/v1/admin/institutions/{id}/status`.
 5. **DSA Sheet Authoring**: At `/admin/dsa-sheets`, admin creates or edits sheets, top-level sections, and linked-question ordering/status. Existing resource IDs are sent only in edit mode through the learning-sheet save POSTs; successful mutations invalidate the student DSA cache.
+
+## Public Trust and Legal Routes (2026-11-17)
+
+The `MainLayout` exposes eight public, indexable, build-prerendered trust routes: `/privacy`, `/cookies`, `/terms`, `/disclaimer`, `/accessibility`, `/support`, `/data-rights`, and `/copyright`. They require no session, remain available from the global footer, and use centralized metadata plus generated clean-URL static documents. `/data-rights` shows an account-scoped local-data control only when a user is authenticated; the explanatory page itself remains public.
+
+These pages do not create backend contracts. Account deletion, full export/portability, privacy-request case handling, and server retention/deletion remain external dependencies documented in [`12_legal_privacy_and_compliance_audit.md`](12_legal_privacy_and_compliance_audit.md).
