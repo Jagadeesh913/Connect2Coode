@@ -42,3 +42,8 @@ graphify-out/
 test-results/
 playwright-report/
 coverage/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example

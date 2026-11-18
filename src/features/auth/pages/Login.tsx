@@ -480,7 +480,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
   };
 
   const cardElement = (
-    <div className="relative w-full max-w-md bg-neutral-900 border border-white/15 rounded-2xl shadow-[0_25px_70px_rgba(0,0,0,0.95)] p-5 sm:p-8 text-white my-auto max-h-[90vh] overflow-y-auto animate-scale-up">
+    <div className="relative w-full max-w-md bg-transparent border border-white/15 rounded-2xl p-5 sm:p-8 text-white my-auto max-h-[90vh] overflow-y-auto animate-scale-up">
       {/* Close Button */}
       <button
         type="button"
