@@ -45,6 +45,85 @@ interface AuthPageProps {
   onCloseModal?: () => void;
 }
 
+interface OtpCodeInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  hasError: boolean;
+}
+
+const OTP_LENGTH = 6;
+
+const OtpCodeInput: React.FC<OtpCodeInputProps> = ({ value, onChange, hasError }) => {
+  const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const digits = Array.from({ length: OTP_LENGTH }, (_, index) => value[index] || '');
+
+  const updateDigits = (nextDigits: string[]) => onChange(nextDigits.join('').slice(0, OTP_LENGTH));
+
+  const handleChange = (index: number, inputValue: string) => {
+    const enteredDigits = inputValue.replace(/\D/g, '');
+    if (!enteredDigits) {
+      const nextDigits = [...digits];
+      nextDigits[index] = '';
+      updateDigits(nextDigits);
+      return;
+    }
+
+    const nextDigits = [...digits];
+    enteredDigits.slice(0, OTP_LENGTH - index).split('').forEach((digit, offset) => {
+      nextDigits[index + offset] = digit;
+    });
+    updateDigits(nextDigits);
+    inputRefs.current[Math.min(index + enteredDigits.length, OTP_LENGTH - 1)]?.focus();
+  };
+
+  const handleKeyDown = (index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && !digits[index] && index > 0) {
+      event.preventDefault();
+      const nextDigits = [...digits];
+      nextDigits[index - 1] = '';
+      updateDigits(nextDigits);
+      inputRefs.current[index - 1]?.focus();
+    }
+    if (event.key === 'ArrowLeft' && index > 0) inputRefs.current[index - 1]?.focus();
+    if (event.key === 'ArrowRight' && index < OTP_LENGTH - 1) inputRefs.current[index + 1]?.focus();
+  };
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLInputElement>) => {
+    const pastedDigits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, OTP_LENGTH);
+    if (!pastedDigits) return;
+    event.preventDefault();
+    onChange(pastedDigits);
+    inputRefs.current[Math.min(pastedDigits.length, OTP_LENGTH) - 1]?.focus();
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-1.5 sm:gap-2" role="group" aria-label="Six digit verification code">
+      {digits.map((digit, index) => (
+        <input
+          key={index}
+          ref={(element) => { inputRefs.current[index] = element; }}
+          type="text"
+          inputMode="numeric"
+          autoComplete={index === 0 ? 'one-time-code' : 'off'}
+          autoFocus={index === 0}
+          maxLength={1}
+          value={digit}
+          onChange={(event) => handleChange(index, event.target.value)}
+          onKeyDown={(event) => handleKeyDown(index, event)}
+          onPaste={handlePaste}
+          aria-label={`OTP digit ${index + 1} of ${OTP_LENGTH}`}
+          aria-invalid={hasError}
+          className={`h-12 w-full min-w-0 rounded-xl border bg-[#080C16] text-center font-mono text-lg font-bold text-white outline-none transition-all sm:h-14 sm:text-xl ${
+            hasError
+              ? 'border-rose-500 ring-2 ring-rose-500/15'
+              : 'border-slate-700 focus:border-sky-400 focus:ring-4 focus:ring-sky-400/15'
+          }`}
+        />
+      ))}
+    </div>
+  );
+};
+
 export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -444,6 +523,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   id="login-email"
                   data-dialog-initial-focus
                   type="email"
+                  maxLength={254}
                   aria-invalid={Boolean(loginErrors.email)}
                   aria-describedby={loginErrors.email ? 'login-email-error' : undefined}
                   placeholder="Enter email address"
@@ -480,6 +560,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="login-password"
                     type={showPassword ? 'text' : 'password'}
+                    maxLength={128}
                     aria-invalid={Boolean(loginErrors.password)}
                     aria-describedby={loginErrors.password ? 'login-password-error' : undefined}
                     placeholder="Enter password"
@@ -570,6 +651,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="signup-first-name"
                     type="text"
+                    maxLength={50}
                     aria-invalid={Boolean(signupErrors.firstName)}
                     aria-describedby={signupErrors.firstName ? 'signup-first-name-error' : undefined}
                     placeholder="e.g. Venkat"
@@ -586,6 +668,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="signup-last-name"
                     type="text"
+                    maxLength={50}
                     aria-invalid={Boolean(signupErrors.lastName)}
                     aria-describedby={signupErrors.lastName ? 'signup-last-name-error' : undefined}
                     placeholder="e.g. Kaveti"
@@ -604,6 +687,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                 <input
                   id="signup-email"
                   type="email"
+                  maxLength={254}
                   aria-invalid={Boolean(signupErrors.email)}
                   aria-describedby={signupErrors.email ? 'signup-email-error' : undefined}
                   placeholder="e.g. venkat@mailinator.com"
@@ -622,6 +706,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="signup-password"
                     type={showPassword ? 'text' : 'password'}
+                    maxLength={128}
                     aria-invalid={Boolean(signupErrors.password)}
                     aria-describedby={signupErrors.password ? 'signup-password-error' : undefined}
                     placeholder="Create a password (min 6 characters)"
@@ -649,6 +734,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="signup-confirm-password"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    maxLength={128}
                     aria-invalid={Boolean(signupErrors.confirmPassword)}
                     aria-describedby={signupErrors.confirmPassword ? 'signup-confirm-password-error' : undefined}
                     placeholder="Confirm your password"
@@ -731,6 +817,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                   <input
                     id="forgot-email-input"
                     type="email"
+                    maxLength={254}
                     placeholder="Enter registered email"
                     value={forgotEmail}
                     aria-invalid={Boolean(forgotOtpError)}
@@ -779,24 +866,23 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
               /* STEP 2: Verify OTP & Reset Password with Full Validation */
               <form onSubmit={handleVerifyForgotOtpAndReset} className="flex flex-col gap-3.5">
                 {/* 6-Digit OTP */}
-                <div className="flex flex-col gap-1">
-                  <label htmlFor="forgot-otp-input" className="text-xs font-semibold text-gray-200">6-Digit OTP Code *</label>
-                  <input
-                    id="forgot-otp-input"
-                    type="text"
-                    maxLength={6}
-                    autoFocus
-                    placeholder="e.g. 550865"
-                    aria-invalid={Boolean(forgotCodeError)}
-                    aria-describedby={forgotCodeError ? 'forgot-otp-error' : undefined}
+                <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-500/10 via-indigo-500/5 to-transparent p-4 sm:p-5">
+                  <div className="mb-4 flex items-start gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-sky-300/20 bg-sky-400/10 text-sky-300">
+                      <i className="fa-solid fa-shield-halved text-sm" aria-hidden="true"></i>
+                    </div>
+                    <div>
+                      <h2 className="text-sm font-bold text-white">Check your inbox</h2>
+                      <p className="mt-0.5 text-xs leading-relaxed text-slate-400">Enter the six-digit security code. You can paste the whole code at once.</p>
+                    </div>
+                  </div>
+                  <OtpCodeInput
                     value={forgotOtpCode}
-                    onChange={(e) => {
-                      setForgotOtpCode(e.target.value.replace(/\D/g, ''));
+                    hasError={Boolean(forgotCodeError)}
+                    onChange={(nextValue) => {
+                      setForgotOtpCode(nextValue);
                       if (forgotCodeError) setForgotCodeError('');
                     }}
-                    className={`w-full bg-neutral-950 border ${
-                      forgotCodeError ? 'border-rose-500 focus:border-rose-500' : 'border-white/15 focus:border-neutral-600'
-                    } text-base text-center tracking-widest font-mono text-white placeholder-gray-600 px-3 py-2 rounded-lg outline-none`}
                   />
                   <FormFieldError id="forgot-otp-error" error={forgotCodeError} />
                 </div>
@@ -808,6 +894,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     <input
                       id="forgot-new-password"
                       type={showNewPassword ? 'text' : 'password'}
+                      maxLength={128}
                       placeholder="Enter new password (min 6 characters)"
                       aria-invalid={Boolean(forgotNewPasswordError)}
                       aria-describedby={forgotNewPasswordError ? 'forgot-new-password-error' : undefined}
@@ -839,6 +926,7 @@ export const Login: React.FC<AuthPageProps> = ({ defaultMode, onCloseModal }) =>
                     <input
                       id="forgot-confirm-password"
                       type={showNewConfirmPassword ? 'text' : 'password'}
+                      maxLength={128}
                       placeholder="Re-enter new password"
                       aria-invalid={Boolean(forgotConfirmPasswordError)}
                       aria-describedby={forgotConfirmPasswordError ? 'forgot-confirm-password-error' : undefined}

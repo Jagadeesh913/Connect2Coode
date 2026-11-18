@@ -9,6 +9,16 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const optionalString = (value: unknown): string | null | undefined =>
   value === null || value === undefined ? value : typeof value === 'string' ? value : undefined;
 
+const MAX_MCQ_SEARCH_LENGTH = 120;
+
+const normalizeMcqSearch = (value: string | undefined): string => {
+  const trimmed = value?.trim() ?? '';
+  if (trimmed.length > MAX_MCQ_SEARCH_LENGTH) {
+    throw new Error(`Question search cannot exceed ${MAX_MCQ_SEARCH_LENGTH} characters`);
+  }
+  return trimmed;
+};
+
 const mapMcqQuestion = (value: unknown): McqQuestion => {
   if (
     !isRecord(value) ||
@@ -108,7 +118,10 @@ const mapMcqPage = (value: unknown): ApiPage<McqQuestion> => {
 
 export const mcqService = {
   async getMcqList(payload: McqQueryPayload, signal?: AbortSignal): Promise<ApiResponse<ApiPage<McqQuestion>>> {
-    const response: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.MCQ.LIST, payload, { signal });
+    const response: ApiResponse<unknown> = await apiClient.post(API_ENDPOINTS.MCQ.LIST, {
+      ...payload,
+      searchText: normalizeMcqSearch(payload.searchText),
+    }, { signal });
     return { ...response, data: mapMcqPage(response.data) };
   },
 

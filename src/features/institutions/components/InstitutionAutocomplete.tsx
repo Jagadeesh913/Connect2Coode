@@ -217,6 +217,7 @@ export const InstitutionAutocomplete: React.FC<InstitutionAutocompleteProps> = (
           value={inputValue}
           disabled={disabled}
           placeholder={placeholder}
+          maxLength={160}
           autoComplete="off"
           onChange={handleInputChange}
           onFocus={() => {

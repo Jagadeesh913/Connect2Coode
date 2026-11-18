@@ -168,6 +168,7 @@ export const AdminDashboard: React.FC = () => {
                   level: [item.id],
                   companies: null,
                   topic: null,
+                  questionPlatform: null,
                   searchText: null,
                   pageRequest: {
                     pageNumber: 0,

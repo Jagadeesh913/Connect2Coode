@@ -3,6 +3,8 @@ import { API_ENDPOINTS } from '../core/api/endpoints';
 import type { ApiResponse } from '../core/types/api';
 import type { Institution, InstitutionOptionDTO } from '../core/types/domain';
 
+const MAX_INSTITUTION_SEARCH_LENGTH = 160;
+
 /**
  * Institution Service Layer (Authenticated Profile Autocomplete)
  * Base URL: /api/v1/institutions
@@ -24,6 +26,9 @@ export const institutionService = {
         message: 'Query requires at least 3 characters',
         data: [],
       };
+    }
+    if (trimmed.length > MAX_INSTITUTION_SEARCH_LENGTH) {
+      throw new Error(`Institution search cannot exceed ${MAX_INSTITUTION_SEARCH_LENGTH} characters`);
     }
 
     try {

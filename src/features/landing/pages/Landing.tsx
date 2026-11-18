@@ -83,22 +83,22 @@ export const Landing: React.FC = () => {
         quote:
           'Build a consistent problem-solving routine with topic-based practice and progress tracking.',
         name: 'Practice workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_sravanthi.png',
+        role: 'Topic-planning workflow',
+        avatar: '/learner-workflow-anika.jpg',
       },
       {
         quote:
           'Focus placement preparation with company-specific question catalogs and aptitude practice.',
         name: 'Placement workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_akhil.png',
+        role: 'Placement-prep workflow',
+        avatar: '/learner-workflow-arjun.jpg',
       },
       {
         quote:
           'Use the coding workspace and API-provided language catalog to practice implementation skills.',
         name: 'Coding workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_meghana.png',
+        role: 'Implementation workflow',
+        avatar: '/learner-workflow-naina.jpg',
       },
     ],
     // Slide 2
@@ -107,22 +107,22 @@ export const Landing: React.FC = () => {
         quote:
           'Follow learning sheets in sequence and revisit completed sections while preparing for interviews.',
         name: 'Learning-sheet workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_student1.png',
+        role: 'Structured-learning workflow',
+        avatar: '/learner-workflow-anika.jpg',
       },
       {
         quote:
           'Review company-associated coding and aptitude questions without treating them as guaranteed interview content.',
         name: 'Company-prep workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_student2.png',
+        role: 'Company-research workflow',
+        avatar: '/learner-workflow-arjun.jpg',
       },
       {
         quote:
           'Filter the question bank by topic and difficulty to plan a focused practice session.',
         name: 'Catalog workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_student3.png',
+        role: 'Focused-practice workflow',
+        avatar: '/learner-workflow-naina.jpg',
       },
     ],
     // Slide 3
@@ -131,22 +131,22 @@ export const Landing: React.FC = () => {
         quote:
           'Combine aptitude and coding practice from one authenticated learner workspace.',
         name: 'Combined-practice workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_student4.png',
+        role: 'Balanced-prep workflow',
+        avatar: '/learner-workflow-anika.jpg',
       },
       {
         quote:
           'Review backend-provided problem details, examples, constraints, and submission history when available.',
         name: 'Review workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_akhil.png',
+        role: 'Problem-review workflow',
+        avatar: '/learner-workflow-arjun.jpg',
       },
       {
         quote:
           'Run visible examples during practice and submit against the server-owned evaluation contract.',
         name: 'Evaluation workflow',
-        role: 'Illustrative learner scenario',
-        avatar: '/avatar_sravanthi.png',
+        role: 'Submission workflow',
+        avatar: '/learner-workflow-naina.jpg',
       },
     ],
   ];
@@ -930,7 +930,7 @@ export const Landing: React.FC = () => {
                         <img
                           src={item.avatar}
                           alt={item.name}
-                          className="w-10 h-10 rounded-full object-cover ring-2 ring-slate-200 dark:ring-slate-700"
+                          className="h-12 w-12 rounded-full object-cover object-center ring-2 ring-slate-200 dark:ring-slate-700"
                         />
                         <div className="flex flex-col text-left">
                           <span className="text-xs font-bold text-slate-900 dark:text-white">{item.name}</span>

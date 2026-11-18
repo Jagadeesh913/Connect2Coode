@@ -88,6 +88,7 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.throws(() => emailRule.parse('   '), /Enter your email address/);
       assert.throws(() => emailRule.parse('not-an-email'), /Enter a valid email address/);
       assert.throws(() => emailRule.parse('missingdomain@'), /Enter a valid email address/);
+      assert.throws(() => emailRule.parse(`${'a'.repeat(245)}@example.com`), /cannot exceed 254 characters/);
     });
 
     it('passwordRule enforces production minimum 6 characters', () => {
@@ -95,6 +96,7 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.doesNotThrow(() => passwordRule.parse('secret'));
       assert.throws(() => passwordRule.parse(''), /Enter your password/);
       assert.throws(() => passwordRule.parse('12345'), /at least 6 characters/);
+      assert.throws(() => passwordRule.parse('a'.repeat(129)), /cannot exceed 128 characters/);
     });
 
     it('nameRule supports international characters, accents, hyphens, and apostrophes', () => {
@@ -107,6 +109,7 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.throws(() => nameRule('First Name').parse(''), /Enter your first name/);
       assert.throws(() => nameRule('First Name').parse('A'), /must be at least 2 characters/);
       assert.throws(() => nameRule('First Name').parse('12345'), /should contain only letters/);
+      assert.throws(() => nameRule('First Name').parse('a'.repeat(51)), /cannot exceed 50 characters/);
     });
 
     it('optionalPhoneRule validates realistic phone formats when provided', () => {
@@ -196,6 +199,12 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
         newPassword: 'MyNewPassword123',
         confirmNewPassword: 'MismatchPassword',
       }), /Passwords do not match/);
+
+      assert.throws(() => forgotPasswordStep2Schema.parse({
+        otp: '',
+        newPassword: 'MyNewPassword123',
+        confirmNewPassword: 'MyNewPassword123',
+      }), /Enter the 6-digit OTP code/);
     });
   });
 
@@ -237,6 +246,19 @@ describe('PRODUCTION-GRADE VALIDATION & FEEDBACK OVERHAUL', () => {
       assert.equal(parsed.collegeId, 42);
       assert.equal(parsed.genderId, 102);
       assert.equal(parsed.dob, '2002-01-01');
+
+      assert.throws(
+        () => academicDetailsSchema.parse({ ...parsed, dob: '2024-02-30' }),
+        /valid date of birth/
+      );
+      assert.throws(
+        () => academicDetailsSchema.parse({ ...parsed, dob: '2999-01-01' }),
+        /valid date of birth/
+      );
+      assert.throws(
+        () => academicDetailsSchema.parse({ ...parsed, regNumber: 'A'.repeat(65) }),
+        /cannot exceed 64 characters/
+      );
     });
 
     it('institutionSelectionSchema requires selecting a valid institution', () => {

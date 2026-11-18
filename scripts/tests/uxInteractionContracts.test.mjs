@@ -253,8 +253,8 @@ describe('shared UX interaction contracts', () => {
     assert.match(source, /difficulty: difficultyIds/);
     assert.match(source, /topic: topicIds/);
     assert.match(source, /companies: companyIds/);
-    assert.doesNotMatch(source, /platform: platformIds/);
-    assert.doesNotMatch(source, /fetchReferenceGroup\('QPF'\)/);
+    assert.match(source, /questionPlatform: platformIds/);
+    assert.match(source, /fetchReferenceGroup\('QPF'\)/);
     assert.match(source, /const hasUnresolvedFilters = useMemo/);
     assert.match(source, /dispatch\(invalidateCompanyList\(\)\)/);
     assert.match(

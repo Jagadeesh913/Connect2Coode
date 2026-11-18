@@ -1,5 +1,9 @@
 import { z } from 'zod';
 
+export const MAX_EMAIL_LENGTH = 254;
+export const MAX_PASSWORD_LENGTH = 128;
+export const MAX_NAME_LENGTH = 50;
+
 /**
  * Standard Email Validator
  * Allows real-world standard emails (RFC 5322 compliant characters including +, subdomains)
@@ -11,6 +15,7 @@ export const emailRule = z
   .string()
   .trim()
   .min(1, 'Enter your email address.')
+  .max(MAX_EMAIL_LENGTH, `Email address cannot exceed ${MAX_EMAIL_LENGTH} characters.`)
   .regex(emailRegex, 'Enter a valid email address, for example, name@example.com.');
 
 /**
@@ -20,7 +25,8 @@ export const emailRule = z
 export const passwordRule = z
   .string()
   .min(1, 'Enter your password.')
-  .min(6, 'Password must be at least 6 characters long.');
+  .min(6, 'Password must be at least 6 characters long.')
+  .max(MAX_PASSWORD_LENGTH, `Password cannot exceed ${MAX_PASSWORD_LENGTH} characters.`);
 
 /**
  * International Name Validator
@@ -36,6 +42,7 @@ export const nameRule = (fieldName: string, minLength = 2) =>
     .trim()
     .min(1, `Enter your ${fieldName.toLowerCase()}.`)
     .min(minLength, `${fieldName} must be at least ${minLength} characters.`)
+    .max(MAX_NAME_LENGTH, `${fieldName} cannot exceed ${MAX_NAME_LENGTH} characters.`)
     .refine((val) => nameRegex.test(val), {
       message: `${fieldName} should contain only letters, spaces, hyphens, or apostrophes.`,
     });

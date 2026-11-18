@@ -32,6 +32,7 @@ describe('adminQuestionService unit tests', () => {
         level: null,
         companies: null,
         topic: null,
+        questionPlatform: null,
         searchText: null,
         pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
@@ -70,6 +71,7 @@ describe('adminQuestionService unit tests', () => {
           level: null,
           companies: null,
           topic: null,
+          questionPlatform: null,
           searchText: null,
           pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
         })

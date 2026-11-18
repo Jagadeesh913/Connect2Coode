@@ -4,6 +4,7 @@
 /* Centralized Design System Design Tokens */
 :root {
   --c2c-navbar-height: 4rem;
+  --c2c-page-width: 94%;
   /* Fonts */
   --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
@@ -181,6 +182,15 @@ body {
 
 .c2c-pill {
   border-radius: var(--radius-full);
+}
+
+/*
+ * The standard wide page container is used by the application shell, header,
+ * footer, loading states, and feature pages.  Keep its outside gutter at 3%
+ * on both sides rather than capping desktop content at the old 80rem width.
+ */
+.max-w-7xl {
+  max-width: var(--c2c-page-width);
 }
 
 /* Subtle Ambient Glows */

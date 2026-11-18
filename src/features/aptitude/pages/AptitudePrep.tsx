@@ -1348,6 +1348,7 @@ export const AptitudePrep: React.FC<AptitudePrepProps> = ({ defaultCategory }) =
                 <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm"></i>
                 <input
                   type="text"
+                  maxLength={120}
                   value={draftSearch}
                   onChange={(e) => setDraftSearch(e.target.value)}
                   placeholder={`Search ${SUBJECT_CONFIG[activeSubject].label} questions by keyword...`}

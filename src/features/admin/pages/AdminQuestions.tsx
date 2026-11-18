@@ -48,26 +48,29 @@ export const AdminQuestions: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Reference Library & Companies Data for Filters
   const difficultyQuery = useReferenceGroup('DIFF');
   const topicQuery = useReferenceGroup('TOPIC');
+  const platformQuery = useReferenceGroup('QPF');
   const difficulties = difficultyQuery.items;
   const topics = topicQuery.items;
-  const { items: qpfs } = useReferenceGroup('QPF');
+  const qpfs = platformQuery.items;
   const [companies, setCompanies] = useState<CompanyItem[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
   const [companiesError, setCompaniesError] = useState<string | null>(null);
   const [companiesRetry, setCompaniesRetry] = useState(0);
-  const filterOptionsPending = difficultyQuery.loading || topicQuery.loading || companiesLoading;
-  const filterOptionsError = difficultyQuery.error || topicQuery.error || companiesError;
+  const filterOptionsPending = difficultyQuery.loading || topicQuery.loading || platformQuery.loading || companiesLoading;
+  const filterOptionsError = difficultyQuery.error || topicQuery.error || platformQuery.error || companiesError;
 
   const retryFilterOptions = useCallback(() => {
     if (difficultyQuery.error) void difficultyQuery.retry();
     if (topicQuery.error) void topicQuery.retry();
+    if (platformQuery.error) void platformQuery.retry();
     if (companiesError) setCompaniesRetry((attempt) => attempt + 1);
-  }, [companiesError, difficultyQuery, topicQuery]);
+  }, [companiesError, difficultyQuery, topicQuery, platformQuery]);
 
   // Modals State
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -136,12 +139,14 @@ export const AdminQuestions: React.FC = () => {
       const levelArr: number[] | null = selectedDifficulty && !isNaN(Number(selectedDifficulty)) ? [Number(selectedDifficulty)] : null;
       const topicArr: number[] | null = selectedTopic && !isNaN(Number(selectedTopic)) ? [Number(selectedTopic)] : null;
       const compArr: number[] | null = selectedCompany && !isNaN(Number(selectedCompany)) ? [Number(selectedCompany)] : null;
+      const platformArr: number[] | null = selectedPlatform && !isNaN(Number(selectedPlatform)) ? [Number(selectedPlatform)] : null;
 
       const res = await adminQuestionService.getQuestions(
         {
           level: levelArr,
           companies: compArr,
           topic: topicArr,
+          questionPlatform: platformArr,
           searchText: debouncedSearch.trim() ? debouncedSearch.trim() : null,
           pageRequest: {
             pageNumber,
@@ -188,7 +193,7 @@ export const AdminQuestions: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [pageNumber, pageSize, selectedDifficulty, selectedTopic, selectedCompany, debouncedSearch]);
+  }, [pageNumber, pageSize, selectedDifficulty, selectedTopic, selectedCompany, selectedPlatform, debouncedSearch]);
 
   useEffect(() => {
     fetchQuestions();
@@ -626,6 +631,23 @@ export const AdminQuestions: React.FC = () => {
               ...difficulties.map((d) => ({ value: String(d.id), label: d.refName })),
             ]}
             aria-label="Filter questions by difficulty"
+            className="w-full sm:w-40"
+            buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
+          />
+
+          {/* Platform */}
+          <C2CSelect
+            value={selectedPlatform}
+            onChange={(val) => {
+              setSelectedPlatform(val);
+              setPageNumber(0);
+            }}
+            disabled={platformQuery.loading || (qpfs.length === 0 && Boolean(platformQuery.error))}
+            options={[
+              { value: '', label: 'All Platforms' },
+              ...qpfs.map((platform) => ({ value: String(platform.id), label: platform.refName })),
+            ]}
+            aria-label="Filter questions by platform"
             className="w-full sm:w-40"
             buttonClassName="rounded-xl px-3 py-2 text-xs font-semibold border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 text-slate-800 dark:text-white"
           />

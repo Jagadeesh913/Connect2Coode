@@ -126,6 +126,7 @@ export interface ProblemFilter {
   searchText?: string | null;
   company?: number[] | string[] | (number | string)[] | string | number | null;
   companies?: number[] | string[] | (number | string)[] | null;
+  questionPlatform?: number[] | string[] | (number | string)[] | string | number | null;
   page?: number;
   limit?: number;
 }
@@ -206,6 +207,7 @@ export interface QuestionListRequest {
   level: number[] | null;
   companies: number[] | null;
   topic: number[] | null;
+  questionPlatform: number[] | null;
   searchText: string | null;
   pageRequest: PageRequest;
 }

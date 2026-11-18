@@ -62,6 +62,7 @@ export const PracticePage: React.FC = () => {
   const selectedTopics = useMemo(() => parseListParam(searchParams.get('topic')), [searchParams]);
   const selectedDifficulties = useMemo(() => parseListParam(searchParams.get('difficulty')), [searchParams]);
   const selectedCompanies = useMemo(() => parseListParam(searchParams.get('company')), [searchParams]);
+  const selectedPlatforms = useMemo(() => parseListParam(searchParams.get('platform')), [searchParams]);
   const rawPage = searchParams.get('page');
   const parsedPage = Number(rawPage || '1');
   const currentPage = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
@@ -70,6 +71,7 @@ export const PracticePage: React.FC = () => {
   const [draftDifficulties, setDraftDifficulties] = useState<string[]>(selectedDifficulties);
   const [draftTopics, setDraftTopics] = useState<string[]>(selectedTopics);
   const [draftCompanies, setDraftCompanies] = useState<string[]>(selectedCompanies);
+  const [draftPlatforms, setDraftPlatforms] = useState<string[]>(selectedPlatforms);
   const [searchInput, setSearchInput] = useState(searchInputParam);
 
   // In-filter search inputs
@@ -94,6 +96,10 @@ export const PracticePage: React.FC = () => {
   }, [selectedCompanies]);
 
   useEffect(() => {
+    setDraftPlatforms(selectedPlatforms);
+  }, [selectedPlatforms]);
+
+  useEffect(() => {
     setSearchInput(searchInputParam);
   }, [searchInputParam]);
 
@@ -102,12 +108,14 @@ export const PracticePage: React.FC = () => {
     count += selectedDifficulties.length;
     count += selectedTopics.length;
     count += selectedCompanies.length;
+    count += selectedPlatforms.length;
     if (searchInputParam.trim()) count++;
     return count;
   }, [
     selectedDifficulties,
     selectedTopics,
     selectedCompanies,
+    selectedPlatforms,
     searchInputParam,
   ]);
 
@@ -116,9 +124,10 @@ export const PracticePage: React.FC = () => {
     count += draftDifficulties.length;
     count += draftTopics.length;
     count += draftCompanies.length;
+    count += draftPlatforms.length;
     if (searchInput.trim()) count++;
     return count;
-  }, [draftDifficulties, draftTopics, draftCompanies, searchInput]);
+  }, [draftDifficulties, draftTopics, draftCompanies, draftPlatforms, searchInput]);
 
   const hasUnappliedChanges = useMemo(() => {
     if (searchInput.trim() !== searchInputParam) return true;
@@ -140,6 +149,12 @@ export const PracticePage: React.FC = () => {
     ) {
       return true;
     }
+    if (
+      draftPlatforms.length !== selectedPlatforms.length ||
+      !draftPlatforms.every((platform) => selectedPlatforms.includes(platform))
+    ) {
+      return true;
+    }
     return false;
   }, [
     draftDifficulties,
@@ -148,6 +163,8 @@ export const PracticePage: React.FC = () => {
     selectedTopics,
     draftCompanies,
     selectedCompanies,
+    draftPlatforms,
+    selectedPlatforms,
     searchInput,
     searchInputParam,
   ]);
@@ -188,6 +205,7 @@ export const PracticePage: React.FC = () => {
   // Reference groups from API
   const apiDifficulties: ReferenceItem[] = referenceGroups.DIFF ?? EMPTY_REFERENCES;
   const apiTopics: ReferenceItem[] = referenceGroups.TOPIC ?? EMPTY_REFERENCES;
+  const apiPlatforms: ReferenceItem[] = referenceGroups.QPF ?? EMPTY_REFERENCES;
   const apiCompanies = serverCompanies ?? EMPTY_COMPANIES;
 
   // Sort difficulties: Row 1 = Basic, Easy; Row 2 = Medium, Hard
@@ -252,12 +270,28 @@ export const PracticePage: React.FC = () => {
     return ids;
   }, [selectedCompanies, apiCompanies]);
 
+  const resolvedPlatformIds = useMemo(() => {
+    const ids = new Set<number>();
+    selectedPlatforms.forEach((val) => {
+      if (isPositiveIntegerId(val)) ids.add(Number(val));
+      const found = apiPlatforms.find(
+        (platform) =>
+          platform.refName.toLowerCase() === val.toLowerCase() ||
+          platform.refCode?.toLowerCase() === val.toLowerCase()
+      );
+      if (found?.id !== undefined && !isNaN(Number(found.id))) ids.add(Number(found.id));
+    });
+    return ids;
+  }, [selectedPlatforms, apiPlatforms]);
+
   const difficultyIdsKey = Array.from(resolvedDifficultyIds).join(',');
   const topicIdsKey = Array.from(resolvedTopicIds).join(',');
   const companyIdsKey = Array.from(resolvedCompanyIds).join(',');
+  const platformIdsKey = Array.from(resolvedPlatformIds).join(',');
   const difficultyIds = useMemo(() => difficultyIdsKey ? difficultyIdsKey.split(',').map(Number) : [], [difficultyIdsKey]);
   const topicIds = useMemo(() => topicIdsKey ? topicIdsKey.split(',').map(Number) : [], [topicIdsKey]);
   const companyIds = useMemo(() => companyIdsKey ? companyIdsKey.split(',').map(Number) : [], [companyIdsKey]);
+  const platformIds = useMemo(() => platformIdsKey ? platformIdsKey.split(',').map(Number) : [], [platformIdsKey]);
 
   const [hasFetchedOnce, setHasFetchedOnce] = useState(false);
 
@@ -266,6 +300,7 @@ export const PracticePage: React.FC = () => {
     if (!isAuthenticated) return;
     dispatch(fetchReferenceGroup('DIFF'));
     dispatch(fetchReferenceGroup('TOPIC'));
+    dispatch(fetchReferenceGroup('QPF'));
     dispatch(fetchCompanies(undefined));
   }, [dispatch, isAuthenticated]);
 
@@ -298,6 +333,15 @@ export const PracticePage: React.FC = () => {
           item.slug?.toLowerCase() === val.toLowerCase()
       )
   );
+  const hasUnresolvedPlatform = selectedPlatforms.some(
+    (val) =>
+      !isPositiveIntegerId(val) &&
+      !apiPlatforms.some(
+        (item) =>
+          item.refName.toLowerCase() === val.toLowerCase() ||
+          item.refCode?.toLowerCase() === val.toLowerCase()
+      )
+  );
 
   const hasPendingFilterResolution = useMemo(() => {
     if (
@@ -306,6 +350,7 @@ export const PracticePage: React.FC = () => {
     ) return true;
     if (hasUnresolvedTopic && (referenceLoading['TOPIC'] || (!referenceGroups['TOPIC'] && !referenceErrors['TOPIC']))) return true;
     if (hasUnresolvedCompany && (companiesLoading || (serverCompanies.length === 0 && !companiesError))) return true;
+    if (hasUnresolvedPlatform && (referenceLoading.QPF || (!referenceGroups.QPF && !referenceErrors.QPF))) return true;
 
     return false;
   }, [
@@ -315,6 +360,7 @@ export const PracticePage: React.FC = () => {
     referenceErrors,
     hasUnresolvedTopic,
     hasUnresolvedCompany,
+    hasUnresolvedPlatform,
     companiesLoading,
     serverCompanies,
     companiesError,
@@ -323,12 +369,13 @@ export const PracticePage: React.FC = () => {
   const hasUnresolvedFilters = useMemo(
     () =>
       !hasPendingFilterResolution &&
-      (hasUnresolvedDifficulty || hasUnresolvedTopic || hasUnresolvedCompany),
+      (hasUnresolvedDifficulty || hasUnresolvedTopic || hasUnresolvedCompany || hasUnresolvedPlatform),
     [
       hasPendingFilterResolution,
       hasUnresolvedDifficulty,
       hasUnresolvedTopic,
       hasUnresolvedCompany,
+      hasUnresolvedPlatform,
     ]
   );
 
@@ -340,8 +387,9 @@ export const PracticePage: React.FC = () => {
       difficulty: difficultyIds,
       topic: topicIds,
       companies: companyIds,
+      questionPlatform: platformIds,
     });
-  }, [currentPage, pageSize, searchInputParam, difficultyIds, topicIds, companyIds]);
+  }, [currentPage, pageSize, searchInputParam, difficultyIds, topicIds, companyIds, platformIds]);
 
   const [fulfilledKey, setFulfilledKey] = useState<string | null>(null);
 
@@ -367,6 +415,7 @@ export const PracticePage: React.FC = () => {
         difficulty: difficultyIds,
         topic: topicIds,
         companies: companyIds,
+        questionPlatform: platformIds,
       })
     );
 
@@ -394,6 +443,7 @@ export const PracticePage: React.FC = () => {
     difficultyIds,
     topicIds,
     companyIds,
+    platformIds,
     hasPendingFilterResolution,
     hasUnresolvedFilters,
     currentRequestKey,
@@ -430,6 +480,15 @@ export const PracticePage: React.FC = () => {
     });
   };
 
+  const handlePlatformClick = (platformVal: string) => {
+    setDraftPlatforms((prev) => {
+      const isAlready = prev.some((platform) => platform.toLowerCase() === platformVal.toLowerCase());
+      return isAlready
+        ? prev.filter((platform) => platform.toLowerCase() !== platformVal.toLowerCase())
+        : [...prev, platformVal];
+    });
+  };
+
   const handleClearDifficultyDraft = () => {
     setDraftDifficulties([]);
   };
@@ -442,6 +501,10 @@ export const PracticePage: React.FC = () => {
     setDraftCompanies([]);
   };
 
+  const handleClearPlatformDraft = () => {
+    setDraftPlatforms([]);
+  };
+
   // APPLY FILTERS: Commits all staged filters to URL and triggers backend API call
   const handleApplyFilters = () => {
     const trimmed = searchInput.trim();
@@ -450,6 +513,7 @@ export const PracticePage: React.FC = () => {
       difficulty: draftDifficulties.length > 0 ? draftDifficulties.join(',') : null,
       topic: draftTopics.length > 0 ? draftTopics.join(',') : null,
       company: draftCompanies.length > 0 ? draftCompanies.join(',') : null,
+      platform: draftPlatforms.length > 0 ? draftPlatforms.join(',') : null,
       page: '1',
     });
     if (isMobileFilterOpen) {
@@ -466,6 +530,7 @@ export const PracticePage: React.FC = () => {
     setDraftDifficulties([]);
     setDraftTopics([]);
     setDraftCompanies([]);
+    setDraftPlatforms([]);
     setSearchInput('');
     setSearchParams(new URLSearchParams(), { replace: true, preventScrollReset: true });
     dispatch(resetFilters());
@@ -481,6 +546,9 @@ export const PracticePage: React.FC = () => {
     if (hasUnresolvedCompany) {
       dispatch(invalidateCompanyList());
       dispatch(fetchCompanies(undefined));
+    }
+    if (hasUnresolvedPlatform) {
+      dispatch(fetchReferenceGroup({ groupCode: 'QPF', force: true }));
     }
   };
 
@@ -507,6 +575,15 @@ export const PracticePage: React.FC = () => {
     setDraftCompanies(next);
     updatePracticeParams({
       company: next.length > 0 ? next.join(',') : null,
+      page: '1',
+    });
+  };
+
+  const removeAppliedPlatform = (val: string) => {
+    const next = selectedPlatforms.filter((platform) => platform.toLowerCase() !== val.toLowerCase());
+    setDraftPlatforms(next);
+    updatePracticeParams({
+      platform: next.length > 0 ? next.join(',') : null,
       page: '1',
     });
   };
@@ -605,6 +682,7 @@ export const PracticePage: React.FC = () => {
             <i className="fa-solid fa-magnifying-glass text-slate-400 text-sm absolute left-5 top-1/2 -translate-y-1/2"></i>
             <input
               type="text"
+              maxLength={120}
               placeholder="Search problems by title or keywords..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -745,6 +823,32 @@ export const PracticePage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => removeAppliedCompany(val)}
+                    className="hover:text-rose-500 transition-colors cursor-pointer"
+                    title={`Remove ${label}`}
+                  >
+                    <i className="fa-solid fa-xmark text-[10px]"></i>
+                  </button>
+                </span>
+              );
+            })}
+
+            {selectedPlatforms.map((val) => {
+              const label =
+                apiPlatforms.find(
+                  (platform) =>
+                    String(platform.id) === val ||
+                    platform.refName.toLowerCase() === val.toLowerCase() ||
+                    platform.refCode?.toLowerCase() === val.toLowerCase()
+                )?.refName || val;
+              return (
+                <span
+                  key={`platform-${val}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-2xs"
+                >
+                  <span>{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAppliedPlatform(val)}
                     className="hover:text-rose-500 transition-colors cursor-pointer"
                     title={`Remove ${label}`}
                   >
@@ -1049,6 +1153,56 @@ export const PracticePage: React.FC = () => {
                     {showMoreCompanies ? 'Show Less ∧' : `Show All (${filteredCompanies.length}) ∨`}
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Platforms Section from API */}
+            {apiPlatforms.length > 0 && (
+              <div className="flex flex-col gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 dark:text-white">Platform</span>
+                  {draftPlatforms.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearPlatformDraft}
+                      className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 max-h-48 overflow-y-auto no-scrollbar">
+                  {apiPlatforms.map((platform) => {
+                    const isSelected = draftPlatforms.some(
+                      (value) =>
+                        value === String(platform.id) ||
+                        value.toLowerCase() === platform.refName.toLowerCase() ||
+                        value.toLowerCase() === platform.refCode?.toLowerCase()
+                    );
+                    return (
+                      <button
+                        type="button"
+                        key={platform.id}
+                        onClick={() => handlePlatformClick(String(platform.id))}
+                        aria-pressed={isSelected}
+                        className="flex w-full items-center justify-between text-left text-xs py-1 px-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 truncate">
+                          <span
+                            className={`w-3.5 h-3.5 rounded flex items-center justify-center border shrink-0 ${
+                              isSelected
+                                ? 'bg-blue-600 border-blue-600 text-white'
+                                : 'border-slate-300 dark:border-slate-600'
+                            }`}
+                          >
+                            {isSelected && <i className="fa-solid fa-check text-[9px]"></i>}
+                          </span>
+                          <span className="truncate">{platform.refName}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

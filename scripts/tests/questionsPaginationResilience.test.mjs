@@ -351,13 +351,14 @@ describe('Questions API pagination contract', () => {
         topic: ['9', 'invalid'],
         companies: [4],
         searchText: '  arrays  ',
-        platform: [7],
+        questionPlatform: [7],
       });
 
       assert.deepEqual(capturedPayload, {
         level: [3],
         companies: [4],
         topic: [9],
+        questionPlatform: [7],
         searchText: 'arrays',
         pageRequest: {
           pageNumber: 1,
@@ -367,9 +368,9 @@ describe('Questions API pagination contract', () => {
         },
       });
       assert.equal(
-        Object.hasOwn(capturedPayload, 'platform'),
-        false,
-        'QPF metadata is not a documented POST /questions filter field'
+        Object.hasOwn(capturedPayload, 'questionPlatform'),
+        true,
+        'POST /questions accepts QPF reference IDs through questionPlatform'
       );
     } finally {
       apiClient.post = originalPost;

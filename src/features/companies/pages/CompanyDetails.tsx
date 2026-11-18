@@ -793,6 +793,7 @@ export const CompanyDetails: React.FC = () => {
               <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xs sm:text-sm"></i>
               <input
                 type="text"
+                maxLength={120}
                 placeholder={`Search ${currentSectionConfig.label} questions by title, tags or keywords...`}
                 value={questionSearch}
                 onChange={(e) => {

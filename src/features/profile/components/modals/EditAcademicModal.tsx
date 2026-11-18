@@ -193,6 +193,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
                   <input
                     id="academic-first-name"
                     type="text"
+                    maxLength={50}
                     placeholder="e.g. Uday"
                     aria-invalid={Boolean(errors.firstName)}
                     aria-describedby={errors.firstName ? 'academic-first-name-error' : undefined}
@@ -218,6 +219,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
                   <input
                     id="academic-last-name"
                     type="text"
+                    maxLength={50}
                     placeholder="e.g. Kumar"
                     aria-invalid={Boolean(errors.lastName)}
                     aria-describedby={errors.lastName ? 'academic-last-name-error' : undefined}
@@ -336,6 +338,7 @@ export const EditAcademicModal: React.FC<EditAcademicModalProps> = ({
                 <input
                   id="academic-reg-number"
                   type="text"
+                  maxLength={64}
                   placeholder="e.g. 231FA07084"
                   aria-invalid={Boolean(errors.regNumber)}
                   aria-describedby={errors.regNumber ? 'academic-reg-number-error' : undefined}

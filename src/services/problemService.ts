@@ -9,6 +9,17 @@ import { fetchQuestionPage } from './admin/adminQuestionService';
 export type ProblemItem = Problem;
 export type ProblemFilterParams = ProblemFilter;
 
+const MAX_PROBLEM_SEARCH_LENGTH = 120;
+
+const normalizeProblemSearch = (value: string | null | undefined): string | null => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > MAX_PROBLEM_SEARCH_LENGTH) {
+    throw new Error(`Problem search cannot exceed ${MAX_PROBLEM_SEARCH_LENGTH} characters`);
+  }
+  return trimmed;
+};
+
 export function parseToIdList(raw: unknown): number[] | null {
   if (raw === undefined || raw === null || raw === '' || raw === 'All' || raw === 'all') {
     return null;
@@ -33,17 +44,15 @@ export const problemService = {
     const levelArr = parseToIdList(params.level ?? params.difficulty);
     const topicArr = parseToIdList(params.topic);
     const companiesArr = parseToIdList(params.companies ?? params.company);
+    const platformArr = parseToIdList(params.questionPlatform);
 
-    const rawSearch = params.searchText?.trim()
-      ? params.searchText.trim()
-      : params.search?.trim()
-      ? params.search.trim()
-      : null;
+    const rawSearch = normalizeProblemSearch(params.searchText) ?? normalizeProblemSearch(params.search);
 
     const payload: QuestionListRequest = {
       level: levelArr,
       companies: companiesArr,
       topic: topicArr,
+      questionPlatform: platformArr,
       searchText: rawSearch,
       pageRequest: {
         pageNumber: pageNum,
@@ -130,6 +139,7 @@ export const problemService = {
         level: null,
         companies: null,
         topic: null,
+        questionPlatform: null,
         searchText: null,
         pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' as const },
       }, signal);

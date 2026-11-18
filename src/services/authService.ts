@@ -4,6 +4,12 @@ import { tokenStorage, clearAllReadableCookies } from '../core/security/tokenSto
 import { publishAuthSessionEvent } from '../core/security/authSessionSync';
 import { requireAuthSessionData, type AuthSessionData } from '../core/security/authContract';
 import { userScopedStorage } from '../core/storage/userScopedStorage';
+import {
+  forgotPasswordStep1Schema,
+  loginSchema,
+  signupPayloadSchema,
+  verifyPasswordResetOtpPayloadSchema,
+} from '../core/validation/schemas/authSchemas';
 import type { ApiResponse } from '../core/types/api';
 
 export interface AuthResponseData {
@@ -75,14 +81,17 @@ export const authService = {
   // SignUp: POST /api/v1/signUp (Does NOT require OTP)
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
   async signUp(payload: SignUpPayload & { labelUserName?: string; userName?: string }): Promise<ApiResponse<AuthResponseData>> {
-    const rawLabel = payload.email ? payload.email.split('@')[0] : `${payload.firstName}${payload.lastName}`;
+    const validatedPayload = signupPayloadSchema.parse(payload);
+    const rawLabel = validatedPayload.email.split('@')[0] || `${validatedPayload.firstName}${validatedPayload.lastName}`;
     const sanitizedLabel = rawLabel.replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || `user${Date.now()}`;
 
     const requestPayload = {
-      ...payload,
+      ...validatedPayload,
       role: 'USER' as const,
-      labelUserName: payload.labelUserName || sanitizedLabel,
-      userName: payload.userName || sanitizedLabel,
+      // These backend-required aliases are derived from validated identity data.
+      // Do not accept caller-provided display labels at this trust boundary.
+      labelUserName: sanitizedLabel,
+      userName: sanitizedLabel,
     };
     return apiClient.post(API_ENDPOINTS.AUTH.SIGNUP, requestPayload, {
       timeout: 120000,
@@ -93,10 +102,11 @@ export const authService = {
   // Login: POST /api/v1/auth/login
   // Configured with 120s timeout to tolerate Java backend Render cold-start delays
   async login(payload: LoginPayload): Promise<ApiResponse<AuthResponseData>> {
+    const validatedPayload = loginSchema.parse(payload);
     // Supersede any older refresh/login without clearing a still-valid session.
     // A logout or newer login will advance the epoch again and reject this response.
     const sessionEpoch = tokenStorage.claimSessionOwnership();
-    const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload, {
+    const response: ApiResponse<AuthResponseData> = await apiClient.post(API_ENDPOINTS.AUTH.LOGIN, validatedPayload, {
       timeout: 120000,
       authPolicy: 'public',
     });
@@ -147,7 +157,8 @@ export const authService = {
 
   // Generate Password Reset OTP: POST /api/v1/auth/generatePasswordResetOtp
   async generatePasswordResetOtp(email: string): Promise<ApiResponse<unknown>> {
-    return apiClient.post(API_ENDPOINTS.AUTH.GENERATE_PASSWORD_RESET_OTP, { email }, {
+    const validatedPayload = forgotPasswordStep1Schema.parse({ email });
+    return apiClient.post(API_ENDPOINTS.AUTH.GENERATE_PASSWORD_RESET_OTP, validatedPayload, {
       timeout: 60000,
       authPolicy: 'public',
     });
@@ -155,7 +166,8 @@ export const authService = {
 
   // Verify OTP and Reset Password: POST /api/v1/auth/verifyPasswordResetOtp
   async verifyPasswordResetOtp(payload: VerifyOtpPayload): Promise<ApiResponse<unknown>> {
-    return apiClient.post(API_ENDPOINTS.AUTH.VERIFY_PASSWORD_RESET_OTP, payload, {
+    const validatedPayload = verifyPasswordResetOtpPayloadSchema.parse(payload);
+    return apiClient.post(API_ENDPOINTS.AUTH.VERIFY_PASSWORD_RESET_OTP, validatedPayload, {
       timeout: 60000,
       authPolicy: 'public',
     });

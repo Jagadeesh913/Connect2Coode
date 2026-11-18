@@ -379,6 +379,7 @@ export const companyService = {
           level: null,
           companies,
           topic: null,
+          questionPlatform: null,
           searchText,
           pageRequest: { pageNumber, pageSize, sortBy: 'id', sortDirection: 'ASC' },
         }, signal);
@@ -451,6 +452,7 @@ export const companyService = {
       level: filters.difficulty?.length ? filters.difficulty : null,
       companies: [companyId],
       topic: null,
+      questionPlatform: null,
       searchText: filters.searchText?.trim() || null,
       pageRequest: {
         pageNumber,

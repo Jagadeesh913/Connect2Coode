@@ -217,6 +217,7 @@ export const AdminDsaSheets: React.FC = () => {
         level: null,
         companies: null,
         topic: null,
+        questionPlatform: null,
         searchText: query.trim() || null,
         pageRequest: { pageNumber: 0, pageSize: 50, sortBy: 'id', sortDirection: 'ASC' },
       }, controller.signal);

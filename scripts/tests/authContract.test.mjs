@@ -84,7 +84,7 @@ it('forces public signup to USER even when an untyped caller supplies another ro
       return { statusCode: 200, message: 'Created', data: {} };
     };
     await authService.signUp({
-      firstName: 'A',
+      firstName: 'Alex',
       lastName: 'User',
       email: 'a.user@example.test',
       password: 'example-password',

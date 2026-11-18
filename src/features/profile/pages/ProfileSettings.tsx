@@ -59,6 +59,9 @@ const toDateKey = (date: Date): string => [
   String(date.getDate()).padStart(2, '0'),
 ].join('-');
 
+// Keep the weekday rail aligned with Date#getDay(), which starts the calendar on Sunday.
+const ACTIVITY_WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 const buildActivityCells = (
   attempts: Array<{ submittedDate?: string }>,
   visibleMonth: Date
@@ -860,15 +863,11 @@ const UserProfilePage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="mt-5 flex gap-3">
-                    <div className="hidden w-7 shrink-0 grid-rows-7 gap-1.5 text-[9px] font-semibold text-slate-400 sm:grid" aria-hidden="true">
-                      <span />
-                      <span className="self-center">Mon</span>
-                      <span />
-                      <span className="self-center">Wed</span>
-                      <span />
-                      <span className="self-center">Fri</span>
-                      <span />
+                  <div className="mt-5 flex gap-2.5 sm:gap-3">
+                    <div className="grid w-8 shrink-0 grid-rows-7 gap-1.5 text-right text-[9px] font-semibold leading-5 text-slate-400 sm:w-9 sm:text-[10px] dark:text-slate-500" aria-hidden="true">
+                      {ACTIVITY_WEEKDAY_LABELS.map((day) => (
+                        <span key={day} className="h-5 whitespace-nowrap">{day}</span>
+                      ))}
                     </div>
 
                     <div

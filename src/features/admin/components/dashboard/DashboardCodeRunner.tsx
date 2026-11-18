@@ -215,6 +215,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
           level: null,
           companies: null,
           topic: null,
+          questionPlatform: null,
           searchText: null,
           pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
         },
@@ -272,6 +273,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         level: null,
         companies: null,
         topic: null,
+        questionPlatform: null,
         searchText: questionPageSearch,
         pageRequest: { pageNumber: nextPage, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
@@ -422,6 +424,7 @@ export const DashboardCodeRunner: React.FC<DashboardCodeRunnerProps> = ({ onQues
         level: null,
         companies: null,
         topic: null,
+        questionPlatform: null,
         searchText: searchFilter.trim(),
         pageRequest: { pageNumber: 0, pageSize: 10, sortBy: 'id', sortDirection: 'ASC' },
       });
